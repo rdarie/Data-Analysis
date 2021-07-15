@@ -1,7 +1,35 @@
 
 import dataAnalysis.custom_transformers.tdr as tdr
 
-
+addHistoryTerms = [
+    {
+        'nb': 5,
+        'dt': None,
+        'historyLen': 250e-3,
+        'b': 0.001, 'useOrtho': False,
+        'normalize': True, 'groupBy': 'trialUID',
+        'zflag': False, 'logBasis': False,
+        'causalShift': True, 'causalFill': True,
+        'addInputToOutput': False},
+    {
+        'nb': 5,
+        'dt': None,
+        'historyLen': 250e-3,
+        'b': 0.001, 'useOrtho': False,
+        'normalize': True, 'groupBy': 'trialUID',
+        'zflag': False, 'logBasis': True,
+        'causalShift': True, 'causalFill': True,
+        'addInputToOutput': False},
+    {
+        'nb': 10,
+        'dt': None,
+        'historyLen': 500e-3,
+        'b': 0.001, 'useOrtho': False,
+        'normalize': True, 'groupBy': 'trialUID',
+        'zflag': False, 'logBasis': False,
+        'causalShift': True, 'causalFill': True,
+        'addInputToOutput': False},
+    ]
 '''lOfDesignFormulas = [
     'velocity + electrode:(rcb(amplitude, **hto0) + electrode:rcb(amplitude * RateInHz, **hto0))',
     'velocity + velocity:electrode:(rcb(amplitude, **hto0) + velocity:electrode:rcb(amplitude * RateInHz, **hto0))',
@@ -74,47 +102,46 @@ def abv(x):
 def absWrap(x):
     return('abv({})'.format(x))
 
-laggedModels = {
-    'v': vStr(genRcbWrap('hto0')), 'a': aStr(genRcbWrap('hto0')),
-    'r': rStr(genRcbWrap('hto0')),
-    'va': vaStr(genRcbWrap('hto0')), 'ar': arStr(genRcbWrap('hto0')),
-    'vr': vrStr(genRcbWrap('hto0')),
-    'var': varStr(genRcbWrap('hto0'))
-    }
-
-'''lOfDesignFormulas = [
-    '{v} + {ar} + {var}'.format(**laggedModels),
-    '{v} + {a} + {va}'.format(**laggedModels),
-    '{v} + {ar}'.format(**laggedModels),
-    '{v} + {a}'.format(**laggedModels),
-    '{v}'.format(**laggedModels),
-    '{ar}'.format(**laggedModels),
-    '{a}'.format(**laggedModels),
-    '{v} + {a} + {r} + {va} + {ar} + {vr} + {var}'.format(**laggedModels),
-    '{v} + {a} + {r}'.format(**laggedModels),
-    ]'''
-lOfDesignFormulas = [
-    '{v} + {a} + {r} + {va} + {ar} + {vr} + {var} - 1'.format(**laggedModels),
-    '{v} + {a} + {r} - 1'.format(**laggedModels),
-    '{a} + {r} - 1'.format(**laggedModels),
-    '{v} - 1'.format(**laggedModels),
+lOfDesignFormulas = []
+sourceTermDict = {}
+designIsLinear = {}
+for lagSpecIdx in range(len(addHistoryTerms)):
+    lagSpec = 'hto{}'.format(lagSpecIdx)
+    wrapperFun = genRcbWrap(lagSpec)
+    for source in ['v']:
+        sourceTermDict[wrapperFun(source)] = source
+    for source in ['a', 'r', 'a*r', 'v*r', 'v*a', 'v*a*r']:
+        sourceTermDict['e:'+wrapperFun(source)] = source
+    #
+    laggedModels = {
+        'v': vStr(genRcbWrap(lagSpec)), 'a': aStr(genRcbWrap(lagSpec)),
+        'r': rStr(genRcbWrap(lagSpec)),
+        'va': vaStr(genRcbWrap(lagSpec)), 'ar': arStr(genRcbWrap(lagSpec)),
+        'vr': vrStr(genRcbWrap(lagSpec)),
+        'var': varStr(genRcbWrap(lagSpec))
+        }
+    theseFormulas = [
+        # '{v} + {a} + {r} + {va} + {ar} + {vr} + {var} - 1'.format(**laggedModels),
+        '{v} + {a} + {r} - 1'.format(**laggedModels),
+        '{a} + {r} - 1'.format(**laggedModels),
+        '{v} - 1'.format(**laggedModels),
+        ]
+    designIsLinear.update({
+        theseFormulas[0]: True,
+        theseFormulas[1]: True,
+        theseFormulas[1]: True,
+        })
+    lOfDesignFormulas += theseFormulas
+#
+lOfHistTemplates = [
+    'rcb({}, **hto0)', 'rcb({}, **hto1)', 'rcb({}, **hto2)'
+    ]
+lOfEnsembleTemplates = [
+    ('rcb({}, **hto0)', 'rcb({}, **hto0)'),
+    ('rcb({}, **hto1)', 'rcb({}, **hto1)'),
     ]
 
-lOfEnsembleTemplates = ['rcb({}, **hto0)']
-
-lOfSelfTemplates = ['rcb({}, **hto0)']
-
-addHistoryTerms = [
-    {
-        'nb': 5,
-        'dt': None,
-        'historyLen': 200e-3,
-        'b': 0.001, 'useOrtho': True,
-        'normalize': True, 'groupBy': 'trialUID',
-        'zflag': False, 'logBasis': False,
-        'addInputToOutput': False},
-    ]
-
+burnInPeriod = 500e-3
 def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
     hTDict['dt'] = binInterval
@@ -152,5 +179,5 @@ modelsToTest = [
         {
             'testDesign': lOfDesignFormulas[0],
             'refDesign': lOfDesignFormulas[1],
-            'captionStr': 'partial R2 of allowing interactions between regression terms, vs assuming their independence'
+            'captionStr': 'partial R2 of adding a term for velocity'
         },]

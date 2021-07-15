@@ -522,14 +522,14 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 10e-3,
+            'forceBinInterval': 5e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -549,14 +549,14 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 10e-3,
+            'forceBinInterval': 5e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -570,20 +570,20 @@ def parseAnalysisOptions(
                 'winStop': 0.
             }
         },
-        # perimovement, any stim
+        # stimOnE5
         'c': {
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 10e-3,
+            'forceBinInterval': 5e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -597,7 +597,7 @@ def parseAnalysisOptions(
                 'winStop': 0.
             }
         },
-        # perimovement, any stim
+        # perimovement, any stim, for regression
         'd': {
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
@@ -622,6 +622,33 @@ def parseAnalysisOptions(
                 'alignQuery': None,
                 'winStart': -800e-3,
                 'winStop': -200.
+            }
+        },
+        # perimovement, any stim, for regression
+        'ra': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 5e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=3,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.6, # start 0.6 before whatever the query was
+                'winStop': 1. # stop 1 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': -1.,
+                'winStop': -.6
             }
         },
         # perimovement onset (or peristim onset if stim only) for RAUC
@@ -652,6 +679,10 @@ def parseAnalysisOptions(
             }
         }
     }
+    #
+    iteratorOpts['cs'] = iteratorOpts['c'].copy()
+    iteratorOpts['cm'] = iteratorOpts['c'].copy()
+    #
     if 'expIteratorOpts' in expOpts:
         for key in iteratorOpts.keys():
             if key in expOpts['expIteratorOpts']:

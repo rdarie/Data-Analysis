@@ -28,6 +28,7 @@ from matplotlib.colors import LogNorm, Normalize
 from matplotlib.ticker import MaxNLocator
 import seaborn as sns
 import os, sys
+from sklearn.pipeline import make_pipeline, Pipeline
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -40,6 +41,7 @@ import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
+from sklearn.covariance import EmpiricalCovariance
 from sklearn.metrics import explained_variance_score
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
@@ -52,6 +54,8 @@ from docopt import docopt
 from numpy.random import default_rng
 from itertools import product
 from scipy import stats
+import umap
+import umap.plot
 rng = default_rng()
 idxSl = pd.IndexSlice
 sns.set(
@@ -95,9 +99,21 @@ def weightsCovariance(est):
 def KL(
         refEstimator=None, testEstimator=None,
         recenter=False, includeNoiseVariance=True):
+    # pdb.set_trace()
+    if isinstance(refEstimator, Pipeline):
+        refEstimator = refEstimator.named_steps['dim_red']
+    if isinstance(testEstimator, Pipeline):
+        testEstimator = testEstimator.named_steps['dim_red']
+    #
     if includeNoiseVariance:
-        S0 = refEstimator.get_covariance()
-        S1 = testEstimator.get_covariance()
+        if isinstance(refEstimator, EmpiricalCovariance):
+            S0 = refEstimator.covariance_
+        else:
+            S0 = refEstimator.get_covariance()
+        if isinstance(testEstimator, EmpiricalCovariance):
+            S1 = testEstimator.covariance_
+        else:
+            S1 = testEstimator.get_covariance()
     else:
         S0 = weightsCovariance(refEstimator)
         # assert ((S0 + np.eye(S0.shape[0]) * refEstimator.noise_variance_) == refEstimator.get_covariance())
@@ -107,8 +123,14 @@ def KL(
         u0 = np.zeros(refEstimator.mean_.shape)
         u1 = np.zeros(testEstimator.mean_.shape)
     else:
-        u0 = refEstimator.mean_
-        u1 = testEstimator.mean_
+        if isinstance(refEstimator, EmpiricalCovariance):
+            u0 = refEstimator.location_
+        else:
+            u0 = refEstimator.mean_
+        if isinstance(testEstimator, EmpiricalCovariance):
+            u1 = testEstimator.location_
+        else:
+            u1 = testEstimator.mean_
     #
     S1inv = np.linalg.inv(S1)
     # np.matmul(S1inv, S0)
@@ -184,23 +206,54 @@ for iteratorSuffix in listOfIteratorSuffixes:
         )
     #
     with pd.HDFStore(estimatorPath, 'r') as store:
-        covMatDict[iteratorSuffix] = pd.read_hdf(store, 'cv_covariance_matrices')
-        eVSDict[iteratorSuffix] = pd.read_hdf(store, 'full_explained_variance')
-        estimatorsDict[iteratorSuffix] = pd.read_hdf(store, 'full_estimators')
+        if 'cv_covariance_matrices' in store:
+            covMatDict[iteratorSuffix] = pd.read_hdf(store, 'cv_covariance_matrices')
+        # covMatDict[iteratorSuffix].index.names == ['freqBandName', 'fold', 'feature']
+        # covMatDict[iteratorSuffix].columns.name == 'feature'
+        if 'full_explained_variance' in store:
+            eVSDict[iteratorSuffix] = pd.read_hdf(store, 'full_explained_variance')
+        if 'full_estimators' in store:
+            estimatorsDict[iteratorSuffix] = pd.read_hdf(store, 'full_estimators')
+        elif 'cv_estimators' in store:
+            estimatorsDict[iteratorSuffix] = pd.read_hdf(store, 'cv_estimators')
+            # estimatorsDict[iteratorSuffix].index.names == ['freqBandName', 'fold']
+            # Series
+    # pdb.set_trace()
 covMatDF = pd.concat(covMatDict, names=['iterator'])
-eVSDF = pd.concat(eVSDict, names=['iterator'])
+if any(eVSDict):
+    eVSDF = pd.concat(eVSDict, names=['iterator'])
+else:
+    eVSDF = None
 estimatorsSrs = pd.concat(estimatorsDict, names=['iterator'])
 #
 del covMatDict, eVSDict, estimatorsDict
 #
 klDict = {}
+projectedDict = {}
 for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
     klDF = pd.DataFrame(np.nan, index=estimatorGroup.index, columns=estimatorGroup.index)
     for refIdx, testIdx in product(estimatorGroup.index, estimatorGroup.index):
         klDF.loc[refIdx, testIdx] = KL(
             estimatorGroup.loc[refIdx], estimatorGroup.loc[testIdx])
     klDict[freqBandName] = klDF.copy()
-#
+    uMapper = umap.UMAP(metric='precomputed')
+    uMapper.fit(klDF)
+    projectedDict[freqBandName] = pd.DataFrame(
+        uMapper.transform(klDF), index=klDF.index, columns=['umap{}'.format(fid) for fid in range(2)])
+    projectedDict[freqBandName].columns.name = 'feature'
+# pdb.set_trace()
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_KLDiv_comparison_2D.pdf'.format(
+        fullEstimatorName))
+with PdfPages(pdfPath) as pdf:
+    for freqBandName, umapDF in projectedDict.items():
+        g = sns.relplot(x='umap0', y='umap1', kind='scatter', hue='iterator', data=umapDF.reset_index())
+        g.suptitle(freqBandName)
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
 pdfPath = os.path.join(
     figureOutputFolder, '{}_KLDiv_comparison.pdf'.format(
         fullEstimatorName))
@@ -216,21 +269,22 @@ with PdfPages(pdfPath) as pdf:
             plt.show()
         else:
             plt.close()
-pdfPath = os.path.join(
-    figureOutputFolder, '{}_explained_variance_comparison.pdf'.format(
-        fullEstimatorName))
-with PdfPages(pdfPath) as pdf:
-    for name, group in eVSDF.groupby('freqBandName'):
-        plotDF = group.xs('test', level='trialType').to_frame(name='signal').reset_index()
-        g = sns.relplot(
-            data=plotDF, x='component', hue='iterator',
-            y='signal', kind='line', alpha=0.5, lw=0.5, errorbar='se')
-        g.fig.set_size_inches((12, 8))
-        g.fig.suptitle('{}'.format(name))
-        g.resize_legend(adjust_subtitles=True)
-        g.tight_layout(pad=.3)
-        pdf.savefig(bbox_inches='tight')
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
+if eVSDF is not None:
+    pdfPath = os.path.join(
+        figureOutputFolder, '{}_explained_variance_comparison.pdf'.format(
+            fullEstimatorName))
+    with PdfPages(pdfPath) as pdf:
+        for name, group in eVSDF.groupby('freqBandName'):
+            plotDF = group.xs('test', level='trialType').to_frame(name='signal').reset_index()
+            g = sns.relplot(
+                data=plotDF, x='component', hue='iterator',
+                y='signal', kind='line', alpha=0.5, lw=0.5, errorbar='se')
+            g.fig.set_size_inches((12, 8))
+            g.fig.suptitle('{}'.format(name))
+            g.resize_legend(adjust_subtitles=True)
+            g.tight_layout(pad=.3)
+            pdf.savefig(bbox_inches='tight')
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()

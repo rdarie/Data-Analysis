@@ -24,8 +24,10 @@
 
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
+# source ./shellScripts/calc_aligned_stim_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+#
 TARGET="pedalState"
 
 # ITERATOR="a"
@@ -34,11 +36,14 @@ TARGET="pedalState"
 # ITERATOR="b"
 # ALIGNQUERYTERM="startingNoStim"
 #
-# ITERATOR="c"
-# ALIGNQUERYTERM="starting"
-ITERATOR="d"
+# ITERATOR="cs"
+# ALIGNQUERYTERM="stimOnE5"
+# ITERATOR="cm"
+# ALIGNQUERYTERM="startingE5"
+
+ITERATOR="ra"
 ALIGNQUERYTERM="starting"
-#
+
 # ITERATOR="e"
 # ALIGNQUERYTERM="startingNoStim"
 #####

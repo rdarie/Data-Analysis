@@ -7,14 +7,14 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=59G
+#SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J qa_motion_2021_01_28
+#SBATCH -J qa_motion_2021_01_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_28.out
-#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_28.out
+#SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_27.out
+#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,7 +29,7 @@ ANALYSISFOLDER="--analysisName=hiRes"
 UNITQUERY="--unitQuery=lfp"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
 #
-# python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
+python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
 # python -u ./calcTrialOutliersPCA.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
 
 # calculate spike stats, once outliers do not affect the calculation
@@ -42,4 +42,4 @@ BLOCKSELECTOR="--blockIdx=2 --processAll"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
 UNITQUERY="--unitQuery=lfp"
 #
-python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --saveResults
+# python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --saveResults

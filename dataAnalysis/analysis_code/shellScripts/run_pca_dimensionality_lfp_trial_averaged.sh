@@ -6,16 +6,16 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --ntasks=24
-#SBATCH --ntasks-per-core=24
-#SBATCH --mem-per-cpu=32G
+#SBATCH --ntasks=8
+#SBATCH --ntasks-per-core=8
+#SBATCH --mem-per-cpu=96G
 
 # Specify a job name:
-#SBATCH -J pca_dimen_motion_lfp_c
+#SBATCH -J pca_dimen_motion_lfp_ra
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_motion_lfp_c.out
-#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_motion_lfp_c.out
+#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_motion_lfp_ra.out
+#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_motion_lfp_ra.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -34,34 +34,39 @@ TARGET="lfp_CAR_spectral"
 # ESTIMATOR="fa"
 ESTIMATOR="pca"
 #
+#  iterators=(a b cs cm)
+#  for ITER in "${iterators[@]}"
+#  do
+#    python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+#    python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+#    python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+#  done
+#
+#  python -u './compareSignalCovarianceMatrices.py' --estimatorName="mahal" --iteratorSuffixList="a, b, cm, cs" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+
+##################################################
 # ITERATOR="a"
 # ALIGNQUERYTERM="outbound"
-##
+##################################################
 # ITERATOR="b"
 # ALIGNQUERYTERM="startingNoStim"
-##
+##################################################
 # ITERATOR="c"
 # ALIGNQUERYTERM="starting"
-#
-ITERATOR="d"
+##################################################
+ITERATOR="ra"
 ALIGNQUERYTERM="starting"
-##
+##################################################
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 #####
 # python -u './testSignalNormality.py' --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-
-
-ESTIMATOR="pca"
-# python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
-# python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-
-ESTIMATOR="pca_ta"
+TARGET="lfp_CAR"
+ESTIMATOR="fa_ta"
 python -u './calcGridSearchSignalDimensionality.py' --averageByTrial --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
 python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 
-# python -u './compareSignalCovarianceMatrices.py' --estimatorName="${ESTIMATOR}" --iteratorSuffixList="a, b" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-##
-# TARGET="lfp_CAR_spectral_fa"
 TARGET="lfp_CAR_spectral"
-# python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
+ESTIMATOR="fa_ta"
+python -u './calcGridSearchSignalDimensionality.py' --averageByTrial --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting

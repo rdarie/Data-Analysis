@@ -178,10 +178,14 @@ if theseIteratorOpts['nCovariateBasisTerms'] > 1:
 if theseIteratorOpts['forceBinInterval'] is not None:
     alignedAsigsKWargs['decimate'] = int(theseIteratorOpts['forceBinInterval'] / binOpts['binInterval'])
     alignedAsigsKWargs['rollingWindow'] = alignedAsigsKWargs['decimate']
+    binInterval = theseIteratorOpts['forceBinInterval']
+else:
+    binInterval = binOpts['binInterval']
 #
 # nSplits = theseIteratorOpts['nSplits']
 listOfIterators = []
 listOfDataFrames = []
+# trackWinMin, trackWinMax = -np.inf, np.inf
 if (not arguments['loadFromFrames']):
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
@@ -244,6 +248,10 @@ if (not arguments['loadFromFrames']):
             #
             colRenamer = {fN: fN.replace('#0', '') for fN in dataDF.columns.get_level_values('feature')}
             dataDF.rename(columns=colRenamer, level='feature', inplace=True)
+        #  tBins = dataDF.index.get_level_values('bin')
+        #  thisWinMin, thisWinMax = tBins.min(), tBins.max()
+        #  trackWinMin = max(trackWinMin, thisWinMin)
+        #  trackWinMax = min(trackWinMax, thisWinMax + binInterval)
         listOfDataFrames.append(dataDF)
     if arguments['lazy']:
         dataReader.file.close()
@@ -253,6 +261,7 @@ else:    # loading frames
             experimentName: [blockIdx]}
     else:
         experimentsToAssemble = theseIteratorOpts['experimentsToAssemble']
+        print(experimentsToAssemble)
     currBlockNum = 0
     for expName, lOfBlocks in experimentsToAssemble.items():
         thisScratchFolder = os.path.join(scratchPath, expName)
@@ -338,9 +347,10 @@ else:
         controlProportionMask = None
     # reject bins where there aren't enough observations to average
     minBinMask = pd.Series(True, index=exportDF.index)
+    # pdb.set_trace()
     if theseIteratorOpts['minBinCount']:
         for stimCnd, stimGrp in exportDF.groupby(stimulusConditionNames):
-            binCount = stimGrp.groupby('bin').count().iloc[:, 0]
+            binCount = stimGrp.fillna(0).groupby('bin').count().iloc[:, 0]
             # which bins need to be rejected?
             binsTooFew = binCount.index[binCount < theseIteratorOpts['minBinCount']]
             binsTooFewMask = stimGrp.index.get_level_values('bin').isin(binsTooFew)
@@ -357,7 +367,9 @@ else:
     listOfIterators.append(cvIterator)
 ###
 # import matplotlib.pyplot as plt; cvIterator.plot_schema(); plt.show()
+
 exportAAKWA = alignedAsigsKWargs.copy()
+# exportAAKWA['windowSize'] = [trackWinMin, trackWinMax]
 exportAAKWA.pop('unitNames', None)
 exportAAKWA.pop('unitQuery', None)
 iteratorMetadata = {

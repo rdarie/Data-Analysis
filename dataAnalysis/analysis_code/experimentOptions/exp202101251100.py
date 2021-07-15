@@ -165,7 +165,7 @@ def getExpOpts():
     ############################################################
     outlierDetectOptions = dict(
         targetEpochSize=100e-3,
-        windowSize=(-.2, 1.2),
+        windowSize=(-.6, 1.),
         twoTailed=True,
         )
     #
@@ -214,5 +214,12 @@ def getExpOpts():
                     'nameSuffix': 'mean_subtracted'}
                 for i in [1, 2, 3]]
         }
+    }
+    expIteratorOpts = {
+        'ra': {
+            'experimentsToAssemble': {
+                '202101251100-Rupert': [1, 2, 3],
+            }
+        },
     }
     return locals()

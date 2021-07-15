@@ -304,24 +304,12 @@ if __name__ == '__main__':
         if joblibBackendArgs['backend'] == 'dask':
             daskClient = Client()
     #
-    cvScoresDict0 = {}
-    gridSearcherDict0 = {}
-    gsScoresDict0 = {}
-    designDict0 = {}
-    #
-    figureOutputPath = os.path.join(
-        figureOutputFolder,
-        '{}_signals.pdf'.format(fullEstimatorName))
-
     # prep rhs dataframes
     rhsPipelineAveragerDict = {}
     rhGroupDict = {}
     #
-    ensDesignDict = {}
-    ensDesignInfoDict = {}
-    #
-    selfDesignDict = {}
-    selfDesignInfoDict = {}
+    histDesignDict = {}
+    histDesignInfoDict = {}
     for rhsMaskIdx in range(rhsMasks.shape[0]):
         #
         print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
@@ -352,52 +340,71 @@ if __name__ == '__main__':
         #         # if maskParams['lag'] not in [0]:
         #         continue
         ####
-        for ensTemplate in lOfEnsembleTemplates:
-            if ensTemplate is None:
-                continue
-            ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
-            ensFormula += ' - 1'
-            print(ensFormula)
-            ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
-            exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
-            ensPt.fit(exampleRhGroup)
-            ensDesignMatrix = ensPt.transform(rhGroup)
-            ensDesignInfo = ensDesignMatrix.design_info
-            ensDesignDict[(rhsMaskIdx, ensTemplate)] = (
-                pd.DataFrame(
-                    ensDesignMatrix,
-                    index=rhGroup.index,
-                    columns=ensDesignInfo.column_names))
-            ensDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
-        for selfTemplate in lOfSelfTemplates:
-            if selfTemplate is None:
-                continue
-            selfFormula = ' + '.join([selfTemplate.format(cN) for cN in rhGroup.columns])
-            selfFormula += ' - 1'
-            print(selfFormula)
-            selfPt = PatsyTransformer(selfFormula, eval_env=thisEnv, return_type="matrix")
-            exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
-            selfPt.fit(exampleRhGroup)
-            selfDesignMatrix = selfPt.transform(rhGroup)
-            selfDesignInfo = selfDesignMatrix.design_info
-            selfDesignDict[(rhsMaskIdx, selfTemplate)] = (
-                pd.DataFrame(
-                    selfDesignMatrix,
-                    index=rhGroup.index,
-                    columns=selfDesignInfo.column_names))
-            selfDesignInfoDict[(rhsMaskIdx, selfTemplate)] = selfDesignInfo
+        # for ensTemplate, selfTemplate in lOfEnsembleTemplates:
+        for ensTemplate in lOfHistTemplates:
+            if ensTemplate is not None:
+                ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
+                ensFormula += ' - 1'
+                print('Calculating history terms as {}'.format(ensFormula))
+                ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
+                exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+                ensPt.fit(exampleRhGroup)
+                ensDesignMatrix = ensPt.transform(rhGroup)
+                ensDesignInfo = ensDesignMatrix.design_info
+                histDesignDict[(rhsMaskIdx, ensTemplate)] = (
+                    pd.DataFrame(
+                        ensDesignMatrix,
+                        index=rhGroup.index,
+                        columns=ensDesignInfo.column_names))
+                histDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
     #
-    ensDesignDF = pd.concat(ensDesignDict, names=['rhsMaskIdx', 'ensTemplate', 'factor'], axis='columns')
-    selfDesignDF = pd.concat(selfDesignDict, names=['rhsMaskIdx', 'selfTemplate', 'factor'], axis='columns')
+    histDesignDF = pd.concat(histDesignDict, names=['rhsMaskIdx', 'ensTemplate', 'factor'], axis='columns')
+    histDesignDF.columns.name = 'factor'
+    if os.path.exists(estimatorPath):
+        os.remove(estimatorPath)
+    histDesignDF.to_hdf(estimatorPath, 'histDesignMatrix')
+    # prep lhs dataframes
+    designDict = {}
+    for lhsMaskIdx in range(lhsMasks.shape[0]):
+        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+        designFormula = lhsMask.name[lhsMasks.index.names.index('designFormula')]
+        lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+        lhGroup = lhsDF.loc[:, lhsMask]
+        lhGroup.columns = lhGroup.columns.get_level_values('feature')
+        #
+        if designFormula not in designDict:
+            print('calculating exog terms for: ')
+            print(designFormula)
+            pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
+            exampleLhGroup = lhGroup.loc[lhGroup.index.get_level_values('conditionUID') == 0, :]
+            pt.fit(exampleLhGroup)
+            designMatrix = pt.transform(lhGroup)
+            designInfo = designMatrix.design_info
+            designDF = (
+                pd.DataFrame(
+                    designMatrix,
+                    index=lhGroup.index,
+                    columns=designInfo.column_names))
+            designDF.columns.name = 'feature'
+            designDict[designFormula] = designDF
     #
+    allDesignDF = pd.concat(designDict, names=['design'])
+    allDesignDF.columns.name = 'factor'
+    allDesignDF.to_hdf(estimatorPath, 'designMatrix')
+    #
+    cvScoresDict0 = {}
+    gridSearcherDict0 = {}
+    gsScoresDict0 = {}
     for lhsMaskIdx in range(lhsMasks.shape[0]):
         lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
         lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
         lhGroup = lhsDF.loc[:, lhsMask]
-        #
         lhGroup.columns = lhGroup.columns.get_level_values('feature')
         designFormula = lhsMask.name[lhsMasks.index.names.index('designFormula')]
         #
+        designDF = designDict[designFormula]
+        exogList = [designDF]
+        '''print('calculating terms for: ')
         print(designFormula)
         pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
         exampleLhGroup = lhGroup.loc[lhGroup.index.get_level_values('conditionUID') == 0, :]
@@ -410,25 +417,13 @@ if __name__ == '__main__':
                 index=lhGroup.index,
                 columns=designInfo.column_names))
         designDF.columns.name = 'feature'
-        designDict0[(lhsMaskIdx, designFormula)] = designDF
+        designDict0[(lhsMaskIdx, designFormula)] = designDF'''
+        # add ensemble to designDF?
+        ensTemplate = lhsMaskParams['ensembleTemplate']
+        selfTemplate = lhsMaskParams['selfTemplate']
         #
         for rhsMaskIdx in range(rhsMasks.shape[0]):
             print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
-            '''rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
-            rhsMaskParams = {k: v for k, v in zip(rhsMask.index.names, rhsMask.name)}
-            rhGroup = rhsDF.loc[:, rhsMask].copy()
-            # transform to PCs
-            if workingPipelinesRhs is not None:
-                transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
-                rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
-                rhsPipelineAverager = transformPipelineRhs.named_steps['averager']
-                rhTransformedColumns = transformedRhsDF.columns[transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
-                rhGroup = pd.DataFrame(
-                    rhsPipelineMinusAverager.transform(rhGroup),
-                    index=lhGroup.index, columns=rhTransformedColumns)
-            else:
-                rhsPipelineAverager = Pipeline[('averager', tdr.DataFramePassThrough(), )]
-            rhGroup.columns = rhGroup.columns.get_level_values('feature')'''
             ####
             rhGroup = rhGroupDict[rhsMaskIdx]
             rhsPipelineAverager = rhsPipelineAveragerDict[rhsMaskIdx]
@@ -436,16 +431,13 @@ if __name__ == '__main__':
             pipelineRhs = Pipeline([('averager', rhsPipelineAverager, ), ])
             pipelineLhs = Pipeline([('averager', rhsPipelineAverager, ), ('regressor', regressorClass(**regressorKWArgs)), ])
             estimatorInstance = TransformedTargetRegressor(regressor=pipelineLhs, transformer=pipelineRhs, check_inverse=False)
-            # add ensemble to designDF?
-            ensTemplate = lhsMaskParams['ensembleTemplate']
-            selfTemplate = lhsMaskParams['selfTemplate']
             ###
             if ensTemplate is not None:
-                ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+                ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
             if selfTemplate is not None:
-                selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
-            # get selfDesignInfo
-            #
+                # selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+                selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+            ###
             gsParamsPerTarget = None
             if 'param_grid' in gridSearchKWArgs:
                 gsKWA = deepcopy(gridSearchKWArgs)
@@ -482,7 +474,7 @@ if __name__ == '__main__':
                 targetDF = rhGroup.loc[:, [targetName]]
                 # add targetDF to designDF?
                 if ensTemplate is not None:
-                    thisEnsDesign = ensDesignDF.xs(rhsMaskIdx, level='rhsMaskIdx', axis='columns').xs(ensTemplate, level='ensTemplate', axis='columns')
+                    thisEnsDesign = histDesignDict[(rhsMaskIdx, ensTemplate)]
                     ensHistList = [
                         thisEnsDesign.iloc[:, sl]
                         for key, sl in ensDesignInfo.term_name_slices.items()
@@ -491,7 +483,7 @@ if __name__ == '__main__':
                     ensHistList = []
                 #
                 if selfTemplate is not None:
-                    thisSelfDesign = selfDesignDF.xs(rhsMaskIdx, level='rhsMaskIdx', axis='columns').xs(selfTemplate, level='selfTemplate', axis='columns')
+                    thisSelfDesign = histDesignDict[(rhsMaskIdx, selfTemplate)]
                     selfHistList = [
                         thisSelfDesign.iloc[:, sl]
                         for key, sl in selfDesignInfo.term_name_slices.items()
@@ -499,10 +491,10 @@ if __name__ == '__main__':
                 else:
                     selfHistList = []
                 #
-                fullDesignList = [designDF] + ensHistList + selfHistList
+                fullDesignList = exogList + ensHistList + selfHistList
                 fullDesignDF = pd.concat(fullDesignList, axis='columns')
-                if fullDesignDF.isna().any().any():
-                    pdb.set_trace()
+                # if fullDesignDF.isna().any().any():
+                #     pdb.set_trace()
                 try:
                     cvScores, gridSearcherDict1[targetName], gsScoresDict1[targetName] = tdr.gridSearchHyperparameters(
                         fullDesignDF, rhGroup.loc[:, [targetName]],
@@ -512,7 +504,7 @@ if __name__ == '__main__':
                         crossvalKWArgs=crossvalKWArgs,
                         joblibBackendArgs=joblibBackendArgs
                         )
-                except:
+                except Exception:
                     traceback.print_exc()
                     pdb.set_trace()
                 cvScoresDF = pd.DataFrame(cvScores)
@@ -520,25 +512,15 @@ if __name__ == '__main__':
                 cvScoresDF.dropna(axis='columns', inplace=True)
                 cvScoresDict1[targetName] = cvScoresDF
                 gridSearcherDict0[(lhsMaskIdx, rhsMaskIdx)] = gridSearcherDict1
-            # pdb.set_trace()
             cvScoresDict0[(lhsMaskIdx, rhsMaskIdx)] = pd.concat(cvScoresDict1, names=['target'])
             gsScoresDict0[(lhsMaskIdx, rhsMaskIdx)] = pd.concat(gsScoresDict1, names=['target'])
     #
     allCVScores = pd.concat(cvScoresDict0, names=['lhsMaskIdx', 'rhsMaskIdx'])
     allGSScores = pd.concat(gsScoresDict0, names=['lhsMaskIdx', 'rhsMaskIdx'])
     #
-    allDesignDF = pd.concat(designDict0, names=['lhsMaskIdx', 'design'])
-    allDesignDF.columns.name = 'factor'
-    #
     prf.print_memory_usage('Done fitting')
-    if os.path.exists(estimatorPath):
-        os.remove(estimatorPath)
     lastFoldIdx = cvIterator.n_splits
     print('\n\nSaving {}\n\n'.format(estimatorPath))
-    #
-    allDesignDF.to_hdf(estimatorPath, 'designMatrix')
-    selfDesignDF.to_hdf(estimatorPath, 'selfDesignMatrix')
-    ensDesignDF.to_hdf(estimatorPath, 'ensDesignMatrix')
     #
     try:
         allCVScores.loc[idxSl[:, :, :, lastFoldIdx], :].to_hdf(estimatorPath, 'work_scores_estimators')
@@ -578,17 +560,19 @@ if __name__ == '__main__':
         with PdfPages(figureOutputPath) as pdf:
             # fig, ax = plt.subplots()
             # fig.set_size_inches(12, 8)
+            trialTypeOrder = ['train', 'work', 'test', 'validation']
             g = sns.catplot(
-                data=scoresForPlot, hue='evalType',
+                data=scoresForPlot,
+                hue='evalType', hue_order=trialTypeOrder,
                 col='lhsMaskIdx', col_wrap=colWrap,
                 x='target', y='score',
                 kind='box')
             g.fig.suptitle('R^2')
-            newYLims = scoresForPlot['score'].quantile([0.25, 1 - 1e-3]).to_list()
+            # newYLims = scoresForPlot['score'].quantile([0.25, 1 - 1e-3]).to_list()
             for ax in g.axes.flat:
                 ax.set_xlabel('regression target')
                 ax.set_ylabel('R2 of ordinary least squares fit')
-                ax.set_ylim(newYLims)
+                # ax.set_ylim(newYLims)
             g.fig.tight_layout(pad=1)
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:

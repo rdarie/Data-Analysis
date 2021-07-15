@@ -295,6 +295,7 @@ if __name__ == '__main__':
             dataReader.file.close()
     else:    # loading frames
         experimentsToAssemble = loadingMeta['experimentsToAssemble'].copy()
+        print(experimentsToAssemble)
         currBlockNum = 0
         for expName, lOfBlocks in experimentsToAssemble.items():
             thisScratchFolder = os.path.join(scratchPath, expName)

@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_28
+#SBATCH -J test_train_split_motion_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_28.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_28.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_motion_27.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_motion_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -26,27 +26,21 @@
 # SLURM_ARRAY_TASK_ID=3
 source shellScripts/calc_aligned_motion_preamble.sh
 
-#  ITERATOR="--iteratorSuffix=a"
-#  ALIGNQUERYTERM="outbound"
-#  CONTROLSTATUS="--controlSet"
+# ITERATOR="--iteratorSuffix=a"
+# ALIGNQUERYTERM="outbound"
+# CONTROLSTATUS="--controlSet"
 ###
-#  ITERATOR="--iteratorSuffix=b"
-#  ALIGNQUERYTERM="startingNoStim"
-#  CONTROLSTATUS=""
-##
-# ITERATOR="--iteratorSuffix=c"
-# ALIGNQUERYTERM="starting"
+# ITERATOR="--iteratorSuffix=b"
+# ALIGNQUERYTERM="startingNoStim"
+# CONTROLSTATUS=""
+
+# ITERATOR="--iteratorSuffix=cm"
+# ALIGNQUERYTERM="startingE5"
 # CONTROLSTATUS=""
 #
-ITERATOR="--iteratorSuffix=d"
+ITERATOR="--iteratorSuffix=ra"
 ALIGNQUERYTERM="starting"
 CONTROLSTATUS=""
-#
-# used d in the aligned to stim category############
-#
-# ITERATOR="--iteratorSuffix=e"
-# ROIOPTS="--calcTimeROI --ROIWinStart=-100 --ROIWinStop=100 --timeROIAlignQuery=stopping"
-# ALIGNQUERYTERM="startingNoStim"
 
 
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"

@@ -251,7 +251,8 @@ if __name__ == '__main__':
         if arguments['averageByTrial']:
             estimatorInstance = Pipeline([
                 ('averager', tdr.DataFrameAverager(
-                    stimConditionNames=stimulusConditionNames + ['bin'], addIndexFor=stimulusConditionNames)),
+                    stimConditionNames=stimulusConditionNames + ['bin'],
+                    addIndexFor=stimulusConditionNames, burnInPeriod=500e-3)),
                 ('dim_red', estimatorClass(**estimatorKWArgs))])
         else:
             estimatorInstance = Pipeline([

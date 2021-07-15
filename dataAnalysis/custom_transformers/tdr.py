@@ -81,7 +81,8 @@ class raisedCosTransformer(object):
             normalize=False, useOrtho=True,
             groupBy='trialUID', tLabel='bin',
             zflag=False, logBasis=True,
-            addInputToOutput=False, causal=True,
+            addInputToOutput=False,
+            causalShift=True, causalFill=False,
             selectColumns=None, preprocFun=None):
         ##
         if logBasis:
@@ -94,7 +95,6 @@ class raisedCosTransformer(object):
         self.nb = nb
         self.dt = dt
         self.historyLen = historyLen
-        self.b = b
         self.zflag = zflag
         self.logBasis = logBasis
         self.normalize = normalize
@@ -104,21 +104,25 @@ class raisedCosTransformer(object):
         self.addInputToOutput = addInputToOutput
         self.selectColumns = selectColumns
         self.preprocFun = preprocFun
-        self.causal = causal
+        self.causalShift = causalShift
+        self.causalFill = causalFill
+        if not logBasis:
+            b = 0.
+        self.b = b
         self.endpoints = raisedCosBoundary(
             b=b, DT=historyLen,
-            minX=max(dt / 2, 1e-3),
-            nb=nb, nlin=nlin, invnl=invnl, causal=causal)
+            minX=0.,
+            nb=nb, nlin=nlin, invnl=invnl, causal=causalShift)
         if logBasis:
             self.ihbasisDF, self.orthobasisDF = makeLogRaisedCosBasis(
                 nb=nb, dt=dt, endpoints=self.endpoints, b=b,
-                zflag=zflag, normalize=normalize)
+                zflag=zflag, normalize=normalize, causal=causalFill)
         else:
+            self.b = b
             self.ihbasisDF, self.orthobasisDF = makeRaisedCosBasis(
-                nb=nb, dt=dt, endpoints=self.endpoints, normalize=normalize)
+                nb=nb, dt=dt, endpoints=self.endpoints, normalize=normalize, causal=causalFill)
         self.iht = np.array(self.ihbasisDF.index)
-        self.leftShiftBasis = int(((max(self.iht) - min(self.iht)) / 2 + min(self.iht)) / self.dt)
-        # self.leftShiftBasis = int(min(self.iht) / self.dt)
+        self.leftShiftBasis = int(((max(self.iht) - min(self.iht)) / 2 + min(self.iht)) / self.dt) + 1
         return
 
     def memorize_finish(self):
@@ -129,7 +133,8 @@ class raisedCosTransformer(object):
             historyLen=None, b=1e-3,
             normalize=False, useOrtho=True,
             groupBy='trialUID', tLabel='bin',
-            zflag=False, logBasis=True, causal=True, addInputToOutput=False,
+            zflag=False, logBasis=True, causalShift=True, causalFill=False,
+            addInputToOutput=False,
             selectColumns=None, preprocFun=None):
         # print('Starting to apply raised cos basis to {} (size={})'.format(vecSrs.name, vecSrs.size))
         # for line in traceback.format_stack():
@@ -151,7 +156,8 @@ class raisedCosTransformer(object):
                     sig.to_numpy(),
                     basisDF[cN].to_numpy(),
                     mode='full')
-                leftSeek = int(convResult.shape[0] / 2 - group.shape[0] / 2 - self.leftShiftBasis)
+                leftSeek = max(
+                    int(convResult.shape[0] / 2 - group.shape[0] / 2 - self.leftShiftBasis), 0)
                 rightSeek = leftSeek + group.shape[0]
                 convResult = convResult[leftSeek:rightSeek]
                 '''if group.shape[0] <= basisDF.shape[0]:
@@ -215,7 +221,6 @@ class raisedCosTransformer(object):
                 ax[3].legend()
                 fig.suptitle('{}'.format(seekIdx))
                 plt.show()'''
-                #
                 resDF.loc[group.index, resCN] = convResult
         #
         if self.selectColumns is not None:
@@ -235,7 +240,7 @@ class raisedCosTransformer(object):
         titleStr = 'raised log cos basis' if self.logBasis else 'raised cos basis'
         ax[0].set_title(titleStr)
         ax[1].plot(self.orthobasisDF)
-        ax[1].set_title('orthogonalized log cos basis')
+        ax[1].set_title('orthogonalized basis')
         ax[1].set_xlabel('Time (sec)')
         return fig, ax
 
@@ -244,9 +249,10 @@ patsyRaisedCosTransformer = stateful_transform(raisedCosTransformer)
 class DataFrameAverager(TransformerMixin, BaseEstimator):
     def __init__(
             self, stimConditionNames=None,
-            addIndexFor=None):
+            addIndexFor=None, burnInPeriod=None):
         self.stimConditionNames = stimConditionNames
         self.addIndexFor = addIndexFor
+        self.burnInPeriod = burnInPeriod
     #
     def fit(self, X, y=None):
         return self
@@ -260,6 +266,10 @@ class DataFrameAverager(TransformerMixin, BaseEstimator):
             newEntries = newIndexFrame.set_index(self.addIndexFor).index.map(lookup)
             newIndexFrame.loc[:, 'trialUID'] = newEntries.to_numpy()
             averagedX.index = pd.MultiIndex.from_frame(newIndexFrame.reset_index(drop=True))
+        if self.burnInPeriod is not None:
+            tBins = averagedX.index.get_level_values('bin')
+            burnInMask = tBins > (tBins.min() + self.burnInPeriod)
+            averagedX = averagedX.loc[burnInMask, :]
         return averagedX
 
     def inverse_transform(self, X):
@@ -508,8 +518,6 @@ def crossValidationScores(
         joblibBackendArgs=None, verbose=0):
     if verbose > 0:
         print('joblibBackendArgs = {}'.format(joblibBackendArgs))
-    if hasattr(crossvalKWArgs['cv'], 'workIterator'):
-        workEstim = clone(estimatorInstance)
     #
     if joblibBackendArgs is None:
         contextManager = contextlib.nullcontext()
@@ -518,6 +526,8 @@ def crossValidationScores(
     with contextManager:
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
+        if hasattr(crossvalKWArgs['cv'], 'workIterator'):
+            workEstim = clone(estimatorInstance)
         scores = cross_validate(
             estimatorInstance, X, y, verbose=verbose, **crossvalKWArgs)
     # train on all of the "working" samples, eval on the "validation"
@@ -785,27 +795,6 @@ def raisedCos(x, c, dc):
     return (np.cos(argCos) + 1) / 2
 
 
-'''def raisedCosBoundary(
-        b=None, DT=None, minX=None,
-        nb=None, plotting=True, nlin=None):
-    if nlin is None:
-        nlin = lambda x: np.log(x + eps)
-    # fun = lambda c0: (nb - 1) * nlin(c0 + b) + 2 * nlin(c0 + DT + b) - (nb - 1) * nlin(minX + b)
-    def fun(c0):
-        return raisedCos(
-            np.asarray([nlin(minX + b)]),
-            np.asarray([nlin(c0 + b)]),
-            np.asarray([nlin(c0 + DT + b) - nlin(c0 + b)]) / (nb - 1)
-            )[0]
-    if plotting:
-        plotC0 = np.linspace(-minX * 5, minX * 20, 1000)
-        plt.plot(plotC0, fun(plotC0))
-        plt.title('solving for cos basis')
-        plt.show()
-    result = scipy.optimize.root(fun, minX * 2).x
-    pdb.set_trace()
-    return result'''
-
 def raisedCosBoundary(
         b=None, DT=None, minX=None, causal=True,
         nb=None, plotting=True, nlin=None, invnl=None):
@@ -814,15 +803,18 @@ def raisedCosBoundary(
     if invnl is None:
         invnl = lambda x: np.exp(x) - eps
     boundsT = nlin(np.asarray([minX + b, minX + b + DT]))
+    # print('boundsT {}'.format(boundsT))
     if causal:
         spacingT = (boundsT[1] - boundsT[0]) / (nb + 3)
         endpoints = invnl(np.asarray([boundsT[0] + 2 * spacingT, boundsT[1] - 2 * spacingT]))
     else:
-        endpoints = invnl(np.asarray([boundsT[0], boundsT[1]]))
+        spacingT = (boundsT[1] - boundsT[0]) / (nb + 1)
+        endpoints = invnl(np.asarray([boundsT[0], boundsT[1] - 2 * spacingT]))
+    # print('endpoints {}'.format(endpoints))
     return endpoints
 
 def makeRaisedCosBasis(
-        nb=None, spacing=None, dt=None, endpoints=None, normalize=False):
+        nb=None, spacing=None, dt=None, endpoints=None, normalize=False, causal=False):
     """
         Make linearly stretched basis consisting of raised cosines
     """
@@ -848,16 +840,21 @@ def makeRaisedCosBasis(
     if normalize:
         for colIdx in range(ihbasis.shape[1]):
             ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+    if causal:
+        ihbasis[iht <= 0] = 0
     orthobas = scipy.linalg.orth(ihbasis)
     ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(ctrs, decimals=3))
     orthobasDF = pd.DataFrame(orthobas, index=iht, columns=np.round(ctrs, decimals=3))
+    if causal:
+        ihbDF = ihbDF.loc[iht >= 0, :]
+        orthobasDF = orthobasDF.loc[iht >= 0, :]
     return ihbDF, orthobasDF
 
 
 def makeLogRaisedCosBasis(
         nb, dt, endpoints, b=0.01,
         zflag=False, normalize=False,
-        nlin=None, invnl=None):
+        nlin=None, invnl=None, causal=False):
     """
         Make nonlinearly stretched basis consisting of raised cosines
         Inputs:  nb = # of basis vectors
@@ -903,10 +900,15 @@ def makeLogRaisedCosBasis(
     if normalize:
         for colIdx in range(ihbasis.shape[1]):
             ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+    if causal:
+        ihbasis[iht <= 0] = 0
     orthobas = scipy.linalg.orth(ihbasis)
     # orthobas, _ = scipy.linalg.qr(ihbasis)
     ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(ctrs, decimals=3))
     orthobasDF = pd.DataFrame(orthobas, index=iht, columns=np.round(ctrs, decimals=3))
+    if causal:
+        ihbDF = ihbDF.loc[iht >= 0, :]
+        orthobasDF = orthobasDF.loc[iht >= 0, :]
     #
     # negiht = np.sort(iht[iht > 0] * (-1))
     # negBDF = pd.DataFrame(0, index=negiht, columns=ihbDF.columns)

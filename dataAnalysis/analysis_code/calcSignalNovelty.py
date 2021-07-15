@@ -151,6 +151,7 @@ if __name__ == '__main__':
     outputFeatureList = []
     featureColumnFields = dataDF.columns.names
     cvScoresDict = {}
+    cvCovMatDict = {}
     lOfColumnTransformers = []
     # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
@@ -194,6 +195,14 @@ if __name__ == '__main__':
             else:
                 featureColumns.loc[idx, fcn] = maskParams[fcn]
         outputFeatureList.append(featureColumns)
+        featureNames = dataGroup.columns.get_level_values('feature')
+        for foldIdx, scoresRow in cvScoresDF.iterrows():
+            thisCovDF = pd.DataFrame(
+                scoresRow['estimator'].covariance_,
+                index=featureNames, columns=featureNames)
+            thisCovDF.columns.name = 'feature'
+            thisCovDF.index.name = 'feature'
+            cvCovMatDict[(maskParams['freqBandName'], foldIdx)] = thisCovDF
     #
     chosenEstimator = ColumnTransformer(lOfColumnTransformers)
     chosenEstimator.fit(workingDataDF)
@@ -216,9 +225,9 @@ if __name__ == '__main__':
         scoresDF['estimator'].to_hdf(estimatorPath, 'cv_estimators')
     except Exception:
         traceback.print_exc()
-    #
     jb.dump(chosenEstimator, estimatorPath.replace('.h5', '.joblib'))
-    #
+    covMatDF = pd.concat(cvCovMatDict, names=['freqBandName', 'fold'])
+    covMatDF.to_hdf(estimatorPath, 'cv_covariance_matrices')
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
         'name': estimatorName,

@@ -158,7 +158,6 @@ with open(loadingMetaPath, 'rb') as _f:
     loadingMeta = pickle.load(_f)
     iteratorOpts = loadingMeta['iteratorOpts']
 #
-
 for hIdx, histOpts in enumerate(addHistoryTerms):
     locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
 thisEnv = patsy.EvalEnvironment.capture()
@@ -226,11 +225,7 @@ with pd.HDFStore(estimatorPath) as store:
 # prep rhs dataframes
 rhsPipelineAveragerDict = {}
 rhGroupDict = {}
-selfDesignInfoDict = {}
-selfImpulseDict = {}
-ensDesignInfoDict = {}
-ensImpulseDict = {}
-selfImpulseDict = {}
+histDesignInfoDict = {}
 for rhsMaskIdx in range(rhsMasks.shape[0]):
     #
     print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
@@ -260,30 +255,29 @@ for rhsMaskIdx in range(rhsMasks.shape[0]):
     #         # if maskParams['lag'] not in [0]:
     #         continue
     ####
-    for ensTemplate in lOfEnsembleTemplates:
-        if ensTemplate is None:
-            continue
-        ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
-        ensFormula += ' - 1'
-        print('Evaluating ensemble history {}'.format(ensFormula))
-        ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
-        exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
-        ensDesignMatrix = ensPt.fit_transform(exampleRhGroup)
-        ensDesignInfo = ensDesignMatrix.design_info
-        print(ensDesignInfo.term_names)
-        print('\n')
-        ensDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
-    for selfTemplate in lOfSelfTemplates:
-        if selfTemplate is None:
-            continue
-        selfFormula = ' + '.join([selfTemplate.format(cN) for cN in rhGroup.columns])
-        selfFormula += ' - 1'
-        print('Evaluating self history {}'.format(selfFormula))
-        selfPt = PatsyTransformer(selfFormula, eval_env=thisEnv, return_type="matrix")
-        exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
-        selfDesignMatrix = selfPt.fit_transform(exampleRhGroup)
-        selfDesignInfo = selfDesignMatrix.design_info
-        selfDesignInfoDict[(rhsMaskIdx, selfTemplate)] = selfDesignInfo
+    # for ensTemplate, selfTemplate in lOfEnsembleTemplates:
+    for ensTemplate in lOfHistTemplates:
+        if ensTemplate is not None:
+            ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
+            ensFormula += ' - 1'
+            print('Evaluating ensemble history {}'.format(ensFormula))
+            ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
+            exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+            ensDesignMatrix = ensPt.fit_transform(exampleRhGroup)
+            ensDesignInfo = ensDesignMatrix.design_info
+            print(ensDesignInfo.term_names)
+            print('\n')
+            histDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
+        '''
+        if selfTemplate is not None:
+            selfFormula = ' + '.join([selfTemplate.format(cN) for cN in rhGroup.columns])
+            selfFormula += ' - 1'
+            print('Evaluating self history {}'.format(selfFormula))
+            selfPt = PatsyTransformer(selfFormula, eval_env=thisEnv, return_type="matrix")
+            exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+            selfDesignMatrix = selfPt.fit_transform(exampleRhGroup)
+            selfDesignInfo = selfDesignMatrix.design_info
+            selfDesignInfoDict[(rhsMaskIdx, selfTemplate)] = selfDesignInfo'''
 #
 designInfoDict0 = {}
 impulseDict = {}
@@ -315,13 +309,20 @@ probeTermName = 'rcb({}, **hto0)'.format(rawProbeTermName)
 
 iRGroupNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'fold', 'electrode']
 eps = np.spacing(1)
+eigenValueDict = {}
+ADict = {}
+BDict = {}
+CDict = {}
+DDict = {}
+maxStateSpaceNDim = 200
 for name, iRGroup0 in iRPerTerm.groupby(iRGroupNames):
+    print(name)
     iRWorkingCopy = iRGroup0.copy()
     ##
     iRWorkingCopy.dropna(inplace=True, axis='columns')
     ##
     lhsMaskIdx, designFormula, rhsMaskIdx, fold, electrode = name
-    if lhsMaskIdx != 1:
+    if not designIsLinear[designFormula]:
         continue
     lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
     lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
@@ -330,20 +331,20 @@ for name, iRGroup0 in iRPerTerm.groupby(iRGroupNames):
     termNames = designInfo.term_names
     signalNames = iRWorkingCopy.index.get_level_values('target').unique().to_list()
     ensTemplate = lhsMaskParams['ensembleTemplate']
-    if ensTemplate is not None:
-        ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
-    if selfTemplate is not None:
-        selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
     selfTemplate = lhsMaskParams['selfTemplate']
+    if ensTemplate is not None:
+        ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+    if selfTemplate is not None:
+        selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
     iRWorkingCopy.rename(columns={ensTemplate.format(key): key for key in signalNames}, inplace=True)
     trialInfo = iRWorkingCopy.index.to_frame().reset_index(drop=True)
     ##
     #######################
-    # for rowIdx, row in iRWorkingCopy.iterrows():
-    #     iRWorkingCopy.loc[rowIdx, :] = rowIdx[-3]
+    # Apply Mittnik 1988
     N = pd.concat([iRWorkingCopy.reset_index(drop=True), trialInfo.loc[:, ['bin', 'target']]], axis='columns')
     N.columns.name = 'feature'
-    kernelMask = (N['bin'] >= 0) & (N['bin'] <= histOpts['historyLen'])
+    # kernelMask = (N['bin'] >= 0) & (N['bin'] <= histOpts['historyLen'])
+    kernelMask = (N['bin'] >= 0)
     N = N.loc[kernelMask, ['bin', 'target'] + signalNames + termNames]
     N.loc[N['bin'] == 0, signalNames] = 0. # enforce that y[t] = F(y[t-p]), p positive
     tBins = N['bin'].unique()
@@ -354,21 +355,63 @@ for name, iRGroup0 in iRPerTerm.groupby(iRGroupNames):
     H = pd.concat([N.shift(-nRegressors * it, axis='columns').fillna(0) for it in range(tBins.size)])
     LH = H.shift(-nRegressors, axis='columns').fillna(0)
     u, s, vh = np.linalg.svd(H, full_matrices=False)
+    stateSpaceNDim = min(maxStateSpaceNDim, u.shape[0])
+    u = u[:, :stateSpaceNDim]
+    s = s[:stateSpaceNDim]
+    vh = vh[:stateSpaceNDim, :]
     O = u @ np.diag(np.sqrt(s))
     R = np.diag(np.sqrt(s)) @ vh
     #
     D = N.xs(0, level='bin', axis='columns').loc[:, termNames]
+    DDF = pd.DataFrame(D, index=signalNames, columns=termNames)
+    DDict[name] = DDF
     C = pd.DataFrame(O[:len(signalNames), :], index=signalNames)
+    CDict[name] = C
+    #
     K = pd.DataFrame(R[:, :len(signalNames)], columns=signalNames)
     G = pd.DataFrame(R[:, len(signalNames):len(signalNames) + len(termNames)], columns=termNames)
     F = np.diag(np.sqrt(s) ** -1) @ u.T @ LH @ vh.T @ np.diag(np.sqrt(s) ** -1)
     A = F + K@C
+    ADF = pd.DataFrame(A)
+    ADF.columns.name = 'state'
+    ADF.index.name = 'state'
+    ADict[name] = ADF
     B = G + K@D
+    BDF = pd.DataFrame(B, columns=termNames)
+    BDF.index.name = 'state'
+    BDict[name] = BDF
     #
-    sS = ctrl.ss(A, B, C, D, dt=binInterval)
+    # sS = ctrl.ss(A, B, C, D, dt=binInterval)
     w, v = np.linalg.eig(A)
-    plt.plot(w.real, w.imag, '.')
-    break
+    eigenValueDict[name] = pd.Series(w)
+    eigenValueDict[name].index.name = 'eigenvalueIndex'
+#
+eigDF = pd.concat(eigenValueDict, names=iRGroupNames)
+eigDF.to_hdf(estimatorPath, 'eigenvalues')
+allA = pd.concat(ADict, names=iRGroupNames)
+allA.to_hdf(estimatorPath, 'A')
+allB = pd.concat(BDict, names=iRGroupNames)
+allB.to_hdf(estimatorPath, 'B')
+allC = pd.concat(CDict, names=iRGroupNames)
+allC.to_hdf(estimatorPath, 'C')
+allD = pd.concat(DDict, names=iRGroupNames)
+allD.to_hdf(estimatorPath, 'D')
 
-from numpy.lib.stride_tricks import as_strided
-
+# sanity check that signal dynamics are independent of regressors
+meanA = allA.groupby(['rhsMaskIdx', 'state']).mean()
+stdA = allA.groupby(['rhsMaskIdx', 'state']).std()
+fig, ax = plt.subplots(1, 2)
+sns.heatmap(meanA.reset_index(drop=True), ax=ax[0])
+sns.heatmap(stdA.reset_index(drop=True), ax=ax[1])
+#
+from scipy.stats import zscore
+plotEig = pd.concat({
+    'magnitude': eigDF.apply(lambda x: np.absolute(x)),
+    'phase': eigDF.apply(lambda x: np.angle(x)),
+    'real': eigDF.apply(lambda x: x.real),
+    'imag': eigDF.apply(lambda x: x.imag)}, axis='columns')
+plotEig.reset_index(inplace=True)
+g = sns.relplot(
+    row='lhsMaskIdx', col='rhsMaskIdx',
+    x='real', y='imag', hue='electrode', style='electrode',
+    kind='scatter', data=plotEig)

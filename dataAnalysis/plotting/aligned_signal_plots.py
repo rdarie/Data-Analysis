@@ -1140,6 +1140,27 @@ def genLegendRounder(decimals=2):
     return formatLegend
 
 
+def reformatFacetGridLegend(
+        g, titleOverrides={}, contentOverrides={}, styleOpts={}):
+    leg = g._legend
+    if leg is not None:
+        t = leg.get_title()
+        tContent = t.get_text()
+        if tContent in titleOverrides:
+            t.set_text(titleOverrides[tContent])
+        for t in leg.texts:
+            tContent = t.get_text()
+            if tContent in titleOverrides:
+                t.set_text(titleOverrides[tContent])
+            elif tContent in contentOverrides:
+                t.set_text('{}'.format(contentOverrides[tContent]))
+        for l in leg.get_lines():
+            if 'legend.lw' in styleOpts:
+                l.set_lw(styleOpts['legend.lw'])
+        g.resize_legend(adjust_subtitles=True)
+    return
+
+
 def plotCorrelationMatrix(
         correlationDF, pdfPath,
         fig_kws=dict(constrained_layout=True, figsize=(11, 9)),
@@ -1274,14 +1295,14 @@ def twin_relplot(
         sizes=sizes1, size_order=size_order1, size_norm=size_norm1,
         markers=markers1, dashes=dashes1, style_order=style_order,
         legend=legend,
-    )
+        )
     p2 = plotter2(
         x=x, y=y2, hue=hue, size=size, style=style, data=data,
         palette=palette, hue_order=hue_order, hue_norm=hue_norm,
         sizes=sizes2, size_order=size_order2, size_norm=size_norm2,
         markers=markers2, dashes=dashes2, style_order=style_order,
         legend=legend,
-    )
+        )
 
     palette = p1.palette if p1.palette else None
     hue_order = p1.hue_levels if any(p1.hue_levels) else None

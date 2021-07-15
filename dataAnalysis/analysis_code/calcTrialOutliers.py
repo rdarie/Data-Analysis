@@ -358,6 +358,14 @@ if __name__ == "__main__":
     print('\nOutlier proportion was:')
     print(outlierTrials['rejectBlock'].sum() / outlierTrials['rejectBlock'].size)
 
+    if arguments['saveResults']:
+        outlierTrials['deviation'].to_hdf(
+            resultPath, 'deviation')
+        outlierTrials['rejectBlock'].to_hdf(
+            resultPath, 'rejectBlock')
+        print('#######################################################')
+        print('Done saving data')
+        print('#######################################################')
     if arguments['plotting'] and outlierTrials['rejectBlock'].astype(bool).any():
         binSize = 1
         hist, binEdges = np.histogram(
@@ -505,10 +513,6 @@ if __name__ == "__main__":
     #         bla.to_numpy())
     #     plt.show()
     if arguments['saveResults']:
-        outlierTrials['deviation'].to_hdf(
-            resultPath, 'deviation')
-        outlierTrials['rejectBlock'].to_hdf(
-            resultPath, 'rejectBlock')
         exportDF = (
             outlierTrials
             .apply(

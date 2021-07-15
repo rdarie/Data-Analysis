@@ -63,7 +63,7 @@ import gc, sys
 from docopt import docopt
 from copy import deepcopy
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True)
 for arg in sys.argv:
@@ -78,8 +78,8 @@ if __name__ == '__main__':
     consoleDebugging = True
     if consoleDebugging:
         arguments = {
-            'showFigures': False, 'estimatorName': 'regressor', 'datasetName': 'Synthetic_XL_df_g',
-            'exp': 'exp202101281100', 'averageByTrial': False, 'verbose': '1', 'lazy': False,
+            'showFigures': False, 'estimatorName': 'regressor', 'datasetName': 'Block_XL_df_ra',
+            'exp': 'exp202101271100', 'averageByTrial': False, 'verbose': '1', 'lazy': False,
             'analysisName': 'hiRes', 'blockIdx': '2', 'alignFolderName': 'motion', 'debugging': True,
             'plotting': True, 'window': 'long', 'selectionName': 'rig', 'processAll': True}
         os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
@@ -164,7 +164,6 @@ if __name__ == '__main__':
     lhsScaler.fit(dataDF)
     featuresDF = pd.DataFrame(
         lhsScaler.transform(dataDF), index=dataDF.index, columns=dataDF.columns)
-    # pdb.set_trace()
     # plt.plot(featuresDF.xs('velocity_abs', axis='columns', level='feature').to_numpy())
     regressorsFromMetadata = ['electrode']
     columnAdder = tdr.DataFrameMetaDataToColumns(addColumns=regressorsFromMetadata)
@@ -216,12 +215,8 @@ if __name__ == '__main__':
     #
     for hIdx, histOpts in enumerate(addHistoryTerms):
         locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
-    # hto1['logBasis'] = False
-    # hto1['addInputToOutput'] = True
-    # hto1['preprocFun'] = lambda x: x.diff().fillna(0)
-    # hto1['selectColumns'] = slice(2, 4)
-    # hto1['causal'] = False
-    raisedCosBaser = tdr.raisedCosTransformer(hto0)
+    hto1['preprocFun'] = lambda x: x.diff().fillna(0)
+    raisedCosBaser = tdr.raisedCosTransformer(hto1)
     #
     if arguments['plotting']:
         pdfPath = os.path.join(
@@ -229,7 +224,6 @@ if __name__ == '__main__':
             )
         fig, ax = raisedCosBaser.plot_basis()
         plt.savefig(pdfPath)
-        plt.savefig(pdfPath.replace('.pdf', '.png'))
         if arguments['debugging']:
             plt.show()
         else:
@@ -264,10 +258,10 @@ if __name__ == '__main__':
                 columns=designInfo.column_names))
         fig, ax = plt.subplots(2, 1, sharex=True)
         for cN in ['v', 'a', 'r']:
-            ax[0].plot(exampleFeaturesDF[cN].to_numpy(), label='input {}'.format(cN))
+            ax[0].plot(exampleFeaturesDF[cN].to_numpy(), '.-', label='input {}'.format(cN))
         ax[0].legend()
         for cN in designDF.columns:
-            ax[1].plot(designDF[cN].to_numpy(), label=cN)
+            ax[1].plot(designDF[cN].to_numpy(), '.-', label=cN)
         ax[1].legend()
         plt.show()
         '''
@@ -276,15 +270,14 @@ if __name__ == '__main__':
     maskList = []
     attrNames = ['feature', 'lag', 'designFormula', 'ensembleTemplate', 'selfTemplate']
     for designFormula in lOfDesignFormulas:
-        for ensembleTemplate in lOfEnsembleTemplates:
-            for selfTemplate in lOfSelfTemplates:
-                attrValues = ['all', 0, designFormula, ensembleTemplate, selfTemplate]
-                thisMask = pd.Series(
-                    True,
-                    index=featuresDF.columns).to_frame()
-                thisMask.columns = pd.MultiIndex.from_tuples(
-                    (attrValues, ), names=attrNames)
-                maskList.append(thisMask.T)
+        for ensembleTemplate, selfTemplate in lOfEnsembleTemplates:
+            attrValues = ['all', 0, designFormula, ensembleTemplate, selfTemplate]
+            thisMask = pd.Series(
+                True,
+                index=featuresDF.columns).to_frame()
+            thisMask.columns = pd.MultiIndex.from_tuples(
+                (attrValues, ), names=attrNames)
+            maskList.append(thisMask.T)
     #
     maskDF = pd.concat(maskList)
     maskParams = [
