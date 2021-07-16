@@ -106,10 +106,10 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_d', 'plotting': True,
+        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_ra', 'plotting': True,
         'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
-        'verbose': '1', 'debugging': False, 'estimatorName': 'enr2_ta_spectral',
-        'blockIdx': '2', 'exp': 'exp202101281100'}
+        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_pca_ta',
+        'blockIdx': '2', 'exp': 'exp202101271100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
     scratchFolder = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202101201100-Rupert'
@@ -215,6 +215,7 @@ with pd.HDFStore(estimatorPath) as store:
 eigenValueDict = {}
 iRGroupNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'fold', 'electrode']
 for name, thisA in ADF.groupby(iRGroupNames):
+
     for stateSpaceDim in range(1, thisA.shape[0], 10):
         print(stateSpaceDim)
         w, v = np.linalg.eig(thisA.iloc[:stateSpaceDim, :stateSpaceDim])

@@ -34,6 +34,7 @@ from dataAnalysis.analysis_code.namedQueries import namedQueries
 import pdb, traceback
 import numpy as np
 import pandas as pd
+from scipy.stats import zscore, mode
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
@@ -106,16 +107,207 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_d', 'plotting': True,
+        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_ra', 'plotting': True,
         'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
-        'verbose': '1', 'debugging': False, 'estimatorName': 'enr2_ta_spectral',
-        'blockIdx': '2', 'exp': 'exp202101281100'}
+        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_pca_ta',
+        'blockIdx': '2', 'exp': 'exp202101271100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
     scratchFolder = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202101201100-Rupert'
     figureFolder = '/gpfs/data/dborton/rdarie/Neural Recordings/processed/202101201100-Rupert/figures'
     
 '''
+
+def optimalSVDThreshold(Y):
+    beta = Y.shape[0] / Y.shape[1]
+    omega = 0.56 * beta ** 3 - 0.95 * beta ** 2 + 1.82 * beta + 1.43
+    return omega
+
+def ERAMittnik(N, maxNDim=None, signalNames=None, termNames=None, plotting=False):
+    tBins = np.unique(N.columns.get_level_values('bin'))
+    nRegressors = len(signalNames + termNames)
+    H0 = pd.concat([N.shift(-nRegressors * it, axis='columns').fillna(0) for it in range(tBins.size)])
+    H1 = H0.shift(-nRegressors, axis='columns').fillna(0)
+    u, s, vh = np.linalg.svd(H0, full_matrices=False)
+    if maxNDim is None:
+        optThresh = optimalSVDThreshold(H0) * np.median(s)
+        maxNDim = (s > optThresh).sum()
+    stateSpaceNDim = min(maxNDim, u.shape[0])
+    u = u[:, :stateSpaceNDim]
+    s = s[:stateSpaceNDim]
+    vh = vh[:stateSpaceNDim, :]
+    O = u @ np.diag(np.sqrt(s))
+    R = np.diag(np.sqrt(s)) @ vh
+    F = np.diag(np.sqrt(s) ** -1) @ u.T @ H1 @ vh.T @ np.diag(np.sqrt(s) ** -1)
+    C = pd.DataFrame(O[:len(signalNames), :], index=signalNames)
+    K = pd.DataFrame(R[:, :len(signalNames)], columns=signalNames)
+    G = pd.DataFrame(R[:, len(signalNames):len(signalNames) + len(termNames)], columns=termNames)
+    A = pd.DataFrame(F + K @ C)
+    A.columns.name = 'state'
+    A.index.name = 'state'
+    D = pd.DataFrame(N.xs(0, level='bin', axis='columns').loc[:, termNames], index=signalNames, columns=termNames)
+    B = pd.DataFrame(G + K @ D, columns=termNames)
+    B.index.name = 'state'
+    if not plotting:
+        return A, B, C, D
+    else:
+        fig, ax = plt.subplots()
+        ax.plot(s)
+        ax.set_ylabel('eigenvalue of H0')
+        ax.axvline(maxNDim)
+        return A, B, C, D, fig, ax
+
+def ERA(
+        Phi, maxNDim=None, signalNames=None, termNames=None,
+        plotting=False, nLags=None, method='ERA'):
+    tBins = np.unique(Phi.columns.get_level_values('bin'))
+    bins2Index = {bN: bIdx for bIdx, bN in enumerate(tBins)}
+    Phi.rename(columns=bins2Index, inplace=True)
+    # following notation from vicario 2014 (thesis)
+    p = Phi.columns.get_level_values('bin').max() # order of the varx model
+    q = len(signalNames)
+    m = len(termNames)
+    N = nLags
+    Phi1 = {}
+    Phi2 = {}
+    Phi1[0] = Phi.xs(0, level='bin', axis='columns').loc[:, termNames] # D
+    D = Phi1[0]
+    for j in range(1, N+1):
+        if j <= p:
+            Phi1[j] = Phi.xs(j, level='bin', axis='columns').loc[:, termNames]
+            Phi2[j] = Phi.xs(j, level='bin', axis='columns').loc[:, signalNames]
+        else:
+            Phi1[j] = Phi.xs(p, level='bin', axis='columns').loc[:, termNames] * 0
+            Phi2[j] = Phi.xs(p, level='bin', axis='columns').loc[:, signalNames] * 0
+    # matrix form from Juang 1992 (p. 324)
+    # lPhiMat * Psi_sDF = rPhiMat_s
+    # lPhiMat * Psi_gDF = rPhiMat_g
+    lPhiMatLastRowList = [
+        Phi2[k].reset_index(drop=True) * (-1) for k in range(N-1, 0, -1)
+    ] + [pd.DataFrame(np.eye(q))]
+    lPhiMatLastRow = pd.concat(lPhiMatLastRowList, axis='columns', ignore_index=True)
+    lPhiMat = pd.concat([
+        lPhiMatLastRow.shift(k * q * (-1), axis='columns').fillna(0)
+        for k in range(N-1, -1, -1)
+        ])
+    lPhiMatInv = np.linalg.inv(lPhiMat)
+    #
+    if D.any().any():
+        rPhiMat_s = pd.concat({
+            k: Phi1[k] + Phi2[k].to_numpy() @ D.to_numpy()
+            for k in range(1, N+1)
+            }, names=['bin'])
+    else:
+        rPhiMat_s = pd.concat({
+            k: Phi1[k]
+            for k in range(1, N+1)
+            }, names=['bin'])
+    Psi_sDF = lPhiMatInv @ rPhiMat_s
+    Psi_sDF.index = rPhiMat_s.index
+    Psi_sDF = Psi_sDF.unstack(level='bin')
+    Psi_sDF.sort_index(axis='columns', level='bin', sort_remaining=False, kind='mergesort', inplace=True)
+    #
+    rPhiMat_g = pd.concat({
+        k: Phi2[k]
+        for k in range(1, N+1)
+        }, names=['bin'])
+    Psi_gDF = lPhiMatInv @ rPhiMat_g
+    Psi_gDF.index = rPhiMat_g.index
+    Psi_gDF = Psi_gDF.unstack(level='bin')
+    Psi_gDF.sort_index(axis='columns', level='bin', sort_remaining=False, kind='mergesort', inplace=True)
+    '''
+    # recursive substitution way
+    Psi_s = {}
+    Psi_g = {}
+    Psi_s[0] = Phi1[0]  # also D
+    for j in range(1, nLags):
+        print('j = {}'.format(j))
+        if j <= p:
+            Phi1[j] = Phi.xs(j, level='bin', axis='columns').loc[:, termNames]
+            Phi2[j] = Phi.xs(j, level='bin', axis='columns').loc[:, signalNames]
+        else:
+            Phi1[j] = Phi.xs(p, level='bin', axis='columns').loc[:, termNames] * 0
+            Phi2[j] = Phi.xs(p, level='bin', axis='columns').loc[:, signalNames] * 0
+        Psi_s[j] = Phi1[j]
+        Psi_g[j] = Phi2[j]
+        #
+        print('\tnorm(Phi1) = {}'.format(np.linalg.norm(Phi1[j])))
+        print('\tnorm(Phi2) = {}'.format(np.linalg.norm(Phi2[j])))
+        for h in range(1, j+1):
+            # print('\th = {}'.format(h))
+            Psi_s[j] += Phi2[h].to_numpy() @ Psi_s[j-h].to_numpy()
+            if h < j:
+                Psi_g[j] += Phi2[h].to_numpy() @ Psi_g[j-h].to_numpy()
+    #
+    Psi_sDF = pd.concat(Psi_s, axis='columns', names=['bin'])
+    Psi_gDF = pd.concat(Psi_g, axis='columns', names=['bin'])'''
+    if plotting:
+        dt = mode(np.diff(tBins))[0][0]
+        fig, ax = plt.subplots(3, 1)
+        plotS = Psi_sDF.stack('feature')
+        plotG = Psi_gDF.stack('feature')
+        for rowName, row in plotS.iterrows():
+            ax[0].plot(row.index * dt, row, label=rowName)
+        for rowName, row in plotG.iterrows():
+            ax[1].plot(row.index * dt, row, label=rowName)
+        ax[0].set_title('System Markov parameters (Psi_s)')
+        ax[0].axvline(p)
+        ax[0].legend()
+        ax[1].set_title('Gain Markov parameters (Psi_g)')
+        ax[1].axvline(p)
+        ax[1].legend()
+    else:
+        fig, ax = None, None
+    PsiDF = pd.concat([Psi_gDF, Psi_sDF], axis='columns')
+    PsiDF.sort_index(axis='columns', level=['bin'], kind='mergesort', sort_remaining=False, inplace=True)
+    # PsiDF.columns
+    HComps = []
+    PsiBins = PsiDF.columns.get_level_values('bin')
+    for hIdx in range(1, int(nLags / 2) + 1):
+        HMask = (PsiBins >= hIdx) & (PsiBins < (hIdx + int(nLags / 2) - 1))
+        HComps.append(PsiDF.loc[:, HMask].to_numpy())
+    H0 = np.concatenate(HComps[:-1])
+    H1 = np.concatenate(HComps[1:])
+    if method == 'ERA':
+        svdTargetH = H0
+    elif method == 'ERADC':
+        HH0 = H0 @ H0.T
+        HH1 = H1 @ H0.T
+        svdTargetH = HH0
+    u, s, vh = np.linalg.svd(svdTargetH, full_matrices=False)
+    if maxNDim is None:
+        optThresh = optimalSVDThreshold(svdTargetH) * np.median(s)
+        maxNDim = (s > optThresh).sum()
+    stateSpaceNDim = min(maxNDim, u.shape[0])
+    if plotting:
+        ax[2].plot(s)
+        ax[2].set_title('singular values of Hankel matrix (ERA)')
+        ax[2].set_ylabel('s')
+        ax[2].axvline(stateSpaceNDim)
+    #
+    u = u[:, :stateSpaceNDim]
+    s = s[:stateSpaceNDim]
+    vh = vh[:stateSpaceNDim, :]
+    ###
+    O = u @ np.diag(np.sqrt(s))
+    RColMask = PsiDF.columns.get_level_values('bin').isin(range(len(HComps)))
+    if method == 'ERA':
+        R = pd.DataFrame(np.diag(np.sqrt(s)) @ vh, index=None, columns=PsiDF.loc[:, RColMask].columns)
+        ARaw = np.diag(np.sqrt(s) ** -1) @ u.T @ H1 @ vh.T @ np.diag(np.sqrt(s) ** -1)
+    elif method == 'ERADC':
+        R = pd.DataFrame(np.diag(np.sqrt(s)) @ u.T @ H0, index=None, columns=PsiDF.loc[:, RColMask].columns)
+        ARaw = np.diag(np.sqrt(s) ** -1) @ u.T @ HH1 @ vh.T @ np.diag(np.sqrt(s) ** -1)
+    ###
+    A = pd.DataFrame(ARaw)
+    A.columns.name = 'state'
+    A.index.name = 'state'
+    C = pd.DataFrame(O[:len(signalNames), :], index=signalNames)
+    BK = R.xs(1, level='bin', axis='columns')
+    B = BK.loc[:, termNames]
+    B.index.name = 'state'
+    K = BK.loc[:, signalNames]
+    K.index.name = 'state'
+    return A, B, K, C, D, (fig, ax,)
 
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -170,8 +362,6 @@ lastFoldIdx = cvIterator.n_splits
 selectionNameLhs = estimatorMeta['arguments']['selectionNameLhs']
 selectionNameRhs = estimatorMeta['arguments']['selectionNameRhs']
 #
-
-#
 if estimatorMeta['pipelinePathRhs'] is not None:
     transformedSelectionNameRhs = '{}_{}'.format(
         selectionNameRhs, estimatorMeta['arguments']['transformerNameRhs'])
@@ -193,6 +383,12 @@ lhsDF = pd.read_hdf(estimatorMeta['lhsDatasetPath'], '/{}/data'.format(selection
 rhsDF = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/data'.format(selectionNameRhs))
 lhsMasks = pd.read_hdf(estimatorMeta['lhsDatasetPath'], '/{}/featureMasks'.format(selectionNameLhs))
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
+lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
+lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
+lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
+lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormula', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
+#
+rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
 #
 trialInfoLhs = lhsDF.index.to_frame().reset_index(drop=True)
 trialInfoRhs = rhsDF.index.to_frame().reset_index(drop=True)
@@ -289,102 +485,105 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
     lhGroup.columns = lhGroup.columns.get_level_values('feature')
     designFormula = lhsMask.name[lhsMasks.index.names.index('designFormula')]
     #
-    pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
-    exampleLhGroup = lhGroup.loc[lhGroup.index.get_level_values('conditionUID') == 0, :]
-    designMatrix = pt.fit_transform(exampleLhGroup)
-    designInfo = designMatrix.design_info
-    designInfoDict0[(lhsMaskIdx, designFormula)] = designInfo
+    if designFormula not in designInfoDict0:
+        pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
+        exampleLhGroup = lhGroup.loc[lhGroup.index.get_level_values('conditionUID') == 0, :]
+        designMatrix = pt.fit_transform(exampleLhGroup)
+        designInfo = designMatrix.design_info
+        designInfoDict0[designFormula] = designInfo
 #
-designInfoDF = pd.DataFrame(
-    [value for key, value in designInfoDict0.items()],
-    columns=['designInfo'])
-designInfoDF.index = pd.MultiIndex.from_tuples([key for key, value in designInfoDict0.items()], names=['lhsMaskIdx', 'design'])
 
-from scipy import signal
-import control as ctrl
-histOpts = hto0
-### sanity check impulse responses
-rawProbeTermName = 'pca_ta_all001'
-probeTermName = 'rcb({}, **hto0)'.format(rawProbeTermName)
+designInfoDF = pd.Series(designInfoDict0).to_frame(name='designInfo')
+designInfoDF.index.name = 'design'
+
+# designInfoDF = pd.DataFrame(
+#     [value for key, value in designInfoDict0.items()],
+#     columns=['designInfo'])
+# designInfoDF.index = pd.MultiIndex.from_tuples([key for key, value in designInfoDict0.items()], names=['lhsMaskIdx', 'design'])
 
 iRGroupNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'fold', 'electrode']
 eps = np.spacing(1)
 eigenValueDict = {}
 ADict = {}
 BDict = {}
+KDict = {}
 CDict = {}
 DDict = {}
-maxStateSpaceNDim = 200
-for name, iRGroup0 in iRPerTerm.groupby(iRGroupNames):
-    print(name)
-    iRWorkingCopy = iRGroup0.copy()
-    ##
-    iRWorkingCopy.dropna(inplace=True, axis='columns')
-    ##
-    lhsMaskIdx, designFormula, rhsMaskIdx, fold, electrode = name
-    if not designIsLinear[designFormula]:
-        continue
-    lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
-    lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
-    #
-    designInfo = designInfoDict0[(lhsMaskIdx, designFormula)]
-    termNames = designInfo.term_names
-    signalNames = iRWorkingCopy.index.get_level_values('target').unique().to_list()
-    ensTemplate = lhsMaskParams['ensembleTemplate']
-    selfTemplate = lhsMaskParams['selfTemplate']
-    if ensTemplate is not None:
-        ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
-    if selfTemplate is not None:
-        selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
-    iRWorkingCopy.rename(columns={ensTemplate.format(key): key for key in signalNames}, inplace=True)
-    trialInfo = iRWorkingCopy.index.to_frame().reset_index(drop=True)
-    ##
-    #######################
-    # Apply Mittnik 1988
-    N = pd.concat([iRWorkingCopy.reset_index(drop=True), trialInfo.loc[:, ['bin', 'target']]], axis='columns')
-    N.columns.name = 'feature'
-    # kernelMask = (N['bin'] >= 0) & (N['bin'] <= histOpts['historyLen'])
-    kernelMask = (N['bin'] >= 0)
-    N = N.loc[kernelMask, ['bin', 'target'] + signalNames + termNames]
-    N.loc[N['bin'] == 0, signalNames] = 0. # enforce that y[t] = F(y[t-p]), p positive
-    tBins = N['bin'].unique()
-    N.sort_values(by=['bin', 'target'], kind='mergesort', inplace=True)
-    N.set_index(['bin', 'target'], inplace=True)
-    N = N.stack().unstack('target').T
-    nRegressors = len(signalNames + termNames)
-    H = pd.concat([N.shift(-nRegressors * it, axis='columns').fillna(0) for it in range(tBins.size)])
-    LH = H.shift(-nRegressors, axis='columns').fillna(0)
-    u, s, vh = np.linalg.svd(H, full_matrices=False)
-    stateSpaceNDim = min(maxStateSpaceNDim, u.shape[0])
-    u = u[:, :stateSpaceNDim]
-    s = s[:stateSpaceNDim]
-    vh = vh[:stateSpaceNDim, :]
-    O = u @ np.diag(np.sqrt(s))
-    R = np.diag(np.sqrt(s)) @ vh
-    #
-    D = N.xs(0, level='bin', axis='columns').loc[:, termNames]
-    DDF = pd.DataFrame(D, index=signalNames, columns=termNames)
-    DDict[name] = DDF
-    C = pd.DataFrame(O[:len(signalNames), :], index=signalNames)
-    CDict[name] = C
-    #
-    K = pd.DataFrame(R[:, :len(signalNames)], columns=signalNames)
-    G = pd.DataFrame(R[:, len(signalNames):len(signalNames) + len(termNames)], columns=termNames)
-    F = np.diag(np.sqrt(s) ** -1) @ u.T @ LH @ vh.T @ np.diag(np.sqrt(s) ** -1)
-    A = F + K@C
-    ADF = pd.DataFrame(A)
-    ADF.columns.name = 'state'
-    ADF.index.name = 'state'
-    ADict[name] = ADF
-    B = G + K@D
-    BDF = pd.DataFrame(B, columns=termNames)
-    BDF.index.name = 'state'
-    BDict[name] = BDF
-    #
-    # sS = ctrl.ss(A, B, C, D, dt=binInterval)
-    w, v = np.linalg.eig(A)
-    eigenValueDict[name] = pd.Series(w)
-    eigenValueDict[name].index.name = 'eigenvalueIndex'
+if arguments['plotting']:
+    pdfPath = os.path.join(
+        figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'OKID_ERA'))
+    cm = PdfPages(pdfPath)
+else:
+    import contextlib
+    cm = contextlib.nullcontext()
+with cm as pdf:
+    for name, iRGroup0 in iRPerTerm.groupby(iRGroupNames):
+        iRWorkingCopy = iRGroup0.copy()
+        iRWorkingCopy.dropna(inplace=True, axis='columns')
+        ##
+        lhsMaskIdx, designFormula, rhsMaskIdx, fold, electrode = name
+        if not designIsLinear[designFormula]:
+            continue
+        if not fold == lastFoldIdx:
+            continue
+        if electrode == 'NA':
+            continue
+        print('Calculating state space coefficients for {}'.format(name))
+        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+        lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+        #
+        designInfo = designInfoDict0[designFormula]
+        termNames = designInfo.term_names
+        histLens = [sourceHistOptsDict[tN.replace(' ', '')]['historyLen'] for tN in termNames]
+        signalNames = iRWorkingCopy.index.get_level_values('target').unique().to_list()
+        ensTemplate = lhsMaskParams['ensembleTemplate']
+        selfTemplate = lhsMaskParams['selfTemplate']
+        if ensTemplate is not None:
+            ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+            histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+        if selfTemplate is not None:
+            selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+            histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+        iRWorkingCopy.rename(columns={ensTemplate.format(key): key for key in signalNames}, inplace=True)
+        trialInfo = iRWorkingCopy.index.to_frame().reset_index(drop=True)
+        ##
+        #######################
+        # Apply ERA
+        Phi = pd.concat([iRWorkingCopy.reset_index(drop=True), trialInfo.loc[:, ['bin', 'target']]], axis='columns')
+        Phi.columns.name = 'feature'
+        kernelMask = (Phi['bin'] >= 0) & (Phi['bin'] <= max(histLens))
+        Phi = Phi.loc[kernelMask, ['bin', 'target'] + signalNames + termNames]
+        Phi.loc[Phi['bin'] == 0, signalNames] = 0. # enforce that y[t] = F(y[t-p]), p positive
+        Phi.sort_values(by=['bin', 'target'], kind='mergesort', inplace=True)
+        Phi.set_index(['bin', 'target'], inplace=True)
+        Phi = Phi.stack().unstack('target').T
+        #
+        nLags = int(10 * max(histLens) / binInterval)
+        #
+        A, B, K, C, D, (fig, ax,) = ERA(
+            Phi, maxNDim=None,
+            signalNames=signalNames, termNames=termNames, nLags=nLags,
+            plotting=arguments['plotting'])
+        ADict[name] = A
+        BDict[name] = B
+        KDict[name] = K
+        CDict[name] = C
+        DDict[name] = D
+        #
+        # sS = ctrl.ss(A, B, C, D, dt=binInterval)
+        w, v = np.linalg.eig(A)
+        eigenValueDict[name] = pd.Series(w)
+        eigenValueDict[name].index.name = 'eigenvalueIndex'
+        if arguments['plotting']:
+            fig.suptitle('{}'.format(name))
+            fig.tight_layout()
+            pdf.savefig(
+                bbox_inches='tight',
+            )
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
 #
 eigDF = pd.concat(eigenValueDict, names=iRGroupNames)
 eigDF.to_hdf(estimatorPath, 'eigenvalues')
@@ -392,11 +591,15 @@ allA = pd.concat(ADict, names=iRGroupNames)
 allA.to_hdf(estimatorPath, 'A')
 allB = pd.concat(BDict, names=iRGroupNames)
 allB.to_hdf(estimatorPath, 'B')
+allK = pd.concat(KDict, names=iRGroupNames)
+allK.to_hdf(estimatorPath, 'K')
 allC = pd.concat(CDict, names=iRGroupNames)
 allC.to_hdf(estimatorPath, 'C')
 allD = pd.concat(DDict, names=iRGroupNames)
 allD.to_hdf(estimatorPath, 'D')
-
+##############################################################################################################
+##############################################################################################################
+##############################################################################################################
 # sanity check that signal dynamics are independent of regressors
 meanA = allA.groupby(['rhsMaskIdx', 'state']).mean()
 stdA = allA.groupby(['rhsMaskIdx', 'state']).std()
@@ -404,7 +607,7 @@ fig, ax = plt.subplots(1, 2)
 sns.heatmap(meanA.reset_index(drop=True), ax=ax[0])
 sns.heatmap(stdA.reset_index(drop=True), ax=ax[1])
 #
-from scipy.stats import zscore
+
 plotEig = pd.concat({
     'magnitude': eigDF.apply(lambda x: np.absolute(x)),
     'phase': eigDF.apply(lambda x: np.angle(x)),

@@ -103,15 +103,20 @@ def absWrap(x):
     return('abv({})'.format(x))
 
 lOfDesignFormulas = []
+lOfHistTemplates = []
 sourceTermDict = {}
+sourceHistOptsDict = {}
+templateHistOptsDict = {}
 designIsLinear = {}
 for lagSpecIdx in range(len(addHistoryTerms)):
     lagSpec = 'hto{}'.format(lagSpecIdx)
     wrapperFun = genRcbWrap(lagSpec)
     for source in ['v']:
         sourceTermDict[wrapperFun(source)] = source
+        sourceHistOptsDict[wrapperFun(source)] = addHistoryTerms[lagSpecIdx]
     for source in ['a', 'r', 'a*r', 'v*r', 'v*a', 'v*a*r']:
         sourceTermDict['e:'+wrapperFun(source)] = source
+        sourceHistOptsDict['e:'+wrapperFun(source)] = addHistoryTerms[lagSpecIdx]
     #
     laggedModels = {
         'v': vStr(genRcbWrap(lagSpec)), 'a': aStr(genRcbWrap(lagSpec)),
@@ -129,16 +134,15 @@ for lagSpecIdx in range(len(addHistoryTerms)):
     designIsLinear.update({
         theseFormulas[0]: True,
         theseFormulas[1]: True,
-        theseFormulas[1]: True,
+        theseFormulas[2]: True,
         })
     lOfDesignFormulas += theseFormulas
+    histTemplate = 'rcb({}, **{})'.format('{}', lagSpec)
+    lOfHistTemplates.append(histTemplate)
+    templateHistOptsDict[histTemplate] = addHistoryTerms[lagSpecIdx]
 #
-lOfHistTemplates = [
-    'rcb({}, **hto0)', 'rcb({}, **hto1)', 'rcb({}, **hto2)'
-    ]
 lOfEnsembleTemplates = [
-    ('rcb({}, **hto0)', 'rcb({}, **hto0)'),
-    ('rcb({}, **hto1)', 'rcb({}, **hto1)'),
+    (hT, hT) for hT in lOfHistTemplates
     ]
 
 burnInPeriod = 500e-3

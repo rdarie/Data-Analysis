@@ -104,13 +104,12 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 # if debugging in a console:
 '''
-
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
         'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_ra', 'plotting': True,
         'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
-        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_ta',
+        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_pca_ta',
         'blockIdx': '2', 'exp': 'exp202101271100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
@@ -571,27 +570,41 @@ if not loadedPlotOpts:
         'endog': pd.Series(histSourceTermDict).to_frame(name='source'),
         'other': pd.Series(['prediction', 'ground_truth'], index=['prediction', 'ground_truth']).to_frame(name='source'),}, names=['type', 'term'])
     #
-    primaryPalette = pd.DataFrame(sns.color_palette('deep', 10), columns=['r', 'g', 'b'])
+    pickingColors = False
+    primaryPalette = pd.DataFrame(sns.color_palette('colorblind'), columns=['r', 'g', 'b'])
+    if pickingColors:
+        sns.palplot(primaryPalette.apply(lambda x: tuple(x), axis='columns'))
+        palAx = plt.gca()
+        for tIdx, tN in enumerate(primaryPalette.index):
+            palAx.text(tIdx, .5, '{}'.format(tN))
     rgb = pd.DataFrame(
-        primaryPalette.iloc[[0, 3, 8, 7], :].to_numpy(),
-        columns=['r', 'g', 'b'], index=['v', 'a', 'r', 'ens'])
+        primaryPalette.iloc[[1, 0, 2, 4, 7], :].to_numpy(),
+        columns=['r', 'g', 'b'], index=['v', 'a', 'r', 'ens', 'prediction'])
     hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
-    hls.loc['a*r', :] = hls.loc[['a', 'a', 'r'], :].mean()
-    hls.loc['v*r', :] = hls.loc[['v', 'r', 'r'], :].mean()
-    hls.loc['v*a', :] = hls.loc[['v', 'a', 'a'], :].mean()
-    hls.loc['v*a*r', :] = hls.loc[['v', 'a', 'a', 'r'], :].mean()
-    hls.loc['v*a*r', 's'] = hls.loc['v*a*r', 's'] / 2
+    hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
+    hls.loc['v*r', :] = hls.loc[['v', 'r'], :].mean()
+    hls.loc['v*a', :] = hls.loc[['v', 'v', 'a'], :].mean()
+    hls.loc['v*a*r', :] = hls.loc[['v', 'a', 'r'], :].mean()
+    for sN in ['a*r', 'v*r', 'v*a', 'v*a*r']:
+        hls.loc[sN, 's'] = hls.loc[sN, 's'] * 0.75
+        hls.loc[sN, 'l'] = hls.loc[sN, 'l'] * 1.2
+    hls.loc['v*a*r', 's'] = hls.loc['v*a*r', 's'] * 0.5
+    hls.loc['v*a*r', 'l'] = hls.loc['v*a*r', 'l'] * 1.5
     for rhsMaskIdx, rhGroup in rhGroupDict.items():
         lumVals = np.linspace(0.3, 0.7, rhGroup.shape[1])
         for cIdx, cN in enumerate(rhGroup.columns):
             hls.loc[cN, :] = hls.loc['ens', :]
             hls.loc[cN, 'l'] = lumVals[cIdx]
-    hls.loc['prediction', :] = hls.loc['ens', :]
-    hls.loc['prediction', 'l'] = 0.1
     hls.loc['ground_truth', :] = hls.loc['prediction', :]
+    hls.loc['ground_truth', 'l'] = hls.loc['prediction', 'l'] * 0.25
     primarySourcePalette = hls.apply(lambda x: pd.Series(colorsys.hls_to_rgb(*x), index=['r', 'g', 'b']), axis='columns')
     sourcePalette = primarySourcePalette.apply(lambda x: tuple(x), axis='columns')
-    #
+    if pickingColors:
+        sns.palplot(sourcePalette, size=sourcePalette.shape[0])
+        palAx = plt.gca()
+        for tIdx, tN in enumerate(sourcePalette.index):
+            palAx.text(tIdx, .5, '{}'.format(tN))
+    ########################################################################################
     factorPaletteDict = {}
     endoFactors = []
     for designFormula, row in designInfoDF.iterrows():
@@ -661,7 +674,6 @@ if not loadedIR:
             columnsNotInDesign = [cN for cN in coefs.index if cN not in designDF.columns]
             thisIR = designDF * coefs.loc[columnsInDesign]
             outputIR = thisIR.copy()
-            #
             if ensTemplate is not None:
                 ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
                 ensTermNames = [
@@ -717,11 +729,43 @@ if not loadedIR:
                         factorNames = selfDesignInfo.column_names[selfDesignInfo.term_name_slices[termName]]
                         iRPerSource.loc[:, termName] = selfIR.loc[:, factorNames].sum(axis='columns').to_numpy()
                 ipsList.append(iRPerSource)
+            ###########################
+            sanityCheckIRs = False
+            # check that the impulse responses are equivalent to the sum of the weighted basis functions
+            if sanityCheckIRs:
+                plotIR = outputIR.copy()
+                plotIR.index = plotIR.index.droplevel([idxName for idxName in plotIR.index.names if idxName not in ['trialUID', 'bin']])
+                fig, ax = plt.subplots()
+                sns.heatmap(plotIR, ax=ax)
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha='right')
+                for termName, termSlice in designInfo.term_name_slices.items():
+                    histOpts = sourceHistOptsDict[termName.replace(' ', '')]
+                    factorNames = designInfo.column_names[termSlice]
+                    if 'rcb(' in termName:
+                        basisApplier = tdr.raisedCosTransformer(histOpts)
+                        fig, ax = basisApplier.plot_basis()
+                        if histOpts['useOrtho']:
+                            basisDF = basisApplier.orthobasisDF
+                        else:
+                            basisDF = basisApplier.ihbasisDF
+                        # hack to multiply by number of electrodes
+                        assert (len(factorNames) % basisDF.shape[1]) == 0
+                        nReps = int(len(factorNames) / basisDF.shape[1])
+                        for trialUID in range(nReps):
+                            basisDF.columns = factorNames[trialUID::nReps]
+                            irDF = plotIR.xs(trialUID, level='trialUID')
+                            fig, ax = plt.subplots(2, 1, sharex=True)
+                            for cN in basisDF.columns:
+                                ax[0].plot(basisDF.index, basisDF[cN], label='basis {}'.format(cN))
+                                ax[1].plot(basisDF.index, basisDF[cN] * coefs[cN], label='basis {} * coef'.format(cN))
+                                ax[1].plot(irDF.index.get_level_values('bin'), irDF[cN], '--', label='IR {}'.format(cN))
+                            ax[0].legend()
+                            ax[1].legend()
+            ###########################
             iRPerFactorDict1[(rhsMaskIdx, targetName, fold)] = outputIR
             iRPerTermDict1[(rhsMaskIdx, targetName, fold)] = pd.concat(ipsList)
         iRPerFactorDict0[(lhsMaskIdx, designFormula)] = pd.concat(iRPerFactorDict1, names=['rhsMaskIdx', 'target', 'fold'])
         iRPerTermDict0[(lhsMaskIdx, designFormula)] = pd.concat(iRPerTermDict1, names=['rhsMaskIdx', 'target', 'fold'])
-    #
     #
     iRPerFactor = pd.concat(iRPerFactorDict0, names=['lhsMaskIdx', 'design'])
     iRPerFactor.columns.name = 'factor'
@@ -759,7 +803,7 @@ if not loadedIR:
     kinConditionLookupIR.to_hdf(estimatorPath, 'impulseResponseKinConditionLookup')
 #
 groupPagesBy = ['rhsMaskIdx', 'lhsMaskIdx', 'target']
-groupSubPagesBy = ['trialType', 'foldType', 'electrode']
+groupSubPagesBy = ['trialType', 'foldType', 'electrode', 'trialRateInHz']
 scoresStack = pd.concat({
         'test': scoresDF['test_score'],
         'train': scoresDF['train_score']},
@@ -842,7 +886,7 @@ with PdfPages(pdfPath) as pdf:
         g.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(
             bbox_inches='tight',
-        )
+            )
         if arguments['showFigures']:
             plt.show()
         else:
@@ -872,7 +916,7 @@ with PdfPages(pdfPath) as pdf:
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
 with PdfPages(pdfPath) as pdf:
-    height, width = 3, 3
+    height, width = 2, 4
     aspect = width / height
     for (lhsMaskIdx, designFormula, targetName), thisIRPerTerm in iRPerTerm.groupby(['lhsMaskIdx', 'design', 'target']):
         designInfo = designInfoDF.loc[designFormula, 'designInfo']
@@ -901,7 +945,7 @@ with PdfPages(pdfPath) as pdf:
         else:
             plt.close()
 
-height, width = 2, 2
+height, width = 2, 4
 trialTypeToPlot = 'test'
 aspect = width / height
 commonOpts = dict(
@@ -922,6 +966,7 @@ with PdfPages(pdfPath) as pdf:
             x='fullDesignAsLabel', y='score',
             hue_order=thisPalette.index.to_list(),
             palette=thisPalette.to_dict(),
+            height=height, aspect=aspect,
             kind='box')
         g.set_xticklabels(rotation=-30, ha='left')
         g.suptitle('R^2 for target {target}'.format(**nmLk0))
@@ -934,6 +979,7 @@ with PdfPages(pdfPath) as pdf:
         for name1, predGroup1 in predGroup0.groupby(groupSubPagesBy):
             nmLk1 = {key: value for key, value in zip(groupSubPagesBy, name1)} # name lookup
             nmLk0.update(nmLk1)
+            nmLk0.update({'fullDesign': lhsMasksInfo.loc[nmLk0['lhsMaskIdx'], 'fullFormulaDescr']})
             if nmLk0['trialType'] != trialTypeToPlot:
                 continue
             plotDF = predGroup1.stack().to_frame(name='signal').reset_index()
@@ -942,6 +988,7 @@ with PdfPages(pdfPath) as pdf:
             plotDF.loc[plotDF['term'] == 'prediction', 'predType'] = 'prediction'
             plotDF.loc[:, 'kinCondition'] = plotDF.loc[:, ['pedalMovementCat', 'pedalDirection']].apply(lambda x: tuple(x), axis='columns').map(kinConditionLookup)
             plotDF.loc[:, 'stimCondition'] = plotDF.loc[:, ['electrode', 'trialRateInHz']].apply(lambda x: tuple(x), axis='columns').map(stimConditionLookup)
+            plotDF.loc[:, 'fullDesign'] = plotDF['lhsMaskIdx'].apply(lambda x: lhsMasksInfo.loc[x, 'fullFormulaDescr'])
             kinOrder = kinConditionLookup.loc[kinConditionLookup.isin(plotDF['kinCondition'])].to_list()
             stimOrder = stimConditionLookup.loc[stimConditionLookup.isin(plotDF['stimCondition'])].to_list()
             thisTermPalette = termPalette.loc[termPalette['term'].isin(plotDF['term']), :]
@@ -967,7 +1014,7 @@ with PdfPages(pdfPath) as pdf:
                 facet_kws=dict(margin_titles=True),
                 )
             g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
-            titleText = 'model {design}\n{target}, electrode {electrode} ({trialType})'.format(
+            titleText = 'model {fullDesign}\n{target}, electrode {electrode} rate {trialRateInHz} Hz ({trialType})'.format(
                 **nmLk0)
             print('Saving plot of {}...'.format(titleText))
             g.suptitle(titleText)
@@ -1114,174 +1161,5 @@ with PdfPages(pdfPath) as pdf:
             plt.show()
         else:
             plt.close()
-'''
-
-'''
-from scipy import signal
-import control as ctrl
-histOpts = hto0
-### sanity check impulse responses
-rawProbeTermName = 'pca_ta_all001'
-probeTermName = 'rcb({}, **hto0)'.format(rawProbeTermName)
-for (lhsMaskIdx, designFormula, rhsMaskIdx, targetName, fold), thisIRPerTerm in iRPerTerm.groupby(['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold']):
-    if fold == cvIterator.n_splits:
-        continue
-    lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
-    lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
-    lhGroup = lhsDF.loc[:, lhsMask]
-    #
-    lhGroup.columns = lhGroup.columns.get_level_values('feature')
-    #
-    designInfo = designInfoDict0[(lhsMaskIdx, designFormula)]
-    termNames = designInfo.term_names
-    ensTemplate = lhsMaskParams['ensembleTemplate']
-    selfTemplate = lhsMaskParams['selfTemplate']
-    if ensTemplate is not None:
-        ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
-        ensDesignDF = ensImpulseDict[(rhsMaskIdx, ensTemplate)]
-        ensTermNames = [
-            key
-            for key, sl in ensDesignInfo.term_name_slices.items()
-            if key != ensTemplate.format(targetName)]
-    else:
-        ensTermNames = []
-    if selfTemplate is not None:
-        selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
-        selfDesignDF = selfImpulseDict[(rhsMaskIdx, selfTemplate)]
-        selfTermNames = [
-            key
-            for key, sl in selfDesignInfo.term_name_slices.items()
-            if key == selfTemplate.format(targetName)]
-    else:
-        selfTermNames = []
-    estimatorIdx = (lhsMaskIdx, rhsMaskIdx, targetName, fold)
-    if not estimatorIdx in estimatorsDF.index:
-        continue
-    estimator = estimatorsDF.loc[estimatorIdx]
-    if rawProbeTermName in lhsDF.columns.get_level_values('feature'):
-        estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
-        preprocdLhs = estPreprocessorLhs.transform(lhsDF.iloc[cvIterator.folds[fold][0], :])
-        preprocdLhs.columns = preprocdLhs.columns.get_level_values('feature')
-        dFToConvolve = preprocdLhs
-    else:
-        estPreprocessorRhs = estimator.transformer_
-        preprocdRhs = estPreprocessorRhs.transform(rhGroupDict[rhsMaskIdx].iloc[cvIterator.folds[fold][0], :])
-        preprocdRhs.columns = preprocdRhs.columns.get_level_values('feature')
-        dFToConvolve = preprocdRhs
-    #
-    thisIRPerTerm = thisIRPerTerm.dropna(axis='columns')
-    #
-    fig, ax = plt.subplots(2, 1)
-    for elecName, iRGroup in thisIRPerTerm.groupby('electrode'):
-        for moveCat, dataGroup0 in dFToConvolve.xs(elecName, level='electrode', drop_level=False).groupby('pedalMovementCat'):
-            for trialUID, dataGroup in dataGroup0.groupby('trialUID'):
-                break
-            try:
-                tBins = dataGroup.index.get_level_values('bin')
-                ax[0].plot(tBins, dataGroup[rawProbeTermName], label='input {}'.format(rawProbeTermName))
-                ax[0].plot(tBins, iRGroup[probeTermName], '*-', label='kernel corresponding to {}'.format(rawProbeTermName))
-                ax[0].legend()
-                ax[0].set_title('target {}, elec {}, {}'.format(targetName, elecName, moveCat))
-                predDFIdx = idxSl[lhsMaskIdx, designFormula, rhsMaskIdx, targetName, fold, 'train', 'train', elecName, :, :, :, :, :, :, trialUID]
-                ax[1].plot(tBins, predDF.loc[predDFIdx, probeTermName], 'c', label='predicted', lw=5)
-                #
-                kernelTMask = (tBins >= 0) & (tBins <= histOpts['historyLen'])
-                b = iRGroup.loc[kernelTMask, probeTermName].to_numpy()
-                a = np.zeros(b.shape)
-                a[0] = 1
-                #
-                filtered = signal.lfilter(b, a, dataGroup[rawProbeTermName])
-                ax[1].plot(tBins, filtered, 'b--', label='filtered', lw=2)
-                ax[1].legend()
-                plt.show()
-                # sys = signal.dlti(b, a, dt=binInterval)
-                # trFun = ctrl.tf(b, a, dt=binInterval)
-                # ctrl.tf2ss(trFun)
-            except:
-                traceback.print_exc()
-                continue
-            fig, ax = plt.subplots(2, 1)
-        break
-    break
-from sympy.matrices import Matrix, eye, zeros
-from sympy.interactive.printing import init_printing
-init_printing(use_unicode=False, wrap_line=False)
-from sympy.abc import z
-from sympy import simplify, cancel, ratsimp, degree
-iRGroupNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'fold', 'electrode']
-for name, iRGroup0 in iRPerTerm.groupby(iRGroupNames):
-    ##
-    iRGroup0.dropna(inplace=True, axis='columns')
-    ##
-    lhsMaskIdx, designFormula, rhsMaskIdx, fold, electrode = name
-    if lhsMaskIdx != 1:
-        continue
-    lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
-    lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
-    #
-    designInfo = designInfoDict0[(lhsMaskIdx, designFormula)]
-    termNames = designInfo.term_names
-    signalNames = iRGroup0.index.get_level_values('target').unique().to_list()
-    ensTemplate = lhsMaskParams['ensembleTemplate']
-    if ensTemplate is not None:
-        ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
-    if selfTemplate is not None:
-        selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
-    selfTemplate = lhsMaskParams['selfTemplate']
-    iRGroup0.rename(columns={ensTemplate.format(key): key for key in signalNames}, inplace=True)
-    #
-    #
-    Zs = pd.DataFrame(np.nan, index=signalNames, columns=signalNames + termNames)
-    MN = zeros(*Zs.shape)
-    for targetName, iRGroup in iRGroup0.groupby('target'):
-        if ensTemplate is not None:
-            ensTermNames = [
-                key
-                for key, sl in ensDesignInfo.term_name_slices.items()
-                if key != ensTemplate.format(targetName)]
-        else:
-            ensTermNames = []
-        if selfTemplate is not None:
-            selfTermNames = [
-                key
-                for key, sl in selfDesignInfo.term_name_slices.items()
-                if key == selfTemplate.format(targetName)]
-        else:
-            selfTermNames = []
-        tBins = iRGroup.index.get_level_values('bin')
-        kernelTMask = (tBins >= 0) & (tBins <= histOpts['historyLen'])
-        for termName in iRGroup.columns:
-            kernel = iRGroup.loc[kernelTMask, termName]
-            b = kernel.to_numpy()
-            a = np.zeros(b.shape)
-            a[0] = 1.
-            rowIdx = Zs.index.to_list().index(targetName)
-            colIdx = Zs.columns.to_list().index(termName)
-            for order, coefficient in enumerate(b):
-                MN[rowIdx, colIdx] += coefficient * z ** (-(order + 1))
-            # trFun = ctrl.tf(b, a, dt=binInterval)
-            # Zs.loc[targetName, termName] = trFun / ctrl.tf('z', dt=binInterval)
-            # sns.heatmap(sS.A, annot=True, annot_kws={'fontsize': 2})
-    M = MN[:, :len(signalNames)]
-    N = MN[:, len(signalNames):]
-    G = (z * eye(len(signalNames)) - M).inv() * N
-    tf_num = []
-    tf_den = []
-    for rowIdx, targetName in enumerate(Zs.index):
-        tf_num.append([])
-        tf_den.append([])
-        for colIdx, termName in enumerate(signalNames):
-            num, den = ratsimp(G[rowIdx, colIdx]).as_numer_denom()
-            print('{}, {}'.format(num, den))
-            if num == 0:
-                tf_num[rowIdx].append(np.asarray([0]))
-            else:
-                tf_num[rowIdx].append(np.asarray(num.as_poly().all_coeffs()))
-            if den == 1:
-                tf_den[rowIdx].append(np.asarray([1]))
-            else:
-                tf_den[rowIdx].append(np.asarray(den.as_poly().all_coeffs()))
-    trFun = ctrl.tf(tf_num, tf_den, dt=binInterval)
-    break
 '''
 ####
