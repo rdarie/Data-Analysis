@@ -165,6 +165,7 @@ def ERA(
     Phi.rename(columns=bins2Index, inplace=True)
     # following notation from vicario 2014 (thesis)
     p = Phi.columns.get_level_values('bin').max() # order of the varx model
+    Phi.loc[:, Phi.columns.get_level_values('bin') == p] = 0
     q = len(signalNames)
     m = len(termNames)
     N = nLags
@@ -251,20 +252,25 @@ def ERA(
         for rowName, row in plotG.iterrows():
             ax[1].plot(row.index * dt, row, label=rowName)
         ax[0].set_title('System Markov parameters (Psi_s)')
-        ax[0].axvline(p)
+        ax[0].axvline(p * dt)
         ax[0].legend()
         ax[1].set_title('Gain Markov parameters (Psi_g)')
-        ax[1].axvline(p)
+        ax[1].axvline(p * dt)
         ax[1].legend()
+        ax[1].set_xlabel('Time (sec)')
     else:
         fig, ax = None, None
     PsiDF = pd.concat([Psi_gDF, Psi_sDF], axis='columns')
-    PsiDF.sort_index(axis='columns', level=['bin'], kind='mergesort', sort_remaining=False, inplace=True)
-    # PsiDF.columns
+    PsiDF.sort_index(
+        axis='columns', level=['bin'],
+        kind='mergesort', sort_remaining=False, inplace=True)
+    # pdb.set_trace()
+    PsiDF.loc[:, PsiDF.columns.get_level_values('bin') == N] = 0.
+    ####
     HComps = []
     PsiBins = PsiDF.columns.get_level_values('bin')
-    for hIdx in range(1, int(nLags / 2) + 1):
-        HMask = (PsiBins >= hIdx) & (PsiBins < (hIdx + int(nLags / 2) - 1))
+    for hIdx in range(1, int(N / 2) + 1):
+        HMask = (PsiBins >= hIdx) & (PsiBins < (hIdx + int(N / 2) - 1))
         HComps.append(PsiDF.loc[:, HMask].to_numpy())
     H0 = np.concatenate(HComps[:-1])
     H1 = np.concatenate(HComps[1:])
@@ -276,7 +282,7 @@ def ERA(
         svdTargetH = HH0
     u, s, vh = np.linalg.svd(svdTargetH, full_matrices=False)
     if maxNDim is None:
-        optThresh = optimalSVDThreshold(svdTargetH) * np.median(s)
+        optThresh = optimalSVDThreshold(svdTargetH) * np.median(s[:int(N / 2)])
         maxNDim = (s > optThresh).sum()
     stateSpaceNDim = min(maxNDim, u.shape[0])
     if plotting:
@@ -284,6 +290,7 @@ def ERA(
         ax[2].set_title('singular values of Hankel matrix (ERA)')
         ax[2].set_ylabel('s')
         ax[2].axvline(stateSpaceNDim)
+        ax[2].set_xlabel('Count')
     #
     u = u[:, :stateSpaceNDim]
     s = s[:stateSpaceNDim]
@@ -558,7 +565,7 @@ with cm as pdf:
         Phi.set_index(['bin', 'target'], inplace=True)
         Phi = Phi.stack().unstack('target').T
         #
-        nLags = int(10 * max(histLens) / binInterval)
+        nLags = int(5 * max(histLens) / binInterval)
         #
         A, B, K, C, D, (fig, ax,) = ERA(
             Phi, maxNDim=None,
@@ -571,9 +578,37 @@ with cm as pdf:
         DDict[name] = D
         #
         # sS = ctrl.ss(A, B, C, D, dt=binInterval)
-        w, v = np.linalg.eig(A)
-        eigenValueDict[name] = pd.Series(w)
-        eigenValueDict[name].index.name = 'eigenvalueIndex'
+        theseEigValsList = []
+        for nd in range(A.shape[0], 1, -10):
+            w, v = np.linalg.eig(A.iloc[:nd, :nd])
+            w = pd.Series(w)
+            logW = np.log(w)
+            theseEigVals = pd.concat({
+                'complex': w,
+                'logComplex': logW,
+                'magnitude': w.abs(),
+                'phase': w.apply(np.angle),
+                'real': w.apply(np.real),
+                'r': logW.apply(np.real).apply(np.exp),
+                'delta': logW.apply(np.imag),
+                'imag': w.apply(np.imag)}, axis='columns')
+            theseEigVals.loc[:, 'stateNDim'] = nd
+            theseEigVals.loc[:, 'nDimIsMax'] = (nd == A.shape[0])
+            theseEigVals.index.name = 'eigenvalueIndex'
+            theseEigVals.set_index('stateNDim', append=True, inplace=True)
+            #
+            theseEigVals.loc[:, 'tau'] = 2 * np.pi * binInterval / theseEigVals['delta']
+            theseEigVals.loc[:, 'chi'] = - (theseEigVals['r'].apply(np.log) ** (-1)) * binInterval
+            theseEigVals.loc[:, 'isOscillatory'] = (theseEigVals['imag'].abs() > 1e-6) | (theseEigVals['real'] < 0)
+            theseEigVals.loc[:, 'isStable'] = theseEigVals['magnitude'] <= 1
+            #
+            theseEigVals.loc[:, 'eigValType'] = ''
+            theseEigVals.loc[theseEigVals['isOscillatory'] & theseEigVals['isStable'], 'eigValType'] = 'oscillatory decay'
+            theseEigVals.loc[~theseEigVals['isOscillatory'] & theseEigVals['isStable'], 'eigValType'] = 'pure decay'
+            theseEigVals.loc[theseEigVals['isOscillatory'] & ~theseEigVals['isStable'], 'eigValType'] = 'oscillatory growth'
+            theseEigVals.loc[~theseEigVals['isOscillatory'] & ~theseEigVals['isStable'], 'eigValType'] = 'pure growth'
+            theseEigValsList.append(theseEigVals)
+        eigenValueDict[name] = pd.concat(theseEigValsList)
         if arguments['plotting']:
             fig.suptitle('{}'.format(name))
             fig.tight_layout()
@@ -597,24 +632,36 @@ allC = pd.concat(CDict, names=iRGroupNames)
 allC.to_hdf(estimatorPath, 'C')
 allD = pd.concat(DDict, names=iRGroupNames)
 allD.to_hdf(estimatorPath, 'D')
-##############################################################################################################
-##############################################################################################################
-##############################################################################################################
-# sanity check that signal dynamics are independent of regressors
-meanA = allA.groupby(['rhsMaskIdx', 'state']).mean()
-stdA = allA.groupby(['rhsMaskIdx', 'state']).std()
-fig, ax = plt.subplots(1, 2)
-sns.heatmap(meanA.reset_index(drop=True), ax=ax[0])
-sns.heatmap(stdA.reset_index(drop=True), ax=ax[1])
-#
 
-plotEig = pd.concat({
-    'magnitude': eigDF.apply(lambda x: np.absolute(x)),
-    'phase': eigDF.apply(lambda x: np.angle(x)),
-    'real': eigDF.apply(lambda x: x.real),
-    'imag': eigDF.apply(lambda x: x.imag)}, axis='columns')
-plotEig.reset_index(inplace=True)
-g = sns.relplot(
-    row='lhsMaskIdx', col='rhsMaskIdx',
-    x='real', y='imag', hue='electrode', style='electrode',
-    kind='scatter', data=plotEig)
+eigValTypes = ['oscillatory decay', 'pure decay', 'oscillatory growth', 'pure growth']
+eigValColors = sns.color_palette('Set2')
+eigValPaletteDict = {}
+eigValColorAlpha = 0.5
+for eIx, eType in enumerate(eigValTypes):
+    eigValPaletteDict[eType] = tuple([col for col in eigValColors[eIx]] + [eigValColorAlpha])
+eigValPalette = pd.Series(eigValPaletteDict)
+eigValPalette.index.name = 'eigValType'
+eigValPalette.name = 'color'
+eigValPalette.to_hdf(estimatorPath, 'eigValPalette')
+##############################################################################################################
+##############################################################################################################
+##############################################################################################################
+if False:
+    # sanity check that signal dynamics are independent of regressors
+    meanA = allA.groupby(['rhsMaskIdx', 'state']).mean()
+    stdA = allA.groupby(['rhsMaskIdx', 'state']).std()
+    fig, ax = plt.subplots(1, 2)
+    sns.heatmap(meanA.reset_index(drop=True), ax=ax[0])
+    sns.heatmap(stdA.reset_index(drop=True), ax=ax[1])
+    #
+
+    plotEig = pd.concat({
+        'magnitude': eigDF.apply(lambda x: np.absolute(x)),
+        'phase': eigDF.apply(lambda x: np.angle(x)),
+        'real': eigDF.apply(lambda x: x.real),
+        'imag': eigDF.apply(lambda x: x.imag)}, axis='columns')
+    plotEig.reset_index(inplace=True)
+    g = sns.relplot(
+        row='lhsMaskIdx', col='rhsMaskIdx',
+        x='real', y='imag', hue='electrode', style='electrode',
+        kind='scatter', data=plotEig)

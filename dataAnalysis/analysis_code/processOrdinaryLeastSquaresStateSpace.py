@@ -22,6 +22,7 @@ matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('QT5Agg')   # generate postscript output
 # matplotlib.use('Agg')   # generate postscript output
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 import os
@@ -34,6 +35,7 @@ from dataAnalysis.analysis_code.namedQueries import namedQueries
 import pdb, traceback
 import numpy as np
 import pandas as pd
+from scipy.stats import mode
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
@@ -88,7 +90,7 @@ mplRCParams = {
     }
 styleOpts = {
     'legend.lw': 2,
-    'tight_layout.pad': 3e-1, # units of font size
+    'tight_layout.pad': 3e-1,  # units of font size
     'panel_heading.pad': 0.
     }
 sns.set(
@@ -111,9 +113,6 @@ if consoleDebugging:
         'verbose': '1', 'debugging': False, 'estimatorName': 'enr_pca_ta',
         'blockIdx': '2', 'exp': 'exp202101271100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-    scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
-    scratchFolder = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202101201100-Rupert'
-    figureFolder = '/gpfs/data/dborton/rdarie/Neural Recordings/processed/202101201100-Rupert/figures'
     
 '''
 
@@ -203,6 +202,11 @@ trialInfo = trialInfoLhs
 lhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
 rhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
 #
+rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
+lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
+lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
+lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
+lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormula', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
 binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
 #
 with pd.HDFStore(estimatorPath) as store:
@@ -211,11 +215,12 @@ with pd.HDFStore(estimatorPath) as store:
     CDF = pd.read_hdf(store, 'C')
     DDF = pd.read_hdf(store, 'D')
     eigDF = pd.read_hdf(store, 'eigenvalues')
-# check eigenvalue persistence over reduction of the state dimension
+    eigValPalette = pd.read_hdf(store, 'eigValPalette')
+# check eigenvalue persistence over reduction of the state space dimensionality
+'''
 eigenValueDict = {}
 iRGroupNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'fold', 'electrode']
 for name, thisA in ADF.groupby(iRGroupNames):
-
     for stateSpaceDim in range(1, thisA.shape[0], 10):
         print(stateSpaceDim)
         w, v = np.linalg.eig(thisA.iloc[:stateSpaceDim, :stateSpaceDim])
@@ -229,59 +234,65 @@ plotRedEig = pd.concat({
     'real': reducedEigDF.apply(lambda x: x.real),
     'imag': reducedEigDF.apply(lambda x: x.imag)}, axis='columns')
 plotRedEig.reset_index(inplace=True)
-rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
-lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
 plotRedEig.loc[:, 'freqBandName'] = plotRedEig['rhsMaskIdx'].map(rhsMasksInfo['freqBandName'])
 plotRedEig.loc[:, 'designFormula'] = plotRedEig['lhsMaskIdx'].map(lhsMasksInfo['designFormula'])
 plotRedEig.loc[:, 'designFormulaLabel'] = plotRedEig['designFormula'].apply(lambda x: x.replace(' + ', ' +\n'))
+plotRedEig.loc[:, 'eigValType'] = ''
+realMask = (plotRedEig['imag'].abs() < 1e-3) & (plotRedEig['real'] > 0)
+unstableMask = plotRedEig['magnitude'] > 1
+plotRedEig.loc[realMask & unstableMask, 'eigValType'] = 'unstable pure exponential'
+plotRedEig.loc[realMask & ~unstableMask, 'eigValType'] = 'stable pure decay'
+plotRedEig.loc[~realMask & unstableMask, 'eigValType'] = 'unstable oscillatory'
+plotRedEig.loc[~realMask & ~unstableMask, 'eigValType'] = 'stable oscillatory decay'
+'''
+
+eigDF.loc[:, 'freqBandName'] = eigDF.reset_index()['rhsMaskIdx'].map(rhsMasksInfo['freqBandName']).to_numpy()
+eigDF.loc[:, 'designFormula'] = eigDF.reset_index()['lhsMaskIdx'].map(lhsMasksInfo['designFormula']).to_numpy()
+eigDF.loc[:, 'designFormulaLabel'] = eigDF.reset_index()['designFormula'].apply(lambda x: x.replace(' + ', ' +\n')).to_numpy()
+eigDF.loc[:, 'fullFormula'] = eigDF.reset_index()['lhsMaskIdx'].map(lhsMasksInfo['fullFormulaDescr']).to_numpy()
+eigDF.loc[:, 'fullFormulaLabel'] = eigDF.reset_index()['fullFormula'].apply(lambda x: x.replace(' + ', ' +\n')).to_numpy()
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalue_reduction'))
 with PdfPages(pdfPath) as pdf:
-    for name, thisPlotEig in plotRedEig.groupby(['designFormula', 'freqBandName']):
+    for name, thisPlotEig in eigDF.groupby(['fullFormula', 'freqBandName']):
         height, width = 3, 3
         aspect = width / height
         g = sns.relplot(
-            col='spaceDim', col_wrap=3,
-            x='real', y='imag',
+            col='stateNDim', col_wrap=3,
+            x='real', y='imag', hue='eigValType',
             height=height, aspect=aspect,
             facet_kws={'margin_titles': True},
-            kind='scatter', data=thisPlotEig)
+            palette=eigValPalette.to_dict(),
+            kind='scatter', data=thisPlotEig.reset_index(), rasterized=True, edgecolor=None)
         g.suptitle('design: {} freqBand: {}'.format(*name))
+        for ax in g.axes.flatten():
+            c = Circle((0, 0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
+            ax.add_artist(c)
         g.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
             plt.show()
         else:
             plt.close()
-# sanity check that signal dynamics are independent of fold, electrode
-meanA = ADF.groupby(['rhsMaskIdx', 'state']).mean()
-stdA = ADF.groupby(['rhsMaskIdx', 'state']).std()
-fig, ax = plt.subplots(1, 2)
-sns.heatmap(meanA.reset_index(drop=True), ax=ax[0])
-sns.heatmap(stdA.reset_index(drop=True), ax=ax[1])
 #
-plotEig = pd.concat({
-    'magnitude': eigDF.apply(lambda x: np.absolute(x)),
-    'phase': eigDF.apply(lambda x: np.angle(x)),
-    'real': eigDF.apply(lambda x: x.real),
-    'imag': eigDF.apply(lambda x: x.imag)}, axis='columns')
-plotEig.reset_index(inplace=True)
-rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
-lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
-plotEig.loc[:, 'freqBandName'] = plotEig['rhsMaskIdx'].map(rhsMasksInfo['freqBandName'])
-plotEig.loc[:, 'designFormula'] = plotEig['lhsMaskIdx'].map(lhsMasksInfo['designFormula'])
-plotEig.loc[:, 'designFormulaLabel'] = plotEig['designFormula'].apply(lambda x: x.replace(' + ', ' +\n'))
+plotEig = eigDF.loc[eigDF['nDimIsMax'], :]
 pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues_all'))
+    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues'))
 with PdfPages(pdfPath) as pdf:
     height, width = 3, 3
     aspect = width / height
     g = sns.relplot(
-        row='designFormula', col='freqBandName',
-        x='real', y='imag',
+        row='fullFormulaLabel', col='freqBandName',
+        x='real', y='imag', hue='eigValType',
         height=height, aspect=aspect,
-        facet_kws={'margin_titles': True},
+        palette=eigValPalette.to_dict(),
+        facet_kws={'margin_titles': True}, rasterized=True, edgecolor=None,
         kind='scatter', data=plotEig)
+    for ax in g.axes.flatten():
+        c = Circle((0, 0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
+        ax.add_artist(c)
+        ax.set_ylim(-1, 1)
+        ax.set_xlim(-1, 1)
     g.tight_layout(pad=styleOpts['tight_layout.pad'])
     pdf.savefig(bbox_inches='tight', pad_inches=0)
     if arguments['showFigures']:
@@ -289,7 +300,7 @@ with PdfPages(pdfPath) as pdf:
     else:
         plt.close()
 
-pdfPath = os.path.join(
+'''pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues'))
 with PdfPages(pdfPath) as pdf:
     height, width = 3, 3
@@ -297,14 +308,21 @@ with PdfPages(pdfPath) as pdf:
     plotMask = plotEig['designFormula'] == lOfDesignFormulas[1]
     g = sns.relplot(
         row='designFormulaLabel', col='freqBandName',
-        x='real', y='imag',
+        x='real', y='imag', hue='eigValType',
         height=height, aspect=aspect,
         kind='scatter',
-        facet_kws={'margin_titles': True},
+        facet_kws={'margin_titles': True}, edgecolor=None, rasterized=True,
         data=plotEig.loc[plotMask, :])
+    g.suptitle('design: {} freqBand: {}'.format(*name))
+    for ax in g.axes.flatten():
+        c = Circle((0,0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
+        ax.add_artist(c)
+        ax.set_ylim(-1, 1)
+        ax.set_xlim(-1, 1)
     g.tight_layout(pad=styleOpts['tight_layout.pad'])
     pdf.savefig(bbox_inches='tight', pad_inches=0)
     if arguments['showFigures']:
         plt.show()
     else:
         plt.close()
+'''
