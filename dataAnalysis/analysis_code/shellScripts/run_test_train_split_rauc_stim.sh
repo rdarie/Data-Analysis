@@ -23,6 +23,7 @@
 #SBATCH --array=1
 
 #  SLURM_ARRAY_TASK_ID=2
+source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 #
 # suffixes a through e used for the dimensionality calculation#

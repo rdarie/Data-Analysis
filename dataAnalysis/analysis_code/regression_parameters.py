@@ -3,33 +3,35 @@ import dataAnalysis.custom_transformers.tdr as tdr
 
 addHistoryTerms = [
     {
-        'nb': 5,
+        'nb': 10,
         'dt': None,
         'historyLen': 250e-3,
-        'b': 0.001, 'useOrtho': False,
+        'b': 5e-2, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False, 'logBasis': False,
-        'causalShift': True, 'causalFill': True,
-        'addInputToOutput': False},
-    {
-        'nb': 5,
-        'dt': None,
-        'historyLen': 250e-3,
-        'b': 0.001, 'useOrtho': False,
-        'normalize': True, 'groupBy': 'trialUID',
-        'zflag': False, 'logBasis': True,
         'causalShift': True, 'causalFill': True,
         'addInputToOutput': False},
     {
         'nb': 10,
         'dt': None,
+        'historyLen': 250e-3,
+        'b': 5e-2, 'useOrtho': False,
+        'normalize': True, 'groupBy': 'trialUID',
+        'zflag': False, 'logBasis': True,
+        'causalShift': True, 'causalFill': True,
+        'addInputToOutput': False},
+    {
+        'nb': 20,
+        'dt': None,
         'historyLen': 500e-3,
-        'b': 0.001, 'useOrtho': False,
+        'b': 5e-2, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False, 'logBasis': False,
         'causalShift': True, 'causalFill': True,
         'addInputToOutput': False},
     ]
+
+''''''
 '''lOfDesignFormulas = [
     'velocity + electrode:(rcb(amplitude, **hto0) + electrode:rcb(amplitude * RateInHz, **hto0))',
     'velocity + velocity:electrode:(rcb(amplitude, **hto0) + velocity:electrode:rcb(amplitude * RateInHz, **hto0))',
@@ -82,7 +84,6 @@ def vrStr(
 zeroLagModels = {
     'v': vStr(), 'a': aStr(), 'r': rStr(), 'va': vaStr(), 'ar': arStr(), 'vr': vrStr(), 'var': varStr()
 }
-
 rcb = tdr.patsyRaisedCosTransformer
 
 def genRcbWrap(htoStr):
@@ -102,12 +103,23 @@ def abv(x):
 def absWrap(x):
     return('abv({})'.format(x))
 
+designFormulaTemplates = [
+    '{v} + {a} + {r} + {va} + {ar} + {vr} + {var} - 1',
+    '{v} + {a} + {r} - 1',
+    '{v} + {a} - 1',
+    '{v} + {r} - 1',
+    '{a} + {r} - 1',
+    '{v} - 1',
+    ]
+
 lOfDesignFormulas = []
 lOfHistTemplates = []
 sourceTermDict = {}
 sourceHistOptsDict = {}
+designHistOptsDict = {}
 templateHistOptsDict = {}
 designIsLinear = {}
+formulasShortHand = {}
 for lagSpecIdx in range(len(addHistoryTerms)):
     lagSpec = 'hto{}'.format(lagSpecIdx)
     wrapperFun = genRcbWrap(lagSpec)
@@ -125,26 +137,45 @@ for lagSpecIdx in range(len(addHistoryTerms)):
         'vr': vrStr(genRcbWrap(lagSpec)),
         'var': varStr(genRcbWrap(lagSpec))
         }
-    theseFormulas = [
-        # '{v} + {a} + {r} + {va} + {ar} + {vr} + {var} - 1'.format(**laggedModels),
+    theseFormulas = [dft.format(**laggedModels) for dft in designFormulaTemplates]
+    formulasShortHand.update({dft.format(**laggedModels): '({}, **{})'.format(dft, lagSpec) for dft in designFormulaTemplates})
+    '''theseFormulas = [
+        '{v} + {a} + {r} + {va} + {ar} + {vr} + {var} - 1'.format(**laggedModels),
         '{v} + {a} + {r} - 1'.format(**laggedModels),
+        '{v} + {a} - 1'.format(**laggedModels),
+        '{v} + {r} - 1'.format(**laggedModels),
         '{a} + {r} - 1'.format(**laggedModels),
         '{v} - 1'.format(**laggedModels),
-        ]
+        ]'''
     designIsLinear.update({
-        theseFormulas[0]: True,
+        theseFormulas[0]: False,
         theseFormulas[1]: True,
         theseFormulas[2]: True,
+        theseFormulas[3]: True,
+        theseFormulas[4]: True,
+        theseFormulas[5]: True,
         })
     lOfDesignFormulas += theseFormulas
     histTemplate = 'rcb({}, **{})'.format('{}', lagSpec)
     lOfHistTemplates.append(histTemplate)
+    designHistOptsDict.update({thisForm: addHistoryTerms[lagSpecIdx] for thisForm in theseFormulas})
     templateHistOptsDict[histTemplate] = addHistoryTerms[lagSpecIdx]
+lOfDesignFormulas.append('NULL')
+lOfHistTemplates.append('NULL')
+formulasShortHand['NULL'] = 'NULL'
+designIsLinear['NULL'] = True
 #
 lOfEnsembleTemplates = [
     (hT, hT) for hT in lOfHistTemplates
     ]
 
+modelsToTest = []
+for lhsMaskIdx in [0, 1, 2, 3]:
+    modelsToTest.append({
+        'testDesign': lhsMaskIdx,
+        'refDesign': lhsMaskIdx + 4,
+        'captionStr': 'partial R2 of adding interaction terms ({})'.format(lhsMaskIdx)
+    })
 burnInPeriod = 500e-3
 def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
@@ -179,9 +210,3 @@ modelsToTest = [
             'captionStr': 'R2 of the full model, V + AR + VAR'
         },
     ]'''
-modelsToTest = [
-        {
-            'testDesign': lOfDesignFormulas[0],
-            'refDesign': lOfDesignFormulas[1],
-            'captionStr': 'partial R2 of adding a term for velocity'
-        },]

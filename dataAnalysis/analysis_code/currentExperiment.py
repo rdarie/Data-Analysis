@@ -651,6 +651,33 @@ def parseAnalysisOptions(
                 'winStop': -.6
             }
         },
+        # perimovement, any stim, for regression
+        'rb': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 5e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=3,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.7, # start 0.6 before whatever the query was
+                'winStop': .6 # stop .6 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': -1.,
+                'winStop': -.6
+            }
+        },
         # perimovement onset (or peristim onset if stim only) for RAUC
         'f': {
             'ensembleHistoryLen': .30,

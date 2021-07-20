@@ -221,5 +221,10 @@ def getExpOpts():
                 '202101251100-Rupert': [1, 2, 3],
             }
         },
+        'rb': {
+            'experimentsToAssemble': {
+                '202101251100-Rupert': [1, 2, 3],
+            }
+        },
     }
     return locals()

@@ -10,26 +10,24 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J test_train_split
+#SBATCH -J test_train_assembler_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_assembler_25.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_assembler_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#               SBATCH --array=2,3
+#SBATCH --array=2
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
 # source ./shellScripts/calc_aligned_stim_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 #
-TARGET="pedalState"
-
 # ITERATOR="a"
 # ALIGNQUERYTERM="outbound"
 #
@@ -41,7 +39,9 @@ TARGET="pedalState"
 # ITERATOR="cm"
 # ALIGNQUERYTERM="startingE5"
 
-ITERATOR="ra"
+# ITERATOR="ra"
+# ALIGNQUERYTERM="starting"
+ITERATOR="rb"
 ALIGNQUERYTERM="starting"
 
 # ITERATOR="e"

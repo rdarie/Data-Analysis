@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_stim_27
+#SBATCH -J test_train_split_stim_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_stim_27.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_stim_27.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_stim_25.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_stim_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,6 +24,7 @@
 #SBATCH --export=CCV_HEADLESS=1
 
 # SLURM_ARRAY_TASK_ID=2
+source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 ###
 
@@ -39,7 +40,10 @@ source shellScripts/calc_aligned_stim_preamble.sh
 # ALIGNQUERYTERM="stimOnE5"
 # CONTROLSTATUS=""
 
-ITERATOR="--iteratorSuffix=ra"
+# ITERATOR="--iteratorSuffix=ra"
+# ALIGNQUERYTERM="stimOnHighRate"
+# CONTROLSTATUS=""
+ITERATOR="--iteratorSuffix=rb"
 ALIGNQUERYTERM="stimOnHighRate"
 CONTROLSTATUS=""
 #

@@ -51,17 +51,17 @@ def getR2(srs):
     return 1 - (lls - llf) / (lls - lln)
 
 
-def partialR2(llSrs, testDesign=None, refDesign=None):
+def partialR2(llSrs, testDesign=None, refDesign=None, designLevel='design'):
     assert testDesign is not None
-    llSat = llSrs.xs(testDesign, level='design').xs('llSat', level='llType')
+    llSat = llSrs.xs(testDesign, level=designLevel).xs('llSat', level='llType')
     # llSat2 = llSrs.xs(refDesign, level='design').xs('llSat', level='llType')
     # sanity check: should be same
     # assert (llSat - llSat2).abs().max() == 0
     if refDesign is not None:
-        llRef = llSrs.xs(refDesign, level='design').xs('llFull', level='llType')
+        llRef = llSrs.xs(refDesign, level=designLevel).xs('llFull', level='llType')
     else:
-        llRef = llSrs.xs(testDesign, level='design').xs('llNull', level='llType')
-    llTest = llSrs.xs(testDesign, level='design').xs('llFull', level='llType')
+        llRef = llSrs.xs(testDesign, level=designLevel).xs('llNull', level='llType')
+    llTest = llSrs.xs(testDesign, level=designLevel).xs('llFull', level='llType')
     # tInfoSat = llSat.index.to_frame().reset_index(drop=True)
     # tInfoRef = llRef.index.to_frame().reset_index(drop=True)
     # lhsMaskIdx refers to design, which is different between llRef and llTest
@@ -118,7 +118,6 @@ class raisedCosTransformer(object):
                 nb=nb, dt=dt, endpoints=self.endpoints, b=b,
                 zflag=zflag, normalize=normalize, causal=causalFill)
         else:
-            self.b = b
             self.ihbasisDF, self.orthobasisDF = makeRaisedCosBasis(
                 nb=nb, dt=dt, endpoints=self.endpoints, normalize=normalize, causal=causalFill)
         self.iht = np.array(self.ihbasisDF.index)
@@ -811,7 +810,7 @@ def raisedCosBoundary(
         spacingT = (boundsT[1] - boundsT[0]) / (nb + 1)
         endpoints = invnl(np.asarray([boundsT[0], boundsT[1] - 2 * spacingT]))
     # print('endpoints {}'.format(endpoints))
-    return endpoints
+    return endpoints - b
 
 def makeRaisedCosBasis(
         nb=None, spacing=None, dt=None, endpoints=None, normalize=False, causal=False):
@@ -840,6 +839,7 @@ def makeRaisedCosBasis(
     if normalize:
         for colIdx in range(ihbasis.shape[1]):
             ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+    iht = np.round(iht, decimals=6)
     if causal:
         ihbasis[iht <= 0] = 0
     orthobas = scipy.linalg.orth(ihbasis)

@@ -23,6 +23,7 @@
 #SBATCH --account=carney-dborton-condo
 
 SLURM_ARRAY_TASK_ID=2
+source shellScripts/run_exp_preamble.sh
 source shellScripts/run_align_stim_raw_preamble.sh
 #
 python -u ./calcAlignedAsigs.py --chanQuery="all" --outputBlockSuffix="lfp" --eventBlockSuffix='epochs' --signalBlockPrefix='utah' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER --signalSubfolder=None
