@@ -84,7 +84,7 @@ eventBlockPath = os.path.join(
     prefix + '_epochs.nix')
 #
 figureOutputFolder = os.path.join(
-    scratchFolder, 'preprocDiagnostics'
+    processedFolder, 'preprocDiagnostics'
     )
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder, exist_ok=True)

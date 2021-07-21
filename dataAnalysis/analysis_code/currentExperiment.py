@@ -517,7 +517,7 @@ def parseAnalysisOptions(
     #
     iteratorOpts = {
         # rest period from before movement onset
-        'a': {
+        'ca': {
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
@@ -544,7 +544,7 @@ def parseAnalysisOptions(
             }
         },
         # perimovement, no stim
-        'b': {
+        'cb': {
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
@@ -571,7 +571,7 @@ def parseAnalysisOptions(
             }
         },
         # stimOnE5
-        'c': {
+        'cc': {
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
@@ -598,7 +598,7 @@ def parseAnalysisOptions(
             }
         },
         # perimovement, any stim, for regression
-        'd': {
+        'cd': {
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
@@ -707,8 +707,8 @@ def parseAnalysisOptions(
         }
     }
     #
-    iteratorOpts['cs'] = iteratorOpts['c'].copy()
-    iteratorOpts['cm'] = iteratorOpts['c'].copy()
+    iteratorOpts['ccs'] = iteratorOpts['cc'].copy()
+    iteratorOpts['ccm'] = iteratorOpts['cc'].copy()
     #
     if 'expIteratorOpts' in expOpts:
         for key in iteratorOpts.keys():

@@ -301,3 +301,4 @@ if __name__ == '__main__':
         )
     with open(outputLoadingMetaPath, 'wb') as f:
         pickle.dump(outputLoadingMeta, f)
+    print('Done preparing data for regression')

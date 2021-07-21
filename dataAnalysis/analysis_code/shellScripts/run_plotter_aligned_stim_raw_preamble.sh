@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/run_align_stim_preamble.sh
 WINDOW="--window=XS"
 ANALYSISFOLDER="--analysisName=fullRes"

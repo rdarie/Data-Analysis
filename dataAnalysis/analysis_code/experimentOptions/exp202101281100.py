@@ -242,32 +242,37 @@ def getExpOpts():
         }
     }
     expIteratorOpts = {
-        'a': {
+        'ca': {
             'experimentsToAssemble': {
                 '202101281100-Rupert': [1, 2, 3],
                 }
         },
-        'b': {
+        'cb': {
             'experimentsToAssemble': {
                 '202101281100-Rupert': [2, 3],
                 }
         },
-        'cs': {
+        'ccs': {
             'experimentsToAssemble': {
                 '202101281100-Rupert': [1],
                 }
         },
-        'cm': {
+        'ccm': {
             'experimentsToAssemble': {
                 '202101281100-Rupert': [2],
                 }
         },
-        'd': {
+        'cd': {
             'experimentsToAssemble': {
                 '202101281100-Rupert': [1, 2, 3],
                 }
         },
         'ra': {
+            'experimentsToAssemble': {
+                '202101281100-Rupert': [1, 2, 3],
+                }
+        },
+        'rb': {
             'experimentsToAssemble': {
                 '202101281100-Rupert': [1, 2, 3],
                 }

@@ -23,6 +23,7 @@
 #SBATCH --array=2,3
 
 # SLURM_ARRAY_TASK_ID=2
+source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/run_align_motion_preamble.sh
 
 python -u ./calcLaplacianFromTriggered.py --plotting --useKCSD --inputBlockSuffix="lfp" --unitQuery="lfp" --outputBlockSuffix="csd" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

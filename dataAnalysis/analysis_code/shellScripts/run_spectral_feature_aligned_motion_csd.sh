@@ -23,5 +23,6 @@
 #SBATCH --array=2,3
 
 # SLURM_ARRAY_TASK_ID=2
+source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 python -u './calcWaveletFeatures.py' --inputBlockSuffix="csd" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $TIMEWINDOWOPTS $LAZINESS --verbose

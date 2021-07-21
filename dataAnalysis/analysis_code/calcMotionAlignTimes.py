@@ -66,7 +66,7 @@ if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 #
 figureOutputFolder = os.path.join(
-    scratchFolder, 'preprocDiagnostics'
+    processedFolder, 'preprocDiagnostics'
     )
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder, exist_ok=True)

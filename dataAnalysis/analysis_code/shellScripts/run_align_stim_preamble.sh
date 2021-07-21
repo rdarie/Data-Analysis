@@ -1,6 +1,5 @@
 #!/bin/bash
 
-source shellScripts/run_exp_preamble.sh
 
 LAZINESS="--lazy"
 # LAZINESS=""

@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J test_train_assembler_25
+#SBATCH -J test_train_assembler_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_assembler_25.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_assembler_25.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_assembler_28.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_assembler_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -23,30 +23,17 @@
 #SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=2
+source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 # source ./shellScripts/calc_aligned_stim_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 #
-# ITERATOR="a"
-# ALIGNQUERYTERM="outbound"
-#
-# ITERATOR="b"
-# ALIGNQUERYTERM="startingNoStim"
-#
-# ITERATOR="cs"
-# ALIGNQUERYTERM="stimOnE5"
-# ITERATOR="cm"
-# ALIGNQUERYTERM="startingE5"
-
 # ITERATOR="ra"
 # ALIGNQUERYTERM="starting"
+
 ITERATOR="rb"
 ALIGNQUERYTERM="starting"
-
-# ITERATOR="e"
-# ALIGNQUERYTERM="startingNoStim"
-#####
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 #
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
