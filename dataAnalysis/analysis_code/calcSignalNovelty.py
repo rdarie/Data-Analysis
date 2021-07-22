@@ -19,11 +19,14 @@ Options:
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
 """
 
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
+#
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns

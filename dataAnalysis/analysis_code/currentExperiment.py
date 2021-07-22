@@ -267,6 +267,7 @@ def parseAnalysisOptions(
     else:
         stimulusConditionNames = stimConditionNames + motionConditionNames
     print('Block type {}; using the following stimulus condition breakdown:'.format(blockExperimentType))
+    print('\n'.join(['    {}'.format(scn) for scn in stimulusConditionNames]))
     #
     if blockExperimentType == 'proprio-miniRC':
         #  override with settings for detecting cycling stim trains
@@ -647,8 +648,8 @@ def parseAnalysisOptions(
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
-                'winStart': -1.,
-                'winStop': -.6
+                'winStart':  None,
+                'winStop':  None,
             }
         },
         # perimovement, any stim, for regression
@@ -674,8 +675,8 @@ def parseAnalysisOptions(
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
-                'winStart': -1.,
-                'winStop': -.6
+                'winStart': None,
+                'winStop':  None,
             }
         },
         # perimovement onset (or peristim onset if stim only) for RAUC
@@ -765,4 +766,9 @@ def parseAnalysisOptions(
         'lBound': [7,       15,     30,      60,        250],
         'hBound': [14,      29,     55,      120,       1000]
         })
+    outlierDetectOptions = dict(
+        targetEpochSize=100e-3,
+        windowSize=(-.7, .6),
+        twoTailed=True,
+        )
     return expOpts, locals()

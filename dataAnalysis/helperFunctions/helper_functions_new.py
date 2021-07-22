@@ -3963,10 +3963,12 @@ def processSubfolderPaths(_arguments, _scratchFolder, assertExists=False):
 
 def exportNormalizedDataFrame(
         dataDF=None, loadingMeta=None, featureInfoMask=None,
-        arguments=None, selectionName=None,
+        # arguments=None, selectionName=None,
         dataFramesFolder=None, datasetName=None,
         ):
     #
+    arguments = loadingMeta['arguments']
+    selectionName = arguments['selectionName']
     if 'trialUID' not in dataDF.index.names:
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         trialInfo.loc[:, 'trialUID'] = loadingMeta['iteratorsBySegment'][0].prelimSplitter.continuousGroup
@@ -4105,11 +4107,9 @@ def exportNormalizedDataFrame(
         )
     if os.path.exists(loadingMetaPath):
         os.remove(loadingMetaPath)
-    loadingMeta['arguments'] = arguments.copy()
     loadingMeta['normalizationParams'] = normalizationParams
     loadingMeta['normalizeDataset'] = normalizeDataset
     loadingMeta['unNormalizeDataset'] = unNormalizeDataset
-    # pdb.set_trace()
     with open(loadingMetaPath, 'wb') as f:
         pickle.dump(loadingMeta, f)
     return

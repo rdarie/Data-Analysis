@@ -30,6 +30,8 @@ Options:
     --controlSet                                         regular data, or control?
 """
 
+import logging
+logging.captureWarnings(True)
 import os, sys
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -53,6 +55,9 @@ from imblearn.under_sampling import RandomUnderSampler
 from docopt import docopt
 import pandas as pd
 from copy import copy, deepcopy
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -102,7 +107,6 @@ if 'winStop' in arguments:
     if arguments['winStop'] is not None:
         alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 
-binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 
 if theseIteratorOpts['calcTimeROI'] and not arguments['loadFromFrames']:
     if arguments['eventBlockSuffix'] is not None:
@@ -165,10 +169,12 @@ iteratorPath = os.path.join(
         arguments['window'],
         arguments['alignQuery'],
         iteratorSuffix, controlSuffix))
-
+if os.path.exists(iteratorPath):
+    os.remove(iteratorPath)
 if arguments['verbose']:
     prf.print_memory_usage('before load data')
 
+binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 if theseIteratorOpts['nCovariateBasisTerms'] > 1:
     lags = np.linspace(
         -1 * theseIteratorOpts['covariateHistoryLen'],
@@ -181,8 +187,7 @@ if theseIteratorOpts['forceBinInterval'] is not None:
     binInterval = theseIteratorOpts['forceBinInterval']
 else:
     binInterval = binOpts['binInterval']
-#
-# nSplits = theseIteratorOpts['nSplits']
+
 listOfIterators = []
 listOfDataFrames = []
 # trackWinMin, trackWinMax = -np.inf, np.inf
@@ -310,6 +315,9 @@ for cN in trialInfo.columns:
     print(trialInfo[cN].unique())
     print('   ')
     '''
+if not len(listOfDataFrames):
+    print('Command yielded empty list of iterators!')
+    sys.exit()
 if not arguments['processAll']:
     for dataDF in listOfDataFrames:
         cvIterator = tdr.trainTestValidationSplitter(
@@ -347,7 +355,6 @@ else:
         controlProportionMask = None
     # reject bins where there aren't enough observations to average
     minBinMask = pd.Series(True, index=exportDF.index)
-    # pdb.set_trace()
     if theseIteratorOpts['minBinCount']:
         for stimCnd, stimGrp in exportDF.groupby(stimulusConditionNames):
             binCount = stimGrp.fillna(0).groupby('bin').count().iloc[:, 0]
@@ -376,7 +383,8 @@ iteratorMetadata = {
     'alignedAsigsKWargs': exportAAKWA,
     'iteratorsBySegment': listOfIterators,
     'iteratorOpts': theseIteratorOpts,
-    'experimentsToAssemble': experimentsToAssemble
+    'experimentsToAssemble': experimentsToAssemble,
+    'arguments': arguments
 }
 if theseIteratorOpts['calcTimeROI'] and (not arguments['loadFromFrames']):
     iteratorMetadata.update({
@@ -393,8 +401,6 @@ if arguments['processAll']:
             'minBinMask': minBinMask
         })
 print('saving\n{}\n'.format(iteratorPath))
-if os.path.exists(iteratorPath):
-    os.remove(iteratorPath)
 with open(iteratorPath, 'wb') as f:
     pickle.dump(
         iteratorMetadata, f)

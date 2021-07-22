@@ -4051,7 +4051,7 @@ def blockFromPath(
         dataPath, lazy=False, mapDF=None,
         reduceChannelIndexes=False, loadList=None,
         purgeNixNames=False, chunkingInfoPath=None):
-    print('blockFromPath() loading {}'.format(dataPath))
+    print('blockFromPath(lazy={}) loading {} ...'.format(lazy, dataPath))
     chunkingMetadata = None
     if chunkingInfoPath is not None:
         if os.path.exists(chunkingInfoPath):

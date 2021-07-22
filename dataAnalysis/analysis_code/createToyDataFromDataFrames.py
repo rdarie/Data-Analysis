@@ -928,9 +928,12 @@ if __name__ == '__main__':
         for idxItem in maskParams]
     maskDF.loc[:, 'maskName'] = maskParamsStr
     maskDF.set_index('maskName', append=True, inplace=True)
+    rhsOutputLoadingMeta = outputLoadingMeta.copy()
+    rhsOutputLoadingMeta['arguments'] = arguments
+    rhsOutputLoadingMeta['arguments']['selectionName'] = arguments['selectionNameRhs']
     hf.exportNormalizedDataFrame(
-        dataDF=toyRhsDF.loc[restrictMask, :], loadingMeta=outputLoadingMeta.copy(), featureInfoMask=maskDF,
-        arguments=arguments, selectionName=arguments['selectionNameRhs'],
+        dataDF=toyRhsDF.loc[restrictMask, :], loadingMeta=rhsOutputLoadingMeta, featureInfoMask=maskDF,
+        # arguments=arguments, selectionName=arguments['selectionNameRhs'],
         dataFramesFolder=dataFramesFolder, datasetName=outputDatasetName,
         )
     ###########
@@ -962,8 +965,11 @@ if __name__ == '__main__':
         for idxItem in maskParams]
     maskDF.loc[:, 'maskName'] = maskParamsStr
     maskDF.set_index('maskName', append=True, inplace=True)
+    lhsOutputLoadingMeta = outputLoadingMeta.copy()
+    lhsOutputLoadingMeta['arguments'] = arguments
+    lhsOutputLoadingMeta['arguments']['selectionName'] = arguments['selectionNameLhs']
     hf.exportNormalizedDataFrame(
-        dataDF=toyLhsDF.loc[restrictMask, :], loadingMeta=outputLoadingMeta.copy(), featureInfoMask=maskDF,
-        arguments=arguments, selectionName=arguments['selectionNameLhs'],
+        dataDF=toyLhsDF.loc[restrictMask, :], loadingMeta=lhsOutputLoadingMeta, featureInfoMask=maskDF,
+        # arguments=arguments, selectionName=arguments['selectionNameLhs'],
         dataFramesFolder=dataFramesFolder, datasetName=outputDatasetName,
         )

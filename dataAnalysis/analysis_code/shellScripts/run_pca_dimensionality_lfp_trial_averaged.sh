@@ -6,9 +6,9 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --ntasks=8
-#SBATCH --ntasks-per-core=8
-#SBATCH --mem-per-cpu=96G
+#SBATCH --ntasks=4
+#SBATCH --ntasks-per-core=4
+#SBATCH --mem-per-cpu=72G
 
 # Specify a job name:
 #SBATCH -J pca_dimen_motion_lfp_rb_ta_25

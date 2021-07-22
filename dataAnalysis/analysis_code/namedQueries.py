@@ -21,8 +21,6 @@ namedQueries = {
         'trialRateInHz==50or0': '((trialRateInHz==50)|(trialRateInHz==0))',
         'trialRateInHz==100or0': '((trialRateInHz==100)|(trialRateInHz==0))',
         'trialRateInHz>20or0': '((trialRateInHz>20)|(trialRateInHz==0))',
-        'E5': "(electrode=='+ E16 - E5')",
-        'E9': "(electrode=='+ E16 - E9')",
     },
     'unit': {
         'fr': "(chanName.str.endswith('fr#0'))",
@@ -140,32 +138,23 @@ namedQueries['align'].update({
         namedQueries['align']['noStim'],
         ]) + ')'
     })
-namedQueries['align'].update({
-    'startingE5': '(' + '&'.join([
-        namedQueries['align']['starting'],
-        namedQueries['align']['E5'],
-        ]) + ')'
-    })
-namedQueries['align'].update({
-    'stimOnE5': '(' + '&'.join([
-        namedQueries['align']['stimOn'],
-        namedQueries['align']['E5'],
-        "(trialRateInHz > 20)"
-        ]) + ')'
-    })
-namedQueries['align'].update({
-    'startingE9': '(' + '&'.join([
-        namedQueries['align']['starting'],
-        namedQueries['align']['E9'],
-        ]) + ')'
-    })
-namedQueries['align'].update({
-    'stimOnE9': '(' + '&'.join([
-        namedQueries['align']['stimOn'],
-        namedQueries['align']['E9'],
-        "(trialRateInHz > 20)"
-        ]) + ')'
-    })
+for eName in ['E2', 'E5', 'E9']:
+    namedQueries['align'].update({
+        '{}'.format(eName): "(electrode=='+ E16 - {}')".format(eName)})
+    namedQueries['align'].update({
+        'starting{}'.format(eName): '(' + '&'.join([
+            namedQueries['align']['starting'],
+            namedQueries['align']['{}'.format(eName)],
+            "(trialRateInHz > 20)"
+            ]) + ')'
+        })
+    namedQueries['align'].update({
+        'stimOn{}'.format(eName): '(' + '&'.join([
+            namedQueries['align']['stimOn'],
+            namedQueries['align']['{}'.format(eName)],
+            "(trialRateInHz > 20)"
+            ]) + ')'
+        })
 namedQueries['align'].update({
     'stopping': '|'.join([
         namedQueries['align']['reachedPeak'],

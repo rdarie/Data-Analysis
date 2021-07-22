@@ -28,18 +28,6 @@ source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 ###
 
-# ITERATOR="--iteratorSuffix=a"
-# ALIGNQUERYTERM="stimOnHighRate"
-# CONTROLSTATUS="--controlSet"
-
-# ITERATOR="--iteratorSuffix=c"
-# ALIGNQUERYTERM="stimOnHighRate"
-# CONTROLSTATUS=""
-
-# ITERATOR="--iteratorSuffix=cs"
-# ALIGNQUERYTERM="stimOnE5"
-# CONTROLSTATUS=""
-
 # ITERATOR="--iteratorSuffix=ra"
 # ALIGNQUERYTERM="stimOnHighRate"
 # CONTROLSTATUS=""

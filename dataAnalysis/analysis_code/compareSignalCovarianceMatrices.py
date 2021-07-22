@@ -17,11 +17,15 @@ Options:
     --alignFolderName=alignFolderName              append a name to the resulting blocks? [default: motion]
     --iteratorSuffixList=iteratorSuffixList        which iterators to compare
 """
-import matplotlib
+import logging
+logging.captureWarnings(True)
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm, Normalize

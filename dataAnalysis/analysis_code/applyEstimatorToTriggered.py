@@ -13,8 +13,9 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --window=window                        process with short window? [default: short]
-    --winStart=winStart                    start of window [default: 200]
-    --winStop=winStop                      end of window [default: 400]
+    --winStart=winStart                    start of window
+    --winStop=winStop                      end of window
+    --maskOutlierBlocks                    delete outlier trials? [default: False]
     --estimatorName=estimatorName          estimator filename
     --datasetName=datasetName              dataset used to train estimator (use to get loading arguments)
     --selectionName=selectionName          dataset used to train estimator (use to get loading arguments)
@@ -23,11 +24,12 @@ Options:
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
 """
-#
+
+import logging
+logging.captureWarnings(True)
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
-from namedQueries import namedQueries
 import os
 import quantities as pq
 import pandas as pd
@@ -37,12 +39,29 @@ import dataAnalysis.preproc.ns5 as ns5
 import joblib as jb
 import dill as pickle
 import sys
-from currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
 from docopt import docopt
 
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+
+'''
+
+consoleDebugging = True
+if consoleDebugging:
+    arguments = {
+        'unitQuery': None, 'profile': False, 'winStop': '1000', 'lazy': False, 'window': 'XL',
+        'inputBlockSuffix': 'lfp_CAR_spectral', 'datasetName': 'Block_XL_df_ca', 'blockIdx': '3',
+        'selectionName': 'lfp_CAR_spectral', 'estimatorName': 'mahal', 'datasetExp': '202101281100-Rupert',
+        'winStart': '-600', 'alignFolderName': 'motion', 'verbose': False, 'maskOutlierBlocks': True,
+        'alignQuery': 'starting', 'processAll': False, 'inputBlockPrefix': 'Block', 'exp': 'exp202101281100',
+        'analysisName': 'hiRes'}
+    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+
+'''
+
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -50,6 +69,23 @@ globals().update(allOpts)
 blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
 analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
+alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+    scratchFolder, blockBaseName, **arguments)
+alignedAsigsKWargs.update(dict(
+    duplicateControlsByProgram=False,
+    makeControlProgram=False, metaDataToCategories=False,
+    transposeToColumns='feature', concatOn='columns',
+    getMetaData=essentialMetadataFields, decimate=1))
+if 'windowSize' not in alignedAsigsKWargs:
+    alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
+if 'winStart' in arguments:
+    if arguments['winStart'] is not None:
+        alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (1e-3)
+if 'winStop' in arguments:
+    if arguments['winStop'] is not None:
+        alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
+alignedAsigsKWargs['verbose'] = arguments['verbose']
+alignedAsigsKWargs['getFeatureMetaData'] = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
 
 triggeredPath = os.path.join(
     alignSubFolder,
@@ -100,8 +136,13 @@ else:
         estimatorsSubFolder,
         fullEstimatorName + '.joblib'
         )
+    estimatorMetadataPath = os.path.join(
+        estimatorsSubFolder,
+        fullEstimatorName + '_meta.pickle'
+        )
     estimator = jb.load(estimatorPath)
-    #
+    with open(estimatorMetadataPath, 'rb') as _f:
+        estimatorMeta = pickle.load(_f)
     loadingMetaPath = os.path.join(
         dataFramesFolder,
         datasetName + '_{}'.format(selectionName) + '_meta.pickle'
@@ -115,19 +156,18 @@ else:
         normalizationParams = loadingMeta['normalizationParams']
     else:
         normalizeDataset = None
-    #
-    # featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
-    #
-    # extendedFeatureMeta = featureMasks.columns.to_frame().reset_index(drop=True)
-    for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns', 'addLags', 'procFun', 'getFeatureMetaData']:
+    matchLoadingArgs = [
+        'getMetaData', 'concatOn', 'transposeToColumns',
+        'addLags', 'procFun', 'getFeatureMetaData',
+        'decimate', 'rollingWindow']
+    for aakwaEntry in matchLoadingArgs:
         if aakwaEntry in loadingMeta['alignedAsigsKWargs']:
             alignedAsigsKWargs[aakwaEntry] = loadingMeta['alignedAsigsKWargs'][aakwaEntry]
-    if 'decimate' in loadingMeta['alignedAsigsKWargs']:
-        alignedAsigsKWargs['decimate'] = loadingMeta['alignedAsigsKWargs']['decimate']
     #
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     print('alignedAsigsKWargs[dataQuery] = {}'.format(alignedAsigsKWargs['dataQuery']))
-    alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(namedQueries, scratchFolder, **arguments)
+    alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+        namedQueries, scratchFolder, **loadingMeta['arguments'])
 #
 with open(
     os.path.join(
@@ -150,7 +190,7 @@ if arguments['verbose']:
 
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-# print(alignedAsigsDF.columns)
+print(alignedAsigsDF.columns)
 '''if extendedFeatureMeta is not None:
     featureMeta = alignedAsigsDF.columns.to_frame().reset_index(drop=True)
     loadedMeta = featureMeta.loc[:, ['feature', 'lag']]
@@ -160,6 +200,8 @@ alignedAsigsDF = ns5.alignedAsigsToDF(
     alignedAsigsDF.columns = pd.MultiIndex.from_frame(extendedFeatureMeta)'''
 if normalizeDataset is not None:
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
+alignedAsigsDF.rename(columns=lambda x: x.replace('#0', ''), level='feature', inplace=True)
+# pdb.set_trace()
 if hasattr(estimator, 'transform'):
     features = estimator.transform(alignedAsigsDF)
 if arguments['profile']:
@@ -177,6 +219,7 @@ else:
     featureNames = pd.Index([
         estimatorMetadata['name'] + '{:0>3}#0'.format(i)
         for i in range(features.shape[1])])
+#
 trialTimes = np.unique(alignedAsigsDF.index.get_level_values('t'))
 tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 alignedFeaturesDF = pd.DataFrame(

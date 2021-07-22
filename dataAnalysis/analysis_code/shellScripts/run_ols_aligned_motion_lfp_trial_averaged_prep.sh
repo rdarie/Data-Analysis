@@ -38,10 +38,10 @@ SUFFIX=""
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 #
-# ESTIMATOR="enr_pca_ta${SUFFIX}"
-# python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='pca_ta' --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
-# ESTIMATOR="enr_fa_ta${SUFFIX}"
-# python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa_ta' --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+ESTIMATOR="enr_pca_ta${SUFFIX}"
+python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='pca_ta' --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+ESTIMATOR="enr_fa_ta${SUFFIX}"
+python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa_ta' --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
 ################################################################################################################
 ## spectral, trial-averaged
 SUFFIX="_spectral"

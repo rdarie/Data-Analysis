@@ -333,6 +333,7 @@ if __name__ == '__main__':
     allTargetsDF.index.name = 'targetIdx'
     allTargetsDF.reset_index(inplace=True)
     allTargetsDF.set_index(['lhsMaskIdx', 'rhsMaskIdx', 'target'], inplace=True)
+    print('Complete. Saving allTargets to {}'.format(designMatrixPath))
     allTargetsDF.to_hdf(designMatrixPath, 'allTargets')
     htmlPath = os.path.join(figureOutputFolder, '{}.html'.format(designMatrixDatasetName))
     allTargetsDF.to_html(htmlPath)

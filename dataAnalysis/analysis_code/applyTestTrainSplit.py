@@ -24,7 +24,10 @@ Options:
     --controlSet                           regular data, or control?
 """
 
+import logging
+logging.captureWarnings(True)
 import sys
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 from docopt import docopt
@@ -109,7 +112,7 @@ triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(
         inputBlockSuffix, arguments['window']))
-alignedAsigsKWargs = loadingMeta['alignedAsigsKWargs']
+alignedAsigsKWargs = loadingMeta['alignedAsigsKWargs'].copy()
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['verbose'] = arguments['verbose']
@@ -118,6 +121,7 @@ if arguments['verbose']:
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 nSeg = len(dataBlock.segments)
+loadingMeta['alignedAsigsKWargs'] = alignedAsigsKWargs.copy()
 for segIdx in range(nSeg):
     if arguments['verbose']:
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
@@ -261,5 +265,10 @@ maskDF.to_hdf(outputDFPath, masksKey, mode='a')
 print('saving loading meta to \n{}\n'.format(outputLoadingMetaPath))
 if os.path.exists(outputLoadingMetaPath):
     os.remove(outputLoadingMetaPath)
+## update loadingMeta['arguments'] re: feature names
+for kN in ['selectionName', 'unitQuery']:
+    if kN in arguments:
+        loadingMeta['arguments'][kN] = arguments[kN]
+## update loadingMeta['alignedAsigsKW'] re: feature names
 with open(outputLoadingMetaPath, 'wb') as _f:
     pickle.dump(loadingMeta, _f)

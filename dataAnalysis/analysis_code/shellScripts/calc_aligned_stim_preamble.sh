@@ -1,6 +1,5 @@
 #!/bin/bash
 
-source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/run_align_stim_preamble.sh
 
 # LAZINESS="--lazy"
@@ -11,7 +10,7 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 OUTLIERMASK="--maskOutlierBlocks"
 # OUTLIERMASK=""
 
-TIMEWINDOWOPTS="--winStart=-600 --winStop=1000"
+TIMEWINDOWOPTS="--winStart=-700 --winStop=1000"
 #
 ALIGNQUERYTERM="stimOn"
 # ALIGNQUERYTERM="stimOnHighRate"
