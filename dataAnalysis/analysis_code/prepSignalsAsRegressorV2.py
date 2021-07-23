@@ -13,7 +13,7 @@ Options:
     --plotting                                 load from raw, or regular? [default: False]
     --showFigures                              load from raw, or regular? [default: False]
     --debugging                                load from raw, or regular? [default: False]
-    --averageByTrial                           load from raw, or regular? [default: False]
+    --maxNumFeatures=maxNumFeatures            load from raw, or regular? [default: 32]
     --verbose=verbose                          print diagnostics? [default: 0]
     --datasetNameRhs=datasetNameRhs            which trig_ block to pull [default: Block]
     --selectionNameRhs=selectionNameRhs        how to restrict channels? [default: fr_sqrt]
@@ -23,7 +23,8 @@ Options:
     --transformerNameLhs=transformerNameLhs    how to restrict channels?
     --estimatorName=estimatorName              filename for resulting estimator (cross-validated n_comps)
 """
-
+import logging
+logging.captureWarnings(True)
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -83,7 +84,7 @@ if __name__ == '__main__':
         arguments = {
         'datasetNameLhs': 'Block_XL_df_ra',
         'window': 'long', 'lazy': False, 'showFigures': False, 'blockIdx': '2',
-        'debugging': True, 'averageByTrial': False, 'exp': 'exp202101281100',
+        'debugging': True, 'exp': 'exp202101281100',
         'transformerNameLhs': None, 'transformerNameRhs': 'pca_ta', 'plotting': True,
         'verbose': '1', 'processAll': True, 'datasetNameRhs': 'Block_XL_df_ra',
         'selectionNameLhs': 'rig', 'analysisName': 'hiRes', 'alignFolderName': 'motion',
@@ -283,7 +284,9 @@ if __name__ == '__main__':
                 index=rhsDF.index, columns=rhTransformedColumns)
         rhGroup.columns = rhGroup.columns.get_level_values('feature')
         #####################
-        rhGroup = rhGroup.iloc[:, :3]
+        theseMaxNumFeatures = min(rhGroup.shape[1], int(arguments['maxNumFeatures']))
+        print('Restricting target group to its first {} features'.format(theseMaxNumFeatures))
+        rhGroup = rhGroup.iloc[:, :theseMaxNumFeatures]
         ####################
         rhGroup.to_hdf(designMatrixPath, 'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
         targetsList.append(pd.Series(rhGroup.columns).to_frame(name='target'))

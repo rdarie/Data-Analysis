@@ -31,12 +31,15 @@ addHistoryTerms = [
         'addInputToOutput': False},
     ]
 
-''''''
-'''lOfDesignFormulas = [
+'''
+
+lOfDesignFormulas = [
     'velocity + electrode:(rcb(amplitude, **hto0) + electrode:rcb(amplitude * RateInHz, **hto0))',
     'velocity + velocity:electrode:(rcb(amplitude, **hto0) + velocity:electrode:rcb(amplitude * RateInHz, **hto0))',
     'velocity + electrode:(amplitude/RateInHz)',
-    'velocity * electrode:(amplitude/RateInHz)', ]'''
+    'velocity * electrode:(amplitude/RateInHz)', ]
+    
+    '''
 
 regressionColumnsToUse = ['velocity_abs', 'amplitude', 'RateInHz', 'electrode']
 regressionColumnRenamer = {
@@ -46,7 +49,9 @@ regressionColumnRenamer = {
 def iWrap(x):
     return 'I({})'.format(x)
 
-
+def elecWrap(x):
+    return 'e:({})'.format(x)
+'''
 def vStr(
         modFun=iWrap):
     return '{}'.format(modFun('v'))
@@ -84,12 +89,18 @@ def vrStr(
 zeroLagModels = {
     'v': vStr(), 'a': aStr(), 'r': rStr(), 'va': vaStr(), 'ar': arStr(), 'vr': vrStr(), 'var': varStr()
 }
+'''
 rcb = tdr.patsyRaisedCosTransformer
 
 def genRcbWrap(htoStr):
     def rcbWrap(x):
         return 'rcb({},**{})'.format(x, htoStr)
     return rcbWrap
+
+def genElecRcbWrap(htoStr):
+    def elecRcbWrap(x):
+        return 'e:rcb({},**{})'.format(x, htoStr)
+    return elecRcbWrap
 
 def ddt(x):
     return x.diff().fillna(0)
@@ -104,7 +115,10 @@ def absWrap(x):
     return('abv({})'.format(x))
 
 designFormulaTemplates = [
-    '{v} + {a} + {r} + {va} + {ar} + {vr} + {var} - 1',
+    '{v} + {a} + {r} + {v*a} + {v*r} + {a*r} + {v*a*r} - 1',
+    '{v} + {a} + {r} + {v*a} + {v*r} + {a*r} - 1',
+    '{v} + {a} + {r} + {v*a} + {v*r} - 1',
+    '{v} + {a} + {r} + {a*r} - 1',
     '{v} + {a} + {r} - 1',
     '{v} + {a} - 1',
     '{v} + {r} - 1',
@@ -123,20 +137,24 @@ formulasShortHand = {}
 for lagSpecIdx in range(len(addHistoryTerms)):
     lagSpec = 'hto{}'.format(lagSpecIdx)
     wrapperFun = genRcbWrap(lagSpec)
+    elecWrapperFun = genElecRcbWrap(lagSpec)
+    laggedModels = {}
     for source in ['v']:
+        laggedModels[source] = wrapperFun(source)
         sourceTermDict[wrapperFun(source)] = source
         sourceHistOptsDict[wrapperFun(source)] = addHistoryTerms[lagSpecIdx]
     for source in ['a', 'r', 'a*r', 'v*r', 'v*a', 'v*a*r']:
-        sourceTermDict['e:'+wrapperFun(source)] = source
-        sourceHistOptsDict['e:'+wrapperFun(source)] = addHistoryTerms[lagSpecIdx]
+        laggedModels[source] = elecWrapperFun(source)
+        sourceTermDict[elecWrapperFun(source)] = source
+        sourceHistOptsDict[elecWrapperFun(source)] = addHistoryTerms[lagSpecIdx]
     #
-    laggedModels = {
+    '''laggedModels = {
         'v': vStr(genRcbWrap(lagSpec)), 'a': aStr(genRcbWrap(lagSpec)),
         'r': rStr(genRcbWrap(lagSpec)),
         'va': vaStr(genRcbWrap(lagSpec)), 'ar': arStr(genRcbWrap(lagSpec)),
         'vr': vrStr(genRcbWrap(lagSpec)),
         'var': varStr(genRcbWrap(lagSpec))
-        }
+        }'''
     theseFormulas = [dft.format(**laggedModels) for dft in designFormulaTemplates]
     formulasShortHand.update({dft.format(**laggedModels): '({}, **{})'.format(dft, lagSpec) for dft in designFormulaTemplates})
     '''theseFormulas = [
@@ -147,16 +165,14 @@ for lagSpecIdx in range(len(addHistoryTerms)):
         '{a} + {r} - 1'.format(**laggedModels),
         '{v} - 1'.format(**laggedModels),
         ]'''
-    designIsLinear.update({
-        theseFormulas[0]: False,
-        theseFormulas[1]: True,
-        theseFormulas[2]: True,
-        theseFormulas[3]: True,
-        theseFormulas[4]: True,
-        theseFormulas[5]: True,
-        })
+    for fIdx in range(4):
+        designIsLinear.update({
+            theseFormulas[fIdx]: False})
+    for fIdx in range(4, 9):
+        designIsLinear.update({
+            theseFormulas[fIdx]: True})
     lOfDesignFormulas += theseFormulas
-    histTemplate = 'rcb({}, **{})'.format('{}', lagSpec)
+    histTemplate = 'rcb({},**{})'.format('{}', lagSpec)
     lOfHistTemplates.append(histTemplate)
     designHistOptsDict.update({thisForm: addHistoryTerms[lagSpecIdx] for thisForm in theseFormulas})
     templateHistOptsDict[histTemplate] = addHistoryTerms[lagSpecIdx]

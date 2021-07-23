@@ -522,6 +522,7 @@ def crossValidationScores(
         contextManager = contextlib.nullcontext()
     else:
         contextManager = parallel_backend(**joblibBackendArgs)
+    print('crossValidationScores() using contextManager: {}'.format(contextManager))
     with contextManager:
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
@@ -1052,18 +1053,71 @@ class trainTestValidationSplitterBackup:
 
 
 class EmpiricalCovarianceTransformer(EmpiricalCovariance, TransformerMixin):
+    def __init__(self, maxNSamples=None, **kwds):
+        self.maxNSamples = int(maxNSamples) if maxNSamples is not None else None
+        super().__init__(**kwds)
+
+    def fit(self, X, y=None):
+        if self.maxNSamples is None:
+            super().fit(X, y=y)
+        else:
+            # subsample X
+            rng = np.random.default_rng()
+            chooseN = min(self.maxNSamples, X.shape[0])
+            if isinstance(X, pd.DataFrame):
+                seekIdx = rng.choice(X.index, chooseN, replace=False)
+                super().fit(X.loc[seekIdx, :], y=y)
+            else:
+                seekIdx = rng.choice(range(X.shape[0]), chooseN, replace=False)
+                super().fit(X[seekIdx, :], y=y)
+        return self
+
     def transform(self, X):
         return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 
 class MinCovDetTransformer(MinCovDet, TransformerMixin):
+    def __init__(self, maxNSamples=None, **kwds):
+        self.maxNSamples = int(maxNSamples) if maxNSamples is not None else None
+        super().__init__(**kwds)
+
+    def fit(self, X, y=None):
+        if self.maxNSamples is None:
+            super().fit(X, y=y)
+        else:
+            # subsample X
+            rng = np.random.default_rng()
+            chooseN = min(self.maxNSamples, X.shape[0])
+            if isinstance(X, pd.DataFrame):
+                seekIdx = rng.choice(X.index, chooseN, replace=False)
+                super().fit(X.loc[seekIdx, :], y=y)
+            else:
+                seekIdx = rng.choice(range(X.shape[0]), chooseN, replace=False)
+                super().fit(X[seekIdx, :], y=y)
+        return self
+
     def transform(self, X):
         return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 
 class LedoitWolfTransformer(LedoitWolf, TransformerMixin):
+    def __init__(self, maxNSamples=None, **kwds):
+        self.maxNSamples = int(maxNSamples) if maxNSamples is not None else None
+        super().__init__(**kwds)
+
     def fit(self, X, y=None):
-        print('LedoitWolfTransformer, X.shape = {}'.format(X.shape))
-        super().fit(X, y=y)
+        if self.maxNSamples is None:
+            super().fit(X, y=y)
+        else:
+            # subsample X
+            rng = np.random.default_rng()
+            chooseN = min(self.maxNSamples, X.shape[0])
+            if isinstance(X, pd.DataFrame):
+                seekIdx = rng.choice(X.index, chooseN, replace=False)
+                super().fit(X.loc[seekIdx, :], y=y)
+            else:
+                seekIdx = rng.choice(range(X.shape[0]), chooseN, replace=False)
+                super().fit(X[seekIdx, :], y=y)
         return self
+
     def transform(self, X):
         return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 

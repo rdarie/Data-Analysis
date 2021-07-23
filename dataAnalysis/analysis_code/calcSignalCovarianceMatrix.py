@@ -20,7 +20,7 @@ Options:
 """
 import logging
 logging.captureWarnings(True)
-import matplotlib, os
+import matplotlib, os, sys
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 if 'CCV_HEADLESS' in os.environ:
@@ -56,7 +56,9 @@ import joblib as jb
 import dill as pickle
 import gc
 from docopt import docopt
-
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 '''
@@ -129,10 +131,15 @@ arguments.update(loadingMeta['arguments'])
 
 if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
-    if 'mahal' in estimatorName:
-        # estimatorClass = EmpiricalCovariance
+    if 'ledoit' in estimatorName:
         estimatorClass = tdr.LedoitWolfTransformer
-        estimatorKWArgs = dict()
+        estimatorKWArgs = dict(maxNSamples=16e3)
+    elif 'emp' in estimatorName:
+        estimatorClass = tdr.EmpiricalCovarianceTransformer
+        estimatorKWArgs = dict(maxNSamples=16e3)
+    elif 'mcd' in estimatorName:
+        estimatorClass = tdr.MinCovDetTransformer
+        estimatorKWArgs = dict(maxNSamples=16e3)
     crossvalKWArgs = dict(
         cv=cvIterator,
         return_train_score=True, return_estimator=True)
@@ -142,8 +149,8 @@ if __name__ == '__main__':
     if joblibBackendArgs['backend'] == 'dask':
         daskComputeOpts = dict(
             # scheduler='threads'
-            # scheduler='processes'
-            scheduler='single-threaded'
+            scheduler='processes'
+            # scheduler='single-threaded'
             )
         if joblibBackendArgs['backend'] == 'dask':
             if daskComputeOpts['scheduler'] == 'single-threaded':

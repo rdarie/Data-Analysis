@@ -16,11 +16,13 @@ Options:
     --analysisName=analysisName              append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName        append a name to the resulting blocks? [default: motion]
 """
+import logging
+logging.captureWarnings(True)
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
 import matplotlib.pyplot as plt
@@ -66,9 +68,9 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'processAll': True, 'debugging': False, 'blockIdx': '2', 'estimatorName': 'pca', 'analysisName': 'default',
-        'showFigures': False, 'selectionName': 'lfp_CAR_spectral', 'alignFolderName': 'motion', 'plotting': True,
-        'verbose': '1', 'datasetName': 'Block_XL_df_a', 'exp': 'exp202101281100'}
+        'processAll': True, 'debugging': False, 'blockIdx': '2', 'estimatorName': 'pca_ta', 'analysisName': 'hiRes',
+        'showFigures': False, 'selectionName': 'lfp_CAR', 'alignFolderName': 'motion', 'plotting': True,
+        'verbose': '1', 'datasetName': 'Block_XL_df_rb', 'exp': 'exp202101271100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
 
@@ -168,7 +170,7 @@ for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
     dictOfEVS1 = {}
     dictOfCovMats1 = {}
     for foldIdx, estimatorsGroup in estimators.groupby('fold'):
-        print('On fold {}'.format(foldIdx))
+        print('Calculating covariance matrix and explained variance on fold {}'.format(foldIdx))
         if foldIdx < lastFoldIdx:
             trainIdx, testIdx = cvIterator.folds[foldIdx]
             trialTypes = ['train', 'test']
@@ -280,13 +282,40 @@ pdfPath = os.path.join(
         fullEstimatorName))
 with PdfPages(pdfPath) as pdf:
     fig, ax = plt.subplots()
-    ax = sns.heatmap(thisDimRed.get_covariance())
+    ax = sns.heatmap(
+        thisDimRed.get_covariance(), cmap='mako')
     pdf.savefig(bbox_inches='tight', pad_inches=0)
     if arguments['showFigures']:
         plt.show()
     else:
         plt.close()
+trialTypeOrder = ['train', 'work', 'test', 'validation']
+trialTypePalette = pd.Series(
+    sns.color_palette('Paired', 12)[::-1][:len(trialTypeOrder)],
+    index=trialTypeOrder)
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_explained_variance.pdf'.format(
+        fullEstimatorName))
+with PdfPages(pdfPath) as pdf:
+    for name, group in eVSDF.groupby('freqBandName'):
+        plotDF = group.to_frame(name='signal').reset_index()
+        thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotDF['trialType'])]
+        g = sns.relplot(
+            data=plotDF, x='component', hue='trialType',
+            hue_order=thisPalette.index.to_list(), palette=thisPalette.to_dict(),
+            y='signal', kind='line', alpha=0.5, lw=1., errorbar='se')
+        g.fig.set_size_inches((12, 8))
+        g.fig.suptitle('{}'.format(name))
+        g.resize_legend(adjust_subtitles=True)
+        g.tight_layout(pad=.3)
+        pdf.savefig(bbox_inches='tight')
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
 # subselect features
+'''
+
 nFeats = recsDF.groupby('feature', axis='columns').ngroups
 if nFeats > 5:
     plotFeatIdxes = rng.choice(
@@ -330,22 +359,5 @@ with PdfPages(pdfPath) as pdf:
                 plt.show()
             else:
                 plt.close()
+'''
 #
-pdfPath = os.path.join(
-    figureOutputFolder, '{}_explained_variance.pdf'.format(
-        fullEstimatorName))
-with PdfPages(pdfPath) as pdf:
-    for name, group in eVSDF.groupby('freqBandName'):
-        plotDF = group.to_frame(name='signal').reset_index()
-        g = sns.relplot(
-            data=plotDF, x='component', hue='trialType',
-            y='signal', kind='line', alpha=0.5, lw=1., errorbar='se')
-        g.fig.set_size_inches((12, 8))
-        g.fig.suptitle('{}'.format(name))
-        g.resize_legend(adjust_subtitles=True)
-        g.tight_layout(pad=.3)
-        pdf.savefig(bbox_inches='tight')
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()

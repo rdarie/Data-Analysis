@@ -563,7 +563,7 @@ def parseAnalysisOptions(
             'timeROIOpts': {
                 'alignQuery': 'startingNoStim',
                 'winStart': -100e-3,
-                'winStop': 400e-3
+                'winStop': 600e-3
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
@@ -590,7 +590,7 @@ def parseAnalysisOptions(
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
                 'winStart': -100e-3,
-                'winStop': 400e-3
+                'winStop': 600e-3
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
