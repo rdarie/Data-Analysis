@@ -63,6 +63,7 @@ sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
     font_scale=1.5, color_codes=True)
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 ##

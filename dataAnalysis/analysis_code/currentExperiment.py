@@ -528,20 +528,20 @@ def parseAnalysisOptions(
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
-                n_splits=7,
+                n_splits=20,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': None,
-                'winStart': -700e-3,
-                'winStop': -400e-3
+                'winStart': -600e-3,
+                'winStop': -300e-3
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
-                'winStart': -700e-3,
-                'winStop': -400e-3
+                'winStart': -600e-3,
+                'winStop': -300e-3
             }
         },
         # perimovement, no stim
@@ -555,15 +555,15 @@ def parseAnalysisOptions(
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
-                n_splits=7,
+                n_splits=20,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
-                'alignQuery': 'stoppingNoStim',
+                'alignQuery': 'startingNoStim',
                 'winStart': -100e-3,
-                'winStop': 0.
+                'winStop': 400e-3
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
@@ -582,15 +582,15 @@ def parseAnalysisOptions(
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
-                n_splits=7,
+                n_splits=20,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
-                'alignQuery': 'stoppingOrStimOff',
+                'alignQuery': 'startingOrStimOn',
                 'winStart': -100e-3,
-                'winStop': 0.
+                'winStop': 400e-3
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
@@ -708,6 +708,9 @@ def parseAnalysisOptions(
         }
     }
     #
+    for optsKey in ['ca', 'cb', 'cc']:
+        iteratorOpts[optsKey]['cvKWArgs']['splitterKWArgs']['samplerKWArgs']['test_size'] = 0.2
+
     iteratorOpts['ccs'] = iteratorOpts['cc'].copy()
     iteratorOpts['ccm'] = iteratorOpts['cc'].copy()
     #

@@ -14,6 +14,7 @@ Options:
     --lazy                                 load from raw, or regular? [default: False]
     --plotting                             make plots? [default: False]
     --debugging                            restrict datasets for debugging? [default: False]
+    --preScale                             restrict datasets for debugging? [default: False]
     --showFigures                          show plots? [default: False]
     --verbose=verbose                      print diagnostics? [default: 0]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: midPeak]

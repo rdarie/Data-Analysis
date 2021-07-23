@@ -42,7 +42,7 @@ import sys
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from docopt import docopt
-
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}

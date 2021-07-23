@@ -7,7 +7,7 @@ from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
 from sklearn.base import clone
-from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
+from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance, MinCovDet
 from sklearn.linear_model import ElasticNet, ElasticNetCV
 from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.svm import LinearSVR
@@ -1055,7 +1055,15 @@ class EmpiricalCovarianceTransformer(EmpiricalCovariance, TransformerMixin):
     def transform(self, X):
         return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 
+class MinCovDetTransformer(MinCovDet, TransformerMixin):
+    def transform(self, X):
+        return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
+
 class LedoitWolfTransformer(LedoitWolf, TransformerMixin):
+    def fit(self, X, y=None):
+        print('LedoitWolfTransformer, X.shape = {}'.format(X.shape))
+        super().fit(X, y=y)
+        return self
     def transform(self, X):
         return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 

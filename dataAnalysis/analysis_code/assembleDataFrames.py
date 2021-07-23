@@ -12,6 +12,7 @@ Options:
     --winStart=winStart                    start of window
     --winStop=winStop                      end of window
     --lazy                                 load from raw, or regular? [default: False]
+    --preScale                             apply normalization per feacture before anything else? [default: False]
     --plotting                             make plots? [default: False]
     --debugging                            restrict datasets for debugging? [default: False]
     --showFigures                          show plots? [default: False]
@@ -117,6 +118,7 @@ if __name__ == '__main__':
             arguments['window'],
             arguments['alignQuery'],
             iteratorSuffix))
+    print('Loading cv iterator from {}'.format(iteratorPath))
     with open(iteratorPath, 'rb') as f:
         loadingMeta = pickle.load(f)
     datasetName = '{}_{}_df{}'.format(
@@ -166,6 +168,7 @@ if __name__ == '__main__':
         if arguments['lazy']:
             dataReader.file.close()
     else:    # loading frames
+        loadingMeta['arguments']['preScale'] = arguments['preScale']
         experimentsToAssemble = loadingMeta['experimentsToAssemble'].copy()
         print(experimentsToAssemble)
         currBlockNum = 0

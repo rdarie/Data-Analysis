@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_stim_covariances_25
+#SBATCH -J test_train_split_stim_covariances_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_stim_covariances_25.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_stim_covariances_25.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_stim_covariances_27.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_stim_covariances_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -30,7 +30,7 @@ source shellScripts/calc_aligned_stim_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=1"
 ITERATOR="--iteratorSuffix=ccs"
-ALIGNQUERYTERM="stimOnE2"
+ALIGNQUERYTERM="stimOnE5"
 CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
@@ -46,7 +46,7 @@ source shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=2"
 
 ITERATOR="--iteratorSuffix=ccm"
-ALIGNQUERYTERM="startingE2"
+ALIGNQUERYTERM="startingE5"
 CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 ###

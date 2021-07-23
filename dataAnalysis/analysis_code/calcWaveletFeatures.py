@@ -262,13 +262,7 @@ if __name__ == "__main__":
         waveletReportPDF.close()
     ##
     #
-    # check index sortedness
-    #
-    # groupBy = ['feature', 'originalIndex', 'segment', 't']
     groupBy = ['feature', 'pedalMovementCat', 'stimCat']
-    # groupBy = ['feature']
-    # dataDF.groupby(groupBy).ngroups
-    # pdb.set_trace()
     spectralDF = ash.splitApplyCombine(
         dataDF, fun=calcCWT,
         newMetadataNames=[

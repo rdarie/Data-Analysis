@@ -40,7 +40,7 @@ import dill as pickle
 import sys
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}

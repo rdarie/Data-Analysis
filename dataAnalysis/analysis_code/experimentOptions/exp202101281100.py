@@ -131,7 +131,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101251100-Rupert': [1, 2, 3],
+        # '202101251100-Rupert': [1, 2, 3],
         # '202101271100-Rupert': [1, 2, 3],
         '202101281100-Rupert': [1, 2, 3],
         }

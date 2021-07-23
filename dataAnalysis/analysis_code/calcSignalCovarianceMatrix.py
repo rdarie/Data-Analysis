@@ -18,7 +18,8 @@ Options:
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
 """
-
+import logging
+logging.captureWarnings(True)
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -56,14 +57,27 @@ import dill as pickle
 import gc
 from docopt import docopt
 
-idxSl = pd.IndexSlice
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+
+'''
+
+arguments = {
+    'analysisName': 'hiRes', 'processAll': True, 'selectionName': 'lfp_CAR', 'datasetName': 'Block_XL_df_ca',
+    'window': 'long', 'estimatorName': 'mahal', 'verbose': 2, 'exp': 'exp202101251100',
+    'alignFolderName': 'motion', 'showFigures': False, 'blockIdx': '2', 'debugging': False,
+    'plotting': True, 'lazy': False}
+os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+
+'''
+
+idxSl = pd.IndexSlice
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 #
 arguments['verbose'] = int(arguments['verbose'])
+
 #
 analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
@@ -102,6 +116,12 @@ with open(loadingMetaPath, 'rb') as _f:
     # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
     iteratorsBySegment = loadingMeta['iteratorsBySegment']
     # cv_kwargs = loadingMeta['cv_kwargs']
+    if 'normalizeDataset' in loadingMeta:
+        normalizeDataset = loadingMeta['normalizeDataset']
+        unNormalizeDataset = loadingMeta['unNormalizeDataset']
+        normalizationParams = loadingMeta['normalizationParams']
+    else:
+        normalizeDataset = None
 for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
     loadingMeta['arguments'].pop(argName, None)
 arguments.update(loadingMeta['arguments'])
@@ -117,7 +137,7 @@ if __name__ == '__main__':
         cv=cvIterator,
         return_train_score=True, return_estimator=True)
     joblibBackendArgs = dict(
-        backend='dask'
+        backend='loky'
         )
     if joblibBackendArgs['backend'] == 'dask':
         daskComputeOpts = dict(
@@ -160,6 +180,7 @@ if __name__ == '__main__':
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
+        print('dataGroup.shape = {}'.format(dataGroup.shape))
         trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
         if arguments['verbose']:
             print('Fitting {} ...'.format(trfName))

@@ -55,6 +55,7 @@ sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
     font_scale=0.5, color_codes=True)
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -287,9 +288,9 @@ with PdfPages(pdfPath) as pdf:
         plt.close()
 # subselect features
 nFeats = recsDF.groupby('feature', axis='columns').ngroups
-if nFeats > 10:
+if nFeats > 5:
     plotFeatIdxes = rng.choice(
-        nFeats, size=10, replace=False)
+        nFeats, size=5, replace=False)
 else:
     plotFeatIdxes = np.arange(nFeats)
 plotFeatNames = recsDF.columns.get_level_values('feature')[plotFeatIdxes]

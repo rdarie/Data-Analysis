@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=96G
 
 # Specify a job name:
-#SBATCH -J pca_dimen_motion_lfp_rb_st_25
+#SBATCH -J pca_dimen_motion_lfp_rb_st_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_motion_lfp_rb_st_25.out
-#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_motion_lfp_rb_st_25.out
+#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_motion_lfp_rb_st_27.out
+#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_motion_lfp_rb_st_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
