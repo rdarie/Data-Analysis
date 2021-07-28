@@ -6,15 +6,15 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=2
+#SBATCH --nodes=1
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J align_motion_2021_01_25_lfp
+#SBATCH -J align_motion_2021_01_27_lfp
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_25_lfp.out
-#SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_25_lfp.out
+#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_27_lfp.out
+#SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_27_lfp.out
 
 # Request custom resources
 #SBATCH --array=2,3

@@ -372,7 +372,7 @@ if __name__ == '__main__':
             designDF.columns.name = 'factor'
             '''
             designDF.to_hdf(designMatrixPath, 'designs/formula_{}'.format(formulaIdx))
-
+    print('Complete.')
     #####################################################################################################################
     ###
     '''

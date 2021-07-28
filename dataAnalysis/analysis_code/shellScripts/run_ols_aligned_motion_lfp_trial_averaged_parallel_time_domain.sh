@@ -6,8 +6,8 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --ntasks=4
-#SBATCH --ntasks-per-core=4
+#SBATCH --ntasks=5
+#SBATCH --ntasks-per-core=5
 #SBATCH --mem-per-cpu=8G
 
 # Specify a job name:

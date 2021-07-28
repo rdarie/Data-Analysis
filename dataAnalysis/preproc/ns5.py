@@ -1091,6 +1091,8 @@ def concatenateUnitSpikeTrainWaveformsDF(
             whichSegments=whichSegments, procFun=procFun)
         if idx == 0:
             idxLabels = unitWaveforms.index.names
+        else:
+            assert (idxLabels == unitWaveforms.index.names)
         if (concatOn == 'columns') and (idx > 0):
             # i.e. if the columns represent features,
             # other than first time, we already have the trial metadata
@@ -1134,7 +1136,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             'finished concatenating, memory usage: {:.1f} MB'
             .format(prf.memory_usage_psutil()))
     try:
-        idxLabels = sorted(idxLabels)
+        # idxLabels = sorted(idxLabels)
         allWaveforms.set_index(idxLabels, inplace=True)
         sortIndexBy = ['segment', 'originalIndex', 't']
         for cN in ['bin']:
@@ -1690,8 +1692,14 @@ def alignedAsigDFtoSpikeTrain(
                 if isinstance(featGroup, pd.Series):
                     featGroup = featGroup.to_frame(name=featName)
                     featGroup.columns.name = 'feature'
-                spikeWaveformsDF = transposeSpikeDF(featGroup, 'bin', fastTranspose=True)
-                pdb.set_trace()
+                ########
+                spikeWaveformsDF = transposeSpikeDF(
+                    featGroup, 'bin', fastTranspose=True)
+                sortIndexBy = ['feature', 'segment', 'originalIndex', 't']
+                spikeWaveformsDF.sort_index(
+                    level=sortIndexBy,
+                    axis='index', inplace=True,
+                    kind='mergesort', sort_remaining=False)
             if matchSamplingRate:
                 if len(spikeWaveformsDF.columns) != len(wfBins):
                     wfDF = spikeWaveformsDF.reset_index(drop=True).T
