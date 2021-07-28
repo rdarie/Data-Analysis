@@ -277,12 +277,10 @@ def getExpOpts():
                 '202101281100-Rupert': [1, 2, 3],
                 }
         },
-        'f': {
+        'ma': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3],
-                '202101271100-Rupert': [1, 2, 3],
                 '202101281100-Rupert': [1, 2, 3],
-                }
+            }
         }
     }
     return locals()

@@ -6,9 +6,8 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --ntasks=1
-#SBATCH --ntasks-per-core=1
-#SBATCH --mem-per-cpu=64G
+#SBATCH --nodes=4
+#SBATCH --mem=120G
 
 # Specify a job name:
 #SBATCH -J ols_motion_lfp_prep_ta_td_fa_27
@@ -39,4 +38,4 @@ RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 #
 ESTIMATOR="enr_fa_ta${SUFFIX}"
-python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa_ta' --maxNumFeatures=16 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa_ta' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1

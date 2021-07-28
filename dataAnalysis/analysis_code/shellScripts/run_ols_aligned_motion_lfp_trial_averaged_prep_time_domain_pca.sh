@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=127G
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_prep_ta_td_pca_27
+#SBATCH -J ols_motion_lfp_prep_ta_td_pca_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ols_motion_lfp_prep_ta_td_pca_27.out
-#SBATCH -e ../../batch_logs/%j-%a-ols_motion_lfp_prep_ta_td_pca_27.out
+#SBATCH -o ../../batch_logs/%j-%a-ols_motion_lfp_prep_ta_td_pca_28.out
+#SBATCH -e ../../batch_logs/%j-%a-ols_motion_lfp_prep_ta_td_pca_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

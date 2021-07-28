@@ -14,6 +14,7 @@ from sklearn.svm import LinearSVR
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
+import pingouin as pg
 from patsy.state import stateful_transform
 from statsmodels.stats.multitest import multipletests as mt
 import pdb, traceback
@@ -21,6 +22,7 @@ import os
 import scipy.optimize
 from itertools import product
 import joblib as jb
+from joblib import Parallel, parallel_backend, delayed
 from copy import copy, deepcopy
 import statsmodels
 from patsy import (
@@ -30,9 +32,10 @@ import pyglmnet
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.linalg
+import scipy.stats
 from sklearn.utils.validation import check_is_fitted
 from dask.distributed import Client, LocalCluster
-from sklearn.utils import _joblib, parallel_backend
+# from sklearn.utils import _joblib, parallel_backend
 from sklearn.metrics import r2_score
 from ttictoc import tic, toc
 import contextlib
@@ -66,10 +69,69 @@ def partialR2(llSrs, testDesign=None, refDesign=None, designLevel='design'):
     # tInfoRef = llRef.index.to_frame().reset_index(drop=True)
     # lhsMaskIdx refers to design, which is different between llRef and llTest
     # so the indices don't line up between llRef and llTest
-    return 1 - (llSat.to_numpy() - llTest) / (llSat.to_numpy() - llRef.to_numpy())
+    partR2 = 1 - (llSat.to_numpy() - llTest) / (llSat.to_numpy() - llRef.to_numpy())
+    return partR2
 
+def correctedResampledPairedTTest(
+        xSrs, y=None,
+        groupBy=None, tTestArgs={}, powerAlpha=0.05,
+        cvIterator=None, test_size=None):
+    if (cvIterator is not None) and test_size is None:
+        test_size = cvIterator.splitter.sampler.test_size
+    if 'tail' in tTestArgs:
+        tail = tTestArgs['tail']
+    else:
+        tail = 'two-sided'
+    if 'confidence' in tTestArgs:
+        confidence = tTestArgs['confidence']
+    else:
+        confidence = 0.95
+    ci_name = 'CI%.0f%%' % (100 * confidence)
+    if tail == "two-sided":
+        alpha = 1 - confidence
+        conf = 1 - alpha / 2  # 0.975
+    else:
+        conf = confidence
+    if groupBy is None:
+        groupIterator = ('all', xSrs)
+    else:
+        groupIterator = xSrs.groupby(groupBy)
+        resultsDict = {}
+    for name, group in groupIterator:
+        if isinstance(y, pd.Series):
+            thisY = y.loc[group.index]
+        else:
+            thisY = y
+        statsResDF = pg.ttest(group, thisY, **tTestArgs).loc['T-test', :]
+        # notation from Nadeau, 2003
+        J = float(statsResDF['dof']) + 1
+        n2 = test_size
+        n1 = 1 - test_size
+        corrFactor = np.sqrt((J ** -1) / (J ** -1 + n2/n1))
+        tcrit = scipy.stats.t.ppf(conf, statsResDF['dof'])
+        se = (group - y).sem() / corrFactor
+        statsResDF['T'] = statsResDF['T'] * corrFactor
+        statsResDF[ci_name] = np.array([statsResDF['T'] - tcrit, statsResDF['T'] + tcrit]) * se
+        if not isinstance(y, pd.Series):
+            statsResDF[ci_name] += thisY
+        statsResDF['cohen-d'] = statsResDF['cohen-d'] * corrFactor
+        # if np.isnan(statsResDF['cohen-d']):
+        #     pdb.set_trace()
+        if tail == "two-sided":
+            statsResDF['p-val'] = 2 * scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
+        else:
+            statsResDF['p-val'] = scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
+        statsResDF['power'] = pg.power_ttest(
+            d=statsResDF['cohen-d'], n=J, power=None, alpha=powerAlpha,
+            contrast='paired', tail=tail)
+        statsResDF.drop('BF10', inplace=True)
+        if groupBy is None:
+            return statsResDF
+        else:
+            resultsDict[name] = statsResDF
+    return pd.concat(resultsDict, axis='columns', names=groupBy).T
 
-class raisedCosTransformer(object):
+class raisedCosTransformerBackup(object):
     def __init__(self, kWArgs=None):
         if kWArgs is not None:
             self.memorize_chunk(None, **kWArgs)
@@ -83,7 +145,9 @@ class raisedCosTransformer(object):
             zflag=False, logBasis=True,
             addInputToOutput=False,
             causalShift=True, causalFill=False,
-            selectColumns=None, preprocFun=None):
+            selectColumns=None, preprocFun=None,
+            joblibBackendArgs=None, convolveMethod='auto',
+            verbose=0):
         ##
         if logBasis:
             nlin = None
@@ -92,6 +156,8 @@ class raisedCosTransformer(object):
             nlin = lambda x: x
             invnl = lambda x: x
             b = 0
+        self.verbose = verbose
+        self.convolveMethod = convolveMethod
         self.nb = nb
         self.dt = dt
         self.historyLen = historyLen
@@ -103,7 +169,10 @@ class raisedCosTransformer(object):
         self.tLabel = tLabel
         self.addInputToOutput = addInputToOutput
         self.selectColumns = selectColumns
-        self.preprocFun = preprocFun
+        if preprocFun is None:
+            self.preprocFun = lambda x: x
+        else:
+            self.preprocFun = preprocFun
         self.causalShift = causalShift
         self.causalFill = causalFill
         if not logBasis:
@@ -134,7 +203,9 @@ class raisedCosTransformer(object):
             groupBy='trialUID', tLabel='bin',
             zflag=False, logBasis=True, causalShift=True, causalFill=False,
             addInputToOutput=False,
-            selectColumns=None, preprocFun=None):
+            selectColumns=None, preprocFun=None,
+            joblibBackendArgs=None, convolveMethod='auto',
+            verbose=0):
         # print('Starting to apply raised cos basis to {} (size={})'.format(vecSrs.name, vecSrs.size))
         # for line in traceback.format_stack():
         #     print(line.strip())
@@ -147,90 +218,240 @@ class raisedCosTransformer(object):
         for name, group in vecSrs.groupby(self.groupBy):
             for cNIdx, cN in enumerate(basisDF.columns):
                 resCN = resDF.columns[cNIdx]
-                if self.preprocFun is not None:
+                '''if self.preprocFun is not None:
                     sig = self.preprocFun(group)
                 else:
-                    sig = group
-                convResult = np.convolve(
+                    sig = group'''
+                sig = self.preprocFun(group)
+                convResult = scipy.signal.convolve(
                     sig.to_numpy(),
                     basisDF[cN].to_numpy(),
-                    mode='full')
+                    mode='full', method=self.convolveMethod)
                 leftSeek = max(
                     int(convResult.shape[0] / 2 - group.shape[0] / 2 - self.leftShiftBasis), 0)
                 rightSeek = leftSeek + group.shape[0]
                 convResult = convResult[leftSeek:rightSeek]
-                '''if group.shape[0] <= basisDF.shape[0]:
-                    convResult = np.convolve(
-                        group.to_numpy(),
-                        basisDF[cN].to_numpy(),
-                        mode='full')
-                    #
-                    convResult = np.roll(convResult, shiftBy)
-                    if shiftBy > 0:
-                        convResult[:shiftBy] = 0
-                    else:
-                        convResult[shiftBy:] = 0
-                    #
-                    convLags = (np.arange(convResult.shape[0]) - np.round(convResult.shape[0] / 2)) * self.dt
-                    tBins = group.index.get_level_values(self.tLabel)
-                    convMask = (convLags >= tBins.min()) & (convLags <= tBins.max())
-                    convResult = convResult[convMask][:group.shape[0]]
-                else:
-                    convResult = np.convolve(
-                        group.to_numpy(),
-                        basisDF[cN].to_numpy(),
-                        mode='same')
-                    convResult = np.roll(convResult, shiftBy)
-                    if shiftBy > 0:
-                        convResult[:shiftBy] = 0
-                    else:
-                        convResult[shiftBy:] = 0'''
                 '''
-                shiftBy = -20
-                bla = np.arange(80)
-                plt.plot(bla, label='original')
-                bla1 = np.roll(bla, shiftBy)
-                plt.plot(bla1, label='shifted')
-                if shiftBy > 0:
-                    bla1[:shiftBy] = 0
-                else:
-                    bla1[shiftBy:] = 0
-                plt.plot(bla1, label='clipped')
-                plt.legend()
-                plt.show()
+                    if group.shape[0] <= basisDF.shape[0]:
+                        convResult = np.convolve(
+                            group.to_numpy(),
+                            basisDF[cN].to_numpy(),
+                            mode='full')
+                        #
+                        convResult = np.roll(convResult, shiftBy)
+                        if shiftBy > 0:
+                            convResult[:shiftBy] = 0
+                        else:
+                            convResult[shiftBy:] = 0
+                        #
+                        convLags = (np.arange(convResult.shape[0]) - np.round(convResult.shape[0] / 2)) * self.dt
+                        tBins = group.index.get_level_values(self.tLabel)
+                        convMask = (convLags >= tBins.min()) & (convLags <= tBins.max())
+                        convResult = convResult[convMask][:group.shape[0]]
+                    else:
+                        convResult = np.convolve(
+                            group.to_numpy(),
+                            basisDF[cN].to_numpy(),
+                            mode='same')
+                        convResult = np.roll(convResult, shiftBy)
+                        if shiftBy > 0:
+                            convResult[:shiftBy] = 0
+                        else:
+                            convResult[shiftBy:] = 0
+                    shiftBy = -20
+                    bla = np.arange(80)
+                    plt.plot(bla, label='original')
+                    bla1 = np.roll(bla, shiftBy)
+                    plt.plot(bla1, label='shifted')
+                    if shiftBy > 0:
+                        bla1[:shiftBy] = 0
+                    else:
+                        bla1[shiftBy:] = 0
+                    plt.plot(bla1, label='clipped')
+                    plt.legend()
+                    plt.show()
+                    fig, ax = plt.subplots(4, 1)
+                    M = group.shape[0]
+                    N = basisDF.shape[0]
+                    tPlotG = np.arange(M) - M / 2
+                    tPlotB = np.arange(N) - N / 2
+                    tPlotC = np.arange(M + N - 1) - (M + N - 1) / 2
+                    ax[0].plot(tPlotG, group.to_numpy(), label='original')
+                    ax[0].plot(tPlotB, basisDF[cN].to_numpy(), label='kernel')
+                    ax[0].legend()
+                    ax[1].plot(tBins / self.dt, group.to_numpy(), label='original')
+                    ax[1].plot(self.iht / self.dt, basisDF[cN].to_numpy(), label='kernel')
+                    ax[1].legend()
+                    ax[2].plot(tPlotC, convResult, label='convolution result')
+                    ax[2].legend()
+                    ax[3].plot(tPlotG, group.to_numpy(), label='original')
+                    ax[3].plot(tPlotG, convResultShifted, label='shifted')
+                    ax[3].legend()
+                    fig.suptitle('{}'.format(seekIdx))
+                    plt.show()
                 '''
-                #
-                # pdb.set_trace()
-                '''fig, ax = plt.subplots(4, 1)
-                M = group.shape[0]
-                N = basisDF.shape[0]
-                tPlotG = np.arange(M) - M / 2
-                tPlotB = np.arange(N) - N / 2
-                tPlotC = np.arange(M + N - 1) - (M + N - 1) / 2
-                ax[0].plot(tPlotG, group.to_numpy(), label='original')
-                ax[0].plot(tPlotB, basisDF[cN].to_numpy(), label='kernel')
-                ax[0].legend()
-                ax[1].plot(tBins / self.dt, group.to_numpy(), label='original')
-                ax[1].plot(self.iht / self.dt, basisDF[cN].to_numpy(), label='kernel')
-                ax[1].legend()
-                ax[2].plot(tPlotC, convResult, label='convolution result')
-                ax[2].legend()
-                ax[3].plot(tPlotG, group.to_numpy(), label='original')
-                ax[3].plot(tPlotG, convResultShifted, label='shifted')
-                ax[3].legend()
-                fig.suptitle('{}'.format(seekIdx))
-                plt.show()'''
                 resDF.loc[group.index, resCN] = convResult
         #
         if self.selectColumns is not None:
             resDF = resDF.iloc[:, self.selectColumns]
         #
         if self.addInputToOutput:
-            if self.preprocFun is not None:
+            '''if self.preprocFun is not None:
                 sig = self.preprocFun(vecSrs)
             else:
-                sig = vecSrs
+                sig = vecSrs'''
+            sig = self.preprocFun(vercSrs)
             resDF.insert(0, 0., sig)
+        return resDF
+
+    def plot_basis(self):
+        fig, ax = plt.subplots(2, 1, sharex=True)
+        ax[0].plot(self.ihbasisDF)
+        titleStr = 'raised log cos basis' if self.logBasis else 'raised cos basis'
+        ax[0].set_title(titleStr)
+        ax[1].plot(self.orthobasisDF)
+        ax[1].set_title('orthogonalized basis')
+        ax[1].set_xlabel('Time (sec)')
+        return fig, ax
+
+class raisedCosTransformer(object):
+    def __init__(self, kWArgs=None):
+        if kWArgs is not None:
+            self.memorize_chunk(None, **kWArgs)
+        return
+
+    def memorize_chunk(
+            self, vecSrs, nb=1, dt=1.,
+            historyLen=None, b=1e-3,
+            normalize=False, useOrtho=True,
+            groupBy='trialUID', tLabel='bin',
+            zflag=False, logBasis=True,
+            addInputToOutput=False,
+            causalShift=True, causalFill=False,
+            selectColumns=None, preprocFun=None,
+            joblibBackendArgs=None, convolveMethod='auto', verbose=0):
+        ##
+        if logBasis:
+            nlin = None
+            invnl = None
+        else:
+            nlin = lambda x: x
+            invnl = lambda x: x
+            b = 0
+        self.verbose = verbose
+        self.convolveMethod = convolveMethod
+        self.joblibBackendArgs = joblibBackendArgs.copy()
+        if joblibBackendArgs['backend'] == 'dask':
+            daskComputeOpts = self.joblibBackendArgs.pop('daskComputeOpts')
+            if daskComputeOpts['scheduler'] == 'single-threaded':
+                daskClient = Client(LocalCluster(n_workers=1))
+            elif daskComputeOpts['scheduler'] == 'processes':
+                daskClient = Client(LocalCluster(processes=True))
+            elif daskComputeOpts['scheduler'] == 'threads':
+                daskClient = Client(LocalCluster(processes=False))
+            else:
+                print('Scheduler name is not correct!')
+                daskClient = Client()
+        self.nb = nb
+        self.dt = dt
+        self.historyLen = historyLen
+        self.zflag = zflag
+        self.logBasis = logBasis
+        self.normalize = normalize
+        self.useOrtho = useOrtho
+        self.groupBy = groupBy
+        self.tLabel = tLabel
+        self.addInputToOutput = addInputToOutput
+        self.selectColumns = selectColumns
+        if preprocFun is None:
+            self.preprocFun = lambda x: x
+        else:
+            self.preprocFun = preprocFun
+        self.causalShift = causalShift
+        self.causalFill = causalFill
+        if not logBasis:
+            b = 0.
+        self.b = b
+        self.endpoints = raisedCosBoundary(
+            b=b, DT=historyLen,
+            minX=0.,
+            nb=nb, nlin=nlin, invnl=invnl, causal=causalShift)
+        if logBasis:
+            self.ihbasisDF, self.orthobasisDF = makeLogRaisedCosBasis(
+                nb=nb, dt=dt, endpoints=self.endpoints, b=b,
+                zflag=zflag, normalize=normalize, causal=causalFill)
+        else:
+            self.ihbasisDF, self.orthobasisDF = makeRaisedCosBasis(
+                nb=nb, dt=dt, endpoints=self.endpoints,
+                normalize=normalize, causal=causalFill)
+        if self.useOrtho:
+            self.basisDF = self.orthobasisDF
+        else:
+            self.basisDF = self.ihbasisDF
+        self.iht = np.array(self.ihbasisDF.index)
+        self.leftShiftBasis = int(((max(self.iht) - min(self.iht)) / 2 + min(self.iht)) / self.dt) + 1
+
+        def transformPiece(name, group):
+            resDF = pd.DataFrame(np.nan, index=group.index, columns=self.basisDF.columns)
+            for cNIdx, cN in enumerate(self.basisDF.columns):
+                resCN = resDF.columns[cNIdx]
+                sig = self.preprocFun(group)
+                convResult = scipy.signal.convolve(
+                    sig.to_numpy(),
+                    self.basisDF[cN].to_numpy(),
+                    mode='full', method=self.convolveMethod)
+                leftSeek = max(
+                    int(convResult.shape[0] / 2 - group.shape[0] / 2 - self.leftShiftBasis), 0)
+                rightSeek = leftSeek + group.shape[0]
+                convResult = convResult[leftSeek:rightSeek]
+                resDF.loc[group.index, resCN] = convResult
+            return resDF
+        self.transformPiece = transformPiece
+        return
+
+    def memorize_finish(self):
+        return
+
+    def transform(
+            self, vecSrs, nb=1, dt=1.,
+            historyLen=None, b=1e-3,
+            normalize=False, useOrtho=True,
+            groupBy='trialUID', tLabel='bin',
+            zflag=False, logBasis=True, causalShift=True, causalFill=False,
+            addInputToOutput=False,
+            selectColumns=None, preprocFun=None,
+            convolveMethod='auto', joblibBackendArgs=None, verbose=0):
+        # print('Starting to apply raised cos basis to {} (size={})'.format(vecSrs.name, vecSrs.size))
+        # for line in traceback.format_stack():
+        #     print(line.strip())
+        columnNames = ['{}_{}'.format(vecSrs.name, basisCN) for basisCN in self.basisDF.columns]
+        # resDF = pd.DataFrame(np.nan, index=vecSrs.index, columns=columnNames)
+        '''
+            lOfPieces = []
+            for name, group in vecSrs.groupby(self.groupBy):
+                lOfPieces.append(self.transformPiece(name, group))
+            '''
+        if self.joblibBackendArgs is None:
+            contextManager = contextlib.nullcontext()
+        else:
+            contextManager = parallel_backend(**self.joblibBackendArgs)
+        if self.verbose > 1:
+            print('Analyzing signal {}'.format(vecSrs.name))
+            print('joblibBackendArgs = {}'.format(self.joblibBackendArgs))
+            print('joblib context manager = {}'.format(contextManager))
+        with contextManager:
+            lOfPieces = Parallel(verbose=self.verbose)(
+                delayed(self.transformPiece)(name, group)
+                for name, group in vecSrs.groupby(self.groupBy))
+            resDF = pd.concat(lOfPieces)
+            resDF = resDF.loc[vecSrs.index, :]
+            resDF.columns = columnNames
+        if self.addInputToOutput:
+            sig = self.preprocFun(vercSrs)
+            resDF.insert(0, 0., sig)
+        if self.selectColumns is not None:
+            resDF = resDF.iloc[:, self.selectColumns]
+        #
         return resDF
 
     def plot_basis(self):
@@ -522,7 +743,8 @@ def crossValidationScores(
         contextManager = contextlib.nullcontext()
     else:
         contextManager = parallel_backend(**joblibBackendArgs)
-    print('crossValidationScores() using contextManager: {}'.format(contextManager))
+    if verbose > 0:
+        print('crossValidationScores() using contextManager: {}'.format(contextManager))
     with contextManager:
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
@@ -530,34 +752,34 @@ def crossValidationScores(
             workEstim = clone(estimatorInstance)
         scores = cross_validate(
             estimatorInstance, X, y, verbose=verbose, **crossvalKWArgs)
-    # train on all of the "working" samples, eval on the "validation"
-    if hasattr(crossvalKWArgs['cv'], 'workIterator'):
-        workingIdx = crossvalKWArgs['cv'].work
-        validIdx = crossvalKWArgs['cv'].validation
-        workingIdx, validIdx = crossvalKWArgs['cv'].workIterator.split(X)[0]
-        #
-        workX = X.iloc[workingIdx, :]
-        valX = X.iloc[validIdx, :]
-        if y is not None:
-            workY = y.iloc[workingIdx]
-            valY = y.iloc[validIdx]
-        else:
-            workY = None
-            valY = None
-        #
-        workEstim.fit(workX, workY)
-        #
-        scores['fit_time'] = np.append(scores['fit_time'], np.nan)
-        scores['score_time'] = np.append(scores['score_time'], np.nan)
-        if 'estimator' in scores:
-            scores['estimator'].append(workEstim)
-        if 'scoring' in crossvalKWArgs:
-            scoreFun = crossvalKWArgs['scoring']
-            scores['train_score'] = np.append(scores['train_score'], scoreFun(workEstim, workX, workY))
-            scores['test_score'] = np.append(scores['test_score'], scoreFun(workEstim, valX, valY))
-        else:
-            scores['train_score'] = np.append(scores['train_score'], workEstim.score(workX, workY))
-            scores['test_score'] = np.append(scores['test_score'], workEstim.score(valX, valY))
+        # train on all of the "working" samples, eval on the "validation"
+        if hasattr(crossvalKWArgs['cv'], 'workIterator'):
+            workingIdx = crossvalKWArgs['cv'].work
+            validIdx = crossvalKWArgs['cv'].validation
+            workingIdx, validIdx = crossvalKWArgs['cv'].workIterator.split(X)[0]
+            #
+            workX = X.iloc[workingIdx, :]
+            valX = X.iloc[validIdx, :]
+            if y is not None:
+                workY = y.iloc[workingIdx]
+                valY = y.iloc[validIdx]
+            else:
+                workY = None
+                valY = None
+            #
+            workEstim.fit(workX, workY)
+            #
+            scores['fit_time'] = np.append(scores['fit_time'], np.nan)
+            scores['score_time'] = np.append(scores['score_time'], np.nan)
+            if 'estimator' in scores:
+                scores['estimator'].append(workEstim)
+            if 'scoring' in crossvalKWArgs:
+                scoreFun = crossvalKWArgs['scoring']
+                scores['train_score'] = np.append(scores['train_score'], scoreFun(workEstim, workX, workY))
+                scores['test_score'] = np.append(scores['test_score'], scoreFun(workEstim, valX, valY))
+            else:
+                scores['train_score'] = np.append(scores['train_score'], workEstim.score(workX, workY))
+                scores['test_score'] = np.append(scores['test_score'], workEstim.score(valX, valY))
     return scores
 
 

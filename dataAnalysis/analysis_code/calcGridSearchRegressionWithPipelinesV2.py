@@ -175,7 +175,7 @@ if __name__ == '__main__':
         # backend='dask',
         backend='loky',
         #### n_jobs=1
-    )
+        )
     #
     estimatorMetadata['joblibBackendArgs'] = joblibBackendArgs
     #
@@ -198,7 +198,7 @@ if __name__ == '__main__':
         return_train_score=True, return_estimator=True)
     estimatorMetadata['crossvalKWArgs'] = crossvalKWArgs
     ###
-    nAlphas = 25
+    nAlphas = 10
     ###
     ## statsmodels elasticnet
     regressorKWArgs = {
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     gridSearchKWArgs = dict(
         return_train_score=True,
         refit=False,
-        param_grid={l1_ratio_name: [.1, .5, .95]}
+        param_grid={l1_ratio_name: [.1, .5, .75, .95]}
         )
     #
     '''regressorClass = ElasticNet
@@ -323,12 +323,17 @@ if __name__ == '__main__':
     #
     if os.getenv('SLURM_ARRAY_TASK_ID') is not None:
         slurmTaskID = int(os.getenv('SLURM_ARRAY_TASK_ID'))
+        estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
     else:
         slurmTaskID = 0
+    if os.path.exists(estimatorPath):
+        os.remove(estimatorPath)
     if os.getenv('SLURM_ARRAY_TASK_COUNT') is not None:
         slurmTaskCount = int(os.getenv('SLURM_ARRAY_TASK_COUNT'))
     else:
         slurmTaskCount = 1
+    print('slurmTaskCount = {}'.format(slurmTaskCount))
+    slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
     if os.getenv('SLURM_ARRAY_TASK_MIN') is not None:
         slurmTaskMin = int(os.getenv('SLURM_ARRAY_TASK_MIN'))
     else:
@@ -339,8 +344,6 @@ if __name__ == '__main__':
         del transformedRhsDF, transformedRhsMasks
     #
     if slurmTaskID == slurmTaskMin:
-        if os.path.exists(estimatorPath):
-            os.remove(estimatorPath)
         if os.path.exists(estimatorMetaDataPath):
             os.remove(estimatorMetaDataPath)
         with open(estimatorMetaDataPath, 'wb') as f:
@@ -385,7 +388,7 @@ if __name__ == '__main__':
             #
             for targetName in rhGroup.columns:
                 targetIdx = allTargetsDF.loc[(lhsMaskIdx, rhsMaskIdx, targetName), 'targetIdx']
-                if (targetIdx % slurmTaskCount) != slurmTaskID:
+                if (targetIdx // slurmGroupSize) != slurmTaskID:
                     continue
                 print('\nslurmTaskID == {} targetIdx == {}\n'.format(slurmTaskID, targetIdx))
                 prf.print_memory_usage('Fitting {} to {}...'.format(lhsMask.name[-1], targetName))
@@ -465,3 +468,4 @@ if __name__ == '__main__':
                         lhsMaskIdx, rhsMaskIdx, targetName
                         ))
                 prf.print_memory_usage('\n\nCompleted fit {} to {}...\n\n'.format(lhsMask.name[-1], targetName))
+print('All fits complete.')

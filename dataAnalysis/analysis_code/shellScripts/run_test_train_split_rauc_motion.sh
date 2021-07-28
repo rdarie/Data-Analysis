@@ -10,11 +10,11 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_28
+#SBATCH -J test_train_split_rauc_motion_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_28.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_28.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_rauc_motion_27.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_rauc_motion_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,22 +25,13 @@
 #   SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
-#
-# suffixes a through e used for the dimensionality calculation#
-# suffix f, for RAUC calculations
-ITERATOR="--iteratorSuffix=f"
-#
-# TARGET="lfp_CAR_spectral_fa_mahal"
-TARGET="lfp_CAR_spectral_mahal"
-#
+
+ITERATOR="--iteratorSuffix=ma"
 ALIGNQUERYTERM="starting"
+CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
-#
-python -u './calcTestTrainSplit.py' --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
-python -u './applyTestTrainSplit.py' --resetHDF --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-# Control Sets
-ALIGNQUERYTERM="outbound"
-ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
-#
-python -u './calcTestTrainSplit.py' --controlSet --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
-python -u './applyTestTrainSplit.py' --controlSet --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+
+python -u './calcTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS
+###
+python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="lfp_CAR_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_mahal' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_mahal' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

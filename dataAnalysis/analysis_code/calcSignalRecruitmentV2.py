@@ -93,10 +93,10 @@ if __name__ == "__main__":
     blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
     analysisSubFolder = os.path.join(
         scratchFolder, arguments['analysisName']
-    )
+        )
     alignSubFolder = os.path.join(
         analysisSubFolder, arguments['alignFolderName']
-    )
+        )
     calcSubFolder = os.path.join(analysisSubFolder, 'dataframes')
     if not os.path.exists(calcSubFolder):
         os.makedirs(calcSubFolder, exist_ok=True)

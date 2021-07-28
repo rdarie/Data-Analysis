@@ -213,7 +213,6 @@ if __name__ == '__main__':
     ######## make lhs masks
     maskList = []
     attrNames = ['feature', 'lag', 'designFormula', 'ensembleTemplate', 'selfTemplate']
-    '''
     for designFormula in lOfDesignFormulas:
         for ensembleTemplate, selfTemplate in lOfEnsembleTemplates:
             if (ensembleTemplate == 'NULL') and (selfTemplate == 'NULL') and (designFormula == 'NULL'):
@@ -225,22 +224,12 @@ if __name__ == '__main__':
             thisMask.columns = pd.MultiIndex.from_tuples(
                 (attrValues,), names=attrNames)
             maskList.append(thisMask.T)
-    '''
-    for designFormula, ensembleTemplate, selfTemplate in lOfEndogAndExogTemplates:
-        if (ensembleTemplate == 'NULL') and (selfTemplate == 'NULL') and (designFormula == 'NULL'):
-                continue
-        attrValues = ['all', 0, designFormula, ensembleTemplate, selfTemplate]
-        thisMask = pd.Series(
-            True,
-            index=lhsDF.columns).to_frame()
-        thisMask.columns = pd.MultiIndex.from_tuples(
-            (attrValues,), names=attrNames)
-        maskList.append(thisMask.T)
+    #
     lhsMasks = pd.concat(maskList)
     maskParams = [
         {k: v for k, v in zip(lhsMasks.index.names, idxItem)}
         for idxItem in lhsMasks.index
-        ]
+    ]
     maskParamsStr = [
         '{}'.format(idxItem).replace("'", '')
         for idxItem in maskParams]
@@ -307,6 +296,11 @@ if __name__ == '__main__':
                 prf.print_memory_usage('Calculating history terms as {}'.format(ensFormula))
                 ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
                 exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+                #
+                raisedCos = tdr.raisedCosTransformerParallel(hto0)
+                bla = raisedCos.transform(exampleRhGroup.iloc[:, 0])
+                pdb.set_trace()
+                #
                 ensPt.fit(exampleRhGroup)
                 ensDesignMatrix = ensPt.transform(rhGroup)
                 ensDesignInfo = ensDesignMatrix.design_info
@@ -332,35 +326,12 @@ if __name__ == '__main__':
     allTargetsDF.to_html(htmlPath)
     ###
     # prep lhs dataframes
-    for parentFormulaIdx, parentFormula in enumerate(masterExogFormulas):
-        prf.print_memory_usage('calculating exog terms for: {}'.format(parentFormula))
-        pt = PatsyTransformer(parentFormula, eval_env=thisEnv, return_type="matrix")
-        exampleLhGroup = lhsDF.loc[lhsDF.index.get_level_values('conditionUID') == 0, :]
-        pt.fit(exampleLhGroup)
-        designMatrix = pt.transform(lhsDF)
-        designInfo = designMatrix.design_info
-        designDF = (
-            pd.DataFrame(
-                designMatrix,
-                index=lhsDF.index,
-                columns=designInfo.column_names))
-        designDF.columns.name = 'factor'
-        designDF.to_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
-    #
+    designDict = {}
     for formulaIdx, designFormula in enumerate(lOfDesignFormulas):
         if designFormula != 'NULL':
-            prf.print_memory_usage('Looking up exog terms for: {}'.format(designFormula))
-            parentFormula = masterExogLookup[designFormula]
-            parentFormulaIdx = masterExogFormulas.index(parentFormula)
+            prf.print_memory_usage('calculating exog terms for: {}'.format(designFormula))
             pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
             exampleLhGroup = lhsDF.loc[lhsDF.index.get_level_values('conditionUID') == 0, :]
-            #
-            designMatrixExample = pt.fit_transform(exampleLhGroup)
-            designInfo = designMatrixExample.design_info
-            theseColumns = designInfo.column_names
-            designDF = pd.read_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
-            designDF = designDF.loc[:, theseColumns]
-            '''
             pt.fit(exampleLhGroup)
             designMatrix = pt.transform(lhsDF)
             designInfo = designMatrix.design_info
@@ -370,7 +341,6 @@ if __name__ == '__main__':
                     index=lhsDF.index,
                     columns=designInfo.column_names))
             designDF.columns.name = 'factor'
-            '''
             designDF.to_hdf(designMatrixPath, 'designs/formula_{}'.format(formulaIdx))
 
     #####################################################################################################################

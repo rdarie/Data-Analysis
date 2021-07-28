@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J test_train_split
+#SBATCH -J test_train_split_assembler_rauc_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_splitt_assembler_rauc_27.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_splitt_assembler_rauc_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -27,15 +27,20 @@ source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-# TARGET="lfp_CAR_spectral_fa_mahal"
-TARGET="lfp_CAR_spectral_mahal"
-
-ITERATOR="f"
+#
+ITERATOR="--iteratorSuffix=ma"
 ALIGNQUERYTERM="starting"
 #
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
-python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix=$TARGET --unitQuery="mahal" --selectionName=$TARGET --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
+TARGET="lfp_CAR_mahal"
 #
-python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix="${TARGET}" --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './calcTestTrainSplit.py' $BLOCKSELECTOR $ITERATOR --loadFromFrames --inputBlockSuffix=$TARGET --unitQuery="mahal" --selectionName=$TARGET --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
 #
+python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix=$TARGET --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+
+TARGET="lfp_CAR_spectral_mahal"
+#
+python -u './calcTestTrainSplit.py' $BLOCKSELECTOR $ITERATOR --loadFromFrames --inputBlockSuffix=$TARGET --unitQuery="mahal" --selectionName=$TARGET --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
+#
+python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix=$TARGET --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2

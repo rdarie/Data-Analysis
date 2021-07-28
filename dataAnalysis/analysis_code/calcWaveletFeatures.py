@@ -15,8 +15,6 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --window=window                        process with short window? [default: short]
-    --winStart=winStart                    start of window
-    --winStop=winStop                      end of window
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
@@ -25,7 +23,7 @@ import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
 #
@@ -59,8 +57,8 @@ if consoleDebug:
     arguments = {
         'window': 'L', 'analysisName': 'hiRes', 'lazy': True, 'inputBlockSuffix': 'lfp_CAR',
         'blockIdx': '3', 'verbose': True, 'processAll': False, 'unitQuery': 'lfp',
-        'winStop': '1300', 'profile': False, 'alignQuery': 'starting', 'exp': 'exp202101201100',
-        'alignFolderName': 'motion', 'inputBlockPrefix': 'Block', 'winStart': '300'}
+        'profile': False, 'alignQuery': 'starting', 'exp': 'exp202101201100',
+        'alignFolderName': 'motion', 'inputBlockPrefix': 'Block'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
 

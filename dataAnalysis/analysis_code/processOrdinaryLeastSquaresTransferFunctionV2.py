@@ -17,19 +17,21 @@ Options:
 """
 import logging
 logging.captureWarnings(True)
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-import os
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
+import dataAnalysis.plotting.aligned_signal_plots as asp
 from dataAnalysis.custom_transformers.tdr import getR2, partialR2
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 import pdb, traceback

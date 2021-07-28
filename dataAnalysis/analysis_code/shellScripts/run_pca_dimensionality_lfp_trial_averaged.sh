@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=72G
 
 # Specify a job name:
-#SBATCH -J pca_dimen_motion_lfp_rb_ta_27
+#SBATCH -J dimen_red_ta_rc_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_motion_lfp_rb_ta_27.out
-#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_motion_lfp_rb_ta_27.out
+#SBATCH -o ../../batch_logs/%j-%a-dimen_red_ta_rc_27.out
+#SBATCH -e ../../batch_logs/%j-%a-dimen_red_ta_rc_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -32,12 +32,9 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 #
 ##################################################
 # ITERATOR="ra"
-# ALIGNQUERYTERM="starting"
+# ITERATOR="rb"
+ITERATOR="rc"
 ##################################################
-ITERATOR="rb"
-ALIGNQUERYTERM="starting"
-##################################################
-ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 #####
 # python -u './testSignalNormality.py' --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting

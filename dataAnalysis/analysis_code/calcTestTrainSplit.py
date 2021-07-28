@@ -261,6 +261,9 @@ if (not arguments['loadFromFrames']):
     if arguments['lazy']:
         dataReader.file.close()
 else:    # loading frames
+    # important to note that loading frames ignores the alignQuery argument
+    # allowing it to collect data that originated from either motion or stim alignments
+    # (the dataframes .h5 file is alignment agnostic)
     if not arguments['processAll']:
         experimentsToAssemble = {
             experimentName: [blockIdx]}
@@ -290,31 +293,22 @@ else:    # loading frames
                     dataKey = '/{}/data'.format(arguments['selectionName'])
                     if dataKey in store:
                         theseDF['main'] = pd.read_hdf(store, dataKey)
-                        print('Loaded {} from {}'.format(dataKey, dFPath))
                     controlKey = '/{}/control'.format(arguments['selectionName'])
                     if controlKey in store:
                         theseDF['control'] = pd.read_hdf(store, controlKey)
-                        print('Loaded {} from {}'.format(controlKey, dFPath))
                     assert len(theseDF.keys()) > 0
+                    print('Loaded {}\n    from {}'.format(arguments['selectionName'], dFPath))
                     thisDF = pd.concat(theseDF, names=['controlFlag'])
                     colRenamer = {fN: fN.replace('#0', '') for fN in thisDF.columns.get_level_values('feature')}
                     thisDF.rename(columns=colRenamer, level='feature', inplace=True)
             except Exception:
                 traceback.print_exc()
-                print('Skipping...')
+                print('Unable to find {}\n    in {}'.format(arguments['selectionName'], dFPath))
                 continue
-            print('Loaded {} from {}'.format(arguments['selectionName'], dFPath))
             # newSegLevel = [currBlockNum for i in range(thisDF.shape[0])]
             thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
             listOfDataFrames.append(thisDF)
             currBlockNum += 1
-'''
-trialInfo = dataDF.index.to_frame().reset_index(drop=True)
-for cN in trialInfo.columns:
-    print('{}'.format(cN))
-    print(trialInfo[cN].unique())
-    print('   ')
-    '''
 if not len(listOfDataFrames):
     print('Command yielded empty list of iterators!')
     sys.exit()

@@ -26,15 +26,19 @@ Options:
     --selector=selector                    filename if using a unit selector
     --loadFromFrames                       load data from pre-saved dataframes?
 """
-
+import logging, sys
+logging.captureWarnings(True)
 from docopt import docopt
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 if arguments['plotting']:
     import matplotlib, os
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
     if 'CCV_HEADLESS' in os.environ:
-        matplotlib.use('PS')   # generate postscript output
+        matplotlib.use('Agg')   # generate postscript output
     else:
         matplotlib.use('QT5Agg')   # generate interactive output
 #

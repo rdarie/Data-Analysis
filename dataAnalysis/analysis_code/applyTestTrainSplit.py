@@ -151,11 +151,15 @@ for segIdx in range(nSeg):
                 'detectionDelay', 'originalIndex',
                 'freqBandName', 'xCoords', 'yCoords', 'parentFeature']]
         try:
-            assert (trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns]).all(axis=None)
+            metaDataMatches = (trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns])
+            assert metaDataMatches.all(axis=None)
             # (trialInfo['t'].unique() == np.unique(trialInfo['t'])).all()
             # (loadedTrialInfo['t'].unique() == np.unique(loadedTrialInfo['t'])).all()
         except Exception:
             traceback.print_exc()
+            print('(this data) trialInfo.loc[:, targetAnns] =\n{}'.format(trialInfo.loc[:, targetAnns]))
+            print('(loaded from iterator) loadedTrialInfo.loc[:, targetAnns] =\n{}'.format(loadedTrialInfo.loc[:, targetAnns]))
+            print('(trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns]).all(axis=0) =\n{}'.format(metaDataMatches.all(axis=0)))
             pdb.set_trace()
     listOfDataFrames.append(dataDF)
 if arguments['verbose']:

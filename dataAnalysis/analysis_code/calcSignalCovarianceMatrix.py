@@ -133,13 +133,13 @@ if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
     if 'ledoit' in estimatorName:
         estimatorClass = tdr.LedoitWolfTransformer
-        estimatorKWArgs = dict(maxNSamples=16e3)
+        estimatorKWArgs = dict(maxNSamples=14e3)
     elif 'emp' in estimatorName:
         estimatorClass = tdr.EmpiricalCovarianceTransformer
-        estimatorKWArgs = dict(maxNSamples=16e3)
+        estimatorKWArgs = dict(maxNSamples=14e3)
     elif 'mcd' in estimatorName:
         estimatorClass = tdr.MinCovDetTransformer
-        estimatorKWArgs = dict(maxNSamples=16e3)
+        estimatorKWArgs = dict(maxNSamples=14e3)
     crossvalKWArgs = dict(
         cv=cvIterator,
         return_train_score=True, return_estimator=True)

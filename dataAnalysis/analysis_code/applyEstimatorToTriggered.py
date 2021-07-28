@@ -159,7 +159,10 @@ else:
     matchLoadingArgs = [
         'getMetaData', 'concatOn', 'transposeToColumns',
         'addLags', 'procFun', 'getFeatureMetaData',
-        'decimate', 'rollingWindow']
+        ]
+    matchDownsampling = False
+    if matchDownsampling:
+        matchLoadingArgs += ['decimate', 'rollingWindow']
     for aakwaEntry in matchLoadingArgs:
         if aakwaEntry in loadingMeta['alignedAsigsKWargs']:
             alignedAsigsKWargs[aakwaEntry] = loadingMeta['alignedAsigsKWargs'][aakwaEntry]
@@ -249,3 +252,4 @@ print('Writing {}.nix...'.format(outputPath))
 writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
 writer.write_block(masterBlock, use_obj_names=True)
 writer.close()
+print('Completed {}.nix...'.format(outputPath))

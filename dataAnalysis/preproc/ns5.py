@@ -875,12 +875,13 @@ def unitSpikeTrainWaveformsToDF(
         bins = (
             np.arange(wfDF.shape[1], dtype=float) * samplingPeriod -
             leftSweep)
-        wfDF.columns = np.around(bins.magnitude, decimals=6)
+        wfDF.columns = bins.magnitude
         if windowSize is not None:
             winMask = (
                 (wfDF.columns >= windowSize[0]) &
                 (wfDF.columns <= windowSize[1]))
             wfDF = wfDF.loc[:, winMask]
+        wfDF.columns = np.around(wfDF.columns, decimals=6)
         if procFun is not None:
             wfDF = procFun(wfDF, st)
         idxLabels = ['segment', 'originalIndex', 't']
@@ -1032,15 +1033,6 @@ def unitSpikeTrainWaveformsToDF(
         waveformsDF = pd.concat(
             laggedWaveformsDict,
             names=['feature', 'lag', 'originalDummy']).reset_index()
-        '''metaLookup = pd.DataFrame(
-            np.nan, index=waveformsDF.index, columns=metaDF.columns)
-        try:
-            for cN in metaLookup.drop(columns='originalDummy').columns:
-                metaLookup.loc[:, cN] = waveformsDF['originalDummy'].map(metaDF[cN])
-                # metaLookup.loc[:, cN] = waveformsDF.index.map(metaDF.reset_index(drop=True)[cN])
-        except Exception:
-            traceback.print_exc()
-            pdb.set_trace()'''
         waveformsDF = pd.concat(
             [
                 stackedMetaDF.drop(columns=['feature', 'lag']),
@@ -1127,7 +1119,10 @@ def concatenateUnitSpikeTrainWaveformsDF(
             .format(prf.memory_usage_psutil()))
     #  if concatenating indexes, reset the index of the result
     #  ignoreIndex = (concatOn == 'index')
-    assert len(waveformsList) > 0, 'Error: dataquery ({}) yields empty list!'.format(dataQuery)
+    try:
+        assert len(waveformsList) > 0, 'Error: dataquery ({}) yields empty list!'.format(dataQuery)
+    except:
+        traceback.print_exc()
     allWaveforms = pd.concat(
         waveformsList, axis=concatOn)
     if getFeatureMetaData is not None:
@@ -1156,7 +1151,6 @@ def concatenateUnitSpikeTrainWaveformsDF(
             axis='columns', inplace=True, kind='mergesort')
     except Exception:
         traceback.print_exc()
-        pdb.set_trace()
     return allWaveforms, allFeatureMetaDF
 
 
@@ -2090,7 +2084,6 @@ def synchronizeINStoNSP(
                                         st.annotations[key] = np.delete(st.annotations[key], ~validMask)
                                     except Exception:
                                         traceback.print_exc()
-                                        pdb.set_trace()
                 else:
                     if trimSpiketrains:
                         st.t_start = tStart
@@ -3228,7 +3221,6 @@ def preprocBlockToNix(
                     devFiltDebugMask = (dummyAsig.times > 90 * pq.s) & (dummyAsig.times < 92 * pq.s)
                 except Exception:
                     traceback.print_exc()
-                    pdb.set_trace()
                 plotColIdx = 1
                 ddfFig, ddfAx = plt.subplots(len(asigNameList), 1)
                 ddfFig2, ddfAx2 = plt.subplots()
@@ -3315,7 +3307,6 @@ def preprocBlockToNix(
                                 axis=0)
                         except:
                             traceback.print_exc()
-                            pdb.set_trace()
                     if useMeanToCenter:
                         tempCenter = (
                             tempLFPStore
@@ -4014,7 +4005,6 @@ def loadObjArrayAnn(st):
             except Exception:
                 print('Error with {}'.format(st.name))
                 traceback.print_exc()
-                pdb.set_trace()
     if hasattr(st, 'waveforms'):
         if st.waveforms is None:
             st.waveforms = np.asarray([]).reshape((0, 0, 0)) * pq.mV

@@ -10,40 +10,43 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_stim_28
+#SBATCH -J test_train_split_regression_motion_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_stim_28.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_stim_28.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_regression_motion_27.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_regression_motion_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=2,3
 #SBATCH --export=CCV_HEADLESS=1
 
-# SLURM_ARRAY_TASK_ID=2
+#     SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_exp_preamble.sh
-source shellScripts/calc_aligned_stim_preamble.sh
-###
+source shellScripts/calc_aligned_motion_preamble.sh
 
 # ITERATOR="--iteratorSuffix=ra"
-# ALIGNQUERYTERM="stimOnHighRate"
+# ALIGNQUERYTERM="starting"
 # CONTROLSTATUS=""
-ITERATOR="--iteratorSuffix=rb"
-ALIGNQUERYTERM="stimOnHighRate"
+# ITERATOR="--iteratorSuffix=rb"
+# ALIGNQUERYTERM="starting"
+# CONTROLSTATUS=""
+ITERATOR="--iteratorSuffix=rc"
+ALIGNQUERYTERM="starting"
 CONTROLSTATUS=""
-#
-ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
-python -u './calcTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ALIGNQUERY $ROIOPTS $ITERATOR --eventName='stim' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS
-##
+
+ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
+###
+python -u './calcTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS
+###
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --selectionName='lfp_CAR' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" --selectionName='lfp_CAR_spectral' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 # python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-#
+###
 # python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="csd" --unitQuery="lfp" --selectionName='csd' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 # python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="csd_spectral" --unitQuery="lfp" --selectionName='csd_spectral' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 # python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

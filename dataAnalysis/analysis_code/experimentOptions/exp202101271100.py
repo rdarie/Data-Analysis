@@ -214,32 +214,47 @@ def getExpOpts():
         'ca': {
             'experimentsToAssemble': {
                 '202101271100-Rupert': [2, 3],
-            }
-        },
+                }
+            },
         'cb': {
             'experimentsToAssemble': {
                 '202101271100-Rupert': [2, 3],
-            }
-        },
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                '202101271100-Rupert': [1, 2],
+                }
+            },
         'ccm': {
             'experimentsToAssemble': {
                 '202101271100-Rupert': [2],
-            }
-        },
+                }
+            },
         'ccs': {
             'experimentsToAssemble': {
                 '202101271100-Rupert': [1],
-            }
-        },
+                }
+            },
         'ra': {
             'experimentsToAssemble': {
                 '202101271100-Rupert': [1, 2, 3],
-            }
-        },
+                }
+            },
         'rb': {
             'experimentsToAssemble': {
                 '202101271100-Rupert': [1, 2, 3],
+                }
+            },
+        'rc': {
+            'experimentsToAssemble': {
+                '202101271100-Rupert': [1, 2, 3],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                '202101271100-Rupert': [1, 2, 3],
+                }
             }
-        },
-    }
+        }
     return locals()
