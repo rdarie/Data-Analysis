@@ -1054,8 +1054,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
         transposeToColumns='bin', concatOn='index',
         fastTranspose=True, getMetaData=True,
         getFeatureMetaData=None,
-        verbose=False,
-        addLags=None, decimate=1, rollingWindow=None,
+        verbose=False, addLags=None, decimate=1, rollingWindow=None,
         metaDataToCategories=False, windowSize=None,
         whichSegments=None, procFun=None):
     allUnits = []
@@ -1691,8 +1690,8 @@ def alignedAsigDFtoSpikeTrain(
                 if isinstance(featGroup, pd.Series):
                     featGroup = featGroup.to_frame(name=featName)
                     featGroup.columns.name = 'feature'
-                spikeWaveformsDF = transposeSpikeDF(
-                    featGroup, 'bin', fastTranspose=True)
+                spikeWaveformsDF = transposeSpikeDF(featGroup, 'bin', fastTranspose=True)
+                pdb.set_trace()
             if matchSamplingRate:
                 if len(spikeWaveformsDF.columns) != len(wfBins):
                     wfDF = spikeWaveformsDF.reset_index(drop=True).T

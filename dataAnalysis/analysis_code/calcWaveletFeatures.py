@@ -291,7 +291,7 @@ if __name__ == "__main__":
     spectralDF.loc[:, 'parentFeature'] = featNames
     spectralDF.loc[:, 'feature'] = newFeatNames
     spectralDF.set_index(['parentFeature', 'feature'], inplace=True, append=True)
-    trialTimes = np.unique(spectralDF.index.get_level_values('t'))
+    trialTimes = np.asarray((spectralDF.index.get_level_values('t')).unique())
     #
     spikeTrainMeta = {
         'units': pq.s,

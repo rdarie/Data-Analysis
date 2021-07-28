@@ -195,21 +195,18 @@ alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 if arguments['lazy']:
     dummySt = dataBlock.filter(objects=ns5.SpikeTrainProxy)[0].load()
+
 else:
     dummySt = dataBlock.filter(objects=ns5.SpikeTrain)[0]
-    spikeTrainMeta = {
-        'units': dummySt.units,
-        'wvfUnits': dummySt.waveforms.units,
-        }
-    spikeTrainMeta['sampling_rate'] = dummySt.sampling_rate / alignedAsigsKWargs['decimate']
-print(alignedAsigsDF.columns)
-'''if extendedFeatureMeta is not None:
-    featureMeta = alignedAsigsDF.columns.to_frame().reset_index(drop=True)
-    loadedMeta = featureMeta.loc[:, ['feature', 'lag']]
-    comparisonMeta = extendedFeatureMeta.loc[:, ['feature', 'lag']]
-    comparisonErrorMsg = "Error: loaded data columns\n\n{}\n\ndoes not equal dataset columns\n\n{}\n\n".format(featureMeta.loc[:, ['feature', 'lag']], extendedFeatureMeta.loc[:, ['feature', 'lag']])
-    assert (loadedMeta == comparisonMeta).all(axis=None), comparisonErrorMsg
-    alignedAsigsDF.columns = pd.MultiIndex.from_frame(extendedFeatureMeta)'''
+spikeTrainMeta = {
+    'units': dummySt.units,
+    'wvfUnits': dummySt.waveforms.units,
+    }
+spikeTrainMeta['sampling_rate'] = dummySt.sampling_rate / alignedAsigsKWargs['decimate']
+
+trialTimes = alignedAsigsDF.index.get_level_values('t').unique()
+# assert np.allclose(trialTimes - dummySt.times.magnitude)
+tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 if normalizeDataset is not None:
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
 alignedAsigsDF.rename(columns=lambda x: x.replace('#0', ''), level='feature', inplace=True)
@@ -231,15 +228,20 @@ else:
     featureNames = pd.Index([
         estimatorMetadata['name'] + '{:0>3}#0'.format(i)
         for i in range(features.shape[1])])
-pdb.set_trace()
-trialTimes = np.unique(alignedAsigsDF.index.get_level_values('t'))
-tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 alignedFeaturesDF = pd.DataFrame(
     features, index=alignedAsigsDF.index,
     # columns=featureNames
     columns=estimatorMetadata['outputFeatures']
     )
 alignedFeaturesDF.columns.name = 'feature'
+
+'''if True:
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    ax.plot(alignedFeaturesDF.index.get_level_values('t'), label='alignedFeatures')
+    ax.plot(alignedAsigsDF.index.get_level_values('t'), label='alignedAsigs')
+    ax.legend()
+    plt.show()'''
 del alignedAsigsDF
 #
 spikeTrainMeta.update({
@@ -248,7 +250,8 @@ spikeTrainMeta.update({
     't_stop': trialTimes[-1] * pq.s,
     })
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
-    alignedFeaturesDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
+    alignedFeaturesDF, spikeTrainMeta=spikeTrainMeta,
+    matchSamplingRate=False)
 if arguments['lazy']:
     dataReader.file.close()
 if os.path.exists(outputPath + '.nix'):

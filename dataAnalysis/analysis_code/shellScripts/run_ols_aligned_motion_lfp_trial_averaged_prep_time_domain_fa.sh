@@ -27,9 +27,9 @@ SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
-ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ITERATOR="rb"
+ITERATOR="rc"
 WINDOWTERM="XL"
 ################################################################################################################
 ## time domain, trial-averaged
