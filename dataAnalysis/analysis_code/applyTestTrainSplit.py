@@ -153,13 +153,15 @@ for segIdx in range(nSeg):
         try:
             metaDataMatches = (trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns])
             assert metaDataMatches.all(axis=None)
-            # (trialInfo['t'].unique() == np.unique(trialInfo['t'])).all()
-            # (loadedTrialInfo['t'].unique() == np.unique(loadedTrialInfo['t'])).all()
         except Exception:
             traceback.print_exc()
             print('(this data) trialInfo.loc[:, targetAnns] =\n{}'.format(trialInfo.loc[:, targetAnns]))
             print('(loaded from iterator) loadedTrialInfo.loc[:, targetAnns] =\n{}'.format(loadedTrialInfo.loc[:, targetAnns]))
             print('(trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns]).all(axis=0) =\n{}'.format(metaDataMatches.all(axis=0)))
+            nonMatchingAnns = metaDataMatches.columns[~metaDataMatches.all(axis=0)]
+            nonMatchingIndex = metaDataMatches.index[~metaDataMatches.all(axis=1)]
+            print('(contradictory this data)\n{}'.format(trialInfo.drop_duplicates('t').loc[:, nonMatchingAnns]))
+            print('(contradictory loaded from iterator)\n{}'.format(loadedTrialInfo.drop_duplicates('t').loc[:, nonMatchingAnns]))
             pdb.set_trace()
     listOfDataFrames.append(dataDF)
 if arguments['verbose']:

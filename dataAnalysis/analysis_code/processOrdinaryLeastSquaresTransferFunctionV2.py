@@ -206,7 +206,9 @@ def ERA(
     Psi_sDF = lPhiMatInv @ rPhiMat_s
     Psi_sDF.index = rPhiMat_s.index
     Psi_sDF = Psi_sDF.unstack(level='bin')
-    Psi_sDF.sort_index(axis='columns', level='bin', sort_remaining=False, kind='mergesort', inplace=True)
+    Psi_sDF.sort_index(
+        axis='columns', level='bin', sort_remaining=False,
+        kind='mergesort', inplace=True)
     #
     rPhiMat_g = pd.concat({
         k: Phi2[k]
@@ -215,7 +217,10 @@ def ERA(
     Psi_gDF = lPhiMatInv @ rPhiMat_g
     Psi_gDF.index = rPhiMat_g.index
     Psi_gDF = Psi_gDF.unstack(level='bin')
-    Psi_gDF.sort_index(axis='columns', level='bin', sort_remaining=False, kind='mergesort', inplace=True)
+    Psi_gDF.sort_index(
+        axis='columns', level='bin',
+        sort_remaining=False, kind='mergesort',
+        inplace=True)
     '''
     # recursive substitution way
     Psi_s = {}

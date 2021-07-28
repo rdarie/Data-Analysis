@@ -28,19 +28,10 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 #
-ITERATOR="--iteratorSuffix=ma"
-ALIGNQUERYTERM="starting"
-#
-ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
+ITERATOR="ma"
+ESTIMATOR='mahal_ledoit'
 
-TARGET="lfp_CAR_mahal"
-#
-python -u './calcTestTrainSplit.py' $BLOCKSELECTOR $ITERATOR --loadFromFrames --inputBlockSuffix=$TARGET --unitQuery="mahal" --selectionName=$TARGET --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
-#
-python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix=$TARGET --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-
-TARGET="lfp_CAR_spectral_mahal"
-#
-python -u './calcTestTrainSplit.py' $BLOCKSELECTOR $ITERATOR --loadFromFrames --inputBlockSuffix=$TARGET --unitQuery="mahal" --selectionName=$TARGET --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
-#
-python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix=$TARGET --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
+# --preScale
+python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix="lfp_CAR_${ESTIMATOR}" --selectionName="lfp_CAR_${ESTIMATOR}" --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix="lfp_CAR_spectral_${ESTIMATOR}" --selectionName="lfp_CAR_spectral_${ESTIMATOR}" --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2

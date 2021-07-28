@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=1
 
-#  SLURM_ARRAY_TASK_ID=1
+#     SLURM_ARRAY_TASK_ID=1
 source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 #
@@ -30,10 +30,11 @@ ITERATOR="--iteratorSuffix=ma"
 #
 ALIGNQUERYTERM="stimOnHighRate"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
-ALIGNQUERYTERM="starting"
 CONTROLSTATUS=""
 
+ESTIMATOR='mahal_ledoit'
+
 python -u './calcTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ALIGNQUERY $ROIOPTS $ITERATOR --eventName='stim' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS
-##
-python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="lfp_CAR_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_mahal' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_mahal' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+###
+python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="lfp_CAR_${ESTIMATOR}" --unitQuery="mahal" --selectionName="lfp_CAR_${ESTIMATOR}" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral_${ESTIMATOR}" --unitQuery="mahal" --selectionName="lfp_CAR_spectral_${ESTIMATOR}" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

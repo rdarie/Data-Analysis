@@ -101,6 +101,7 @@ plotProcFuns = [
     asp.genLegendRounder(decimals=2),
     ]
 statsTestOpts = dict(
+    referenceTimeWindow=None,
     testStride=5e-3,
     testWidth=5e-3,
     tStart=0,

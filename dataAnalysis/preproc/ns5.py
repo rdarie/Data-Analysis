@@ -1146,9 +1146,11 @@ def concatenateUnitSpikeTrainWaveformsDF(
                 sortIndexBy = [cN] + sortIndexBy
         allWaveforms.sort_index(
             level=sortIndexBy,
-            axis='index', inplace=True, kind='mergesort')
+            axis='index', inplace=True,
+            kind='mergesort', sort_remaining=False)
         allWaveforms.sort_index(
-            axis='columns', inplace=True, kind='mergesort')
+            axis='columns', inplace=True,
+            kind='mergesort', sort_remaining=False)
     except Exception:
         traceback.print_exc()
     return allWaveforms, allFeatureMetaDF
@@ -1305,9 +1307,11 @@ def alignedAsigsToDF(
         sortIndexBy = ['feature', 'lag', 'segment', 'originalIndex', 't']
     allWaveforms.sort_index(
         level=sortIndexBy,
-        axis='index', inplace=True, kind='mergesort')
+        axis='index', inplace=True,
+        kind='mergesort', sort_remaining=False)
     allWaveforms.sort_index(
-        axis='columns', inplace=True, kind='mergesort')
+        axis='columns', inplace=True,
+        kind='mergesort', sort_remaining=False)
     ##
     if finalIndexMask is not None:
         if False:

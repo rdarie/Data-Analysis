@@ -1,6 +1,5 @@
 #!/bin/bash
 
-source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/run_align_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"

@@ -212,16 +212,16 @@ if __name__ == '__main__':
                         dataKey = '/{}/data'.format(arguments['selectionName'])
                         if dataKey in store:
                             theseDF['main'] = pd.read_hdf(store, dataKey)
-                            print('Loaded {} from {}'.format(dataKey, dFPath))
                         controlKey = '/{}/control'.format(arguments['selectionName'])
                         if controlKey in store:
                             theseDF['control'] = pd.read_hdf(store, controlKey)
-                            print('Loaded {} from {}'.format(controlKey, dFPath))
                         assert len(theseDF) > 0
+                        print('Loaded {}\n from {}'.format(arguments['selectionName'], dFPath))
                         thisDF = pd.concat(theseDF, names=['controlFlag'])
                         print(' ')
                 except Exception:
                     traceback.print_exc()
+                    print('Unable to find {}\n in {}'.format(arguments['selectionName'], dFPath))
                     print('Skipping...')
                     continue
                 '''thisDF.loc[:, 'expName'] = expName
@@ -236,7 +236,6 @@ if __name__ == '__main__':
     # fill zeros, e.g. if some trials do not have measured position, positions will be NaN
     dataDF.fillna(0, inplace=True)
     ################################################################################################
-    # pdb.set_trace()
     if 'controlProportionMask' in loadingMeta:
         if loadingMeta['controlProportionMask'] is not None:
             dataDF = dataDF.loc[loadingMeta['controlProportionMask'], :]

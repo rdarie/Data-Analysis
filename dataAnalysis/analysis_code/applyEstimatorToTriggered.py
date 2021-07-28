@@ -193,6 +193,15 @@ if arguments['verbose']:
 
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
+if arguments['lazy']:
+    dummySt = dataBlock.filter(objects=ns5.SpikeTrainProxy)[0].load()
+else:
+    dummySt = dataBlock.filter(objects=ns5.SpikeTrain)[0]
+    spikeTrainMeta = {
+        'units': dummySt.units,
+        'wvfUnits': dummySt.waveforms.units,
+        }
+    spikeTrainMeta['sampling_rate'] = dummySt.sampling_rate / alignedAsigsKWargs['decimate']
 print(alignedAsigsDF.columns)
 '''if extendedFeatureMeta is not None:
     featureMeta = alignedAsigsDF.columns.to_frame().reset_index(drop=True)
@@ -222,7 +231,7 @@ else:
     featureNames = pd.Index([
         estimatorMetadata['name'] + '{:0>3}#0'.format(i)
         for i in range(features.shape[1])])
-#
+pdb.set_trace()
 trialTimes = np.unique(alignedAsigsDF.index.get_level_values('t'))
 tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 alignedFeaturesDF = pd.DataFrame(
@@ -233,14 +242,11 @@ alignedFeaturesDF = pd.DataFrame(
 alignedFeaturesDF.columns.name = 'feature'
 del alignedAsigsDF
 #
-spikeTrainMeta = {
-    'units': pq.s,
-    'wvfUnits': pq.dimensionless,
+spikeTrainMeta.update({
     'left_sweep': (-1) * tBins[0] * pq.s,
     't_start': min(0, trialTimes[0]) * pq.s,
     't_stop': trialTimes[-1] * pq.s,
-    'sampling_rate': ((tBins[1] - tBins[0]) ** (-1)) * pq.Hz
-    }
+    })
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
     alignedFeaturesDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
 if arguments['lazy']:

@@ -35,7 +35,7 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 #
 TARGET="lfp_CAR"
 iterators=(ca cb ccs ccm)
-estimators=(mahal_emp mahal_ledoit mahal_mcd)
+estimators=(mahal_emp mahal_ledoit)
 for ITER in "${iterators[@]}"
 do
   for EST in "${estimators[@]}"
@@ -51,7 +51,7 @@ done
 
 TARGET="lfp_CAR_spectral"
 iterators=(ca cb ccs ccm)
-estimators=(mahal_emp mahal_ledoit mahal_mcd)
+estimators=(mahal_emp mahal_ledoit)
 for ITER in "${iterators[@]}"
 do
   for EST in "${estimators[@]}"

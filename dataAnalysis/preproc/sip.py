@@ -49,7 +49,7 @@ def loadSip(basePath, msecPerSample=2):
                 else:
                     idxNeedsChanging = allOccurences['PacketNumber'].idxmin()
                 metadata.loc[idxNeedsChanging, 'Timestamp'] -= frameLength
-    metadata['PacketSize'] = packetRolloverGroup.value_counts().sort_index().to_numpy(dtype='int')
+    metadata['PacketSize'] = packetRolloverGroup.value_counts().sort_index(kind='mergesort').to_numpy(dtype='int')
     metadata['FirstTimestamp'] = metadata['Timestamp'] - 10 * msecPerSample * (metadata['PacketSize'] - 1)
     metadata['SampleOverlap'] = (metadata['Timestamp'] - metadata['FirstTimestamp'].shift(-1).values).fillna(- 10 * msecPerSample)
     metadata['packetsOverlapFuture'] = metadata['SampleOverlap'] > 0

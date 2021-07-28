@@ -354,11 +354,13 @@ def splitApplyCombine(
                     sortIndexBy = [cN] + sortIndexBy
         resultDF.sort_index(
             level=sortIndexBy,
-            axis='index', inplace=True, kind='mergesort')
+            axis='index', inplace=True,
+            kind='mergesort', sort_remaining=False)
     if sortOutputColumns:
         resultDF.sort_index(
             level=sortColumnsBy,
-            axis='columns', inplace=True, kind='mergesort')
+            axis='columns',
+            inplace=True, kind='mergesort', sort_remaining=False)
     # resultDF.index.get_level_values('t')
     # asigStack.index.get_level_values('t')
     return resultDF
@@ -733,7 +735,7 @@ def facetGridApplyFunGrouped(
 
 
 def facetGridCompareMeans(
-        dataBlock, statsTestPath,
+        dataBlock=None, statsTestPath=None,
         limitPages=None, verbose=False, compareISIs=False,
         loadArgs={}, rowColOpts={}, statsTestOpts={}):
     #  get list of units
@@ -840,6 +842,106 @@ def facetGridCompareMeans(
     # give these back in case needed (dictionaries are passed by reference)
     loadArgs['unitNames'] = originalUnitNames
     loadArgs['unitQuery'] = originalUnitQuery
+    return allPValsWide, allStatValsWide, allSigValsWide
+
+def facetGridCompareMeansDataFrame(
+        dataDF=None, statsTestPath=None,
+        limitPages=None, verbose=False, compareISIs=False,
+        rowColOpts={}, statsTestOpts={}):
+    #  set up significance testing
+    if (rowColOpts['rowControl'] is None) and (rowColOpts['colControl'] is None):
+        # test all rows and columns
+        sigTestQuery = None
+    else:
+        sigTestQueryList = []
+        if rowColOpts['rowControl'] is not None:
+            if isinstance(rowColOpts['rowControl'], str):
+                rowQ = '\'' + rowColOpts['rowControl'] + '\''
+            else:
+                rowQ = rowColOpts['rowControl']
+            sigTestQueryList.append(
+                '({} != {})'.format(rowColOpts['rowName'], rowQ))
+        if rowColOpts['colControl'] is not None:
+            if isinstance(rowColOpts['colControl'], str):
+                colQ = '\'' + rowColOpts['colControl'] + '\''
+            else:
+                colQ = rowColOpts['colControl']
+            sigTestQueryList.append(
+                '({} != {})'.format(rowColOpts['colName'], colQ))
+        sigTestQuery = '&'.join(sigTestQueryList)
+    #  test each row and column separately
+    sigTestGroupBy = [
+        i
+        for i in [rowColOpts['rowName'], rowColOpts['colName']]
+        if i is not None
+        ]
+    if not len(sigTestGroupBy):
+        sigTestGroupBy = None
+    # test jointly for significance of hue and/or style
+    sigTestVar = [
+        i
+        for i in [rowColOpts['hueName'], rowColOpts['styleName']]
+        if i is not None
+        ]
+    if statsTestOpts['referenceTimeWindow'] is None:
+        # if comparing across a level, must have something there
+        assert len(sigTestVar) > 0
+    #
+    correctMultiple = statsTestOpts.pop('correctMultiple')
+    #
+    allPVals = {}
+    allStatVals = {}
+    allSigVals = {}
+    for idx, unitName in enumerate(dataDF.columns):
+        if verbose:
+            print('    facetGridCompareMeansDataFrame on unit {}'.format(unitName))
+        ##
+        # debugging
+        # statsTestOpts['plotting'] = (unitName == 'position#0')
+        ##
+        asigWide = dataDF.loc[:, [unitName]]
+        if 'bin' in asigWide.index.names:
+            asigWide = asigWide.stack(asigWide.columns.names).unstack('bin')
+        if sigTestQuery is not None:
+            sigTestAsig = asigWide.query(sigTestQuery)
+        else:
+            sigTestAsig = asigWide
+        # cannot have multiple traces per facet (one p-value per time bin)
+        if len(sigTestVar) > 0:
+            if statsTestOpts['referenceTimeWindow'] is not None:
+                assert sigTestAsig.groupby(sigTestVar).ngroups == 1
+        #  get significance test results (correct for multiple comparionsons at the end, not here)
+        if not compareISIs:
+            pVals, statVals, sigVals = compareMeansGrouped(
+                sigTestAsig, testVar=sigTestVar,
+                groupBy=sigTestGroupBy, correctMultiple=False,
+                **statsTestOpts)
+        else:
+            pVals, statVals, sigVals = compareISIsGrouped(
+                sigTestAsig, testVar=sigTestVar,
+                groupBy=sigTestGroupBy, correctMultiple=False,
+                **statsTestOpts)
+        allPVals.update({unitName: pVals})
+        allStatVals.update({unitName: statVals})
+        allSigVals.update({unitName: sigVals})
+        if limitPages is not None:
+            if idx >= limitPages:
+                break
+    allPValsWide = pd.concat(allPVals, names=dataDF.columns.names)
+    if correctMultiple:
+        origShape = allPValsWide.shape
+        flatPvals = allPValsWide.to_numpy().reshape(-1)
+        try:
+            _, fixedPvals, _, _ = mt(flatPvals, method='holm')
+        except Exception:
+            fixedPvals = flatPvals * flatPvals.size
+        allPValsWide.iloc[:, :] = fixedPvals.reshape(origShape)
+        allSigValsWide = allPValsWide < statsTestOpts['pThresh']
+    allPValsWide.to_hdf(statsTestPath, 'p', format='fixed')
+    allStatValsWide = pd.concat(allStatVals, names=dataDF.columns.names)
+    allStatValsWide.to_hdf(statsTestPath, 'stat', format='fixed')
+    allSigValsWide = pd.concat(allSigVals, names=dataDF.columns.names)
+    allSigValsWide.to_hdf(statsTestPath, 'sig', format='fixed')
     return allPValsWide, allStatValsWide, allSigValsWide
 
 

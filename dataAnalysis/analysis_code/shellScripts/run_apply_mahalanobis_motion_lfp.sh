@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-#   SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2
 
 source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
@@ -30,14 +30,17 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 ###################
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 ITERATOR="ca"
+
 ALIGNQUERYTERM="starting"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
-TARGET="lfp_CAR"
-ESTIMATOR="mahal"
-python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
-# python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-#
-TARGET="lfp_CAR_spectral"
-python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
-# python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+targets=(lfp_CAR lfp_CAR_spectral)
+estimators=(mahal_ledoit)
+for TARGET in "${targets[@]}"
+do
+  for ESTIMATOR in "${estimators[@]}"
+  do
+    python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
+    python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+  done
+done
