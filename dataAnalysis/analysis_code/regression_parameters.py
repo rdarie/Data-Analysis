@@ -2,7 +2,7 @@
 import dataAnalysis.custom_transformers.tdr as tdr
 import pdb
 
-processSlurmTaskCount = 48
+processSlurmTaskCount = 57
 '''joblibBackendArgs = dict(
     backend='dask',
     daskComputeOpts=dict(

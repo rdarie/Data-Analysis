@@ -110,9 +110,9 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_ra', 'plotting': True,
+        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_rc', 'plotting': True,
         'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
-        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_pca_ta',
+        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_fa_ta',
         'blockIdx': '2', 'exp': 'exp202101271100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     
@@ -530,7 +530,7 @@ with cm as pdf:
         Phi.set_index(['bin', 'target'], inplace=True)
         Phi = Phi.stack().unstack('target').T
         #
-        nLags = int(5 * max(histLens) / binInterval)
+        nLags = int(10 * max(histLens) / binInterval)
         #
         A, B, K, C, D, (fig, ax,) = ERA(
             Phi, maxNDim=None,
@@ -573,7 +573,8 @@ with cm as pdf:
             theseEigVals.loc[theseEigVals['isOscillatory'] & ~theseEigVals['isStable'], 'eigValType'] = 'oscillatory growth'
             theseEigVals.loc[~theseEigVals['isOscillatory'] & ~theseEigVals['isStable'], 'eigValType'] = 'pure growth'
             theseEigValsList.append(theseEigVals)
-        eigenValueDict[name] = pd.concat(theseEigValsList)
+        if len(theseEigValsList):
+            eigenValueDict[name] = pd.concat(theseEigValsList)
         if arguments['plotting']:
             fig.suptitle('{}'.format(name))
             fig.tight_layout()

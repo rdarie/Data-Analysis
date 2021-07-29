@@ -48,10 +48,6 @@ else:
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-sns.set(
-    context='talk', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
 from dask.distributed import Client, LocalCluster
 import os, traceback
 import dataAnalysis.helperFunctions.profiling as prf
@@ -62,6 +58,7 @@ import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import pdb
+from tqdm import tqdm
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -74,18 +71,79 @@ import joblib as jb
 import dill as pickle
 import gc
 from docopt import docopt
+sns.set(
+    context='talk', style='darkgrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
+for arg in sys.argv:
+    print(arg)
+idxSl = pd.IndexSlice
+useDPI = 200
+dpiFactor = 72 / useDPI
+snsRCParams = {
+        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+        'lines.linewidth': 1,
+        'lines.markersize': 2.4,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.spines.right": True,
+        "axes.spines.top": True,
+        "axes.linewidth": .125,
+        "grid.linewidth": .2,
+        "font.size": 5,
+        "axes.labelsize": 7,
+        "axes.titlesize": 5,
+        "xtick.labelsize": 5,
+        "ytick.labelsize": 5,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": True,
+        "ytick.left": True,
+        "ytick.right": True,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
+    }
+mplRCParams = {
+    'figure.titlesize': 7
+    }
+styleOpts = {
+    'legend.lw': 2,
+    'tight_layout.pad': 3e-1, # units of font size
+    'panel_heading.pad': 0.
+    }
+sns.set(
+    context='paper', style='whitegrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True, rc=snsRCParams)
+for rcK, rcV in mplRCParams.items():
+    matplotlib.rcParams[rcK] = rcV
+
+
 print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-
+arguments['verbose'] = int(arguments['verbose'])
 '''
 
 arguments = {
-    'analysisName': 'hiRes', 'processAll': True, 'selectionName': 'lfp_CAR', 'datasetName': 'Block_XL_df_ca',
-    'window': 'long', 'estimatorName': 'mahal', 'verbose': 2, 'exp': 'exp202101251100',
-    'alignFolderName': 'motion', 'showFigures': False, 'blockIdx': '2', 'debugging': False,
-    'plotting': True, 'lazy': False}
+    'styleControl': '', 'winStart': '-200', 'processAll': True, 'limitPages': None,
+    'hueControl': '', 'estimatorName': None, 'datasetName': 'Block_XL_df_rc',
+    'alignFolderName': 'motion', 'verbose': '0', 'enableOverrides': True,
+    'selectionName': 'lfp_CAR', 'lazy': False, 'debugging': False, 'hueName': 'trialAmplitude',
+    'rowName': 'pedalMovementCat', 'rowControl': '', 'winStop': '500', 'blockIdx': '2', 'exp': 'exp202101271100',
+    'individualTraces': False, 'overlayStats': True, 'recalcStats': True, 'colControl': '', 'noStim': True,
+    'sizeName': '', 'sizeControl': '', 'styleName': '', 'window': 'XL', 'colName': 'electrode',
+    'showFigures': False, 'analysisName': 'hiRes'}
 os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
 
@@ -95,6 +153,7 @@ if __name__ == '__main__':
         int(arguments['blockIdx']), arguments['exp'])
     globals().update(expOpts)
     globals().update(allOpts)
+    from dataAnalysis.analysis_code.new_plot_options import *
     #
     arguments['verbose'] = int(arguments['verbose'])
     #
@@ -117,6 +176,18 @@ if __name__ == '__main__':
     #
     minNObservations = 3
     plotProcFuns = [
+        asp.xLabelsTime,
+        asp.genVLineAdder([0], vLineOpts),
+        asp.genLegendRounder(decimals=2),
+        ]
+    unusedPlotProcFuns = [
+        # asp.genBlockVertShader([
+        #         max(0e-3, alignedAsigsKWargs['windowSize'][0]),
+        #         min(.9e-3, alignedAsigsKWargs['windowSize'][1])],
+        #     asigPlotShadingOpts),
+        # asp.genStimVLineAdder(
+        #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
+        # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
         asp.genTicksToScale(
             lineOpts={'lw': 2}, shared=True,
             # for evoked lfp report
@@ -126,18 +197,6 @@ if __name__ == '__main__':
             xUnitFactor=1e3, yUnitFactor=1,
             xUnits='msec', yUnits='uV',
             ),
-        asp.genYLabelChanger(
-            lookupDict={}, removeMatch='#0'),
-        # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
-        asp.xLabelsTime,
-        # asp.genBlockVertShader([
-        #         max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-        #         min(.9e-3, alignedAsigsKWargs['windowSize'][1])],
-        #     asigPlotShadingOpts),
-        # asp.genStimVLineAdder(
-        #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
-        asp.genVLineAdder([0], nrnVLineOpts),
-        asp.genLegendRounder(decimals=2),
         ]
     analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
         arguments, scratchFolder)
@@ -171,15 +230,43 @@ if __name__ == '__main__':
             normalizationParams = loadingMeta['normalizationParams']
         else:
             normalizeDataset = None
+        for argName in ['plotting', 'showFigures', 'debugging', 'verbose', 'winStart', 'winStop']:
+            loadingMeta['arguments'].pop(argName, None)
+        arguments.update(loadingMeta['arguments'])
     dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
     featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
     #
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
-    prf.print_memory_usage('just loaded data, plotting')
+    tMask = pd.Series(True, index=trialInfo.index)
+    if arguments['winStop'] is not None:
+        tMask = tMask & (trialInfo['bin'] < (float(arguments['winStop']) * 1e-3))
+    if arguments['winStart'] is not None:
+        tMask = tMask & (trialInfo['bin'] >= (float(arguments['winStart']) * 1e-3))
+    if not tMask.all():
+        dataDF = dataDF.iloc[tMask.to_numpy(), :]
+        trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+        del tMask
     #
-    for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
-        loadingMeta['arguments'].pop(argName, None)
-    arguments.update(loadingMeta['arguments'])
+    tBins = trialInfo['bin'].unique()
+    targetFrameLen = 2 * useDPI * relplotKWArgs['height'] * relplotKWArgs['aspect'] # nominal num. points per facet
+    if tBins.shape[0] > targetFrameLen:
+        skipFactor = tBins.shape[0] // targetFrameLen
+        tMask2 = trialInfo['bin'].isin(tBins[::skipFactor])
+        dataDF = dataDF.iloc[tMask2.to_numpy(), :]
+        trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+        del tMask2
+    #
+    compoundAnnDescr = {
+        'stimCondition': ['electrode', 'trialRateInHz', ],
+        'kinematicCondition': ['pedalDirection', 'pedalSizeCat', 'pedalMovementCat']
+        }
+    for canName, can in compoundAnnDescr.items():
+        compoundAnn = pd.Series(np.nan, index=trialInfo.index)
+        for name, group in trialInfo.groupby(can):
+            compoundAnn.loc[group.index] = '_'.join(['{}'.format(nm) for nm in name])
+        trialInfo.loc[:, canName] = compoundAnn
+    dataDF.index = pd.MultiIndex.from_frame(trialInfo)
+    prf.print_memory_usage('just loaded data, plotting')
     #
     rowColOpts = asp.processRowColArguments(arguments)
     if arguments['limitPages'] is not None:
@@ -200,30 +287,42 @@ if __name__ == '__main__':
             os.makedirs(figureStatsFolder, exist_ok=True)
         statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
         if os.path.exists(statsTestPath) and not arguments['recalcStats']:
-            sigValsWide = pd.read_hdf(statsTestPath, 'sig')
-            sigValsWide.columns.name = 'bin'
+            sigTestResults = pd.read_hdf(statsTestPath, 'sig')
+            sigTestResults.columns.name = 'bin'
         else:
             (
                 pValsWide, statValsWide,
-                sigValsWide) = ash.facetGridCompareMeansDataFrame(
+                sigTestResults) = ash.facetGridCompareMeansDataFrame(
                     dataDF, statsTestPath,
                     rowColOpts=rowColOpts,
                     limitPages=limitPages,
                     statsTestOpts=statsTestOpts, verbose=arguments['verbose'])
     else:
-        sigValsWide = None
+        sigTestResults = None
     pdfPath = os.path.join(figureOutputFolder, '{}.pdf'.format(pdfName))
     with PdfPages(pdfPath) as pdf:
+        pageCount = 0
         for featureMaskIdx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
             maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
             dataGroup = dataDF.loc[:, featureMask]
-            print('dataGroup.shape = {}'.format(dataGroup.shape))
+            print('{}\ndataGroup.shape = {}\n\n'.format(maskParams, dataGroup.shape))
             for uIdx, unitName in enumerate(tqdm(dataGroup.columns)):
+                plotDF = dataGroup.loc[:, unitName].reset_index(name='signal')
+                rowColArgs = {}
+                for axn in ['row', 'col', 'hue']:
+                    if rowColOpts['{}Name'.format(axn)] is not None:
+                        rowColArgs[axn] = rowColOpts['{}Name'.format(axn)]
+                        rowColArgs['{}_order'.format(axn)] = np.unique(plotDF[rowColArgs[axn]])
                 g = sns.relplot(
                     x='bin', y='signal',
-                    col=colName, row=rowName, hue=hueName,
-                    col_order=colOrder, row_order=rowOrder, hue_order=hueOrder,
-                    **relplotKWArgs, data=asig)
+                    facet_kws=dict(margin_titles=True),
+                    **rowColArgs, **relplotKWArgs, data=plotDF)
+                xAxisLabel = 'time (msec)'
+                yAxisLabel = unitName[0]
+                g.set_axis_labels(xAxisLabel, yAxisLabel)
+                g.set_titles(template="data subset: {col_name}")
+                titleText = ''
+                g.suptitle(titleText)
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
                     #  print('(ro, co, hu) = {}'.format((ro, co, hu)))
@@ -232,10 +331,19 @@ if __name__ == '__main__':
                             procFun(g, ro, co, hu, dataSubset)
                     #
                     if sigTestResults is not None:
-                        addSignificanceStars(
-                            g, sigTestResults.query(
-                                "unit == '{}'".format(unitName)),
-                            ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
-                pdf.savefig()
-                plt.close()
-        
+                        unitMask = sigTestResults.reset_index().set_index(dataGroup.columns.names).index == unitName
+                        asp.addSignificanceStars(
+                            g, sigTestResults.loc[unitMask, :],
+                            ro, co, hu, dataSubset, sigStarOpts=asigSigStarOpts)
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(
+                    bbox_inches='tight',
+                    )
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                pageCount += 1
+                if limitPages is not None:
+                    if pageCount > limitPages:
+                        break

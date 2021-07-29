@@ -1,4 +1,3 @@
-print('Here!')
 import os, sys, warnings
 # warnings.filterwarnings("ignore", category=DeprecationWarning)
 # sys.stderr = open(os.devnull, "w")  # silence stderr
@@ -19,7 +18,7 @@ from scipy import stats
 from statsmodels.stats.multitest import multipletests as mt
 from copy import copy
 import pdb, traceback
-
+from tqdm import tqdm
 
 
 def processAlignQueryArgs(
@@ -892,9 +891,12 @@ def facetGridCompareMeansDataFrame(
     allPVals = {}
     allStatVals = {}
     allSigVals = {}
-    for idx, unitName in enumerate(dataDF.columns):
-        if verbose:
-            print('    facetGridCompareMeansDataFrame on unit {}'.format(unitName))
+    if verbose:
+        print('running facetGridCompareMeansDataFrame...\n')
+        columnsIter = tqdm(dataDF.columns)
+    else:
+        columnsIter = (dataDF.columns)
+    for idx, unitName in enumerate(columnsIter):
         ##
         # debugging
         # statsTestOpts['plotting'] = (unitName == 'position#0')

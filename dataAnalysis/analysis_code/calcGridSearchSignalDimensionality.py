@@ -191,7 +191,7 @@ if __name__ == '__main__':
     ###
     joblibBackendArgs = dict(
         # backend='dask'
-        backend='loky'
+        backend='loky',
         )
     if joblibBackendArgs['backend'] == 'dask':
         daskComputeOpts = dict(

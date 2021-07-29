@@ -139,7 +139,7 @@ if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
     workIdx = cvIterator.work
     ######### data loading stuff
-    lOfDF = []
+    listOfDataFrames = []
     lOfFeatureMasks = []
     if not arguments['loadFromFrames']:
         alignedAsigsKWargs = loadingMeta['alignedAsigsKWargs'].copy()
@@ -168,7 +168,7 @@ if __name__ == '__main__':
                 continue
             if arguments['verbose']:
                 prf.print_memory_usage('loaded LHS')
-            lOfDF.append(thisDF)
+            listOfDataFrames.append(thisDF)
         if arguments['lazy']:
             dataReader.file.close()
     else:    # loading frames
@@ -228,11 +228,20 @@ if __name__ == '__main__':
                 thisDF.set_index('expName', inplace=True, append=True)'''
                 #
                 thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
-                lOfDF.append(thisDF)
+                listOfDataFrames.append(thisDF)
                 thisMask = pd.read_hdf(dFPath, '/{}/featureMasks'.format(arguments['selectionName']))
                 lOfFeatureMasks.append(thisMask)
                 currBlockNum += 1
-    dataDF = pd.concat(lOfDF)
+    if not len(listOfDataFrames):
+        print('Command yielded empty list of dataframes!')
+        sys.exit()
+    elif len(listOfDataFrames) > 1:
+        # make sure index names are ordered consistently
+        firstIndexOrder = [indexName for indexName in listOfDataFrames[0].index.names]
+        for dfIdx in range(1, len(listOfDataFrames)):
+            if listOfDataFrames[dfIdx].index.names != firstIndexOrder:
+                listOfDataFrames[dfIdx] = listOfDataFrames[dfIdx].reorder_levels(firstIndexOrder, axis=0)
+    dataDF = pd.concat(listOfDataFrames)
     # fill zeros, e.g. if some trials do not have measured position, positions will be NaN
     dataDF.fillna(0, inplace=True)
     ################################################################################################

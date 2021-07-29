@@ -37,12 +37,12 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 # PAGELIMITS="--limitPages=8"
 OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER} ${TIMEWINDOWOPTS} ${STATSOVERLAY} ${HUEOPTS} ${ROWOPTS} ${COLOPTS} ${STYLEOPTS} ${SIZEOPTS} ${PAGELIMITS} ${OTHERASIGOPTS}"
 #
-iterators=(ccm)
+iterators=(rc)
 targets=(lfp_CAR)
 for ITER in "${iterators[@]}"
 do
   for TARGET in "${targets[@]}"
   do
-    python -u './plotSignalDataFrame.py' --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET $OPTS
+    python -u './plotSignalDataFrame.py' --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET $OPTS --verbose=1
   done
 done

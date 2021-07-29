@@ -28,7 +28,7 @@ source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-ITERATOR="rb"
+# ITERATOR="rb"
 ITERATOR="rc"
 WINDOWTERM="XL"
 ################################################################################################################

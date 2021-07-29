@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sbatch shellScripts/run_test_train_split_aligned_stim.sh
-sbatch shellScripts/run_test_train_split_aligned_motion.sh
-sbatch shellScripts/run_test_train_split_aligned_stim_covariances.sh
-sbatch shellScripts/run_test_train_split_aligned_motion_covariances.sh
+sbatch shellScripts/run_test_train_split_regression_stim.sh
+sbatch shellScripts/run_test_train_split_regression_motion.sh
+sbatch shellScripts/run_test_train_split_covariances_stim.sh
+sbatch shellScripts/run_test_train_split_covariances_motion.sh

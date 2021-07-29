@@ -6,9 +6,9 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --ntasks=4
-#SBATCH --ntasks-per-core=4
-#SBATCH --mem-per-cpu=72G
+#SBATCH --ntasks=10
+#SBATCH --ntasks-per-core=10
+#SBATCH --mem-per-cpu=64G
 
 # Specify a job name:
 #SBATCH -J dimen_red_ta_rc_27

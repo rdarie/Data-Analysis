@@ -67,7 +67,7 @@ globals().update(allOpts)
 
 if arguments['plotting']:
     figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'])
+        figureFolder, arguments['analysisName'], 'outlierTrials')
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder, exist_ok=True)
 analysisSubFolder = os.path.join(
@@ -184,9 +184,11 @@ def findOutliers(
     if twoTailed:
         deviationDF.loc[np.isinf(deviationDF['deviation']), 'deviation'] = 100 * chiProbaLim
         deviationDF['rejectBlock'] = (deviationDF['deviation'] > chiProbaLim)
+        deviationDF['nearRejectBlock'] = (deviationDF['deviation'] > chiProbaLim / 2)
     else:
         deviationDF.loc[np.isinf(deviationDF['deviation']), 'deviation'] = 100 * sdThresh
         deviationDF['rejectBlock'] = (deviationDF['deviation'] > sdThresh)
+        deviationDF['nearRejectBlock'] = (deviationDF['deviation'] > sdThresh / 2)
     #
     return deviationDF
 
@@ -302,7 +304,7 @@ if __name__ == "__main__":
     testVar = None
     groupBy = ['segment', 't']
     resultNames = [
-        'deviation', 'rejectBlock']
+        'deviation', 'rejectBlock', 'nearRejectBlock']
 
     print('working with {} samples'.format(dataDF.shape[0]))
     randSample = slice(None, None, None)
@@ -368,7 +370,7 @@ if __name__ == "__main__":
         print('#######################################################')
         print('Done saving data')
         print('#######################################################')
-    if arguments['plotting'] and outlierTrials['rejectBlock'].astype(bool).any():
+    '''if arguments['plotting'] and outlierTrials['rejectBlock'].astype(bool).any():
         binSize = 1
         hist, binEdges = np.histogram(
             outlierTrials['deviation'],
@@ -405,7 +407,7 @@ if __name__ == "__main__":
             prefix + '_mh_dist_histogram_by_condition_and_epoch_robust.pdf')
         plt.savefig(
             pdfName, bbox_inches='tight', pad_inches=0)
-        plt.close()
+        plt.close()'''
         # plt.show()
     #
     # if arguments['plotting']:
@@ -466,14 +468,14 @@ if __name__ == "__main__":
             for cN in dataDF.columns:
                 emgAx.flat[idx].plot(
                     dataDF.loc[fullOutMask, :].index.get_level_values('bin'),
-                    dataDF.loc[fullOutMask, cN], alpha=0.8, label=cN[0])
+                    dataDF.loc[fullOutMask, cN], alpha=0.8, label=cN[0], rasterized=True)
                 emgAx.flat[idx].text(
                     1, 1, 'dev = {:.2f}'.format(row),
                     va='top', ha='right',
                     transform=emgAx.flat[idx].transAxes)
             mhAx.flat[idx].plot(
                 mahalDist.loc[fullOutMask, :].index.get_level_values('bin'),
-                mahalDist.loc[fullOutMask, 'mahalDist'], label='mahalDist')
+                mahalDist.loc[fullOutMask, 'mahalDist'], label='mahalDist', rasterized=True)
             mhAx.flat[idx].text(
                 1, 1, 'dev = {:.2f}'.format(row),
                 va='top', ha='right',

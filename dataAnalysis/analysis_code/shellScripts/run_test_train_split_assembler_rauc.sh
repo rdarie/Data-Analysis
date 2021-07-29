@@ -13,8 +13,8 @@
 #SBATCH -J test_train_split_assembler_rauc_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_splitt_assembler_rauc_27.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_splitt_assembler_rauc_27.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_assembler_rauc_27.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_assembler_rauc_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -33,5 +33,7 @@ ESTIMATOR='mahal_ledoit'
 
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
 # --preScale
-python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix="lfp_CAR_${ESTIMATOR}" --selectionName="lfp_CAR_${ESTIMATOR}" --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix="lfp_CAR_spectral_${ESTIMATOR}" --selectionName="lfp_CAR_spectral_${ESTIMATOR}" --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+COMMONOPTS=" --iteratorSuffix=${ITERATOR} --loadFromFrames --exp=${EXP} ${WINDOW} ${ALIGNQUERY} ${ANALYSISFOLDER} ${ALIGNFOLDER} ${BLOCKSELECTOR} --plotting --verbose=2"
+python -u './assembleDataFrames.py' --inputBlockSuffix="lfp_CAR_${ESTIMATOR}" --selectionName="lfp_CAR_${ESTIMATOR}" $COMMONOPTS
+python -u './assembleDataFrames.py' --inputBlockSuffix="lfp_CAR_spectral_${ESTIMATOR}" --selectionName="lfp_CAR_spectral_${ESTIMATOR}" $COMMONOPTS
+python -u './assembleDataFrames.py' --inputBlockSuffix='rig' --selectionName='rig' $COMMONOPTS

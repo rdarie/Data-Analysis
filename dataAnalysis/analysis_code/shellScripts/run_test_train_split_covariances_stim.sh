@@ -29,7 +29,7 @@ source shellScripts/calc_aligned_stim_preamble.sh
 ###
 
 BLOCKSELECTOR="--blockIdx=1"
-ITERATOR="--iteratorSuffix=ccm"
+ITERATOR="--iteratorSuffix=ccs"
 ALIGNQUERYTERM="stimOnE5"
 CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
@@ -45,7 +45,7 @@ python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --u
 source shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=2"
 
-ITERATOR="--iteratorSuffix=ccs"
+ITERATOR="--iteratorSuffix=ccm"
 ALIGNQUERYTERM="startingE5"
 CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"

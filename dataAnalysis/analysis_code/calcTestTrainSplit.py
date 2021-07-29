@@ -312,6 +312,12 @@ else:    # loading frames
 if not len(listOfDataFrames):
     print('Command yielded empty list of iterators!')
     sys.exit()
+elif len(listOfDataFrames) > 1:
+    # make sure index names are ordered consistently
+    firstIndexOrder = [indexName for indexName in listOfDataFrames[0].index.names]
+    for dfIdx in range(1, len(listOfDataFrames)):
+        if listOfDataFrames[dfIdx].index.names != firstIndexOrder:
+            listOfDataFrames[dfIdx] = listOfDataFrames[dfIdx].reorder_levels(firstIndexOrder, axis=0)
 if not arguments['processAll']:
     for dataDF in listOfDataFrames:
         cvIterator = tdr.trainTestValidationSplitter(

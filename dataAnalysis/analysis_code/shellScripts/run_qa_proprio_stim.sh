@@ -10,11 +10,11 @@
 #SBATCH --mem=64G
 
 # Specify a job name:
-#SBATCH -J qa_stim_2021_01_25
+#SBATCH -J qa_stim_2021_01_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-qa_stim_2021_01_25.out
-#SBATCH -e ../../batch_logs/%j-%a-qa_stim_2021_01_25.out
+#SBATCH -o ../../batch_logs/%j-%a-qa_stim_2021_01_27.out
+#SBATCH -e ../../batch_logs/%j-%a-qa_stim_2021_01_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

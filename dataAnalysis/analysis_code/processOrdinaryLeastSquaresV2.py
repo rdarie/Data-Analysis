@@ -162,7 +162,7 @@ if __name__ == '__main__':
     consoleDebugging = True
     if consoleDebugging:
         arguments = {
-            'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_rb', 'plotting': True,
+            'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_rc', 'plotting': True,
             'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
             'verbose': '1', 'debugging': False, 'estimatorName': 'enr_fa_ta',
             'blockIdx': '2', 'exp': 'exp202101271100'}
@@ -1068,18 +1068,7 @@ if __name__ == '__main__':
         for modelIdx, modelToTest in modelsToTestDF.iterrows():
             testDesign = modelToTest['testDesign']
             refDesign = modelToTest['refDesign']
-            if 'captionStr' in modelToTest:
-                titleText = modelToTest['captionStr']
-            else:
-                titleText = 'partial R2 scores for {} compared to {}'.format(testDesign, refDesign)
-            if 'refCaption' in modelToTest:
-                refCaption = modelToTest['refCaption']
-            else:
-                refCaption = lhsMasksInfo.loc[refDesign, 'fullFormulaDescr']
-            if 'testCaption' in modelToTest:
-                testCaption = modelToTest['testCaption']
-            else:
-                testCaption = lhsMasksInfo.loc[testDesign, 'fullFormulaDescr']
+            ##
             theseFUDE = tdr.partialR2(llDF['ll'], refDesign=refDesign, testDesign=testDesign, designLevel='lhsMaskIdx')
             theseFUDEStats = tdr.correctedResampledPairedTTest(
                 theseFUDE.xs('test', level='trialType'), y=0., groupBy=['target', 'electrode'], cvIterator=cvIterator)
@@ -1145,6 +1134,19 @@ if __name__ == '__main__':
         aspect = width / height
         # maskSecondOrderTests = modelsToTestDF['testType'] == 'secondOrderInteractions'
         for testTypeName, modelsToTestGroup in modelsToTestDF.groupby('testType'):
+            if 'captionStr' in modelsToTestGroup:
+                titleText = modelsToTestGroup['captionStr'].iloc[0]
+            else:
+                titleText = 'partial R2 scores for {} compared to {}'.format(
+                    modelsToTestGroup['testDesign'].iloc[0], modelsToTestGroup['refDesign'].iloc[0])
+            if 'refCaption' in modelsToTestGroup:
+                refCaption = modelsToTestGroup['refCaption'].iloc[0]
+            else:
+                refCaption = lhsMasksInfo.loc[modelsToTestGroup['refDesign'].iloc[0], 'fullFormulaDescr']
+            if 'testCaption' in modelsToTestGroup:
+                testCaption = modelsToTestGroup['testCaption'].iloc[0]
+            else:
+                testCaption = lhsMasksInfo.loc[modelsToTestGroup['testDesign'].iloc[0], 'fullFormulaDescr']
             plotFUDE = modelCompareFUDE.xs(testTypeName, level='testType').reset_index()
             plotFUDE = plotFUDE.loc[plotFUDE['trialType'].isin(['test']), :]
             plotFUDEStats = modelCompareFUDEStats.xs(testTypeName, level='testType').reset_index()

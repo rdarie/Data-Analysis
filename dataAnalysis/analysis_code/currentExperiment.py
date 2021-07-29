@@ -449,7 +449,7 @@ def parseAnalysisOptions(
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
         # facet_kws={'sharey': True},
-        height=6, aspect=2, kind='line', rasterized=True)
+        height=3, aspect=2, kind='line', rasterized=True)
     vLineOpts = {'color': 'm', 'alpha': 0.5}
     asigPlotShadingOpts = {
         'facecolor': vLineOpts['color'],
@@ -772,5 +772,6 @@ def parseAnalysisOptions(
         targetEpochSize=100e-3,
         windowSize=(-.7, .6),
         twoTailed=True,
+        qThresh=1-1e-4
         )
     return expOpts, locals()

@@ -6,8 +6,8 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --ntasks=5
-#SBATCH --ntasks-per-core=5
+#SBATCH --ntasks=10
+#SBATCH --ntasks-per-core=10
 #SBATCH --mem-per-cpu=8G
 
 # Specify a job name:
@@ -28,7 +28,8 @@ source shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=2 --processAll"
-ITERATOR="rb"
+# ITERATOR="rb"
+ITERATOR="rc"
 WINDOWTERM="XL"
 SUFFIX=""
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"

@@ -11,7 +11,7 @@ OUTLIERMASK="--maskOutlierBlocks"
 STATSOVERLAY="--overlayStats"
 # STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=-300 --winStop=700"
+TIMEWINDOWOPTS="--winStart=-200 --winStop=600"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
@@ -20,8 +20,8 @@ ALIGNQUERY="--alignQuery=starting"
 # ALIGNQUERY="--alignQuery=startingNoStim"
 
 HUEOPTS="--hueName=trialAmplitude --hueControl="
-ROWOPTS="--rowName=pedalMovementCat --rowControl="
-COLOPTS="--colName=electrode --colControl="
+ROWOPTS="--rowName=kinematicCondition --rowControl="
+COLOPTS="--colName=stimCondition --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
 
@@ -31,8 +31,8 @@ SIZEOPTS="--sizeName= --sizeControl="
 # STYLEOPTS="--styleName= --styleControl="
 # SIZEOPTS="--sizeName= --sizeControl="
 
-# PAGELIMITS="--limitPages=5"
-PAGELIMITS=""
+PAGELIMITS="--limitPages=5"
+# PAGELIMITS=""
 
 # OTHERASIGOPTS="--noStim"
 OTHERASIGOPTS="--noStim --recalcStats"
