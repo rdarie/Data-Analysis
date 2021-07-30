@@ -682,6 +682,51 @@ def plotAsigsAlignedWrapper(
         _dataReader.file.close()
 
 
+def genNumRepAnnotator(
+        hue_var=None, unit_var=None,
+        xpos=0, ypos=0, textOpts={}):
+    def numRepAnnotator(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset.iloc[:, 0].isna().all()))
+        if not emptySubset:
+            if not hasattr(g.axes[ro, co], 'nRepsAnnotated'):
+                annText = '# trials:\n'
+                for name, group in dataSubset.groupby(hue_var):
+                    nTrials = group[unit_var].unique().shape[0]
+                    annText += '{}: {}\n'.format(name, nTrials)
+                g.axes[ro, co].text(
+                    xpos, ypos,
+                    annText, transform=g.axes[ro, co].transAxes,
+                    **textOpts)
+                g.axes[ro, co].nRepsAnnotated = True
+        return
+    return numRepAnnotator
+
+def genTraceAnnotator(
+        unit_var=None, labelsList=[], textOpts={}):
+    def traceAnnotator(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset.iloc[:, 0].isna().all()))
+        if not emptySubset:
+            if not hasattr(g.axes[ro, co], 'tracesAnnotated'):
+                locIdx = 0
+                for name, group in dataSubset.groupby(unit_var):
+                    locIdx = locIdx % group.shape[0]
+                    xpos = group[g._x_var].iloc[locIdx]
+                    ypos = group[g._y_var].iloc[locIdx]
+                    content = group[labelsList].iloc[locIdx].to_dict()
+                    annText = ' '.join(['{}: {:.2f}'.format(key, value) for key, value in content.items()])
+                    g.axes[ro, co].text(
+                        xpos, ypos,
+                        annText, **textOpts)
+                    locIdx += 2
+                g.axes[ro, co].tracesAnnotated = True
+        return
+    return traceAnnotator
+
+
 def genYLabelChanger(lookupDict={}, removeMatch=''):
     def yLabelChanger(g, ro, co, hu, dataSubset):
         if (co == 0) and len(g.axes) and (not dataSubset.empty):

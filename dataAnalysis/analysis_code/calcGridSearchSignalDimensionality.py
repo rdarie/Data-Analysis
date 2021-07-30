@@ -200,10 +200,10 @@ if __name__ == '__main__':
             # scheduler='single-threaded'
             )
         if daskComputeOpts['scheduler'] == 'single-threaded':
-            daskClient = Client(LocalCluster(n_workers=1))
+            daskClient = None
         elif daskComputeOpts['scheduler'] == 'processes':
             # daskClient = Client(LocalCluster(processes=True))
-            daskClient = Client(LocalCluster())
+            daskClient = Client(LocalCluster(processes=True))
         elif daskComputeOpts['scheduler'] == 'threads':
             daskClient = Client(LocalCluster(processes=False))
         else:

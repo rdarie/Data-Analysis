@@ -31,8 +31,8 @@ SIZEOPTS="--sizeName= --sizeControl="
 # STYLEOPTS="--styleName= --styleControl="
 # SIZEOPTS="--sizeName= --sizeControl="
 
-PAGELIMITS="--limitPages=5"
-# PAGELIMITS=""
+# PAGELIMITS="--limitPages=5"
+PAGELIMITS=""
 
 # OTHERASIGOPTS="--noStim"
 OTHERASIGOPTS="--noStim --recalcStats"

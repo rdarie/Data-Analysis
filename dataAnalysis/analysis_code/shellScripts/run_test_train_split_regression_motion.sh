@@ -28,12 +28,9 @@ source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 # ITERATOR="--iteratorSuffix=ra"
-# ALIGNQUERYTERM="starting"
-# CONTROLSTATUS=""
 # ITERATOR="--iteratorSuffix=rb"
-# ALIGNQUERYTERM="starting"
-# CONTROLSTATUS=""
 ITERATOR="--iteratorSuffix=rc"
+ITERATOR="--iteratorSuffix=rd"
 ALIGNQUERYTERM="starting"
 CONTROLSTATUS=""
 

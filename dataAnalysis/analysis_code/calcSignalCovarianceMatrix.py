@@ -133,13 +133,13 @@ if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
     if 'ledoit' in estimatorName:
         estimatorClass = tdr.LedoitWolfTransformer
-        estimatorKWArgs = dict(maxNSamples=14e3)
+        estimatorKWArgs = dict(maxNSamples=12.5e3)
     elif 'emp' in estimatorName:
         estimatorClass = tdr.EmpiricalCovarianceTransformer
-        estimatorKWArgs = dict(maxNSamples=14e3)
+        estimatorKWArgs = dict(maxNSamples=12.5e3)
     elif 'mcd' in estimatorName:
         estimatorClass = tdr.MinCovDetTransformer
-        estimatorKWArgs = dict(maxNSamples=14e3)
+        estimatorKWArgs = dict(maxNSamples=12.5e3)
     crossvalKWArgs = dict(
         cv=cvIterator,
         return_train_score=True, return_estimator=True)
@@ -154,7 +154,7 @@ if __name__ == '__main__':
             )
         if joblibBackendArgs['backend'] == 'dask':
             if daskComputeOpts['scheduler'] == 'single-threaded':
-                daskClient = Client(LocalCluster(n_workers=1))
+                daskClient = None
             elif daskComputeOpts['scheduler'] == 'processes':
                 daskClient = Client(LocalCluster(processes=True))
             elif daskComputeOpts['scheduler'] == 'threads':

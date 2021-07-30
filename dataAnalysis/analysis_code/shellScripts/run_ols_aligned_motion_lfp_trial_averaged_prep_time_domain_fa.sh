@@ -30,6 +30,7 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 # ITERATOR="rb"
 ITERATOR="rc"
+ITERATOR="rd"
 WINDOWTERM="XL"
 ################################################################################################################
 ## time domain, trial-averaged

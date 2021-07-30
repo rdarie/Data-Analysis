@@ -20,6 +20,7 @@ Options:
     --alignFolderName=alignFolderName            append a name to the resulting blocks? [default: motion]
     --amplitudeFieldName=amplitudeFieldName      what is the amplitude named? [default: nominalCurrent]
     --sqrtTransform                              for firing rates, whether to take the sqrt to stabilize variance [default: False]
+    --arrayName=arrayName                        name of electrode array? (for map file) [default: utah]
 """
 import logging
 logging.captureWarnings(True)
@@ -49,16 +50,14 @@ from scipy.stats import zscore, chi2
 import quantities as pq
 import pandas as pd
 import numpy as np
-from dask import dataframe as dd
-from dask.diagnostics import ProgressBar
-from dask.distributed import Client, LocalCluster
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 from copy import deepcopy
 from tqdm import tqdm
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
 from sklearn.utils.random import sample_without_replacement as swr
-
+from sklearn.preprocessing import StandardScaler, RobustScaler
 sns.set(
     context='talk', style='white',
     palette='dark', font='sans-serif',
@@ -139,12 +138,6 @@ if 'outlierDetectOptions' in locals():
     alignedAsigsKWargs['windowSize'] = outlierDetectOptions['windowSize']
     devQuantile = outlierDetectOptions.pop('devQuantile', 0.95)
     qThresh = outlierDetectOptions.pop('qThresh', 1e-6)
-    '''
-    alignedAsigsKWargs['procFun'] = ash.genDetrender(
-        timeWindow=(
-            alignedAsigsKWargs['windowSize'][0],
-            alignedAsigsKWargs['windowSize'][1] + 100e-3))
-    '''
 else:
     targetEpochSize = 1e-3
     twoTailed = False
@@ -206,37 +199,29 @@ def calcCovMat(
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
     # print('partition shape = {}'.format(partitionData.shape))
-    if useMinCovDet:
-        try:
-            est = MinCovDet(support_fraction=supportFraction)
-            est.fit(partitionData)
-        except Exception:
-            traceback.print_exc()
-            print('\npartition shape = {}\n'.format(partitionData.shape))
-            est = EmpiricalCovariance()
-            est.fit(partitionData)
-    else:
-        est = EmpiricalCovariance()
-        est.fit(partitionData)
+    est = RobustScaler()
     result = pd.DataFrame(
-        est.mahalanobis(partitionData.values),
-        index=partition.index, columns=['mahalDist'])
-    # print('result shape is {}'.format(result.shape))
+        (
+            est
+            .fit_transform(partitionData.to_numpy().reshape(-1, 1))
+            .reshape(partitionData.shape)),
+        index=partition.index).abs().max(axis='columns').to_frame(name='mahalDist')
     result = pd.concat(
         [partition.loc[:, ~dataColMask], result],
-        axis=1)
+        axis='columns')
     result.name = 'mahalanobisDistance'
     result.columns.name = partition.columns.name
-    #
-    # if result['electrode'].iloc[0] == 'foo':
-    #     pdb.set_trace()
-    # print('result type is {}'.format(type(result)))
-    # print(result.T)
-    # print('partition shape = {}'.format(partitionData.shape))
     return result
 
 
 if __name__ == "__main__":
+    if 'mapDF' not in locals():
+        electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']
+        mapExt = electrodeMapPath.split('.')[-1]
+        if mapExt == 'cmp':
+            mapDF = prb_meta.cmpToDF(electrodeMapPath)
+        elif mapExt == 'map':
+            mapDF = prb_meta.mapToDF(electrodeMapPath)
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
@@ -256,57 +241,16 @@ if __name__ == "__main__":
         dataDF = dataDF * 10 ** (-ordMag)
     # dataDF = dataDF.apply(lambda x: x - x.mean())
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
-    trialInfo['epoch'] = np.nan
+    trialInfo['epoch'] = 0.
     firstBinMask = trialInfo['bin'] == trialInfo['bin'].unique()[0]
     groupNames = stimulusConditionNames + ['epoch']
     #  delay to account for transmission between event
     #  at t=0 and the signal being recorded
     transmissionDelay = 0
-    if 'trialRateInHz' in trialInfo.columns:
-        trialInfo.loc[trialInfo['trialRateInHz'] == 'NA', 'trialRateInHz'] = 1e-1
-        trialInfo.loc[trialInfo['trialRateInHz'] <= 0, 'trialRateInHz'] = 1e-1
-        if 'stimPeriod' not in trialInfo.columns:
-            trialInfo['stimPeriod'] = trialInfo['trialRateInHz'] ** (-1)
-            trialInfo.loc[np.isinf(trialInfo['stimPeriod']), 'stimPeriod'] = 10
-        #
-        for stimPeriod, group in trialInfo.groupby('stimPeriod'):
-            # adjust epoch size down from nominal, to capture
-            # integer number of stim periods
-            if isinstance(stimPeriod, str):
-                trialInfo.loc[group.index, 'epoch'] = 0
-            else:
-                if stimPeriod > targetEpochSize:
-                    epochSize = stimPeriod / np.floor(stimPeriod / targetEpochSize)
-                else:
-                    epochSize = stimPeriod * np.ceil(targetEpochSize / stimPeriod)
-                print('stimPeriod = {}, epochSize = {}'.format(stimPeriod, epochSize))
-                theseTBins = group['bin'].to_numpy()
-                epochBins = np.arange(
-                    theseTBins.min(), theseTBins.max(), epochSize)
-                # align epoch bins to window
-                epochOffset = np.max(epochBins[epochBins <= 0])
-                epochBins = epochBins - epochOffset + transmissionDelay
-                validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
-                validBins[0] = True
-                validBins[-1] = True
-                epochBins = epochBins[validBins]
-                # stretch first and last epoch bin to cover entire window
-                epochBins[0] = theseTBins.min() - 1
-                epochBins[-1] = theseTBins.max() + 1
-                theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
-                trialInfo.loc[group.index, 'epoch'] = theseEpochs
-        trialInfo.fillna(method='ffill', inplace=True)
-        trialInfo.fillna(method='bfill', inplace=True)
-    else:
-        trialInfo.loc[:, 'epoch'] = 0
     #
     dataDF.set_index(
         pd.Index(trialInfo['epoch'], name='epoch'),
         append=True, inplace=True)
-    #  ########################### Debugging
-    # if True:
-    #     dataDF = dataDF.drop(columns=[('utah25#0', 0)])
-    #  ###########################
     testVar = None
     groupBy = ['segment', 't']
     resultNames = [
@@ -345,27 +289,17 @@ if __name__ == "__main__":
             mahalDist.to_hdf(
                 resultPath, 'mahalDist')
     print('#######################################################')
-    refValue = chi2.isf(qThresh, len(dataDF.columns))
-    print('Data is {} dimensional'.format(len(dataDF.columns)))
+    nDoF = 1  #  len(dataDF.columns)
+    refValue = chi2.isf(qThresh, nDoF)
+    print('Data is {} dimensional'.format(nDoF))
     print('The mahalanobis distance should be less than {}'.format(refValue))
-    refLogProba = -np.log(chi2.pdf(refValue, len(dataDF.columns)))
+    refLogProba = -np.log(chi2.pdf(refValue, nDoF))
     print('If the test is two-tailed, the log probability limit is {}'.format(refLogProba))
-    print('i.e. rejects distances between {} and {}')
     print('#######################################################')
     #
     outlierTrials = findOutliers(
         mahalDist, groupBy=groupBy, multiplier=1, qThresh=qThresh,
-        nDim=len(dataDF.columns), devQuantile=devQuantile, twoTailed=twoTailed)
-    # outlierTrials = ash.applyFunGrouped(
-    #     mahalDist,
-    #     groupBy, testVar,
-    #     fun=findOutliers, funArgs=[],
-    #     funKWargs=dict(
-    #         multiplier=1, qThresh=1e-2,
-    #         nDim=len(dataDF.columns), devQuantile=0.95),
-    #     # funKWargs=dict(sdThresh=100),
-    #     resultNames=resultNames,
-    #     plotting=False)
+        nDim=nDoF, devQuantile=devQuantile, twoTailed=twoTailed)
     print('\nHighest observed deviations were:')
     print(outlierTrials['deviation'].sort_values().tail())
     outlierCount = outlierTrials['rejectBlock'].sum()
@@ -381,49 +315,94 @@ if __name__ == "__main__":
         print('Done saving data')
         print('#######################################################')
     if arguments['plotting'] and outlierTrials['rejectBlock'].astype(bool).any():
-        print('Plotting deviation histogram')
-        binSize = 1
-        hist, binEdges = np.histogram(
-            outlierTrials['deviation'],
-            bins=np.arange(
-                0,
-                outlierTrials['deviation'].max() + binSize,
-                binSize)
-            )
-        cumFrac = np.cumsum(hist) / hist.sum()
-        mask = (cumFrac > 0.75) & (cumFrac < 0.99)
-        # rv = chi2(len(dataDF.columns))
-        # theoreticalPMF = rv.pdf(binEdges[:-1] * binSize)
-        # plt.plot(binEdges[:-1][mask], theoreticalPMF[mask]); plt.show()
-        #
-        fig, ax = plt.subplots(1, 2, sharex=True)
-        fig.set_size_inches((6, 4))
-        ax[0].plot(
-            binEdges[:-1][mask],
-            cumFrac[mask]
-            )
-        ax[0].axvline(outlierTrials.deviationThreshold, color='r')
-        ax[0].set_xlabel('signal deviation')
-        ax[0].set_ylabel('cummulative fraction')
-        # sns.distplot(
-        #     outlierTrials['deviation'],
-        #     bins=binEdges, kde=False, ax=ax[1])
-        ax[1].plot(
-            binEdges[:-1][mask],
-            hist[mask] / hist.sum()
-            )
-        # ax[1].plot(binEdges[:-1][mask], theoreticalPMF[mask])
-        ax[1].axvline(outlierTrials.deviationThreshold, color='r')
-        ax[1].set_xlabel('signal deviation')
-        ax[1].set_ylabel('fraction')
-        pdfName = os.path.join(
+        pdfPath = os.path.join(
             figureOutputFolder,
             prefix + '_mahalanobis_dist_histogram.pdf')
-        plt.savefig(
-            pdfName, bbox_inches='tight', pad_inches=0)
-        plt.close()
-        # plt.show()
+        print('Plotting deviation histogram')
+        with PdfPages(pdfPath) as pdf:
+            '''binSize = 1
+            theseBins = np.arange(
+                0,
+                outlierTrials['deviation'].max() + binSize,
+                binSize)'''
+            theseBins = np.linspace(0, outlierTrials['deviation'].max() * 1.01, 200)
+            hist, binEdges = np.histogram(
+                outlierTrials['deviation'],
+                bins=theseBins
+                )
+            cumFrac = np.cumsum(hist) / hist.sum()
+            mask = (cumFrac > 0.75) & (cumFrac < 0.999)
+            fig, ax = plt.subplots(1, 2, sharex=True)
+            fig.set_size_inches((6, 4))
+            ax[0].plot(
+                binEdges[:-1][mask],
+                cumFrac[mask]
+                )
+            ax[0].axvline(outlierTrials.deviationThreshold, color='r')
+            ax[0].set_xlabel('signal deviation')
+            ax[0].set_ylabel('cummulative fraction')
+            ax[1].plot(
+                binEdges[:-1][mask],
+                hist[mask] / hist.sum()
+                )
+            # ax[1].plot(binEdges[:-1][mask], theoreticalPMF[mask])
+            ax[1].axvline(outlierTrials.deviationThreshold, color='r')
+            ax[1].set_xlabel('signal deviation')
+            ax[1].set_ylabel('fraction')
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            plt.close()
+            fig, ax = plt.subplots()
+            plotDF = outlierTrials.reset_index()
+            ax.plot(plotDF['t'], plotDF['deviation'], 'b')
+            ax.axhline(outlierTrials.deviationThreshold, color='r')
+            ax.set_xlabel('trial time (sec)')
+            ax.set_ylabel('trial deviation')
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            plt.close()
     #
+    featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
+    dataChanNames = featureInfo['feature'].apply(lambda x: x.replace('#0', ''))
+    banksLookup = mapDF.loc[:, ['label', 'bank']].set_index(['label'])['bank']
+    featureInfo.loc[:, 'bank'] = dataChanNames.map(banksLookup)
+    trialInfo.loc[:, 'wasKept'] = ~outlierTrials.loc[pd.MultiIndex.from_frame(trialInfo[['segment', 't']]), 'rejectBlock'].to_numpy()
+    dataDF.set_index(pd.MultiIndex.from_frame(trialInfo), inplace=True)
+    #
+    signalRangesFigPath = os.path.join(
+        figureOutputFolder,
+        prefix + '_outlier_channels.pdf')
+    print('plotting signal ranges')
+    with PdfPages(signalRangesFigPath) as pdf:
+        keepLevels = ['wasKept']
+        dropLevels = [lN for lN in dataDF.index.names if lN not in keepLevels]
+        plotDF = dataDF.T.reset_index(drop=True).T.reset_index(dropLevels, drop=True)
+        plotDF.columns.name = 'flatFeature'
+        plotDF = plotDF.stack().reset_index(name='signal')
+        plotDF.loc[:, 'bank'] = plotDF['flatFeature'].map(featureInfo['bank'])
+        plotDF.loc[:, 'feature'] = plotDF['flatFeature'].map(featureInfo['feature'])
+        h = 18
+        w = 3
+        aspect = w / h
+        g = sns.catplot(
+            col='bank', x='signal', y='feature',
+            data=plotDF, orient='h', kind='violin', ci='sd',
+            linewidth=0.5, cut=0,
+            sharex=False, sharey=False, height=h, aspect=aspect
+        )
+        g.suptitle('original')
+        g.tight_layout()
+        pdf.savefig(bbox_inches='tight')
+        plt.close()
+        g = sns.catplot(
+            col='bank', x='signal', y='feature',
+            data=plotDF.loc[plotDF['wasKept'], :], orient='h', kind='violin', ci='sd',
+            linewidth=0.5, cut=0,
+            sharex=False, sharey=False, height=h, aspect=aspect
+            )
+        g.suptitle('triaged')
+        g.tight_layout()
+        pdf.savefig(bbox_inches='tight')
+        plt.close()
+
     theseOutliers = (
         outlierTrials
         .loc[outlierTrials['nearRejectBlock'].astype(bool), 'deviation'].sort_values()
@@ -451,7 +430,7 @@ if __name__ == "__main__":
                 for lvlIdx, levelName in enumerate(theseOutliers.index.names):
                     outlierDataMasks.append(dataDF.index.get_level_values(levelName) == name[lvlIdx])
                 fullOutMask = np.logical_and.reduce(outlierDataMasks)
-                mhp = - chi2.logpdf(mahalDist.loc[fullOutMask, 'mahalDist'], len(dataDF.columns))
+                mhp = - chi2.logpdf(mahalDist.loc[fullOutMask, 'mahalDist'], nDoF)
                 mhAx.flat[idx].plot(
                     mahalDist.loc[fullOutMask, :].index.get_level_values('bin'),
                     mhp,
@@ -536,19 +515,6 @@ if __name__ == "__main__":
                 # bbox_extra_artists=[emgLeg]
                 )
             plt.close()
-            # plt.show()
-    #
-    # if arguments['plotting']:
-    #     fig, ax = plt.subplots(2, 1, sharex=True)
-    #     bla = (mahalDist.xs(992, level='originalIndex').xs(3, level='segment'))
-    #     ax[0].plot(
-    #         bla.index.get_level_values('bin').to_numpy(),
-    #         bla.to_numpy())
-    #     bla = (dataDF.xs(992, level='originalIndex').xs(3, level='segment'))
-    #     ax[1].plot(
-    #         bla.index.get_level_values('bin').to_numpy(),
-    #         bla.to_numpy())
-    #     plt.show()
     if arguments['saveResults']:
         exportDF = (
             outlierTrials

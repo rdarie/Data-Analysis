@@ -218,15 +218,6 @@ def getExpOpts():
                 for i in [1, 2, 3]]
         }
     }
-    #
-    '''analysisClippingOpts = {
-        'utah': {
-            'absoluteLimit': 600,
-            # 'IQR': True,
-            # 'quantileVal': 0.25,
-            # 'quantileMultiple': 5
-        }}'''
-    #
     csdOpts = {
         'NSamplesForCV': 1000,
         'chunkSize': 20000,

@@ -67,6 +67,10 @@ def processOutlierTrials(
             scratchPath, 'outlierTrials', alignFolderName,
             prefix + '_{}_outliers.h5'.format(window))
         oBlocks = pd.read_hdf(resultPath, 'rejectBlock')
+        oBlocksCount = oBlocks.sum()
+        oBlocksSize = oBlocks.shape[0]
+        print('Loading outlier trials. Rejecting a proportion of {:.2f} ({} out of {})'.format(
+            oBlocksCount / oBlocksSize, oBlocksCount, oBlocksSize))
         if invertOutlierBlocks:
             oBlocks = ~oBlocks.astype(bool)
         return oBlocks

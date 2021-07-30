@@ -10,6 +10,7 @@ Options:
     --showFigures                            show plots? [default: False]
     --verbose=verbose                        print diagnostics?
     --debugging                              print diagnostics? [default: False]
+    --forceReprocess                         print diagnostics? [default: False]
     --estimatorName=estimatorName            filename for resulting estimator (cross-validated n_comps)
     --datasetName=datasetName                filename for resulting estimator (cross-validated n_comps)
     --analysisName=analysisName              append a name to the resulting blocks? [default: default]
@@ -269,7 +270,6 @@ if __name__ == '__main__':
                 lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
             else:
                 lhsMasksInfo.loc[rowIdx, key] = 'NULL'
-    #
     # lhsMasksInfo.loc[:, 'lagSpec'] = np.nan
     for rowIdx, row in lhsMasksInfo.iterrows():
         if row['designFormula'] in designHistOptsDict:
@@ -524,7 +524,7 @@ if __name__ == '__main__':
         names=['rhsMaskIdx', 'ensTemplate'])
     ################################################################################################
     reProcessPredsCoefs = not (loadedCoefs and loadedPreds)
-    if reProcessPredsCoefs:
+    if reProcessPredsCoefs or arguments['forceReprocess']:
         coefDict0 = {}
         predDict0 = {}
         for lhsMaskIdx in range(lhsMasks.shape[0]):
@@ -671,8 +671,7 @@ if __name__ == '__main__':
     else:
         print('Predictions and coefficients loaded from .h5 file')
     ################################################################################################
-    loadedPlotOpts = False
-    if not loadedPlotOpts:
+    if (not loadedPlotOpts) or arguments['forceReprocess']:
         termPalette = pd.concat({
             'exog': pd.Series(np.unique(np.concatenate([di.term_names for di in designInfoDF['designInfo']]))),
             'endog': pd.Series(np.unique(np.concatenate([di.term_names for di in histDesignInfoDF['designInfo']]))),
@@ -766,7 +765,7 @@ if __name__ == '__main__':
         factorPalette.to_hdf(estimatorPath, 'factorPalette')
         trialTypePalette.to_hdf(estimatorPath, 'trialTypePalette')
 
-    if not loadedIR:
+    if (not loadedIR) or arguments['forceReprocess']:
         iRPerFactorDict0 = {}
         iRPerTermDict0 = {}
         for lhsMaskIdx in range(lhsMasks.shape[0]):
@@ -1008,7 +1007,7 @@ if __name__ == '__main__':
         sourceTermLookup.to_hdf(estimatorPath, 'sourceTermLookup')
         factorPalette.to_hdf(estimatorPath, 'factorPalette')
     #
-    if not loadedProcessedScores:
+    if (not loadedProcessedScores) or arguments['forceReprocess']:
         scoresStack = pd.concat({
                 'test': scoresDF['test_score'],
                 'train': scoresDF['train_score']},

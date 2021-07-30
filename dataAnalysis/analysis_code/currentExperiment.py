@@ -679,6 +679,33 @@ def parseAnalysisOptions(
                 'winStop':  None,
                 }
             },
+        # perimovement, any stim, for regression
+        'rd': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 5e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=10,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.7,  # start 0.6 before whatever the query was
+                'winStop': .6  # stop .6 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
         # perimovement onset (or peristim onset if stim only) for RAUC
         'ma': {
             'ensembleHistoryLen': .30,
@@ -769,9 +796,10 @@ def parseAnalysisOptions(
         'hBound': [14,      29,     55,      120,       1000]
         })
     outlierDetectOptions = dict(
-        targetEpochSize=100e-3,
+        targetEpochSize=200e-3,
         windowSize=(-.7, .6),
         twoTailed=True,
-        qThresh=1-1e-4
+        qThresh=1e-3,
+        devQuantile=None,
         )
     return expOpts, locals()

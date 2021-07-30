@@ -179,6 +179,16 @@ if __name__ == '__main__':
         asp.xLabelsTime,
         asp.genVLineAdder([0], vLineOpts),
         asp.genLegendRounder(decimals=2),
+        asp.genNumRepAnnotator(
+            hue_var=arguments['hueName'], unit_var='trialUID',
+            xpos=0.05, ypos=.95, textOpts=dict(
+                ha='left', va='top',
+                c=(0., 0., 0., 0.7),
+                bbox=dict(
+                    boxstyle="square",
+                    ec=(0., 0., 0., 0.),
+                    fc=(1., 1., 1., 0.2))
+            )),
         ]
     unusedPlotProcFuns = [
         # asp.genBlockVertShader([
@@ -197,7 +207,13 @@ if __name__ == '__main__':
             xUnitFactor=1e3, yUnitFactor=1,
             xUnits='msec', yUnits='uV',
             ),
+        asp.genTraceAnnotator(
+            unit_var='trialUID', labelsList=['segment', 't'],
+            textOpts=dict(ha='left', va='bottom', fontsize=4))
         ]
+    titlesOpts = dict(
+        col_template="{col_var}\n{col_name}",
+        row_template="{row_var}\n{row_name}")
     analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
         arguments, scratchFolder)
     figureOutputFolder = os.path.join(
@@ -266,6 +282,7 @@ if __name__ == '__main__':
             compoundAnn.loc[group.index] = '_'.join(['{}'.format(nm) for nm in name])
         trialInfo.loc[:, canName] = compoundAnn
     dataDF.index = pd.MultiIndex.from_frame(trialInfo)
+
     prf.print_memory_usage('just loaded data, plotting')
     #
     rowColOpts = asp.processRowColArguments(arguments)
@@ -279,6 +296,17 @@ if __name__ == '__main__':
     #
     if arguments['individualTraces']:
         pdfName += '_traces'
+        relplotKWArgs.update(dict(estimator=None, units='trialUID'))
+        plotProcFuns.append(
+            asp.genTraceAnnotator(
+                unit_var='trialUID', labelsList=['segment', 't'],
+                textOpts=dict(
+                    ha='left', va='bottom', fontsize=5,
+                    c=(0., 0., 0., 0.7),
+                    bbox=dict(
+                        boxstyle="square",
+                        ec=(0., 0., 0., 0.), fc=(1., 1., 1., 0.2))
+                )))
     if arguments['overlayStats']:
         figureStatsFolder = os.path.join(
             alignSubFolder, 'figureStats'
@@ -317,12 +345,6 @@ if __name__ == '__main__':
                     x='bin', y='signal',
                     facet_kws=dict(margin_titles=True),
                     **rowColArgs, **relplotKWArgs, data=plotDF)
-                xAxisLabel = 'time (msec)'
-                yAxisLabel = unitName[0]
-                g.set_axis_labels(xAxisLabel, yAxisLabel)
-                g.set_titles(template="data subset: {col_name}")
-                titleText = ''
-                g.suptitle(titleText)
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
                     #  print('(ro, co, hu) = {}'.format((ro, co, hu)))
@@ -335,6 +357,12 @@ if __name__ == '__main__':
                         asp.addSignificanceStars(
                             g, sigTestResults.loc[unitMask, :],
                             ro, co, hu, dataSubset, sigStarOpts=asigSigStarOpts)
+                xAxisLabel = 'time (msec)'
+                yAxisLabel = unitName[0]
+                g.set_axis_labels(xAxisLabel, yAxisLabel)
+                g.set_titles(**titlesOpts)
+                titleText = ''
+                g.suptitle(titleText)
                 g.tight_layout(pad=styleOpts['tight_layout.pad'])
                 pdf.savefig(
                     bbox_inches='tight',

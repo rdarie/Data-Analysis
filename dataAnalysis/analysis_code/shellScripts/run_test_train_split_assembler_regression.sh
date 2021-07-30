@@ -30,13 +30,9 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 #
 # ITERATOR="ra"
-# ALIGNQUERYTERM="starting"
 # ITERATOR="rb"
-# ALIGNQUERYTERM="starting"
 ITERATOR="rc"
-# ALIGNQUERYTERM="starting"
-
-# ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
+ITERATOR="rd"
 #
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
 # --preScale

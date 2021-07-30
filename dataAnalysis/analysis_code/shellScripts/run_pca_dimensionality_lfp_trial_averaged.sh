@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=64G
 
 # Specify a job name:
-#SBATCH -J dimen_red_ta_rc_27
+#SBATCH -J dimen_red_ta_rd_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-dimen_red_ta_rc_27.out
-#SBATCH -e ../../batch_logs/%j-%a-dimen_red_ta_rc_27.out
+#SBATCH -o ../../batch_logs/%j-%a-dimen_red_ta_rd_27.out
+#SBATCH -e ../../batch_logs/%j-%a-dimen_red_ta_rd_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -33,15 +33,14 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ##################################################
 # ITERATOR="ra"
 # ITERATOR="rb"
-ITERATOR="rc"
+# ITERATOR="rc"
+ITERATOR="rd"
 ##################################################
-
-#####
 
 # targets=(lfp_CAR lfp_CAR_spectral)
 # estimators=(fa_ta pca_ta)
 #
-targets=(lfp_CAR)
+targets=(lfp_CAR lfp_CAR_spectral)
 estimators=(fa_ta)
 for TARGET in "${targets[@]}"
 do

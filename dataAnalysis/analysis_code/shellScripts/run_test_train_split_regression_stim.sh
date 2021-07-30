@@ -29,12 +29,9 @@ source shellScripts/calc_aligned_stim_preamble.sh
 ###
 
 # ITERATOR="--iteratorSuffix=ra"
-# ALIGNQUERYTERM="stimOnHighRate"
-# CONTROLSTATUS=""
 # ITERATOR="--iteratorSuffix=rb"
-# ALIGNQUERYTERM="stimOnHighRate"
-# CONTROLSTATUS=""
 ITERATOR="--iteratorSuffix=rc"
+ITERATOR="--iteratorSuffix=rd"
 ALIGNQUERYTERM="stimOnHighRate"
 CONTROLSTATUS=""
 #
