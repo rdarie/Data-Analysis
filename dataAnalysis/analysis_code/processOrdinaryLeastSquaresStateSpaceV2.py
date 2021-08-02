@@ -49,12 +49,14 @@ from dataAnalysis.analysis_code.regression_parameters import *
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
+from scipy.spatial import distance
 import dill as pickle
 import gc
 import patsy
 from itertools import product
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
+import control as ctrl
 idxSl = pd.IndexSlice
 useDPI = 200
 dpiFactor = 72 / useDPI
@@ -112,9 +114,9 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_ra', 'plotting': True,
+        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_rd', 'plotting': True,
         'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
-        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_pca_ta',
+        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_fa_ta',
         'blockIdx': '2', 'exp': 'exp202101271100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     
@@ -226,24 +228,70 @@ pdfPath = os.path.join(
 with PdfPages(pdfPath) as pdf:
     height, width = 3, 3
     aspect = width / height
-    g = sns.relplot(
-        row='fullFormulaLabel', col='freqBandName',
-        x='real', y='imag', hue='eigValType',
-        height=height, aspect=aspect,
-        palette=eigValPalette.to_dict(),
-        facet_kws={'margin_titles': True}, rasterized=True, edgecolor=None,
-        kind='scatter', data=plotEig)
-    for ax in g.axes.flatten():
-        c = Circle((0, 0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
-        ax.add_artist(c)
-        ax.set_ylim(-1, 1)
-        ax.set_xlim(-1, 1)
-    g.tight_layout(pad=styleOpts['tight_layout.pad'])
-    pdf.savefig(bbox_inches='tight', pad_inches=0)
-    if arguments['showFigures']:
-        plt.show()
-    else:
-        plt.close()
+    for name, eigGroup in plotEig.groupby(['lhsMaskIdx', 'fullFormulaLabel']):
+        lhsMaskIdx, fullFormulaLabel = name
+        g = sns.relplot(
+            col='freqBandName',
+            x='real', y='imag', hue='eigValType',
+            height=height, aspect=aspect,
+            palette=eigValPalette.to_dict(),
+            facet_kws={'margin_titles': True},
+            rasterized=True, edgecolor=None,
+            kind='scatter', data=eigGroup)
+        for ax in g.axes.flatten():
+            c = Circle((0, 0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
+            ax.add_artist(c)
+            ax.set_ylim(-1, 1)
+            ax.set_xlim(-1, 1)
+        g.suptitle(fullFormulaLabel)
+        g.tight_layout(pad=styleOpts['tight_layout.pad'])
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        #
+        fig, ax = plt.subplots(1, 2, figsize=(6, 3))
+        commonOpts = dict(element='step', stat="probability")
+        sns.histplot(x='tau', data=eigGroup.query('tau > 0'), ax=ax[0], color=eigValPalette['oscillatory decay'], **commonOpts)
+        ax[0].set_xlabel('Oscillatory mode period (sec)')
+        sns.histplot(x='chi', data=eigGroup, ax=ax[1], color=eigValPalette['pure decay'], **commonOpts)
+        ax[1].set_xlabel('Decay mode time constant (sec)')
+        ax[1].set_ylabel('')
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        thisB = BDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        if not thisB.empty:
+            fig, ax = plt.subplots(figsize=(3, 3))
+            colsToEval = [cN for cN in thisB.columns if '[NA]' not in cN]
+            BCosineSim = pd.DataFrame(np.nan, index=colsToEval, columns=colsToEval)
+            mask = np.zeros_like(BCosineSim)
+            mask[np.triu_indices_from(mask)] = True
+            for cNr in colsToEval:
+                for cNc in colsToEval:
+                    BCosineSim.loc[cNr, cNc] = distance.cosine(thisB[cNr], thisB[cNc])
+            sns.heatmap(BCosineSim, mask=mask, vmin=0, vmax=1, square=True, ax=ax)
+            ax.set_title('Cosine distance between input directions')
+            fig.tight_layout()
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+        '''thisA = ADF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        
+        thisC = CDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        thisD = DDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        sys = ctrl.StateSpace(thisA, thisB, thisC, thisD, dt=binInterval)
+        f = np.linspace(1e-3, 100, 1000)
+        mag, phase, omega = ctrl.freqresp(sys, 2 * np.pi * f)
+        fig, ax = plt.subplots(sys.ninputs, sys.noutputs, sharey=True)
+        for inpIdx in range(sys.ninputs):
+            for outIdx in range(sys.noutputs):
+                ax[inpIdx, outIdx].semilogy(f, mag[outIdx, inpIdx, :])'''
 
 '''pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues'))

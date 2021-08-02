@@ -7,15 +7,15 @@
 
 # Request memory:
 #SBATCH --ntasks=10
-#SBATCH --ntasks-per-core=10
+#SBATCH --ntasks-per-core=1
 #SBATCH --mem-per-cpu=8G
 
 # Specify a job name:
 #SBATCH -J ols_motion_lfp_ta_td_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ols_motion_lfp_ta_td_27.out
-#SBATCH -e ../../batch_logs/%j-%a-ols_motion_lfp_ta_td_27.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_ta_td_27.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_ta_td_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

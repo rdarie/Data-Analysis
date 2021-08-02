@@ -19,24 +19,28 @@ Options:
     --invertOutlierMask                    delete outlier trials? [default: False]
     --showFigures                          show plots interactively? [default: False]
 """
-import matplotlib
+import logging
+logging.captureWarnings(True)
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('PS')   # generate postscript output
-matplotlib.use('Qt5Agg')   # generate interactive output
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-from namedQueries import namedQueries
 import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.preproc.ns5 as ns5
 import os
-from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import dill as pickle
 import pandas as pd
@@ -44,6 +48,19 @@ import numpy as np
 from sklearn.preprocessing import RobustScaler, MinMaxScaler
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+
+'''
+consoleDebug = True
+if consoleDebug:
+    arguments = {
+        'maskOutlierBlocks': False, 'inputBlockSuffix': 'lfp_CAR_spectral_mahal_ledoit',
+        'window': 'XL', 'blockIdx': '2', 'lazy': False, 'verbose': False,
+        'exp': 'exp202101271100', 'alignFolderName': 'motion', 'analysisName': 'hiRes', 'unitQuery': 'mahal',
+        'alignQuery': 'starting', 'inputBlockPrefix': 'Block', 'invertOutlierMask': False, 'processAll': True,
+        'showFigures': False}
+    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+    '''
+
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -119,7 +136,7 @@ height, width = 3, 3
 aspect = width / height
 with PdfPages(pdfPath) as pdf:
     plotLims = plotRC[whichRAUC].quantile([1e-2, 1-1e-2])
-    for name, group in plotRC.groupby('RateInHz'):
+    for name, group in plotRC.groupby('trialRateInHz'):
         nAmps = group[amplitudeFieldName].unique().size
         if nAmps > 1:
             g = sns.relplot(
@@ -132,7 +149,7 @@ with PdfPages(pdfPath) as pdf:
                 hue=hueName, hue_order=hueOrder,
                 kind='line', data=group,
                 # palette=emgPalette,
-                height=height, aspect=aspect, errorbar='se', estimator='mean',
+                height=height, aspect=aspect, errorbar='sd', estimator='mean',
                 facet_kws=dict(sharey=True, sharex=False, margin_titles=True), lw=1,
                 )
         else:

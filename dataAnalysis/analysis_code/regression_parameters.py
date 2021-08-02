@@ -170,6 +170,7 @@ lOfEnsembleTemplates = [
     (hT, hT) for hT in lOfHistTemplates
     ]
 
+lhsMasksOfInterest = [0, 9, 10, 19, 28, 29, 38, 47, 48]
 burnInPeriod = 500e-3
 def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']

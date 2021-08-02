@@ -296,6 +296,7 @@ else:    # loading frames
                     controlKey = '/{}/control'.format(arguments['selectionName'])
                     if controlKey in store:
                         theseDF['control'] = pd.read_hdf(store, controlKey)
+                        # pdb.set_trace()
                     assert len(theseDF.keys()) > 0
                     print('Loaded {}\n    from {}'.format(arguments['selectionName'], dFPath))
                     thisDF = pd.concat(theseDF, names=['controlFlag'])

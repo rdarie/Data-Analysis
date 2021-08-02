@@ -31,8 +31,12 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib.ticker import MaxNLocator
+from matplotlib.patches import Rectangle
+from matplotlib.collections import PatchCollection
 import seaborn as sns
 import os, sys
+from itertools import combinations
+import pingouin as pg
 from sklearn.pipeline import make_pipeline, Pipeline
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -56,6 +60,7 @@ from sklearn.decomposition import PCA, FactorAnalysis
 import joblib as jb
 import dill as pickle
 import gc
+import vg
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 from numpy.random import default_rng
@@ -65,13 +70,15 @@ import scipy
 import umap
 from tqdm import tqdm
 import umap.plot
-rng = default_rng()
+#
 idxSl = pd.IndexSlice
 useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': 1,
+        'lines.linewidth': .5,
+        'lines.markersize': 2.,
+        'patch.linewidth': .5,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -128,7 +135,7 @@ if consoleDebugging:
         'selectionName': 'lfp_CAR', 'verbose': '1', 'exp': 'exp202101271100',
         'analysisName': 'hiRes', 'blockIdx': '2', 'alignFolderName': 'motion', 'processAll': True,
         'plotting': True, 'datasetPrefix': 'Block_XL_df', 'iteratorSuffixList': 'ca, cb, ccm, ccs',
-        'debugging': False, 'estimatorName': 'mahal', 'showFigures': False}
+        'debugging': False, 'estimatorName': 'mahal_emp', 'showFigures': False}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
 
@@ -311,7 +318,14 @@ for iteratorSuffix in listOfIteratorSuffixes:
         estimatorsSubFolder,
         thisEstimatorName + '.h5'
         )
-    #
+    dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
+    loadingMetaPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '_{}'.format(selectionName) + '_meta.pickle'
+        )
+    with open(loadingMetaPath, 'rb') as _f:
+        dataLoadingMeta = pickle.load(_f)
+        cvIterator = dataLoadingMeta['iteratorsBySegment'][0]
     with pd.HDFStore(estimatorPath, 'r') as store:
         if 'cv_covariance_matrices' in store:
             covMatDict[iteratorSuffix] = pd.read_hdf(store, 'cv_covariance_matrices')
@@ -368,7 +382,7 @@ for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
         distancesDict[distanceType][freqBandName].name = distanceType
         distancesDict[distanceType][freqBandName].to_hdf(resultPath, '/distanceMatrices/{}/{}'.format(freqBandName, distanceType))
         #
-        uMapper = umap.UMAP(metric='precomputed', n_neighbors=2*lastFoldIdx)
+        uMapper = umap.UMAP(metric='precomputed', n_neighbors=3*lastFoldIdx, min_dist=0.5)
         uMapper.fit(theseDistances[distanceType])
         projectedDict[distanceType][freqBandName] = pd.DataFrame(
             uMapper.transform(theseDistances[distanceType]), index=theseDistances[distanceType].index,
@@ -377,52 +391,165 @@ for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
         projectedDict[distanceType][freqBandName].name = '{}_umap'.format(distanceType)
         projectedDict[distanceType][freqBandName].to_hdf(resultPath, '/umapDistanceMatrices/{}/{}'.format(freqBandName, distanceType))
 
-
-primaryPalette = pd.DataFrame(sns.color_palette('colorblind'), columns=['r', 'g', 'b'])
-pickingColors = False
-if pickingColors:
-    sns.palplot(primaryPalette.apply(lambda x: tuple(x), axis='columns'))
-    palAx = plt.gca()
-    for tIdx, tN in enumerate(primaryPalette.index):
-        palAx.text(tIdx, .5, '{}'.format(tN))
-rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 0, 2, 4, 7, 3], :].to_numpy(),
-    columns=['r', 'g', 'b'], index=['v', 'a', 'r', 'ens', 'prediction', 'outsideStim'])
-hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
-hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
-hls.loc['v*r', :] = hls.loc[['v', 'r'], :].mean()
-hls.loc['v*a', :] = hls.loc[['v', 'v', 'a'], :].mean()
-hls.loc['v*a*r', :] = hls.loc[['v', 'a', 'r'], :].mean()
-for sN in ['a*r', 'v*r', 'v*a', 'v*a*r']:
-    hls.loc[sN, 's'] = hls.loc[sN, 's'] * 0.75
-    hls.loc[sN, 'l'] = hls.loc[sN, 'l'] * 1.2
-hls.loc['v*a*r', 's'] = hls.loc['v*a*r', 's'] * 0.5
-hls.loc['v*a*r', 'l'] = hls.loc['v*a*r', 'l'] * 1.5
-hls.loc['ground_truth', :] = hls.loc['prediction', :]
-hls.loc['ground_truth', 'l'] = hls.loc['prediction', 'l'] * 0.25
-primarySourcePalette = hls.apply(lambda x: pd.Series(colorsys.hls_to_rgb(*x), index=['r', 'g', 'b']), axis='columns')
-sourcePalette = primarySourcePalette.apply(lambda x: tuple(x), axis='columns')
-sourcePalette.loc['ca'] = sourcePalette['prediction'] # no stim no movement
-sourcePalette.loc['cb'] = sourcePalette['v'] # no stim, movement
-sourcePalette.loc['ccs'] = sourcePalette['a*r'] # stim, no movement
-sourcePalette.loc['ccm'] = sourcePalette['v*a*r'] # stim, movement
-sourcePalette.loc['withinStim'] = sourcePalette['a']
-sourcePalette.loc['acrossStim'] = sourcePalette['r']
-keepEntries = ['ca', 'cb', 'ccs', 'ccm', 'withinStim', 'acrossStim', 'outsideStim']
-sourcePalette = sourcePalette.loc[keepEntries].to_frame(name='color')
-iteratorDescriptions = {
-    'ca':  'no stim, no movement',
-    'cb':  'no stim, movement',
-    'ccs': 'stim, no movement',
-    'ccm': 'stim, movement',
+colorMaps = {
+    # coldish
+    'covMat': 'crest_r',
+    'points': 'mako',
+    # warmish
+    'distMat': 'flare_r',
+    'distHist': 'rocket'
     }
-sourcePalette.loc[:, 'description'] = pd.Series(iteratorDescriptions)
+iteratorDescriptions = pd.Series({
+    'ca': 'B',
+    'cb': 'M',
+    'ccs': 'S',
+    'ccm': 'SM',
+    })
+diagonalTerms = ['{}_{}'.format(tn, tn) for tn in listOfIteratorSuffixes]
+categoryDescriptions = pd.Series({
+    'withinGroup': diagonalTerms,
+    'deltaM': ['ca_cb'],
+    'deltaS': ['ccm_ccs'],
+    'deltaSM': ['cb_ccm', 'ca_ccs']
+})
+NACategory = 'Other'
+#
+pickingColors = False
+singlesPalette = pd.DataFrame(
+    sns.color_palette(colorMaps['points'], 4), columns=['r', 'g', 'b'], index=iteratorDescriptions.to_list())
+singlesPaletteHLS = singlesPalette.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 if pickingColors:
-    sns.palplot(sourcePalette['color'], size=sourcePalette.shape[0])
+    sns.palplot(singlesPalette.apply(lambda x: tuple(x), axis='columns'))
     palAx = plt.gca()
-    for tIdx, tN in enumerate(sourcePalette.index):
+    for tIdx, tN in enumerate(singlesPalette.index):
+        palAx.text(tIdx, .5, '{}'.format(tN), fontsize=10)
+for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
+    for distanceType in ['frobenius']:
+        distanceDF = distancesDict[distanceType][freqBandName]
+        indexInfo = distanceDF.index.to_frame().reset_index(drop=True).drop(columns='freqBandName')
+        indexInfo.loc[:, 'hasStim'] = indexInfo['iterator'].isin(['ccs', 'ccm'])
+        indexInfo.loc[:, 'hasMovement'] = indexInfo['iterator'].isin(['cb', 'ccm'])
+        refIndexInfo = indexInfo.copy()
+        refIndexInfo.rename(columns=lambda x: 'ref_' + x, inplace=True)
+        testIndexInfo = indexInfo.copy()
+        testIndexInfo.rename(columns=lambda x: 'test_' + x, inplace=True)
+        plotDF = pd.DataFrame(
+            distanceDF.to_numpy())
+        plotDF.index.name = 'test'
+        plotDF.columns.name = 'ref'
+        plotDF = plotDF.stack()
+        # remove comparisons between self and self
+        plotDF = plotDF.loc[plotDF.index.get_level_values('test')!=plotDF.index.get_level_values('ref')]
+        plotDF = pd.concat([
+            testIndexInfo.loc[plotDF.index.get_level_values('test'), :].reset_index(drop=True),
+            refIndexInfo.loc[plotDF.index.get_level_values('ref'), :].reset_index(drop=True),
+            plotDF.reset_index(drop=True).to_frame(name='distance')
+            ], axis='columns')
+        groupsLookup = plotDF[['test_iterator', 'ref_iterator']].drop_duplicates().reset_index(drop=True)
+        groupsLookup.loc[:, 'test_label'] = groupsLookup['test_iterator'].map(iteratorDescriptions)
+        groupsLookup.loc[:, 'ref_label'] = groupsLookup['ref_iterator'].map(iteratorDescriptions)
+        groupsLookup.loc[:, 'test_ref'] = (
+            groupsLookup[['test_iterator', 'ref_iterator']]
+            .apply(lambda x: '{}_{}'.format(*sorted(x.to_list())), axis='columns'))
+        def sortedLabel(x):
+            iterators = sorted(x.to_list())
+            label = '{}-{}'.format(*[iteratorDescriptions[it] for it in iterators])
+            return label
+        groupsLookup.loc[:, 'test_ref_label'] = (
+            groupsLookup[['test_iterator', 'ref_iterator']]
+            .apply(sortedLabel, axis='columns'))
+        #
+        pairIndex = plotDF[['test_iterator', 'ref_iterator']].apply(lambda x: tuple(x), axis='columns')
+        for key in ['test_ref', 'test_ref_label']:
+            plotDF.loc[:, key] = pairIndex.map(groupsLookup[['test_iterator', 'ref_iterator', key]].set_index(['test_iterator', 'ref_iterator'])[key])
+        #
+        categoryLookup = groupsLookup[['test_ref', 'test_ref_label']].drop_duplicates().reset_index(drop=True)
+        for key, value in categoryDescriptions.items():
+            categoryLookup.loc[categoryLookup['test_ref'].isin(value), 'category'] = key
+        categoryLookup.loc[:, 'category'].fillna(NACategory, inplace=True)
+        reOrderList = categoryDescriptions.index.to_list() + [NACategory]
+        categoryLookup.loc[:, 'category_num'] = categoryLookup['category'].apply(lambda x: reOrderList.index(x))
+        categoryLookup.sort_values(by=['category_num', 'test_ref'], inplace=True)
+        categoryLookup.reset_index(drop=True, inplace=True)
+        categoryLookup.loc[:, 'group_num'] = categoryLookup.index.to_numpy()
+        nGroups = categoryLookup.shape[0]
+        rawGroupColors = sns.color_palette(colorMaps['distHist'], nGroups)
+        groupsPalette = pd.DataFrame(
+            rawGroupColors, columns=['r', 'g', 'b'],
+            index=categoryLookup['test_ref_label'].to_list())
+        if pickingColors:
+            sns.palplot(groupsPalette.apply(lambda x: tuple(x), axis='columns'))
+            palAx = plt.gca()
+            for tIdx, tN in enumerate(groupsPalette.index):
+                palAx.text(tIdx, .5, '{}'.format(tN), fontsize=10)
+        ####
+        groupsLookup.loc[:, 'color'] = groupsLookup['test_ref_label'].map(groupsPalette.apply(lambda x: tuple(x), axis='columns'))
+        uniqueCats = categoryLookup['category'].unique()
+        nCats = uniqueCats.shape[0]
+        categoryPalette = pd.DataFrame(
+            sns.color_palette(colorMaps['distHist'], nCats), columns=['r', 'g', 'b'],
+            index=uniqueCats)
+        if pickingColors:
+            sns.palplot(categoryPalette.apply(lambda x: tuple(x), axis='columns'))
+            palAx = plt.gca()
+            for tIdx, tN in enumerate(categoryPalette.index):
+                palAx.text(tIdx, .5, '{}'.format(tN), fontsize=10)
+        categoryLookup.loc[:, 'color'] = categoryLookup['category'].map(categoryPalette.apply(lambda x: tuple(x), axis='columns'))
+        break
+    break
+'''rgb = pd.DataFrame(
+    primaryPalette.iloc[[1, 0, 2, 7, 5], :].to_numpy(),
+    columns=['r', 'g', 'b'], index=['deltaM', 'deltaS', 'Other'])
+hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
+hls.loc['deltaS', :] = hls.loc[['a', 'r'], :].mean()
+hls.loc['deltaSM', :] = hls.loc[['deltaS', 'deltaM'], :].mean()
+#
+hls.loc['deltaS', :] = hls.loc['+S', :]
+hls.loc['deltaS', 'l'] *= 1.2
+hls.loc['deltaM', :] = hls.loc['+M', :]
+hls.loc['deltaM', 'l'] *= 1.2
+hls.loc['deltaSM', :] = hls.loc['+S+M', :]
+hls.loc['deltaSM', 'l'] *= 1.2
+#
+primaryGroupPalette = hls.apply(lambda x: pd.Series(colorsys.hls_to_rgb(*x), index=['r', 'g', 'b']), axis='columns')
+groupPalette = primaryGroupPalette.apply(lambda x: tuple(x), axis='columns').to_frame(name='color')
+groupPalette.loc[:, 'description'] = pd.Series(iteratorDescriptions)
+if pickingColors:
+    sns.palplot(groupPalette['color'], size=groupPalette.shape[0])
+    palAx = plt.gca()
+    for tIdx, tN in enumerate(groupPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
-sourcePalette.to_hdf(resultPath, 'plotOpts')
+groupPalette.to_hdf(resultPath, 'plotOpts')'''
+
+
+def annotateLine(
+        pointsToPlot, ax,
+        x_var=None, y_var=None,
+        offsets=None, plotKWArgs=None,
+        textLocation=None, text=None, textKWArgs={}):
+    left, right = pointsToPlot[x_var].idxmin(), pointsToPlot[x_var].idxmax()
+    bottom, top = pointsToPlot[y_var].idxmin(), pointsToPlot[y_var].idxmax()
+    p1 = pointsToPlot.loc[left, :].to_numpy()
+    p1 = np.append(p1, [0])
+    p2 = pointsToPlot.loc[right, :].to_numpy()
+    p2 = np.append(p2, [0])
+    deltaPDir = vg.normalize(p2 - p1)
+    if offsets is not None:
+        p1 = p1 + offsets[left] * deltaPDir
+        p2 = p2 - offsets[right] * deltaPDir
+    pointsToPlot.loc[left, :] = p1[:2]
+    pointsToPlot.loc[right, :] = p2[:2]
+    ax.plot(
+        pointsToPlot[x_var], pointsToPlot[y_var], **plotKWArgs,
+        )
+    if text is not None:
+        if textLocation == 'average':
+            xpos, ypos = pointsToPlot[x_var].mean(), pointsToPlot[y_var].mean()
+        else:
+            xpos, ypos = textLocation
+        ax.text(xpos, ypos, text, **textKWArgs)
+    return
+
 pdfPath = os.path.join(
     figureOutputFolder, '{}_covMatSimilarity_comparison.pdf'.format(
         fullEstimatorName))
@@ -437,7 +564,7 @@ with PdfPages(pdfPath) as pdf:
         groupCovMat = covMatDF.loc[idxSl[:, freqBandName, lastFoldIdx, :], :]
         groupCovMinVal, groupCovMaxVal = np.percentile(groupCovMat.to_numpy().flatten(), [2.5, 97.5])
         commonHeatmapOpts = dict(
-            cmap='mako', vmin=groupCovMinVal, vmax=groupCovMaxVal,
+            cmap=colorMaps['covMat'], vmin=groupCovMinVal, vmax=groupCovMaxVal,
             linewidths=0
             )
         for axIdx, (iteratorName, _) in enumerate(estimatorGroup.groupby('iterator')):
@@ -450,7 +577,8 @@ with PdfPages(pdfPath) as pdf:
                 else:
                     newTickLabels[tlIdx] = tl
             commonHeatmapOpts.update(dict(
-                xticklabels=newTickLabels
+                xticklabels=newTickLabels,
+                rasterized=True,
                 ))
             if axIdx == 0:
                 sns.heatmap(thisCovMat, ax=ax[axIdx], cbar_ax=ax[-1], yticklabels=newTickLabels, **commonHeatmapOpts)
@@ -464,7 +592,7 @@ with PdfPages(pdfPath) as pdf:
                 sns.heatmap(thisCovMat, ax=ax[axIdx], cbar=False, yticklabels=False, **commonHeatmapOpts)
                 ax[axIdx].set_xticklabels(newTickLabels, rotation=-30, ha='left', va='top')
                 ax[axIdx].set_ylabel('')
-            ax[axIdx].set_title(sourcePalette.loc[iteratorName, 'description'])
+            ax[axIdx].set_title(iteratorDescriptions.loc[iteratorName])
         ax[-1].set_ylabel('Covariance ($uV^2$)')
         fig.suptitle('Example covariance matrices (frequency band: {})'.format(freqBandName))
         pdf.savefig(bbox_inches='tight', pad_inches=0)
@@ -472,15 +600,15 @@ with PdfPages(pdfPath) as pdf:
             plt.show()
         else:
             plt.close()
-        for distanceType in ['compound']:
+        for distanceType in ['frobenius']:
             distanceDF = distancesDict[distanceType][freqBandName]
             distanceForPlot = distanceDF.copy()
-            newIndex = distanceDF.index.get_level_values('iterator').map(sourcePalette['description'])
-            distanceForPlot.index = newIndex
-            distanceForPlot.columns = newIndex
+            newIndex = distanceDF.index.get_level_values('iterator').map(iteratorDescriptions)
+            # distanceForPlot.index = newIndex
+            # distanceForPlot.columns = newIndex
             newTickLabels = newIndex.to_numpy()
             for tlIdx, tl in enumerate(newTickLabels):
-                if (tlIdx % lastFoldIdx) != 0:
+                if (tlIdx % lastFoldIdx) != int(lastFoldIdx / 2):
                     newTickLabels[tlIdx] = ''
                 else:
                     newTickLabels[tlIdx] = tl.replace(',', ',\n')
@@ -490,17 +618,57 @@ with PdfPages(pdfPath) as pdf:
                     'width_ratios': [20, 1],
                     'wspace': 0.1})
             sns.heatmap(
-                distanceForPlot, cmap='rocket',
+                distanceForPlot, cmap=colorMaps['distMat'],
                 xticklabels=newTickLabels, yticklabels=newTickLabels,
                 ax=ax[0], linewidths=0, cbar_ax=ax[1]
-                # norm=LogNorm()
                 )
+            ###
+            accentLineWidth = 0
+            inset = 0
+            boxDict = {cN: [] for cN in categoryDescriptions.index}
+            for rowIdx in range(0, distanceForPlot.shape[0], lastFoldIdx):
+                left = rowIdx + inset
+                right = rowIdx + (lastFoldIdx - inset)
+                test_iter = distanceForPlot.index[left:right].get_level_values('iterator').unique()[0]
+                for colIdx in range(0, distanceForPlot.shape[1], lastFoldIdx):
+                    top = colIdx + inset
+                    bottom = colIdx + (lastFoldIdx - inset)
+                    ref_iter = distanceForPlot.columns[top:bottom].get_level_values('iterator').unique()[0]
+                    test_ref = '{}_{}'.format(*sorted([test_iter, ref_iter]))
+                    thisCat = categoryLookup.set_index('test_ref').loc[test_ref, :]
+                    if thisCat['category'] not in [NACategory]:
+                        boxDict[thisCat['category']].append(Rectangle((left, bottom), (right - left), (top - bottom)))
+            ###
             ax[0].set_ylabel('data subset')
             ax[0].set_xlabel('data subset')
             ax[0].set_xticklabels(newTickLabels, rotation=-30, ha='left', va='top')
             ax[0].set_yticklabels(newTickLabels, rotation=30, ha='right', va='top')
             ax[1].set_ylabel('Distance (a.u.)')
             fig.suptitle('{} covariance distances (frequency band: {})'.format(distanceType, freqBandName))
+            fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+            drawBoxesAroundGroups = True
+            if drawBoxesAroundGroups:
+                mapFig, mapAx = plt.subplots(1, 1, figsize=(1, 1))
+                mapAx.set_xlim(ax[0].get_xlim())
+                mapAx.set_ylim(ax[0].get_ylim())
+                for cN in categoryDescriptions.index:
+                    thisCatIdx = categoryLookup.index[categoryLookup['category'] == cN][0]
+                    thisCat = categoryLookup.loc[thisCatIdx, :]
+                    thisColor = tuple([rgb for rgb in thisCat['color']] + [1.])
+                    if len(boxDict[thisCat['category']]):
+                        # Create patch collection with specified colour/alpha
+                        pc = PatchCollection(
+                            boxDict[thisCat['category']], facecolor=thisColor,
+                            edgecolor=(0., 0., 0., 0.), linewidth=accentLineWidth)
+                        # Add collection to axes
+                        mapAx.add_collection(pc)
+                mapAx.set_xticks([])
+                mapAx.set_yticks([])
             fig.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:
@@ -527,35 +695,77 @@ with PdfPages(pdfPath) as pdf:
                 refIndexInfo.loc[plotDF.index.get_level_values('ref'), :].reset_index(drop=True),
                 plotDF.reset_index(drop=True).to_frame(name='distance')
                 ], axis='columns')
-            plotDF.loc[plotDF['ref_hasStim'] & plotDF['test_hasStim'], 'stimNoStim'] = 'withinCluster'
-            plotDF.loc[plotDF['ref_hasStim'] & (~plotDF['test_hasStim']), 'stimNoStim'] = 'betweenCluster'
-            plotDF.loc[(~plotDF['ref_hasStim']) & plotDF['test_hasStim'], 'stimNoStim'] = 'betweenCluster'
-            plotDF.loc[(~plotDF['ref_hasStim']) & (~plotDF['test_hasStim']), 'stimNoStim'] = 'NA'
             #
-            plotDF.loc[:, 'stimPerimovementStim'] = 'NA'
-            plotDF.loc[(plotDF['test_iterator'] == 'ccs') & (plotDF['ref_iterator'] == 'ccm'), 'stimPerimovementStim'] = 'betweenCluster'
-            plotDF.loc[(plotDF['test_iterator'] == 'ccm') & (plotDF['ref_iterator'] == 'ccs'), 'stimPerimovementStim'] = 'betweenCluster'
-            plotDF.loc[(plotDF['test_iterator'] == 'ccs') & (plotDF['ref_iterator'] == 'ccs'), 'stimPerimovementStim'] = 'withinCluster'
-            plotDF.loc[(plotDF['test_iterator'] == 'ccm') & (plotDF['ref_iterator'] == 'ccm'), 'stimPerimovementStim'] = 'withinCluster'
+            pairIndex = plotDF[['test_iterator', 'ref_iterator']].apply(lambda x: tuple(x), axis='columns')
+            for key in ['test_ref', 'test_ref_label']:
+                plotDF.loc[:, key] = pairIndex.map(groupsLookup[['test_iterator', 'ref_iterator', key]].set_index(['test_iterator', 'ref_iterator'])[key])
+            for key in ['category', 'category_num', 'group_num']:
+                plotDF.loc[:, key] = plotDF['test_ref'].map(categoryLookup[['test_ref', key]].set_index('test_ref')[key])
+            plotDF.loc[:, 'xDummy'] = 0.
+            statsDictGroups = {}
+            for catName, catGroup in plotDF.groupby('category'):
+                catSubGroups = [sg for sn, sg in catGroup.groupby('test_ref')]
+                if len(catSubGroups) > 1:
+                    for subGroup1, subGroup2 in combinations(catSubGroups, 2):
+                        thisIndex = tuple([catName, subGroup1['test_ref'].unique()[0], subGroup2['test_ref'].unique()[0]])
+                        statsDictGroups[thisIndex] = tdr.tTestNadeauCorrection(
+                            subGroup1['distance'], subGroup2['distance'], tTestArgs={}, powerAlpha=0.05,
+                            test_size=cvIterator.splitter.sampler.test_size)
+            groupStatsDF = pd.concat(statsDictGroups, axis='columns', names=['category', 'test_ref1', 'test_ref2'])
+            thisPalette = groupsLookup[['test_ref_label', 'color']].set_index('test_ref_label')['color'].drop_duplicates()
+            g = sns.catplot(
+                data=plotDF, height=2, aspect=1,
+                y='distance', x='xDummy',
+                hue='test_ref_label',
+                palette=thisPalette.to_dict(),
+                hue_order=categoryLookup['test_ref_label'],
+                kind='violin', cut=0)
+            g.set_axis_labels("", "Distance (a.u.)")
+            g.suptitle('{} distance (frequency band: {})'.format(distanceType, freqBandName))
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
             #
-            plotDF.loc[:, 'stimByClass'] = 'NA'
-            plotDF.loc[(plotDF['test_iterator'] == 'ccs') & (plotDF['ref_iterator'] == 'ccs'), 'stimByClass'] = 'withinStim'
-            plotDF.loc[(plotDF['test_iterator'] == 'ccm') & (plotDF['ref_iterator'] == 'ccm'), 'stimByClass'] = 'withinStim'
-            plotDF.loc[(plotDF['test_iterator'] == 'ccs') & (plotDF['ref_iterator'] == 'ccm'), 'stimByClass'] = 'acrossStim'
-            plotDF.loc[(plotDF['test_iterator'] == 'ccm') & (plotDF['ref_iterator'] == 'ccs'), 'stimByClass'] = 'acrossStim'
-            plotDF.loc[(plotDF['test_iterator'].isin(['ccs', 'ccm'])) & (~plotDF['ref_iterator'].isin(['ccs', 'ccm'])), 'stimByClass'] = 'outsideStim'
-            plotDF.loc[(~plotDF['test_iterator'].isin(['ccs', 'ccm'])) & (plotDF['ref_iterator'].isin(['ccs', 'ccm'])), 'stimByClass'] = 'outsideStim'
-            normFactor = plotDF.loc[plotDF['stimByClass'] == 'withinStim', 'distance'].mean()
-            normalizedClusterDistDF = plotDF.loc[plotDF['stimByClass'] != 'NA', :].copy()
+            normFactor = plotDF.loc[plotDF['category'] == 'withinGroup', 'distance'].median()
+            normalizedClusterDistDF = plotDF.loc[plotDF['category'] != 'Other', :].copy()
             normalizedClusterDistDF.loc[:, 'distance'] = normalizedClusterDistDF['distance'] / normFactor
-            normalizedClusterDistDF.loc[:, 'xDummy'] = 0.
-            thisPalette = sourcePalette['color'].loc[sourcePalette.index.isin(normalizedClusterDistDF['stimByClass'])]
             #
+            statsDictCats = {}
+            catSubGroups = [sg for sn, sg in plotDF.groupby('category')]
+            for subGroup1, subGroup2 in combinations(catSubGroups, 2):
+                thisIndex = tuple([subGroup1['category'].unique()[0], subGroup2['category'].unique()[0]])
+                statsDictCats[thisIndex] = tdr.tTestNadeauCorrection(
+                    subGroup1['distance'], subGroup2['distance'], tTestArgs={}, powerAlpha=0.05,
+                    test_size=cvIterator.splitter.sampler.test_size)
+            catStatsDF = pd.concat(statsDictCats, axis='columns', names=['category1', 'category2'])
+            thisPalette = (
+                categoryLookup
+                    .loc[categoryLookup['category'].isin(normalizedClusterDistDF['category']), ['category', 'color']]
+                    .set_index('category')['color'].drop_duplicates())
             g = sns.catplot(
                 data=normalizedClusterDistDF,
-                y='distance', x='xDummy', hue='stimByClass', height=2, aspect=1,
+                y='distance', x='xDummy', hue='category', height=2, aspect=1,
                 palette=thisPalette.to_dict(), hue_order=thisPalette.index.to_list(),
-                kind='violin')
+                kind='violin', cut=0)
+            xLim = g.axes[0, 0].get_xlim()
+            xLen = xLim[1] - xLim[0]
+            thisPalette = thisPalette.to_frame()
+            thisPalette.loc[:, 'x'] = xLim[0] + (1 + np.arange(thisPalette.shape[0])) * xLen / (thisPalette.shape[0] + 1)
+            thisPalette.loc[:, 'y'] = normalizedClusterDistDF.groupby('category').max()['distance']
+            thisPalette.loc[:, 'yOff'] = normalizedClusterDistDF.groupby('category').std()['distance']
+            for cN in [('deltaM', 'withinGroup'), ('deltaS', 'withinGroup'), ('deltaSM', 'withinGroup')]:
+                theseStats = catStatsDF.loc[:, cN]
+                if theseStats['p-val'] < 1e-3:
+                    pointsToPlot = thisPalette.loc[cN, ['x', 'y']].copy()
+                    pointsToPlot.loc[:, 'y'] = pointsToPlot['y'].max() + float(thisPalette.loc[cN, ['yOff']].max())
+                    annotateLine(
+                        pointsToPlot, g.axes[0, 0],
+                        x_var='x', y_var='y',
+                        offsets=None, plotKWArgs=dict(c='k'),
+                        textLocation='average', text='*', textKWArgs={})
             g.set_axis_labels("", "Distance (a.u.)")
             g.suptitle('Clusterability of {} distance (frequency band: {})'.format(distanceType, freqBandName))
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
@@ -565,37 +775,34 @@ with PdfPages(pdfPath) as pdf:
             else:
                 plt.close()
             umapDF = projectedDict[distanceType][freqBandName]
-            plotDF = umapDF.reset_index()
-            thisPalette = sourcePalette['color'].loc[sourcePalette.index.isin(plotDF['iterator'])]
+            umapPlotDF = umapDF.reset_index()
+            umapPlotDF.loc[:, 'iterator_label'] = umapPlotDF['iterator'].map(iteratorDescriptions)
+            thisPalette = singlesPalette.apply(lambda x: tuple(x), axis='columns')
+            x_var, y_var = 'umap_0', 'umap_1'
             g = sns.relplot(
-                x='umap_0', y='umap_1', kind='scatter', height=3, aspect=1,
-                hue='iterator', palette=thisPalette.to_dict(), data=plotDF)
-            xLim = g.axes[0, 0].get_xlim()
-            yLim = g.axes[0, 0].get_ylim()
-            offset = (xLim[1] - xLim[0]) / 100, (yLim[1] - yLim[0]) / 100
-            examplePoints = [
-                ('ccs', 'ccs', 'withinStim'),
-                ('ccm', 'ccm', 'withinStim'),
-                ('ccm', 'ccs', 'acrossStim'),
-                ('ccm', 'cb', 'outsideStim'),
-                ('ccs', 'cb', 'outsideStim'),
-                ('ccm', 'ca', 'outsideStim'),
-                ('ccs', 'ca', 'outsideStim')]
-            rng = np.random.default_rng()
-            nPoints = 1
-            for pairName in examplePoints:
-                testIdxList = rng.choice(umapDF.xs(pairName[0], level='iterator', drop_level=False).index, nPoints)
-                refIdxList = rng.choice(umapDF.xs(pairName[1], level='iterator', drop_level=False).index, nPoints)
-                # testIdx = umapDF.xs(pairName[0], level='iterator', drop_level=False).index[pointIdx]
-                # refIdx = umapDF.xs(pairName[1], level='iterator', drop_level=False).index[pointIdx+1]
-                for testIdx, refIdx in zip(testIdxList, refIdxList):
-                    pointsToPlot = umapDF.loc[[testIdx, refIdx], :].to_numpy()
-                    alpha = 0.5
-                    useColor = tuple([rgb for rgb in sourcePalette.loc[pairName[2], 'color']] + [alpha])
-                    g.axes[0, 0].plot(pointsToPlot[:, 0], pointsToPlot[:, 1], c=useColor)
-                textPos = np.mean(pointsToPlot, axis=0)
-                g.axes[0, 0].text(
-                    textPos[0] - offset[0], textPos[1] - offset[1], pairName[2], c=useColor, va='top', ha='right')
+                x=x_var, y=y_var, kind='scatter', height=3, aspect=1,
+                edgecolor=None, alpha=0.6,
+                hue='iterator_label', hue_order=thisPalette.index,
+                palette=thisPalette.to_dict(), data=umapPlotDF)
+            meanPositions = umapPlotDF.groupby('iterator').mean()[umapDF.columns]
+            stdPositions = umapPlotDF.groupby('iterator').std()[umapDF.columns]
+            for test_iter, ref_iter in combinations(meanPositions.index, 2):
+                test_ref = '{}_{}'.format(*sorted([test_iter, ref_iter]))
+                thisCat = categoryLookup.set_index('test_ref').loc[test_ref, :]
+                if thisCat['category'] in ['deltaS', 'deltaSM', 'deltaM']:
+                    pointsToPlot = meanPositions.loc[[test_iter, ref_iter], :].copy()
+                    thisColor = tuple([rgb for rgb in thisCat['color']] + [0.6])
+                    plotKWArgs = dict(color=thisColor, linewidth=snsRCParams['lines.markersize'] / 2)
+                    offsets = 4 * stdPositions.max(axis='columns')
+                    textLocation = 'average'
+                    text = '  {}'.format(thisCat['category'])
+                    textKWArgs = dict(c=thisColor, ha='left', va='bottom')
+                    annotateLine(
+                        pointsToPlot, g.axes[0, 0],
+                        offsets=offsets,
+                        x_var=x_var, y_var=y_var,
+                        plotKWArgs=plotKWArgs,
+                        textLocation=textLocation, text=text, textKWArgs=textKWArgs)
             g.suptitle('umap projection of {} distance (frequency band: {})'.format(distanceType, freqBandName))
             asp.reformatFacetGridLegend(
                 g, titleOverrides={'iterator': 'data subset'},

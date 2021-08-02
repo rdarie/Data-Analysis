@@ -72,12 +72,9 @@ def partialR2(llSrs, testDesign=None, refDesign=None, designLevel='design'):
     partR2 = 1 - (llSat.to_numpy() - llTest) / (llSat.to_numpy() - llRef.to_numpy())
     return partR2
 
-def correctedResampledPairedTTest(
-        xSrs, y=None,
-        groupBy=None, tTestArgs={}, powerAlpha=0.05,
-        cvIterator=None, test_size=None):
-    if (cvIterator is not None) and test_size is None:
-        test_size = cvIterator.splitter.sampler.test_size
+def tTestNadeauCorrection(
+        group, thisY, tTestArgs={}, powerAlpha=0.05,
+        test_size=None):
     if 'tail' in tTestArgs:
         tail = tTestArgs['tail']
     else:
@@ -92,6 +89,37 @@ def correctedResampledPairedTTest(
         conf = 1 - alpha / 2  # 0.975
     else:
         conf = confidence
+    statsResDF = pg.ttest(group, thisY, **tTestArgs).loc['T-test', :]
+    # notation from Nadeau, 2003
+    J = float(statsResDF['dof']) + 1
+    n2 = test_size
+    n1 = 1 - test_size
+    corrFactor = np.sqrt((J ** -1) / (J ** -1 + n2 / n1))
+    tcrit = scipy.stats.t.ppf(conf, statsResDF['dof'])
+    se = ((np.mean(group) - np.mean(np.atleast_1d(thisY))) / statsResDF['T']) / corrFactor
+    statsResDF['T'] = statsResDF['T'] * corrFactor
+    statsResDF[ci_name] = np.array([statsResDF['T'] - tcrit, statsResDF['T'] + tcrit]) * se
+    if not isinstance(thisY, pd.Series):
+        statsResDF[ci_name] += thisY
+    statsResDF['cohen-d'] = statsResDF['cohen-d'] * corrFactor
+    # if np.isnan(statsResDF['cohen-d']):
+    #     pdb.set_trace()
+    if tail == "two-sided":
+        statsResDF['p-val'] = 2 * scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
+    else:
+        statsResDF['p-val'] = scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
+    statsResDF['power'] = pg.power_ttest(
+        d=statsResDF['cohen-d'], n=J, power=None, alpha=powerAlpha,
+        contrast='paired', tail=tail)
+    statsResDF.drop('BF10', inplace=True)
+    return statsResDF
+
+def correctedResampledPairedTTest(
+        xSrs, y=None,
+        groupBy=None, tTestArgs={}, powerAlpha=0.05,
+        cvIterator=None, test_size=None):
+    if (cvIterator is not None) and test_size is None:
+        test_size = cvIterator.splitter.sampler.test_size
     if groupBy is None:
         groupIterator = ('all', xSrs)
     else:
@@ -102,29 +130,9 @@ def correctedResampledPairedTTest(
             thisY = y.loc[group.index]
         else:
             thisY = y
-        statsResDF = pg.ttest(group, thisY, **tTestArgs).loc['T-test', :]
-        # notation from Nadeau, 2003
-        J = float(statsResDF['dof']) + 1
-        n2 = test_size
-        n1 = 1 - test_size
-        corrFactor = np.sqrt((J ** -1) / (J ** -1 + n2/n1))
-        tcrit = scipy.stats.t.ppf(conf, statsResDF['dof'])
-        se = (group - y).sem() / corrFactor
-        statsResDF['T'] = statsResDF['T'] * corrFactor
-        statsResDF[ci_name] = np.array([statsResDF['T'] - tcrit, statsResDF['T'] + tcrit]) * se
-        if not isinstance(y, pd.Series):
-            statsResDF[ci_name] += thisY
-        statsResDF['cohen-d'] = statsResDF['cohen-d'] * corrFactor
-        # if np.isnan(statsResDF['cohen-d']):
-        #     pdb.set_trace()
-        if tail == "two-sided":
-            statsResDF['p-val'] = 2 * scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
-        else:
-            statsResDF['p-val'] = scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
-        statsResDF['power'] = pg.power_ttest(
-            d=statsResDF['cohen-d'], n=J, power=None, alpha=powerAlpha,
-            contrast='paired', tail=tail)
-        statsResDF.drop('BF10', inplace=True)
+        statsResDF = tTestNadeauCorrection(
+            group, thisY, tTestArgs=tTestArgs, powerAlpha=powerAlpha,
+            test_size=test_size)
         if groupBy is None:
             return statsResDF
         else:

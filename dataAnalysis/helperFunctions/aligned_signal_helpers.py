@@ -305,6 +305,7 @@ def splitApplyCombine(
                 # put it back, no client
                 daskComputeOpts['scheduler'] = 'single-threaded'
                 daskClient = None
+                daskClient = Client()
             elif schedulerType == 'processes':
                 daskClient = Client(LocalCluster(processes=True))
             elif schedulerType == 'threads':
@@ -333,7 +334,7 @@ def splitApplyCombine(
             .groupby(by=rowKeys, group_keys=False)
             .apply(fun, *funArgs, **funKWArgs))
     # sort the index (comes back from dask out of order)
-    resultDF.sort_index(kind='mergesort', axis='index', inplace=True)
+    resultDF.sort_index(kind='mergesort', axis='index', inplace=True, sort_remaining=False)
     # find out which metadata fields are still present after the function
     presentMetaNames = [cN for cN in stackIndex.names if cN in resultDF.columns]
     # if I stacked a metadata level and it is still there, unstack it.
@@ -516,10 +517,9 @@ def compareMeansGrouped(
             # testGroups = [t[:maxSize] for t in testGroups]
             if len(testGroups) > 1:
                 try:
-                    isNormal = [pg.normality(tg)['normal'].iloc[0] for tg in testGroups]
-                    equalVariance = pg.homoscedasticity(testGroups)
+                    # isNormal = [pg.normality(tg)['normal'].iloc[0] for tg in testGroups]
+                    # equalVariance = pg.homoscedasticity(testGroups)
                     stat, p = stats.kruskal(*testGroups, nan_policy='raise')
-                    # stat, p = stats.f_oneway(*testGroups)
                     if plotting:
                         import matplotlib.pyplot as plt
                         import seaborn as sns
@@ -626,8 +626,8 @@ def compareISIsGrouped(
             # testGroups = [t[:maxSize] for t in testGroups]
             if len(testGroups) > 1:
                 try:
-                    isNormal = [pg.normality(tg)['normal'].iloc[0] for tg in testGroups]
-                    equalVariance = pg.homoscedasticity(testGroups)
+                    # isNormal = [pg.normality(tg)['normal'].iloc[0] for tg in testGroups]
+                    # equalVariance = pg.homoscedasticity(testGroups)
                     stat, p = stats.kruskal(*testGroups, nan_policy='raise')
                     # stat, p = stats.f_oneway(*testGroups)
                     if plotting:

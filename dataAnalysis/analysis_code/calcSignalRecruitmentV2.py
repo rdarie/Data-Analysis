@@ -25,13 +25,21 @@ Options:
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --iteratorSuffix=iteratorSuffix        filename for resulting estimator (cross-validated n_comps)
 """
-import matplotlib
+import logging
+logging.captureWarnings(True)
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('PS')   # generate postscript output by default
-matplotlib.use('QT5Agg')   # generate interactive output
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
+#
+import matplotlib.pyplot as plt
 import seaborn as sns
 import pdb
+import pingouin as pg
+import traceback
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -59,17 +67,17 @@ sns.set(
 consoleDebug = True
 if consoleDebug:
     arguments = {
-    'processAll': True, 'blockIdx': '2', 'selectionName': 'lfp_CAR_spectral_fa_mahal',
-    'lazy': False, 'verbose': False, 'window': 'XL', 'alignQuery': 'starting', 'datasetName': 'Block_XL_df_f',
-    'analysisName': 'default', 'exp': 'exp202101281100', 'selector': None, 'winStart': '200', 'alignFolderName': 'motion',
-    'winStop': '400', 'loadFromFrames': True, 'maskOutlierBlocks': False, 'unitQuery': 'fr_sqrt', 'inputBlockPrefix': 'Block',
-    'inputBlockSuffix': 'lfp_CAR_spectral_mahal', 'iteratorSuffix': 'f', 'plotting': True}
+        'verbose': False, 'winStart': None, 'window': 'XL', 'exp': 'exp202101271100', 'plotting': True, 'blockIdx': '2',
+        'loadFromFrames': True, 'datasetName': 'Block_XL_df_ma', 'alignQuery': 'outboundWithStim', 'iteratorSuffix': 'ma',
+        'unitQuery': 'pca', 'alignFolderName': 'motion', 'processAll': True, 'selectionName': 'lfp_CAR_spectral_mahal_ledoit',
+        'inputBlockSuffix': 'pca', 'lazy': False, 'selector': None, 'winStop': None, 'maskOutlierBlocks': False,
+        'analysisName': 'hiRes', 'inputBlockPrefix': 'Block'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     '''
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-#
+
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -78,13 +86,40 @@ globals().update(allOpts)
 
 
 def calcRauc(
-        partition, dataColNames=None):
+        partition,
+        tStart=None, tStop=None,
+        maskBaseline=False,
+        baselineTStart=None, baselineTStop=None,
+        dataColNames=None):
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
     partitionMeta = partition.loc[:, ~dataColMask]
-    result = (partitionData - partitionData.mean()).abs().mean()
-    resultDF = pd.concat(
-        [result, partitionMeta.iloc[0, :]])
+    #
+    tMask = pd.Series(True, index=partition.index)
+    if tStart is not None:
+        tMask = tMask & (partition['bin'] >= tStart)
+    if tStop is not None:
+        tMask = tMask & (partition['bin'] < tStop)
+    if not tMask.any():
+        tMask = pd.Series(True, index=partition.index)
+    if maskBaseline:
+        baselineTMask = pd.Series(True, index=partition.index)
+        if baselineTStart is not None:
+            baselineTMask = baselineTMask & (partition['bin'] >= baselineTStart)
+        if baselineTStop is not None:
+            baselineTMask = baselineTMask & (partition['bin'] < baselineTStop)
+        if not baselineTMask.any():
+            baselineTMask = pd.Series(True, index=partition.index)
+        if 'foo' in partition.iloc[0, :].to_numpy():
+            baselineTMask.loc[:] = True
+        baseline = partitionData.loc[baselineTMask, :].mean()
+    else:
+        baseline = 0
+    if 'foo' in partition.iloc[0, :].to_numpy():
+        tMask.loc[:] = True
+    detrended = partitionData.loc[tMask, :].subtract(baseline, axis='columns')
+    result = detrended.abs().mean()
+    resultDF = pd.concat([partitionMeta.iloc[0, :], result]).to_frame(name=partition.index[0]).T
     resultDF.name = 'rauc'
     return resultDF
 
@@ -107,9 +142,10 @@ if __name__ == "__main__":
         iteratorSuffix = ''
     #  Overrides
     limitPages = None
-    funKWargs = dict(
-        # baseline='mean',
-        tStart=-100e-3, tStop=200e-3)
+    funKWArgs = dict(
+        tStart=-100e-3, tStop=200e-3,
+        maskBaseline=True,
+        baselineTStart=-200e-3, baselineTStop=-100e-3)
     #  End Overrides
     if not arguments['loadFromFrames']:
         resultPath = os.path.join(
@@ -182,29 +218,39 @@ if __name__ == "__main__":
         arguments.update(loadingMeta['arguments'])
         cvIterator = iteratorsBySegment[0]
         dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+        # tweak control time base to look like main time base
+        trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+        deltaB = trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'].min() - trialInfo.loc[trialInfo['controlFlag'] == 'main', 'bin'].min()
+        trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'] -= deltaB
+        dataDF.index = pd.MultiIndex.from_frame(trialInfo)
     groupNames = ['originalIndex', 'segment', 't']
     daskComputeOpts = dict(
-        scheduler='processes'
-        # scheduler='single-threaded'
+        # scheduler='processes'
+        scheduler='single-threaded'
         )
-    '''if daskComputeOpts['scheduler'] == 'single-threaded':
-        daskClient = Client(LocalCluster(n_workers=1))
-    elif daskComputeOpts['scheduler'] == 'processes':
-        daskClient = Client(LocalCluster(processes=True))
-        # daskClient = Client(LocalCluster())
-    elif daskComputeOpts['scheduler'] == 'threads':
-        daskClient = Client(LocalCluster(processes=False))
-    else:
-        print('Scheduler name is not correct!')
-        daskClient = Client()'''
-    colFeatureInfo = [nm for nm in dataDF.columns.names if nm != 'feature']
+    colFeatureInfo = dataDF.columns.copy()
+    dataDF.columns = dataDF.columns.get_level_values('feature')
     rawRaucDF = ash.splitApplyCombine(
-        dataDF, fun=calcRauc, resultPath=resultPath,
-        rowKeys=groupNames, colKeys=colFeatureInfo,
-        daskProgBar=False,
-        daskPersist=True, useDask=True, daskComputeOpts=daskComputeOpts)
+        dataDF, fun=calcRauc, funKWArgs=funKWArgs, resultPath=resultPath,
+        rowKeys=groupNames,
+        daskProgBar=True, daskPersist=True, useDask=True,
+        daskComputeOpts=daskComputeOpts)
+    for cN in rawRaucDF.columns:
+        rawRaucDF.loc[:, cN] = rawRaucDF[cN].astype(float)
+    rawRaucDF.columns = colFeatureInfo
     rawRaucDF.index = rawRaucDF.index.droplevel('bin')
-    #
+    trialInfo = rawRaucDF.index.to_frame().reset_index(drop=True)
+    compoundAnnDescr = {
+        'stimCondition': ['electrode', 'trialRateInHz', ],
+        'kinematicCondition': ['pedalDirection', 'pedalMovementCat']
+        }
+    for canName, can in compoundAnnDescr.items():
+        compoundAnn = pd.Series(np.nan, index=trialInfo.index)
+        for name, group in trialInfo.groupby(can):
+            compoundAnn.loc[group.index] = '_'.join(['{}'.format(nm) for nm in name])
+        trialInfo.loc[:, canName] = compoundAnn
+    rawRaucDF.index = pd.MultiIndex.from_frame(trialInfo)
+    #####
     qScaler = PowerTransformer()
     qScaler.fit(rawRaucDF)
     scaledRaucDF = pd.DataFrame(
@@ -212,7 +258,7 @@ if __name__ == "__main__":
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
     ##
-    sdThresh = 2.5
+    sdThresh = 2.
     clippedScaledRaucDF = scaledRaucDF.clip(upper=sdThresh, lower=-sdThresh)
     clippedRaucDF = pd.DataFrame(
         qScaler.inverse_transform(clippedScaledRaucDF),
@@ -233,23 +279,67 @@ if __name__ == "__main__":
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
     scalers = pd.Series({'scale': qScaler, 'normalize': mmScaler, 'scale_normalize': mmScaler2})
-
+    #
+    referenceRaucDF = (
+        clippedRaucDF
+            .xs('NA', level='electrode', drop_level=False)
+            .xs('NA_NA', level='kinematicCondition', drop_level=False)
+            .median())
+    relativeRaucDF = clippedRaucDF / referenceRaucDF
     clippedRaucDF.to_hdf(resultPath, 'raw')
     clippedScaledRaucDF.to_hdf(resultPath, 'scaled')
     normalizedRaucDF.to_hdf(resultPath, 'normalized')
     scaledNormalizedRaucDF.to_hdf(resultPath, 'scaled_normalized')
+    referenceRaucDF.to_hdf(resultPath, 'reference_raw')
+    relativeRaucDF.to_hdf(resultPath, 'relative')
     scalers.to_hdf(resultPath, 'scalers')
     #
-    splitterKWArgs = dict(
+    amplitudeStatsDict = {}
+    relativeStatsDict = {}
+    recCurve = relativeRaucDF.reset_index()
+    for name, group in recCurve.groupby(['electrode', 'kinematicCondition']):
+        elecName, kinName = name
+        if elecName != 'NA':
+            refMask = (recCurve['electrode'] == 'NA') & (recCurve['kinematicCondition'] == kinName)
+            if refMask.any():
+                refGroup = recCurve.loc[refMask, :]
+            else:
+                refMask = (recCurve['electrode'] == 'NA')
+                refGroup = recCurve.loc[refMask, :]
+            for colName in relativeRaucDF.columns:
+                if isinstance(colName, tuple):
+                    thisEntry = tuple([elecName, kinName] + [a for a in colName])
+                else:
+                    thisEntry = tuple([elecName, kinName, colName])
+                lm = pg.linear_regression(group['trialAmplitude'], group[colName])
+                amplitudeStatsDict[thisEntry] = lm
+                maxAmpMask = (group['trialAmplitude'] == group['trialAmplitude'].max())
+                tt = pg.ttest(group.loc[maxAmpMask, colName], refGroup[colName])
+                relativeStatsDict[thisEntry] = tt
+    ampStatsDF = pd.concat(amplitudeStatsDict, names=['electrode', 'kinematicCondition'] + relativeRaucDF.columns.names)
+    ampStatsDF.set_index('names', append=True, inplace=True)
+    ampStatsDF.to_hdf(resultPath, 'amplitudeStats')
+    relativeStatsDF = pd.concat(relativeStatsDict, names=['electrode', 'kinematicCondition'] + relativeRaucDF.columns.names)
+    relativeStatsDF.to_hdf(resultPath, 'relativeStatsDF')
+    #
+    defaultSamplerKWArgs = dict(random_state=42, test_size=0.5)
+    defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.1)
+    # args for tdr.
+    defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
-        continuousFactors=['segment', 'originalIndex', 't'])
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=defaultSamplerKWArgs)
+    defaultPrelimSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=defaultPrelimSamplerKWArgs)
     iteratorKWArgs = dict(
         n_splits=7,
-        splitterClass=tdr.trialAwareStratifiedKFold, splitterKWArgs=splitterKWArgs,
-        samplerKWArgs=dict(random_state=None, test_size=None,),
-        prelimSplitterClass=tdr.trialAwareStratifiedKFold, prelimSplitterKWArgs=splitterKWArgs,
-        resamplerClass=RandomOverSampler, resamplerKWArgs={},
-        # resamplerClass=None, resamplerKWArgs={},
+        splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+        prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+        resamplerClass=None, resamplerKWArgs={},
         )
     cvIterator = tdr.trainTestValidationSplitter(
         dataDF=clippedRaucDF, **iteratorKWArgs)

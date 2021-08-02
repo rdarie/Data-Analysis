@@ -155,14 +155,12 @@ def getExpOpts():
     dropMotionRounds = None
 
     ############################################################
+    manualOutlierOverrideDict = {
+        1: [110, 140],
+        2: [171, 45, 68]
+        }
     ############################################################
-    outlierDetectOptions = dict(
-        targetEpochSize=100e-3,
-        windowSize=(-.5, 1.),
-        twoTailed=True,
-        devQuantile=0.99,
-        qThresh=1-1e-6
-        )
+
     #
     minNConditionRepetitions = {
         'n': 1,

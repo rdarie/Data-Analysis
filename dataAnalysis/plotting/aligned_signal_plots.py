@@ -711,17 +711,17 @@ def genTraceAnnotator(
             (dataSubset.iloc[:, 0].isna().all()))
         if not emptySubset:
             if not hasattr(g.axes[ro, co], 'tracesAnnotated'):
-                locIdx = 0
                 for name, group in dataSubset.groupby(unit_var):
-                    locIdx = locIdx % group.shape[0]
-                    xpos = group[g._x_var].iloc[locIdx]
-                    ypos = group[g._y_var].iloc[locIdx]
-                    content = group[labelsList].iloc[locIdx].to_dict()
-                    annText = ' '.join(['{}: {:.2f}'.format(key, value) for key, value in content.items()])
+                    locIdx = group[g._y_var].abs().idxmax()
+                    xpos = group[g._x_var].loc[locIdx]
+                    ypos = group[g._y_var].loc[locIdx]
+                    content = group[labelsList].loc[locIdx].to_dict()
+                    annText = ' '.join([
+                        '{}: {:.2f}'.format(key, value)
+                        for key, value in content.items()])
                     g.axes[ro, co].text(
                         xpos, ypos,
                         annText, **textOpts)
-                    locIdx += 2
                 g.axes[ro, co].tracesAnnotated = True
         return
     return traceAnnotator

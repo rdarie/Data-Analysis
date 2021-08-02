@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --ntasks=10
-#SBATCH --ntasks-per-core=10
+#SBATCH --ntasks-per-core=1
 #SBATCH --mem-per-cpu=64G
 
 # Specify a job name:

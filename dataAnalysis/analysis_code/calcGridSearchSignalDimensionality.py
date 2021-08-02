@@ -237,7 +237,7 @@ if __name__ == '__main__':
     featureColumnFields = dataDF.columns.names
     ###
 
-    maxNCompsToTest = min(96, featureMasks.sum(axis='columns').min())
+    maxNCompsToTest = min(80, featureMasks.sum(axis='columns').min())
     # pdb.set_trace()
     listOfNCompsToTest = []
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):

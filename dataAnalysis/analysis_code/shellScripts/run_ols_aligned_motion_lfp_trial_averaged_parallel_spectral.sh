@@ -6,8 +6,8 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --ntasks=4
-#SBATCH --ntasks-per-core=4
+#SBATCH --ntasks=10
+#SBATCH --ntasks-per-core=1
 #SBATCH --mem-per-cpu=8G
 
 # Specify a job name:
@@ -21,21 +21,21 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=0-48
+#SBATCH --array=0-56
 source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 #
 ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=2 --processAll"
-ITERATOR="rb"
+ITERATOR="rd"
 WINDOWTERM="XL"
 SUFFIX="_spectral"
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 DIMRED="pca_ta"
 ESTIMATOR="enr_${DIMRED}${SUFFIX}"
-python -u './calcGridSearchRegressionWithPipelinesV2.py' --transformerNameRhs="${DIMRED}" --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+# python -u './calcGridSearchRegressionWithPipelinesV2.py' --transformerNameRhs="${DIMRED}" --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
 DIMRED="fa_ta"
 ESTIMATOR="enr_${DIMRED}${SUFFIX}"
 python -u './calcGridSearchRegressionWithPipelinesV2.py' --transformerNameRhs="${DIMRED}" --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1

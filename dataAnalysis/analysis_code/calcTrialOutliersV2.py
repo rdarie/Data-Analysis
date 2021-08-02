@@ -154,6 +154,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 def findOutliers(
         mahalDistDF, groupBy=None,
         qThresh=None, sdThresh=None, sdThreshInner=None,
+        manualOutlierOverride=None,
         devQuantile=None, nDim=1, multiplier=1, twoTailed=False):
     #
     if sdThresh is None:
@@ -188,7 +189,9 @@ def findOutliers(
         deviationDF['rejectBlock'] = (deviationDF['deviation'] > sdThresh)
         deviationDF['nearRejectBlock'] = (deviationDF['deviation'] > sdThresh / 2)
         deviationDF.deviationThreshold = sdThresh
-    #
+    if manualOutlierOverride is not None:
+        print('Identifying these indices as outliers based on manualOutlierOverride\n{}'.format(deviationDF.index[manualOutlierOverride]))
+        deviationDF.loc[deviationDF.index[manualOutlierOverride], ['nearRejectBlock', 'rejectBlock']] = True
     return deviationDF
 
 
@@ -297,8 +300,13 @@ if __name__ == "__main__":
     print('If the test is two-tailed, the log probability limit is {}'.format(refLogProba))
     print('#######################################################')
     #
+    try:
+        manualOutlierOverride = manualOutlierOverrideDict[int(arguments['blockIdx'])]
+    except:
+        manualOutlierOverride = None
     outlierTrials = findOutliers(
         mahalDist, groupBy=groupBy, multiplier=1, qThresh=qThresh,
+        manualOutlierOverride=manualOutlierOverride,
         nDim=nDoF, devQuantile=devQuantile, twoTailed=twoTailed)
     print('\nHighest observed deviations were:')
     print(outlierTrials['deviation'].sort_values().tail())
@@ -552,5 +560,6 @@ if __name__ == "__main__":
     # goodTrialCount.groupby(stimulusConditionNames).ngroups
     badTrialInfo = firstBinTrialInfo.loc[outlierTrials['rejectBlock'].to_numpy().flatten().astype(bool), :]
     badTrialCount = badTrialInfo.groupby(stimulusConditionNames).count().iloc[:, 0].sort_values().to_frame(name='count').reset_index()
-    outlierTrials['deviation'].reset_index().sort_values(['segment', 'deviation']).to_html(os.path.join(figureOutputFolder, prefix + '_trial_deviation_breakdown.html'))
+    outlierTrials['deviation'].reset_index().to_html(os.path.join(figureOutputFolder, prefix + '_trial_deviation_breakdown.html'))
+    outlierTrials['deviation'].reset_index().sort_values(['segment', 'deviation']).to_html(os.path.join(figureOutputFolder, prefix + '_trial_deviation_breakdown_sorted.html'))
     print('Bad trial count:\n{}'.format(badTrialCount))

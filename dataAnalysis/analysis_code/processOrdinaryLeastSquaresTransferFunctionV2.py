@@ -491,6 +491,8 @@ with cm as pdf:
             continue
         if not (fold == lastFoldIdx):
             continue
+        if not (lhsMaskIdx in [0, 9, 10, 19, 28, 29, 38, 47, 48]):
+            continue
         print('Calculating state space coefficients for {}'.format(lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']))
         lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
         lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}

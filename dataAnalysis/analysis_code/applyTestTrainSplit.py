@@ -179,12 +179,6 @@ outputDFPath = os.path.join(
 if arguments['resetHDF']:
     if os.path.exists(outputDFPath):
         os.remove(outputDFPath)
-outputLoadingMetaPath = os.path.join(
-    dataFramesFolder,
-    '{}_{}_df{}_{}_meta.pickle'.format(
-        blockBaseName,
-        arguments['window'],
-        iteratorSuffix, arguments['selectionName']))
 #
 if arguments['controlSet']:
     trialInfo = exportDF.index.to_frame().reset_index(drop=True)
@@ -193,7 +187,19 @@ if arguments['controlSet']:
     trialInfo.loc[:, 'originalIndex'] = trialInfo['originalIndex'] + int(1e6)
     exportDF.index = pd.MultiIndex.from_frame(trialInfo)
     exportKey = '/{}/control'.format(arguments['selectionName'])
+    outputLoadingMetaPath = os.path.join(
+        dataFramesFolder,
+        '{}_{}_df{}_ctrl_{}_meta.pickle'.format(
+            blockBaseName,
+            arguments['window'],
+            iteratorSuffix, arguments['selectionName']))
 else:
+    outputLoadingMetaPath = os.path.join(
+        dataFramesFolder,
+        '{}_{}_df{}_{}_meta.pickle'.format(
+            blockBaseName,
+            arguments['window'],
+            iteratorSuffix, arguments['selectionName']))
     exportKey = '/{}/data'.format(arguments['selectionName'])
 if arguments['verbose']:
     prf.print_memory_usage(

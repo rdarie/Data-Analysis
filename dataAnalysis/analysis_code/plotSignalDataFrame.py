@@ -166,9 +166,9 @@ if __name__ == '__main__':
     statsTestOpts = dict(
         referenceTimeWindow=None,
         # referenceTimeWindow=[-400e-3, -350e-3],
-        testStride=200e-3,
-        testWidth=200e-3,
-        tStart=-400e-3,
+        testStride=100e-3,
+        testWidth=100e-3,
+        tStart=-200e-3,
         tStop=None,
         pThresh=5e-2,
         correctMultiple=True,
@@ -296,12 +296,13 @@ if __name__ == '__main__':
     #
     if arguments['individualTraces']:
         pdfName += '_traces'
-        relplotKWArgs.update(dict(estimator=None, units='trialUID'))
+        relplotKWArgs.update(dict(
+            estimator=None, units='trialUID', alpha=0.7))
         plotProcFuns.append(
             asp.genTraceAnnotator(
                 unit_var='trialUID', labelsList=['segment', 't'],
                 textOpts=dict(
-                    ha='left', va='bottom', fontsize=5,
+                    ha='center', va='top', fontsize=5,
                     c=(0., 0., 0., 0.7),
                     bbox=dict(
                         boxstyle="square",

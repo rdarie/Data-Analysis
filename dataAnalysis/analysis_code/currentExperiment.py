@@ -540,8 +540,8 @@ def parseAnalysisOptions(
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
-                'winStart': -600e-3,
-                'winStop': -300e-3
+                'winStart': -700e-3,
+                'winStop': -400e-3
                 }
             },
         # perimovement, no stim
@@ -724,13 +724,13 @@ def parseAnalysisOptions(
                 ),
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
-                'winStart': -0.2,  # start 0.6 before whatever the query was
-                'winStop': .6  # stop .6 sec after startingOrStimOn
+                'winStart': -0.4,  # start 0.6 before whatever the query was
+                'winStop': 0.5  # stop .6 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
-                'alignQuery': None,
-                'winStart': None,
-                'winStop':  None,
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.7,
+                'winStop': 0.2,
                 }
             },
         }
