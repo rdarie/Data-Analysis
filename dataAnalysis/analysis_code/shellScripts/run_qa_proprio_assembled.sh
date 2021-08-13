@@ -29,10 +29,10 @@ ANALYSISFOLDER="--analysisName=hiRes"
 #
 # for concatenated files#
 BLOCKSELECTOR="--blockIdx=2 --processAll"
-INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp"
 UNITQUERY="--unitQuery=lfp"
 #
-python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --saveResults
+python -u ./calcTrialOutliersV2.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --saveResults
 
 # calculate spike stats, once outliers do not affect the calculation
 # python -u ./calcUnitMeanFR.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --maskOutlierBlocks

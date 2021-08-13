@@ -380,6 +380,7 @@ if __name__ == "__main__":
         prefix + '_outlier_channels.pdf')
     print('plotting signal ranges')
     with PdfPages(signalRangesFigPath) as pdf:
+        # pdb.set_trace()
         keepLevels = ['wasKept']
         dropLevels = [lN for lN in dataDF.index.names if lN not in keepLevels]
         plotDF = dataDF.T.reset_index(drop=True).T.reset_index(dropLevels, drop=True)
@@ -394,22 +395,24 @@ if __name__ == "__main__":
             col='bank', x='signal', y='feature',
             data=plotDF, orient='h', kind='violin', ci='sd',
             linewidth=0.5, cut=0,
-            sharex=False, sharey=False, height=h, aspect=aspect
-        )
+            sharex=False, sharey=False, height=h, aspect=aspect)
         g.suptitle('original')
         g.tight_layout()
         pdf.savefig(bbox_inches='tight')
         plt.close()
-        g = sns.catplot(
-            col='bank', x='signal', y='feature',
-            data=plotDF.loc[plotDF['wasKept'], :], orient='h', kind='violin', ci='sd',
-            linewidth=0.5, cut=0,
-            sharex=False, sharey=False, height=h, aspect=aspect
-            )
-        g.suptitle('triaged')
-        g.tight_layout()
-        pdf.savefig(bbox_inches='tight')
-        plt.close()
+        try:
+            g = sns.catplot(
+                col='bank', x='signal', y='feature',
+                data=plotDF.loc[plotDF['wasKept'], :], orient='h', kind='violin', ci='sd',
+                linewidth=0.5, cut=0,
+                sharex=False, sharey=False, height=h, aspect=aspect
+                )
+            g.suptitle('triaged')
+            g.tight_layout()
+            pdf.savefig(bbox_inches='tight')
+            plt.close()
+        except Exception:
+            traceback.print_exc()
 
     theseOutliers = (
         outlierTrials

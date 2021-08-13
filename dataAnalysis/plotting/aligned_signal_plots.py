@@ -105,6 +105,10 @@ def processRowColArguments(arguments):
         for ident in ['col', 'row', 'hue']:
             if outDict['{}Name'.format(ident)] in arguments['rowColOverrides']:
                 outDict['{}Order'.format(ident)] = arguments['rowColOverrides'][outDict['{}Name'.format(ident)]]
+
+    for extraKey in ['{}Order'.format(k) for k in ['col', 'row', 'hue']]:
+        if extraKey in arguments:
+            outDict[extraKey] = arguments[extraKey]
     return outDict
 
 
@@ -787,6 +791,23 @@ def genGridAnnotator(
         return
     return gridAnnotator
 
+def genTitleChanger(newLookup):
+    def titleChanger(g, ro, co, hu, dataSubset):
+        if not hasattr(g, 'titleChangerCheckedMargins'):
+            g.titleChangerCheckedMargins = True
+            if g._margin_titles:
+                for t in g._margin_titles_texts:
+                    tContent = t.get_text()
+                    if tContent in newLookup:
+                        t.set_text(newLookup[tContent])
+        if not hasattr(g.axes[ro, co], 'titleChangerCheckedMargins'):
+            g.axes[ro, co].titleChangerCheckedMargins = True
+            thisTitle = g.axes[ro, co].get_title()
+            if thisTitle in newLookup:
+                g.axes[ro, co].set_title(newLookup[thisTitle])
+        return
+    return titleChanger
+
 def genTitleAnnotator(
         template='', colNames=[],
         textOpts={}, shared=True,
@@ -1091,7 +1112,7 @@ def genVLineAdder(posList, patchOpts, dropNaNCol='segment'):
 
 def genStimVLineAdder(
         rateFieldName, patchOpts,
-        tOnset=0, tOffset=1, includeRight=True,
+        tOnset=0, tOffset=1, includeLeft=True, includeRight=True,
         dropNaNCol='segment'):
     def addVline(g, ro, co, hu, dataSubset):
         emptySubset = (
@@ -1110,6 +1131,8 @@ def genStimVLineAdder(
             if includeRight:
                 pulseLims[1] = pulseLims[1] + pulsePeriod
             posList = np.arange(*pulseLims, pulsePeriod)
+            if not includeLeft:
+                posList = posList[1:]
             for pos in posList:
                 g.axes[ro, co].axvline(pos, **patchOpts)
         return
@@ -1154,15 +1177,6 @@ def genBlockVertShader(lims, patchOpts, dropNaNCol='segment'):
         if (hu == 0) and not emptySubset:
             g.axes[ro, co].axvspan(
                 lims[0], lims[1], **patchOpts)
-            # Create list for all the patches
-            # y = (dataSubset[g._y_var].max() + dataSubset[g._y_var].min()) / 2
-            # height = (dataSubset[g._y_var].max() - dataSubset[g._y_var].min())
-            # xLim = g.axes[ro, co].get_xlim()
-            # x = (xLim[0] + xLim[1]) / 2
-            # width = (xLim[1] - xLim[0])
-            # rect = Rectangle((x, y), width, height, **patchOpts)
-            # # Add collection to axes
-            # g.axes[ro, co].add_patch(rect)
             return
     return shadeBlocks
 

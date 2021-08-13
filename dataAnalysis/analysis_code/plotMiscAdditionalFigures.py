@@ -79,6 +79,10 @@ import joblib as jb
 import dill as pickle
 import gc
 from docopt import docopt
+sns.set(
+    context='talk', style='darkgrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
 for arg in sys.argv:
     print(arg)
 idxSl = pd.IndexSlice
@@ -86,26 +90,25 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': .5,
-        'lines.markersize': 2.5,
-        'patch.linewidth': .5,
+        'lines.linewidth': 1,
+        'lines.markersize': 2.4,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
         "axes.spines.top": True,
         "axes.linewidth": .125,
         "grid.linewidth": .2,
-        "font.size": 7,
+        "font.size": 5,
         "axes.labelsize": 7,
-        "axes.titlesize": 9,
+        "axes.titlesize": 5,
         "xtick.labelsize": 5,
         "ytick.labelsize": 5,
-        "legend.fontsize": 7,
-        "legend.title_fontsize": 9,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
         "xtick.bottom": True,
-        "xtick.top": False,
+        "xtick.top": True,
         "ytick.left": True,
-        "ytick.right": False,
+        "ytick.right": True,
         "xtick.major.width": .125,
         "ytick.major.width": .125,
         "xtick.minor.width": .125,
@@ -124,9 +127,9 @@ mplRCParams = {
     'ps.fonttype': 42,
     }
 sns.set(
-    context='talk', style='whitegrid',
+    context='paper', style='whitegrid',
     palette='dark', font='sans-serif',
-    font_scale=2, color_codes=True, rc=snsRCParams)
+    font_scale=.8, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
@@ -135,7 +138,6 @@ print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-
 '''
 
 arguments = {
@@ -180,11 +182,6 @@ if __name__ == '__main__':
     selectionName = arguments['selectionName']
     pdfName = '{}_{}'.format(
         datasetName, selectionName)
-    if arguments['plotSuffix'] is not None:
-        plotSuffix = '_{}'.format(arguments['plotSuffix'])
-    else:
-        plotSuffix = ''
-    pdfPath = os.path.join(figureOutputFolder, '{}{}.pdf'.format(pdfName, plotSuffix))
     #
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(
@@ -202,6 +199,9 @@ if __name__ == '__main__':
         plotProcFuns = plotProcFunsLookup[arguments['plotSuffix']]
     else:
         plotProcFuns = []
+    titlesOpts = dict(
+        col_template="{col_var}\n{col_name}",
+        row_template="{row_var}\n{row_name}")
     #
     with open(loadingMetaPath, 'rb') as _f:
         loadingMeta = pickle.load(_f)
@@ -272,9 +272,6 @@ if __name__ == '__main__':
             compoundAnn.loc[group.index] = '_'.join(['{}'.format(nm) for nm in name])
         trialInfo.loc[:, canName] = compoundAnn
     dataDF.index = pd.MultiIndex.from_frame(trialInfo)
-    ######
-    if arguments['plotSuffix'] in customCodeLookup:
-        exec(customCodeLookup[arguments['plotSuffix']])
     prf.print_memory_usage('just loaded data, plotting')
     #
     rowColOpts = asp.processRowColArguments(arguments)
@@ -282,108 +279,41 @@ if __name__ == '__main__':
         limitPages = int(arguments['limitPages'])
     else:
         limitPages = None
-    if arguments['individualTraces']:
-        pdfName += '_traces'
-        relplotKWArgs.update(dict(
-            estimator=None, units='trialUID', alpha=0.7))
-        plotProcFuns.append(
-            asp.genTraceAnnotator(
-                unit_var='trialUID', labelsList=['segment', 't'],
-                textOpts=dict(
-                    ha='center', va='top', fontsize=5,
-                    c=(0., 0., 0., 0.7),
-                    bbox=dict(
-                        boxstyle="square",
-                        ec=(0., 0., 0., 0.), fc=(1., 1., 1., 0.2))
-                )))
-    #  Get stats results?
-    if arguments['overlayStats']:
-        figureStatsFolder = os.path.join(
-            alignSubFolder, 'figureStats'
-            )
-        if not os.path.exists(figureStatsFolder):
-            os.makedirs(figureStatsFolder, exist_ok=True)
-        statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
-        if os.path.exists(statsTestPath) and not arguments['recalcStats']:
-            sigTestResults = pd.read_hdf(statsTestPath, 'sig')
-            sigTestResults.columns.name = 'bin'
-        else:
-            (
-                pValsWide, statValsWide,
-                sigTestResults) = ash.facetGridCompareMeansDataFrame(
-                    dataDF, statsTestPath,
-                    rowColOpts=rowColOpts,
-                    limitPages=limitPages,
-                    statsTestOpts=statsTestOpts, verbose=arguments['verbose'])
-    else:
-        sigTestResults = None
     if arguments['plotSuffix'] in relPlotKWArgsLookup:
         relplotKWArgs.update(relPlotKWArgsLookup[arguments['plotSuffix']])
-    with PdfPages(pdfPath) as pdf:
-        pageCount = 0
-        for uIdx, unitName in enumerate(tqdm(dataDF.columns)):
-            plotDF = dataDF.loc[:, unitName].reset_index(name='signal')
-            rowColArgs = {}
-            for axn in ['row', 'col', 'hue']:
-                if rowColOpts['{}Name'.format(axn)] is not None:
-                    rowColArgs[axn] = rowColOpts['{}Name'.format(axn)]
-                    if '{}Order'.format(axn) in rowColOpts:
-                        rowColArgs['{}_order'.format(axn)] = rowColOpts['{}Order'.format(axn)]
-                    else:
-                        rowColArgs['{}_order'.format(axn)] = np.unique(plotDF[rowColArgs[axn]])
-            g = sns.relplot(
-                x='bin', y='signal',
-                **rowColArgs, **relplotKWArgs, data=plotDF,
-                facet_kws=dict(margin_titles=True))
-            #  iterate through plot and add significance stars
-            for (ro, co, hu), dataSubset in g.facet_data():
-                #  print('(ro, co, hu) = {}'.format((ro, co, hu)))
-                if len(plotProcFuns):
-                    for procFun in plotProcFuns:
-                        procFun(g, ro, co, hu, dataSubset)
-                #
-                if sigTestResults is not None:
-                    unitMask = (
-                            sigTestResults.reset_index().set_index(dataDF.columns.names).index == unitName)
-                    asp.addSignificanceStars(
-                        g, sigTestResults.loc[unitMask, :],
-                        ro, co, hu, dataSubset, sigStarOpts=asigSigStarOpts)
-
-            if arguments['plotSuffix'] in xAxisLabelLookup:
-                xAxisLabel = xAxisLabelLookup[arguments['plotSuffix']]
-            else:
-                xAxisLabel = 'Time (msec)'
-            if arguments['plotSuffix'] in yAxisLabelLookup:
-                thisYLookup = yAxisLabelLookup[arguments['plotSuffix']]
-                if isinstance(thisYLookup, dict):
-                    if unitName[0] in thisYLookup:
-                        yAxisLabel = thisYLookup[unitName[0]]
-                    else:
-                        yAxisLabel = '{}'.format(unitName[0])
-                else:
-                    yAxisLabel = '{}'.format(thisYLookup)
-            else:
-                yAxisLabel = '{}'.format(unitName[0])
-            g.set_axis_labels(xAxisLabel, yAxisLabel)
-            if arguments['plotSuffix'] in titlesOptsLookup:
-                titlesOpts = titlesOptsLookup[arguments['plotSuffix']]
-                g.set_titles(**titlesOpts)
-            if arguments['plotSuffix'] in titleTextLookup:
-                titleText = titleTextLookup[arguments['plotSuffix']]
-                g.suptitle(titleText)
-            if arguments['plotSuffix'] in legendTitleOverridesLookup:
-                legendTitleOverrides = legendTitleOverridesLookup[arguments['plotSuffix']]
-            else:
-                legendTitleOverrides = {}
-            if arguments['plotSuffix'] in legendContentOverridesLookup:
-                legendContentOverrides = legendContentOverridesLookup[arguments['plotSuffix']]
-            else:
-                legendContentOverrides = {}
-            asp.reformatFacetGridLegend(
-                g, titleOverrides=legendTitleOverrides,
-                contentOverrides=legendContentOverrides,
-                styleOpts=styleOpts)
-            g.resize_legend(adjust_subtitles=True)
+    ##########################################################################################
+    if arguments['plotSuffix'] == 'rig_illustration':
+        import matplotlib.lines as mlines
+        pdfPath = os.path.join(figureOutputFolder, '{}_{}_shadingLegend.pdf'.format(pdfName, arguments['plotSuffix']))
+        # make a dummy displot to copy the shading info
+        dummyData = {}
+        iterToLabelLookup = {
+            'B': 'Baseline',
+            'M': 'Movement',
+            'S': 'Stimulation',
+            'SM': 'Stimulation during movement',
+            'AUC': 'AUC window'
+            }
+        thisPalette = {}
+        for iterName, row in iteratorPalette.iterrows():
+            dummyData[iterToLabelLookup[iterName]] = np.arange(100)
+            thisPalette[iterToLabelLookup[iterName]] = tuple([rgb for rgb in row['color']] + [0.5])
+        dummyDF = pd.DataFrame(dummyData)
+        dummyDF.columns.name = 'Epoch'
+        plotDummy = dummyDF.stack().to_frame(name='dummy').reset_index()
+        plotDummy.loc[:, 'xDummy'] = 0.
+        ###
+        with PdfPages(pdfPath) as pdf:
+            g = sns.catplot(data=plotDummy, x='xDummy', y='dummy', hue='Epoch', palette=thisPalette, kind='violin')
+            blue_line = mlines.Line2D(
+                [], [], lw=0, marker="|", label='Trial onset', markeredgecolor='y', markersize=5)
+            g._legend_data['Trial onset'] = blue_line
+            g.legend.remove()
+            g.add_legend(
+                legend_data=g._legend_data, title='Epoch', label_order=None,
+                adjust_subtitles=False)
+            for pat in g.legend.get_patches():
+                pat.set_alpha(0.5)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(
                 bbox_inches='tight',
@@ -392,7 +322,3 @@ if __name__ == '__main__':
                 plt.show()
             else:
                 plt.close()
-            pageCount += 1
-            if limitPages is not None:
-                if pageCount > limitPages:
-                    break

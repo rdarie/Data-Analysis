@@ -33,8 +33,8 @@
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 #
-# EXP="exp202101251100"
-EXP="exp202101271100"
+EXP="exp202101251100"
+# EXP="exp202101271100"
 # EXP="exp202101281100"
 #
 # EXP="exp202102041100"
@@ -53,10 +53,11 @@ conda activate
 source activate nda2
 python --version
 
+python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize
 # global operations
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze*' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.*' --fromDataToScratch --filesIncluded
 #
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromScratchToData --moveItems --filesIncluded

@@ -7,6 +7,7 @@ from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
 from sklearn.base import clone
+from sklearn.preprocessing import StandardScaler
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance, MinCovDet
 from sklearn.linear_model import ElasticNet, ElasticNetCV
 from sklearn.pipeline import make_pipeline, Pipeline
@@ -308,7 +309,7 @@ class raisedCosTransformerBackup(object):
                 sig = self.preprocFun(vecSrs)
             else:
                 sig = vecSrs'''
-            sig = self.preprocFun(vercSrs)
+            sig = self.preprocFun(vecSrs)
             resDF.insert(0, 0., sig)
         return resDF
 
@@ -964,6 +965,24 @@ def shiftSmoothDecimate(x, lag=0, winWidth=1, decimate=1):
         return procDF.iloc[::decimate]
     else:
         return procDF.iloc[:, halfRollingWin:-halfRollingWin:decimate]
+
+
+class flatStandardScaler(StandardScaler):
+
+    def fit(self, X, y=None):
+        if isinstance(X, pd.DataFrame):
+            super().fit(X.to_numpy().reshape(-1, 1), y=y)
+        else:
+            super().fit(X.reshape(-1, 1), y=y)
+        return self
+
+    def transform(self, X):
+        originalShape = X.shape
+        if isinstance(X, pd.DataFrame):
+            res = super().transform(X.to_numpy().reshape(-1, 1))
+        else:
+            res = super().transform(X.reshape(-1, 1))
+        return np.reshape(res, originalShape)
 
 
 def applyScalersGrouped(DF, listOfScalers):

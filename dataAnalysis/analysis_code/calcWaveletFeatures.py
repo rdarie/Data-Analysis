@@ -195,12 +195,8 @@ if __name__ == "__main__":
     #
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
-    # if True:
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-    # dataDF.to_hdf(os.path.join(scratchFolder, 'temp.h5'), 'temp')
-    # else:
-    #     dataDF = pd.read_hdf(os.path.join(scratchFolder, 'temp.h5'), 'temp')
     dummySt = dataBlock.filter(
         objects=[ns5.SpikeTrain, ns5.SpikeTrainProxy])[0]
     fs = float(dummySt.sampling_rate)

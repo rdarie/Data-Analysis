@@ -29,6 +29,13 @@ if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
@@ -48,6 +55,62 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import RobustScaler, MinMaxScaler
 
+sns.set(
+    context='talk', style='darkgrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
+useDPI = 200
+dpiFactor = 72 / useDPI
+snsRCParams = {
+        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+        'lines.linewidth': 1,
+        'lines.markersize': 2.4,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.spines.right": True,
+        "axes.spines.top": True,
+        "axes.linewidth": .125,
+        "grid.linewidth": .2,
+        "font.size": 5,
+        "axes.labelsize": 7,
+        "axes.titlesize": 5,
+        "xtick.labelsize": 5,
+        "ytick.labelsize": 5,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": True,
+        "ytick.left": True,
+        "ytick.right": True,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
+    }
+mplRCParams = {
+    'figure.titlesize': 7,
+    'font.family': "Nimbus Sans",
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
+    }
+sns.set(
+    context='paper', style='whitegrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True, rc=snsRCParams)
+for rcK, rcV in mplRCParams.items():
+    matplotlib.rcParams[rcK] = rcV
+
+styleOpts = {
+    'legend.lw': 2,
+    'tight_layout.pad': 3e-1, # units of font size
+    'panel_heading.pad': 0.
+    }
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 '''
@@ -105,6 +168,8 @@ relativeRaucDF = pd.read_hdf(resultPath, 'relative')
 relativeRaucDF.columns = relativeRaucDF.columns.get_level_values('feature')
 recCurve.loc[:, 'normalizedRAUC'] = relativeRaucDF.stack().to_numpy()
 
+whichRAUC = 'normalizedRAUC'
+averageRaucDF = relativeRaucDF.mean(axis='columns').to_frame(name=whichRAUC).reset_index()
 
 ampStatsDF = pd.read_hdf(resultPath, 'amplitudeStats')
 relativeStatsDF = pd.read_hdf(resultPath, 'relativeStatsDF')
@@ -124,11 +189,12 @@ plotRC.drop(columns=dropCols, inplace=True)
 refGroup = plotRC.loc[plotRC['electrode'] == 'NA', :]
 testGroup = plotRC.loc[plotRC['electrode'] != 'NA', :]
 
-averageRaucDF = relativeRaucDF.mean(axis='columns').to_frame(name='normalizedRAUC').reset_index()
 averageRaucDF.loc[:, 'feature'] = 'averageFeature'
 refGroupAverage = averageRaucDF.loc[averageRaucDF['electrode'] == 'NA', :]
 testGroupAverage = averageRaucDF.loc[averageRaucDF['electrode'] != 'NA', :]
 
+########
+# plotRC = plotRC.loc[plotRC['feature'].str.contains('_all'), :]
 colName = 'electrode'
 colOrder = sorted(np.unique(plotRC[colName]))
 hueName = 'kinematicCondition'
@@ -140,7 +206,6 @@ rowOrder = sorted(np.unique(plotRC[rowName]))
 colWrap = min(3, len(colOrder))
 height, width = 3, 3
 aspect = width / height
-whichRAUC = 'normalizedRAUC'
 alpha = 1e-3
 def statsAnnotator(g, ro, co, hu, dataSubset):
     emptySubset = (
@@ -166,9 +231,20 @@ def statsAnnotator(g, ro, co, hu, dataSubset):
             g.axes[ro, co].starsAnnotated = True
     return
 
-#
+
+
+titleLabelLookup = {
+    'electrode = + E16 - E5': 'Stimulation (+ E16 - E5)',
+    'electrode = NA': 'No stimulation',
+    'feature = mahal_ledoit_all': 'Mahalanobis distance (all bands)',
+    'feature = mahal_ledoit_alpha': 'Mahalanobis distance (alpha band)',
+    'feature = mahal_ledoit_beta': 'Mahalanobis distance (beta band)',
+    'feature = mahal_ledoit_gamma': 'Mahalanobis distance (gamma band)',
+    'feature = mahal_ledoit_higamma': 'Mahalanobis distance (high gamma band)',
+    'feature = mahal_ledoit_spb': 'Mahalanobis distance (spike power band)',
+    }
 with PdfPages(pdfPath) as pdf:
-    plotLims = plotRC[whichRAUC].quantile([0, 1-5e-3])
+    plotLims = [0, plotRC[whichRAUC].quantile(1-1e-2)]
     if arguments['plotThePieces']:
         g = sns.relplot(
             col=colName,
@@ -179,9 +255,12 @@ with PdfPages(pdfPath) as pdf:
             hue=hueName, hue_order=hueOrder, palette=huePalette,
             kind='line', data=testGroup,
             height=height, aspect=aspect, errorbar='sd', estimator='mean',
-            facet_kws=dict(sharey=True, sharex=False, margin_titles=True), lw=1,
+            facet_kws=dict(
+                sharey=True, sharex=False, margin_titles=True,
+                gridspec_kws=dict(width_ratios=[4, 1])), lw=1,
+
             )
-        plotProcFuns = [statsAnnotator]
+        plotProcFuns = [statsAnnotator, asp.genTitleChanger(titleLabelLookup)]
         for (ro, co, hu), dataSubset in g.facet_data():
             if len(plotProcFuns):
                 for procFun in plotProcFuns:
@@ -199,8 +278,22 @@ with PdfPages(pdfPath) as pdf:
                     hue=hueName, hue_order=hueOrder, data=refData,
                     cut=0, inner='box',
                     ax=ax)
+                ax.set_xlabel('')
+                ax.set_xticks([])
                 if ax.get_legend() is not None:
                     ax.get_legend().remove()
+        g.set_axis_labels('Stimulation amplitude (uA)', 'Normalized AUC')
+        asp.reformatFacetGridLegend(
+            g, titleOverrides={
+                'kinematicCondition': 'Movement type'
+            },
+            contentOverrides={
+                'NA_NA': 'No movement',
+                'CW_outbound': 'Start of movement (extension)',
+                'CW_return': 'Return to start (flexion)'
+            },
+            styleOpts=styleOpts)
+        g.resize_legend(adjust_subtitles=True)
         g.axes[0, 0].set_ylim(plotLims)
         pdf.savefig(
             bbox_inches='tight',
@@ -219,7 +312,10 @@ with PdfPages(pdfPath) as pdf:
         hue=hueName, hue_order=hueOrder, palette=huePalette,
         kind='line', data=testGroupAverage,
         height=height, aspect=aspect, errorbar='sd', estimator='mean',
-        facet_kws=dict(sharey=True, sharex=False, margin_titles=True), lw=1,
+        facet_kws=dict(
+            sharey=True, sharex=False, margin_titles=True,
+            gridspec_kws=dict(width_ratios=[4, 1])), lw=1,
+
         )
     plotProcFuns = []
     for (ro, co, hu), dataSubset in g.facet_data():
@@ -241,6 +337,18 @@ with PdfPages(pdfPath) as pdf:
                 ax=ax)
             if ax.get_legend() is not None:
                 ax.get_legend().remove()
+    g.set_axis_labels('Stimulation amplitude (uA)', 'Normalized AUC')
+    asp.reformatFacetGridLegend(
+        g, titleOverrides={
+            'kinematicCondition': 'Movement type'
+        },
+        contentOverrides={
+            'NA_NA': 'No movement',
+            'CW_outbound': 'Start of movement (extension)',
+            'CW_return': 'Return to start (flexion)'
+        },
+        styleOpts=styleOpts)
+    g.resize_legend(adjust_subtitles=True)
     g.axes[0, 0].set_ylim(plotLims)
     g.suptitle('Averaged across all signals')
     pdf.savefig(

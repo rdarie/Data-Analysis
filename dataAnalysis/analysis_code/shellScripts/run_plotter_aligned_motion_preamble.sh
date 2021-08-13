@@ -15,9 +15,9 @@ TIMEWINDOWOPTS="--winStart=-200 --winStop=600"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
-ALIGNQUERY="--alignQuery=starting"
+# ALIGNQUERY="--alignQuery=starting"
 # ALIGNQUERY="--alignQuery=stopping"
-# ALIGNQUERY="--alignQuery=startingNoStim"
+ALIGNQUERY="--alignQuery=startingNoStim"
 
 HUEOPTS="--hueName=trialAmplitude --hueControl="
 ROWOPTS="--rowName=kinematicCondition --rowControl="
@@ -31,8 +31,8 @@ SIZEOPTS="--sizeName= --sizeControl="
 # STYLEOPTS="--styleName= --styleControl="
 # SIZEOPTS="--sizeName= --sizeControl="
 
-# PAGELIMITS="--limitPages=5"
-PAGELIMITS=""
+PAGELIMITS="--limitPages=1"
+# PAGELIMITS=""
 
 # OTHERASIGOPTS="--noStim"
 OTHERASIGOPTS="--noStim --recalcStats"

@@ -18,6 +18,7 @@ Options:
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
 """
+
 import logging
 logging.captureWarnings(True)
 import matplotlib, os, sys
@@ -49,6 +50,7 @@ import numpy as np
 import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
 from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA, FactorAnalysis
 from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
@@ -64,8 +66,8 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 '''
 
 arguments = {
-    'analysisName': 'hiRes', 'processAll': True, 'selectionName': 'lfp_CAR', 'datasetName': 'Block_XL_df_ca',
-    'window': 'long', 'estimatorName': 'mahal', 'verbose': 2, 'exp': 'exp202101251100',
+    'analysisName': 'hiRes', 'processAll': True, 'selectionName': 'lfp_CAR_spectral', 'datasetName': 'Block_XL_df_rd',
+    'window': 'long', 'estimatorName': 'scaled', 'verbose': 2, 'exp': 'exp202101271100',
     'alignFolderName': 'motion', 'showFigures': False, 'blockIdx': '2', 'debugging': False,
     'plotting': True, 'lazy': False}
 os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
@@ -110,7 +112,7 @@ loadingMetaPath = os.path.join(
     )
 estimatorPath = os.path.join(
     estimatorsSubFolder,
-    fullEstimatorName + '.h5'
+    fullEstimatorName + '.joblib'
     )
 #
 with open(loadingMetaPath, 'rb') as _f:
@@ -131,37 +133,6 @@ arguments.update(loadingMeta['arguments'])
 
 if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
-    if 'ledoit' in estimatorName:
-        estimatorClass = tdr.LedoitWolfTransformer
-        estimatorKWArgs = dict(maxNSamples=12.5e3)
-    elif 'emp' in estimatorName:
-        estimatorClass = tdr.EmpiricalCovarianceTransformer
-        estimatorKWArgs = dict(maxNSamples=12.5e3)
-    elif 'mcd' in estimatorName:
-        estimatorClass = tdr.MinCovDetTransformer
-        estimatorKWArgs = dict(maxNSamples=12.5e3)
-    crossvalKWArgs = dict(
-        cv=cvIterator,
-        return_train_score=True, return_estimator=True)
-    joblibBackendArgs = dict(
-        backend='loky'
-        )
-    if joblibBackendArgs['backend'] == 'dask':
-        daskComputeOpts = dict(
-            # scheduler='threads'
-            scheduler='processes'
-            # scheduler='single-threaded'
-            )
-        if joblibBackendArgs['backend'] == 'dask':
-            if daskComputeOpts['scheduler'] == 'single-threaded':
-                daskClient = None
-            elif daskComputeOpts['scheduler'] == 'processes':
-                daskClient = Client(LocalCluster(processes=True))
-            elif daskComputeOpts['scheduler'] == 'threads':
-                daskClient = Client(LocalCluster(processes=False))
-            else:
-                print('Scheduler name is not correct!')
-                daskClient = Client()
     dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
     featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
     # only use zero lag targets
@@ -169,19 +140,12 @@ if __name__ == '__main__':
     dataDF = dataDF.loc[:, lagMask]
     featureMasks = featureMasks.loc[:, lagMask]
     #
-    trialInfo = dataDF.index.to_frame().reset_index(drop=True)
-    workIdx = cvIterator.work
-    workingDataDF = dataDF.iloc[workIdx, :]
-    prf.print_memory_usage('just loaded data, fitting')
-    # remove the 'all' column?
-    removeAllColumn = False
-    if removeAllColumn:
-        featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
+    freqBands = featureMasks.index.get_level_values('freqBandName').unique()
+    if freqBands.size > 1:
+        # remove the all mask
+        freqBandMask = ~(featureMasks.index.get_level_values('freqBandName') == 'all')
+        featureMasks = featureMasks.loc[freqBandMask, :]
     #
-    outputFeatureList = []
-    featureColumnFields = dataDF.columns.names
-    cvScoresDict = {}
-    cvCovMatDict = {}
     lOfColumnTransformers = []
     # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
@@ -189,108 +153,59 @@ if __name__ == '__main__':
         dataGroup = dataDF.loc[:, featureMask]
         print('dataGroup.shape = {}'.format(dataGroup.shape))
         trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
-        if arguments['verbose']:
-            print('Fitting {} ...'.format(trfName))
-        nFeatures = dataGroup.columns.shape[0]
-        cvScores = tdr.crossValidationScores(
-            dataGroup, None, estimatorClass,
-            estimatorKWArgs=estimatorKWArgs,
-            crossvalKWArgs=crossvalKWArgs,
-            joblibBackendArgs=joblibBackendArgs,
-            verbose=arguments['verbose']
-            )
-        cvScoresDF = pd.DataFrame(cvScores)
-        cvScoresDF.index.name = 'fold'
-        cvScoresDF.dropna(axis='columns', inplace=True)
-        cvScoresDict[maskParams['freqBandName']] = cvScoresDF
-        #
-        lastFoldIdx = cvScoresDF.index.get_level_values('fold').max()
-        bestEstimator = cvScoresDF.loc[lastFoldIdx, 'estimator']
+        estimator = tdr.flatStandardScaler()
         lOfColumnTransformers.append((
             # transformer name
             trfName,
             # estimator
-            bestEstimator,
+            estimator,
             # columns
             dataGroup.columns.copy()
             ))
-        featureColumns = pd.DataFrame(
-            np.nan,
-            index=[idx],
-            columns=featureColumnFields)
-        for fcn in featureColumnFields:
-            if fcn == 'feature':
-                featureColumns.loc[idx, fcn] = trfName + '#0'
-            elif fcn == 'lag':
-                featureColumns.loc[idx, fcn] = 0
-            else:
-                featureColumns.loc[idx, fcn] = maskParams[fcn]
-        outputFeatureList.append(featureColumns)
-        featureNames = dataGroup.columns.get_level_values('feature')
-        for foldIdx, scoresRow in cvScoresDF.iterrows():
-            thisCovDF = pd.DataFrame(
-                scoresRow['estimator'].covariance_,
-                index=featureNames, columns=featureNames)
-            thisCovDF.columns.name = 'feature'
-            thisCovDF.index.name = 'feature'
-            cvCovMatDict[(maskParams['freqBandName'], foldIdx)] = thisCovDF
     #
     chosenEstimator = ColumnTransformer(lOfColumnTransformers)
-    chosenEstimator.fit(workingDataDF)
-    outputFeaturesIndex = pd.MultiIndex.from_frame(
-        pd.concat(outputFeatureList).reset_index(drop=True))
-    #
-    scoresDF = pd.concat(cvScoresDict, names=['freqBandName'])
-    scoresDF.dropna(axis='columns', inplace=True)
-    #
+    chosenEstimator.fit(dataDF)
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
-    # 
-    try:
-        scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
-        scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')
-    except Exception:
-        traceback.print_exc()
-    try:
-        scoresDF['estimator'].to_hdf(estimatorPath, 'cv_estimators')
-    except Exception:
-        traceback.print_exc()
-    jb.dump(chosenEstimator, estimatorPath.replace('.h5', '.joblib'))
-    covMatDF = pd.concat(cvCovMatDict, names=['freqBandName', 'fold'])
-    covMatDF.to_hdf(estimatorPath, 'cv_covariance_matrices')
+    #
+    jb.dump(chosenEstimator, estimatorPath)
+    #
+    outputFeatureNames = dataDF.columns.to_frame().reset_index(drop=True)
+    outputFeatureNames.loc[:, 'feature'] = outputFeatureNames['feature'].apply(lambda x: '{}#0'.format(x))
+    outputFeatureIndex = pd.MultiIndex.from_frame(outputFeatureNames)
+    # pdb.set_trace()
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
         'name': estimatorName,
         'datasetName': datasetName,
         'selectionName': selectionName,
-        'outputFeatures': outputFeaturesIndex
+        'outputFeatures': outputFeatureIndex
         }
-    with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
+    with open(estimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
         pickle.dump(estimatorMetadata, f)
     #
     features = chosenEstimator.transform(dataDF)
     #
-    # pdb.set_trace()
     featuresDF = pd.DataFrame(
         features,
-        index=dataDF.index, columns=outputFeaturesIndex)
+        index=dataDF.index, columns=outputFeatureIndex)
     outputSelectionName = '{}_{}'.format(
         selectionName, estimatorName)
     #
     maskList = []
     haveAllGroup = False
     allGroupIdx = pd.MultiIndex.from_tuples(
-        [tuple('all' for fgn in featureColumnFields)],
-        names=featureColumnFields)
+        [tuple('all' for fgn in dataDF.columns.names)],
+        names=dataDF.columns.names)
     allMask = pd.Series(True, index=featuresDF.columns).to_frame()
     allMask.columns = allGroupIdx
     maskList.append(allMask.T)
     if selectionName == 'lfp_CAR_spectral':
         # each freq band
         for name, group in featuresDF.groupby('freqBandName', axis='columns'):
-            attrValues = ['all' for fgn in featureColumnFields]
-            attrValues[featureColumnFields.index('freqBandName')] = name
+            attrValues = ['all' for fgn in dataDF.columns.names]
+            attrValues[dataDF.columns.names.index('freqBandName')] = name
             thisMask = pd.Series(
                 featuresDF.columns.isin(group.columns),
                 index=featuresDF.columns).to_frame()
@@ -299,19 +214,19 @@ if __name__ == '__main__':
                 thisMask.columns = allGroupIdx
             else:
                 thisMask.columns = pd.MultiIndex.from_tuples(
-                    (attrValues, ), names=featureColumnFields)
+                    (attrValues, ), names=dataDF.columns.names)
             maskList.append(thisMask.T)
     # each lag    
     for name, group in featuresDF.groupby('lag', axis='columns'):
-        attrValues = ['all' for fgn in featureColumnFields]
-        attrValues[featureColumnFields.index('lag')] = name
+        attrValues = ['all' for fgn in dataDF.columns.names]
+        attrValues[dataDF.columns.names.index('lag')] = name
         thisMask = pd.Series(
             featuresDF.columns.isin(group.columns),
             index=featuresDF.columns).to_frame()
         if not np.all(thisMask):
             # all group already covered
             thisMask.columns = pd.MultiIndex.from_tuples(
-                (attrValues, ), names=featureColumnFields)
+                (attrValues, ), names=dataDF.columns.names)
             maskList.append(thisMask.T)
     #
     maskDF = pd.concat(maskList)
@@ -330,7 +245,7 @@ if __name__ == '__main__':
         mode='a')
     #
     outputLoadingMeta = deepcopy(loadingMeta)
-    outputLoadingMeta['arguments']['unitQuery'] = 'mahal'
+    outputLoadingMeta['arguments']['unitQuery'] = 'lfp'
     outputLoadingMeta['arguments']['selectionName'] = outputSelectionName
     # these were already applied, no need to apply them again
     for k in ['decimate', 'procFun', 'addLags']:

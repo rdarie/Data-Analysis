@@ -30,12 +30,12 @@
 
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_exp_preamble.sh
-source ./shellScripts/run_plotter_aligned_motion_preamble.sh
+source shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 # PAGELIMITS="--limitPages=8"
-OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER} ${TIMEWINDOWOPTS} ${STATSOVERLAY} ${HUEOPTS} ${ROWOPTS} ${COLOPTS} ${STYLEOPTS} ${SIZEOPTS} ${PAGELIMITS} ${OTHERASIGOPTS}"
+OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER}"
 #
 # iterators=(ma)
 # targets=(lfp_CAR_mahal_ledoit lfp_CAR_spectral_mahal_ledoit)
@@ -46,12 +46,14 @@ OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW
 #     python -u './plotSignalDataFrame.py' --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET $OPTS --verbose=1
 #   done
 # done
-iterators=(rd)
-targets=(rig)
+iterators=(pa)
 for ITER in "${iterators[@]}"
 do
-  for TARGET in "${targets[@]}"
-  do
-    python -u './plotSignalDataFrame.py' --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET $OPTS --verbose=1
-  done
+  # python -u './plotMiscAdditionalFigures.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  # python -u './plotSignalDataFrame.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  # python -u './plotSignalDataFrame.py' --plotSuffix="lfp_illustration" --verbose=1 --selectionName=lfp_CAR $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  python -u './plotSignalDataFrameHistogram.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  # python -u './plotSignalDataFrame.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_mahal_ledoit $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
 done

@@ -176,6 +176,20 @@ def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
     hTDict['dt'] = binInterval
     return hTDict
+
+fullFormulaReadableLabels = {
+    '({v} + {a} + {r} - 1, **hto1) + rcb(ensemble, **hto1) + rcb(self, **hto1)': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v + a + r)$',
+    }
+modelsTestReadable = {
+    'ensemble_history': r'$\dot{x} = \mathbf{A}x$',
+    '(v + a + r +) ensemble_history': '$\dot{x} = \mathbf{A}x + \mathbf{B}(\mathbf{v + a + r})$',
+    '(v +) a + r': '$\dot{x} = \mathbf{A}x + \mathbf{B}(\mathbf{v} + a + r)$',
+    'a + r': '$\dot{x} = \mathbf{A}x + \mathbf{B}(a + r)$',
+    'v + (a + r)': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v \mathbf{+ a + r})$',
+    'v': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v)$',
+    'v + a + r (+ va + vr) + ar': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v + a + r \mathbf{+ v\dot a + v\dot r }+ a\dot r)$',
+    'v + a + r + ar': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v + a + r + a\dot r)$',
+    }
 # test should be the "bigger" model (we are adding coefficients and asking whether they improved performance
 '''
 modelsToTest = [

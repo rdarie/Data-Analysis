@@ -29,6 +29,7 @@ Options:
     --groupPagesBy=groupPagesBy                          break down each page
     --winStart=winStart                                  start of window [default: 200]
     --winStop=winStop                                    end of window [default: 400]
+    --limitPages=limitPages                              limit page count
     --noStim                                             process entire experimental day? [default: False]
 """
 
@@ -39,7 +40,13 @@ if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
-
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 #
@@ -69,10 +76,55 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import seaborn as sns
 #
+useDPI = 200
+dpiFactor = 72 / useDPI
+snsRCParams = {
+        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+        'lines.linewidth': .5,
+        'lines.markersize': 2.5,
+        'patch.linewidth': .5,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.spines.right": True,
+        "axes.spines.top": True,
+        "axes.linewidth": .125,
+        "grid.linewidth": .2,
+        "font.size": 7,
+        "axes.labelsize": 8,
+        "axes.titlesize": 9,
+        "xtick.labelsize": 5,
+        "ytick.labelsize": 5,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": False,
+        "ytick.left": True,
+        "ytick.right": False,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
+    }
+mplRCParams = {
+    'figure.titlesize': 7,
+    'font.family': "Nimbus Sans",
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
+    }
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='whitegrid',
     palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+    font_scale=2, color_codes=True, rc=snsRCParams)
+for rcK, rcV in mplRCParams.items():
+    matplotlib.rcParams[rcK] = rcV
+
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -193,11 +245,10 @@ mapSpecificRelplotKWArgs = {
     }
 
 relplotKWArgs.update({
-    'rasterized': True,
     'legend': 'brief',
     # 'legend': False,
-    'height': 6,
-    'aspect': 2,
+    'height': 1,
+    'aspect': 1,
     'facet_kws': {
         'sharey': False,
         'legend_out': False,
@@ -221,29 +272,29 @@ plotProcFuns = [
         top=True, right=True,
         left=True, bottom=True,
         offset=None, trim=False),
-    asp.genGridAnnotator(
-        xpos=1, ypos=1, template='{}',
-        colNames=['feature'],
-        textOpts={
-            'verticalalignment': 'top',
-            'horizontalalignment': 'right'
-        }, shared=False),
+    # asp.genGridAnnotator(
+    #     xpos=1, ypos=1, template='{}',
+    #     colNames=['feature'],
+    #     textOpts={
+    #         'verticalalignment': 'top',
+    #         'horizontalalignment': 'right'
+    #     }, shared=False),
     # for evoked lfp report, add stim times
     asp.genBlockVertShader([
             max(0e-3, alignedAsigsKWargs['windowSize'][0]),
             min(1000e-3, alignedAsigsKWargs['windowSize'][1])],
         asigPlotShadingOpts),
+    # asp.genTicksToScale(
+    #     lineOpts={'lw': 1}, shared=sharedYAxes,
+    #     xUnitFactor=1e3, xUnits='msec',
+    #     yUnitFactor=1e3, yUnits='uA/mm^3',
+    #     # yUnitFactor=1, yUnits='uV',
+    #     )
     # asp.genStimVLineAdder(
     #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False)
         ]
 mapSpecificPlotProcFuns = {
     'utah': [
-        asp.genTicksToScale(
-            lineOpts={'lw': 1}, shared=sharedYAxes,
-            xUnitFactor=1e3, xUnits='msec',
-            yUnitFactor=1e3, yUnits='uA/mm^3',
-            # yUnitFactor=1, yUnits='uV',
-            )
         ]}
 addSpacesFromMap = True
 extraSpaces = {
@@ -254,7 +305,7 @@ extraSpaces = {
         (34, 364), (34, 852),
         (85, 1060)]}
 #
-limitPages = None
+limitPages = int(arguments['limitPages']) if arguments['limitPages'] is not None else None
 minNObservations = None
 #
 if arguments['individualTraces']:
@@ -452,6 +503,7 @@ with PdfPages(pdfName) as pdf:
                             relplotKWArgs['height'] * 0.1 / np.mean(absHeights))
                     else:
                         updateFigSize = None
+            relplotKWArgs['rasterized'] = False
             g = sns.relplot(
                 data=thisAsigStack,
                 x='bin', y='signal', hue=arguments['hueName'],
@@ -494,6 +546,9 @@ with PdfPages(pdfName) as pdf:
                         facetMetaList.append(pd.Series(facetMeta))
             g.set_titles("")
             g.set_axis_labels("", "")
+            for ax in g.axes.flat:
+                ax.set_xticks([])
+                ax.set_yticks([])
             if updateFigSize is not None:
                 g.fig.set_size_inches(updateFigSize['width'], updateFigSize['height'])
             pageTitle = g.fig.suptitle(pageName)

@@ -21,7 +21,7 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-#    SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 # ANALYSISFOLDER="--analysisName=default"
@@ -31,7 +31,12 @@ ANALYSISFOLDER="--analysisName=hiRes"
 UNITQUERY="--unitQuery=lfp"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp"
 # python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
-python -u ./calcTrialOutliersV2.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
+# python -u ./calcTrialOutliersV2.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
+
+# sanity check signal distribution
+UNITQUERY="--unitQuery=lfp"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR_spectral"
+python -u ./calcTrialOutliersV2.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude"
 
 # calculate spike stats, once outliers do not affect the calculation
 # python -u ./calcUnitMeanFR.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --maskOutlierBlocks

@@ -19,12 +19,17 @@ Options:
 import logging
 logging.captureWarnings(True)
 import matplotlib, os
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
 if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.backends.backend_pdf import PdfPages
@@ -32,6 +37,7 @@ import seaborn as sns
 import os
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.custom_transformers.tdr import getR2, partialR2
@@ -62,7 +68,9 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': 1,
+        'lines.linewidth': .5,
+        'lines.markersize': 2.5,
+        'patch.linewidth': .5,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -77,9 +85,9 @@ snsRCParams = {
         "legend.fontsize": 5,
         "legend.title_fontsize": 7,
         "xtick.bottom": True,
-        "xtick.top": True,
+        "xtick.top": False,
         "ytick.left": True,
-        "ytick.right": True,
+        "ytick.right": False,
         "xtick.major.width": .125,
         "ytick.major.width": .125,
         "xtick.minor.width": .125,
@@ -92,7 +100,10 @@ snsRCParams = {
         "ytick.direction": 'in',
     }
 mplRCParams = {
-    'figure.titlesize': 7
+    'figure.titlesize': 7,
+    'font.family': "Nimbus Sans",
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
     }
 styleOpts = {
     'legend.lw': 2,
@@ -200,36 +211,39 @@ eigDF.loc[:, 'fullFormula'] = eigDF.reset_index()['lhsMaskIdx'].map(lhsMasksInfo
 eigDF.loc[:, 'fullFormulaLabel'] = eigDF.reset_index()['fullFormula'].apply(lambda x: x.replace(' + ', ' +\n')).to_numpy()
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalue_reduction'))
-with PdfPages(pdfPath) as pdf:
-    for name, thisPlotEig in eigDF.groupby(['fullFormula', 'freqBandName']):
-        height, width = 3, 3
-        aspect = width / height
-        g = sns.relplot(
-            col='stateNDim', col_wrap=3,
-            x='real', y='imag', hue='eigValType',
-            height=height, aspect=aspect,
-            facet_kws={'margin_titles': True},
-            palette=eigValPalette.to_dict(),
-            kind='scatter', data=thisPlotEig.reset_index(), rasterized=True, edgecolor=None)
-        g.suptitle('design: {} freqBand: {}'.format(*name))
-        for ax in g.axes.flatten():
-            c = Circle((0, 0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
-            ax.add_artist(c)
-        g.tight_layout(pad=styleOpts['tight_layout.pad'])
-        pdf.savefig(bbox_inches='tight', pad_inches=0)
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
+if False:
+    with PdfPages(pdfPath) as pdf:
+        for name, thisPlotEig in eigDF.groupby(['fullFormula', 'freqBandName']):
+            height, width = 3, 3
+            aspect = width / height
+            g = sns.relplot(
+                col='stateNDim', col_wrap=3,
+                x='real', y='imag', hue='eigValType',
+                height=height, aspect=aspect,
+                facet_kws={'margin_titles': True},
+                palette=eigValPalette.to_dict(),
+                kind='scatter', data=thisPlotEig.reset_index(), rasterized=True, edgecolor=None)
+            g.suptitle('design: {} freqBand: {}'.format(*name))
+            for ax in g.axes.flatten():
+                c = Circle((0, 0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
+                ax.add_artist(c)
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
 #
 plotEig = eigDF.loc[eigDF['nDimIsMax'], :]
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues'))
 with PdfPages(pdfPath) as pdf:
-    height, width = 3, 3
+    height, width = 2, 2
     aspect = width / height
-    for name, eigGroup in plotEig.groupby(['lhsMaskIdx', 'fullFormulaLabel']):
-        lhsMaskIdx, fullFormulaLabel = name
+    for name, eigGroup in plotEig.groupby(['lhsMaskIdx', 'fullFormula']):
+        lhsMaskIdx, fullFormula = name
+        if lhsMaskIdx not in [29]:
+            continue
         g = sns.relplot(
             col='freqBandName',
             x='real', y='imag', hue='eigValType',
@@ -239,11 +253,22 @@ with PdfPages(pdfPath) as pdf:
             rasterized=True, edgecolor=None,
             kind='scatter', data=eigGroup)
         for ax in g.axes.flatten():
-            c = Circle((0, 0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
+            c = Circle(
+                (0, 0), 1,
+                ec=(0, 0, 0, 0.25),
+                fc=(0, 0, 0, 0))
             ax.add_artist(c)
-            ax.set_ylim(-1, 1)
-            ax.set_xlim(-1, 1)
-        g.suptitle(fullFormulaLabel)
+            ax.set_ylim(-1.05, 1.05)
+            ax.set_yticks([-1, 0, 1])
+            ax.set_xlim(-1.05, 1.05)
+            ax.set_xticks([-1, 0, 1])
+        asp.reformatFacetGridLegend(
+            g, titleOverrides={
+                'eigValType': 'Eigenvalue type'},
+            contentOverrides={},
+            styleOpts=styleOpts)
+        g.set_axis_labels('Real', 'Imaginary')
+        g.resize_legend(adjust_subtitles=True)
         g.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
@@ -251,13 +276,18 @@ with PdfPages(pdfPath) as pdf:
         else:
             plt.close()
         #
-        fig, ax = plt.subplots(1, 2, figsize=(6, 3))
+        fig, ax = plt.subplots(2, 1, figsize=(2, 1.5))
         commonOpts = dict(element='step', stat="probability")
-        sns.histplot(x='tau', data=eigGroup.query('tau > 0'), ax=ax[0], color=eigValPalette['oscillatory decay'], **commonOpts)
-        ax[0].set_xlabel('Oscillatory mode period (sec)')
-        sns.histplot(x='chi', data=eigGroup, ax=ax[1], color=eigValPalette['pure decay'], **commonOpts)
-        ax[1].set_xlabel('Decay mode time constant (sec)')
-        ax[1].set_ylabel('')
+        sns.histplot(
+            x='tau', data=eigGroup.query('tau > 0'),
+            ax=ax[0], color=eigValPalette['oscillatory decay'], **commonOpts)
+        sns.histplot(
+            x='chi', data=eigGroup, ax=ax[1],
+            color=eigValPalette['pure decay'], **commonOpts)
+        ax[0].set_xlabel('Oscillation period (sec)')
+        ax[1].set_xlabel('Decay time constant (sec)')
+        sns.despine(fig)
+        fig.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
             plt.show()
@@ -265,7 +295,7 @@ with PdfPages(pdfPath) as pdf:
             plt.close()
         thisB = BDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
         if not thisB.empty:
-            fig, ax = plt.subplots(figsize=(3, 3))
+            fig, ax = plt.subplots(figsize=(2, 2))
             colsToEval = [cN for cN in thisB.columns if '[NA]' not in cN]
             BCosineSim = pd.DataFrame(np.nan, index=colsToEval, columns=colsToEval)
             mask = np.zeros_like(BCosineSim)
@@ -275,7 +305,7 @@ with PdfPages(pdfPath) as pdf:
                     BCosineSim.loc[cNr, cNc] = distance.cosine(thisB[cNr], thisB[cNc])
             sns.heatmap(BCosineSim, mask=mask, vmin=0, vmax=1, square=True, ax=ax)
             ax.set_title('Cosine distance between input directions')
-            fig.tight_layout()
+            fig.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:
                 plt.show()

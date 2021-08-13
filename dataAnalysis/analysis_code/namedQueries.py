@@ -59,6 +59,7 @@ namedQueries = {
         'pedalPositionXY': "chanName.isin(['position_x#0', 'position_y#0'])",
         'pedalVelocity': "chanName.isin(['velocity#0', 'velocity_abs#0'])",
         'pedalVelocityXY': "chanName.isin(['velocity_x#0', 'velocity_y#0'])",
+        'rigIllustration': "chanName.isin(['position#0', 'amplitude#0'])",
     },
     'chan': {
         'all': "(chanName.notna())",
@@ -137,6 +138,24 @@ namedQueries['align'].update({
         namedQueries['align']['starting'],
         namedQueries['align']['noStim'],
         ]) + ')'
+    })
+namedQueries['align'].update({
+    'startingSizeS': '(' + '&'.join([
+        namedQueries['align']['starting'],
+        '(pedalSizeCat == \'S\')'
+        ]) + ')'
+    })
+namedQueries['align'].update({
+    'startingOnHighOrNone': '&'.join([
+        namedQueries['align']['starting'],
+        namedQueries['align']['trialRateInHz==100or0']
+        ])
+    })
+namedQueries['align'].update({
+    'startingOnHighOrNoneSizeS': '&'.join([
+        namedQueries['align']['startingSizeS'],
+        namedQueries['align']['trialRateInHz==100or0']
+        ])
     })
 for eName in ['E2', 'E5', 'E9']:
     namedQueries['align'].update({
@@ -390,6 +409,12 @@ namedQueries['align'].update({
     'stimOnLessThan11Hz': '&'.join([
         namedQueries['align']['stimOn'],
         "(trialRateInHz < 11) & (trialRateInHz > 5)"
+        ])
+    })
+namedQueries['align'].update({
+    'stimOnHighOrNone': '&'.join([
+        namedQueries['align']['stimOn'],
+        namedQueries['align']['trialRateInHz==100or0']
         ])
     })
 namedQueries['align'].update({

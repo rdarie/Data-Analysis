@@ -96,12 +96,12 @@ snsRCParams = {
         "axes.linewidth": .125,
         "grid.linewidth": .2,
         "font.size": 7,
-        "axes.labelsize": 7,
+        "axes.labelsize": 8,
         "axes.titlesize": 9,
         "xtick.labelsize": 5,
         "ytick.labelsize": 5,
-        "legend.fontsize": 7,
-        "legend.title_fontsize": 9,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
         "xtick.bottom": True,
         "xtick.top": False,
         "ytick.left": True,
@@ -184,7 +184,7 @@ if __name__ == '__main__':
         plotSuffix = '_{}'.format(arguments['plotSuffix'])
     else:
         plotSuffix = ''
-    pdfPath = os.path.join(figureOutputFolder, '{}{}.pdf'.format(pdfName, plotSuffix))
+    pdfPath = os.path.join(figureOutputFolder, '{}{}_histogram.pdf'.format(pdfName, plotSuffix))
     #
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(
@@ -253,7 +253,11 @@ if __name__ == '__main__':
         del tMask
     #
     tBins = trialInfo['bin'].unique()
-    targetFrameLen = 2 * useDPI * relplotKWArgs['height'] * relplotKWArgs['aspect'] # nominal num. points per facet
+    catPlotKWArgs = dict(
+        palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
+        height=3, aspect=2, kind='violin', cut=0,
+        facet_kws=dict(margin_titles=True))
+    targetFrameLen = 2 * useDPI * catPlotKWArgs['height'] * catPlotKWArgs['aspect'] # nominal num. points per facet
     if tBins.shape[0] > targetFrameLen:
         skipFactor = tBins.shape[0] // targetFrameLen
         tMask2 = trialInfo['bin'].isin(tBins[::skipFactor])
@@ -282,47 +286,35 @@ if __name__ == '__main__':
         limitPages = int(arguments['limitPages'])
     else:
         limitPages = None
-    if arguments['individualTraces']:
-        pdfName += '_traces'
-        relplotKWArgs.update(dict(
-            estimator=None, units='trialUID', alpha=0.7))
-        plotProcFuns.append(
-            asp.genTraceAnnotator(
-                unit_var='trialUID', labelsList=['segment', 't'],
-                textOpts=dict(
-                    ha='center', va='top', fontsize=5,
-                    c=(0., 0., 0., 0.7),
-                    bbox=dict(
-                        boxstyle="square",
-                        ec=(0., 0., 0., 0.), fc=(1., 1., 1., 0.2))
-                )))
     #  Get stats results?
+    # figureStatsFolder = os.path.join(
+    #     alignSubFolder, 'figureStats'
+    #     )
+    # if not os.path.exists(figureStatsFolder):
+    #     os.makedirs(figureStatsFolder, exist_ok=True)
+    # statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
+    # if os.path.exists(statsTestPath) and not arguments['recalcStats']:
+    #     sigTestResults = pd.read_hdf(statsTestPath, 'sig')
+    #     sigTestResults.columns.name = 'bin'
+    # else:
+    #     (
+    #         pValsWide, statValsWide,
+    #         sigTestResults) = ash.facetGridCompareMeansDataFrame(
+    #             dataDF, statsTestPath,
+    #             rowColOpts=rowColOpts,
+    #             limitPages=limitPages,
+    #             statsTestOpts=statsTestOpts, verbose=arguments['verbose'])
     if arguments['overlayStats']:
-        figureStatsFolder = os.path.join(
-            alignSubFolder, 'figureStats'
-            )
-        if not os.path.exists(figureStatsFolder):
-            os.makedirs(figureStatsFolder, exist_ok=True)
-        statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
-        if os.path.exists(statsTestPath) and not arguments['recalcStats']:
-            sigTestResults = pd.read_hdf(statsTestPath, 'sig')
-            sigTestResults.columns.name = 'bin'
-        else:
-            (
-                pValsWide, statValsWide,
-                sigTestResults) = ash.facetGridCompareMeansDataFrame(
-                    dataDF, statsTestPath,
-                    rowColOpts=rowColOpts,
-                    limitPages=limitPages,
-                    statsTestOpts=statsTestOpts, verbose=arguments['verbose'])
+        sigTestResults = None
     else:
         sigTestResults = None
-    if arguments['plotSuffix'] in relPlotKWArgsLookup:
-        relplotKWArgs.update(relPlotKWArgsLookup[arguments['plotSuffix']])
+    if arguments['plotSuffix'] in catPlotKWArgsLookup:
+        catPlotKWArgs.update(catPlotKWArgsLookup[arguments['plotSuffix']])
     with PdfPages(pdfPath) as pdf:
         pageCount = 0
         for uIdx, unitName in enumerate(tqdm(dataDF.columns)):
             plotDF = dataDF.loc[:, unitName].reset_index(name='signal')
+            plotDF.loc[:, 'xDummy'] = 0
             rowColArgs = {}
             for axn in ['row', 'col', 'hue']:
                 if rowColOpts['{}Name'.format(axn)] is not None:
@@ -331,10 +323,9 @@ if __name__ == '__main__':
                         rowColArgs['{}_order'.format(axn)] = rowColOpts['{}Order'.format(axn)]
                     else:
                         rowColArgs['{}_order'.format(axn)] = np.unique(plotDF[rowColArgs[axn]])
-            g = sns.relplot(
-                x='bin', y='signal',
-                **rowColArgs, **relplotKWArgs, data=plotDF,
-                facet_kws=dict(margin_titles=True))
+            g = sns.catplot(
+                y='signal', x='xDummy',
+                **rowColArgs, **catPlotKWArgs, data=plotDF)
             #  iterate through plot and add significance stars
             for (ro, co, hu), dataSubset in g.facet_data():
                 #  print('(ro, co, hu) = {}'.format((ro, co, hu)))

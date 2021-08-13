@@ -25,6 +25,7 @@ Options:
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --iteratorSuffix=iteratorSuffix        filename for resulting estimator (cross-validated n_comps)
 """
+
 import logging
 logging.captureWarnings(True)
 import matplotlib, os
@@ -91,6 +92,7 @@ def calcRauc(
         maskBaseline=False,
         baselineTStart=None, baselineTStop=None,
         dataColNames=None):
+    #
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
     partitionMeta = partition.loc[:, ~dataColMask]
@@ -102,6 +104,8 @@ def calcRauc(
         tMask = tMask & (partition['bin'] < tStop)
     if not tMask.any():
         tMask = pd.Series(True, index=partition.index)
+    else:
+        print('calcRauc; tMask.sum() = {}'.format(tMask.sum()))
     if maskBaseline:
         baselineTMask = pd.Series(True, index=partition.index)
         if baselineTStart is not None:
@@ -112,7 +116,7 @@ def calcRauc(
             baselineTMask = pd.Series(True, index=partition.index)
         if 'foo' in partition.iloc[0, :].to_numpy():
             baselineTMask.loc[:] = True
-        baseline = partitionData.loc[baselineTMask, :].mean()
+        baseline = partitionData.loc[baselineTMask, :].median()
     else:
         baseline = 0
     if 'foo' in partition.iloc[0, :].to_numpy():
@@ -143,9 +147,9 @@ if __name__ == "__main__":
     #  Overrides
     limitPages = None
     funKWArgs = dict(
-        tStart=-100e-3, tStop=200e-3,
+        tStart=-100e-3, tStop=100e-3,
         maskBaseline=True,
-        baselineTStart=-200e-3, baselineTStop=-100e-3)
+        baselineTStart=-300e-3, baselineTStop=-150e-3)
     #  End Overrides
     if not arguments['loadFromFrames']:
         resultPath = os.path.join(
@@ -223,6 +227,11 @@ if __name__ == "__main__":
         deltaB = trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'].min() - trialInfo.loc[trialInfo['controlFlag'] == 'main', 'bin'].min()
         trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'] -= deltaB
         dataDF.index = pd.MultiIndex.from_frame(trialInfo)
+        # detrend as a group
+        tMask = ((trialInfo['bin'] >= funKWArgs['baselineTStart']) & (trialInfo['bin'] < funKWArgs['baselineTStop']))
+        baseline = dataDF.loc[tMask.to_numpy(), :].median()
+        dataDF = dataDF.subtract(baseline, axis='columns')
+
     groupNames = ['originalIndex', 'segment', 't']
     daskComputeOpts = dict(
         # scheduler='processes'
@@ -258,7 +267,7 @@ if __name__ == "__main__":
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
     ##
-    sdThresh = 2.
+    sdThresh = 3.
     clippedScaledRaucDF = scaledRaucDF.clip(upper=sdThresh, lower=-sdThresh)
     clippedRaucDF = pd.DataFrame(
         qScaler.inverse_transform(clippedScaledRaucDF),

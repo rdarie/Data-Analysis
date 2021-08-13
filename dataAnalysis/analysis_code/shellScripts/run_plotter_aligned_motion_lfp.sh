@@ -23,17 +23,18 @@
 # Request custom resources
 #SBATCH --array=2
 
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=2
+source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh
 
 # PAGELIMITS="--limitPages=8"
 OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNQUERY} ${ALIGNFOLDER} ${TIMEWINDOWOPTS} ${STATSOVERLAY} ${OUTLIERMASK} ${HUEOPTS} ${ROWOPTS} ${COLOPTS} ${STYLEOPTS} ${SIZEOPTS} ${PAGELIMITS} ${OTHERASIGOPTS}"
 echo $OPTS
-python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_mahal" --unitQuery="mahal" $OPTS
-python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" $OPTS
+# python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_mahal" --unitQuery="mahal" $OPTS
+# python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" $OPTS
 # python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" $OPTS
 #
-python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR --groupPagesBy="electrode, pedalMovementCat, pedalDirection, pedalSizeCat" $HUEOPTS $OUTLIERMASK
+python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR $PAGELIMITS --groupPagesBy="electrode, pedalMovementCat, pedalDirection, pedalSizeCat" $HUEOPTS $OUTLIERMASK
 # python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_spectral" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR --groupPagesBy="electrode, pedalMovementCat, pedalDirection, pedalSizeCat, freqBandName" $HUEOPTS $OUTLIERMASK
 #
 # python3 -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" $OPTS

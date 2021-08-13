@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J nix_assembly_28
+#SBATCH -J nix_assembly_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-nix_assembly_28.out
-#SBATCH -e ../../batch_logs/%j-%a-nix_assembly_28.out
+#SBATCH -o ../../batch_logs/%j-%a-nix_assembly_27.out
+#SBATCH -e ../../batch_logs/%j-%a-nix_assembly_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -30,7 +30,7 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 # primary data
-blocks=(lfp_CAR lfp_CAR_spectral rig)
+blocks=(lfp lfp_CAR rig)
 #
 # alignfolders=(stim motion)
 alignfolders=(motion)
@@ -43,7 +43,7 @@ do
       echo "concatenating $B blocks"
       python -u ./assembleExperimentAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix=$B $WINDOW $ANALYSISFOLDER --alignFolderName=$A $LAZINESS
     done
-    INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
+    INPUTBLOCKNAME="--inputBlockSuffix=lfp"
     UNITQUERY="--unitQuery=lfp"
-    python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW --alignFolderName=$A $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --saveResults
+    python -u ./calcTrialOutliersV2.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW --alignFolderName=$A $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --saveResults
 done

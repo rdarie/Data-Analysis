@@ -444,11 +444,9 @@ def parseAnalysisOptions(
         )
     relplotKWArgs = dict(
         errorbar='se',
-        # ci=95, n_boot=1000,
         estimator='mean',
         # estimator=None, units='t',
-        palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
-        # facet_kws={'sharey': True},
+        palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1", err_kws=dict(alpha=0.2, edgecolor=None),
         height=3, aspect=2, kind='line', rasterized=True)
     vLineOpts = {'color': 'm', 'alpha': 0.5}
     asigPlotShadingOpts = {
@@ -699,6 +697,33 @@ def parseAnalysisOptions(
                 'alignQuery': 'startingOrStimOn',
                 'winStart': -0.7,  # start 0.6 before whatever the query was
                 'winStop': .6  # stop .6 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
+        # perimovement, any stim, for plotting
+        'pa': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 5e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=10,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.7,  # start 0.6 before whatever the query was
+                'winStop': 1.  # stop .6 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
                 'alignQuery': None,

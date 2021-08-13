@@ -337,6 +337,7 @@ if __name__ == '__main__':
             'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
             })
     modelsToTestDF = pd.DataFrame(modelsToTest)
+    modelsToTestDF.to_hdf(estimatorPath, 'modelsToTest')
     rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
     #
     estimatorsDict = {}
