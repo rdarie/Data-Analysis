@@ -1655,10 +1655,10 @@ def alignedAsigDFtoSpikeTrain(
             sampling_rate = spikeTrainMeta['sampling_rate']
         if isinstance(group.columns, pd.MultiIndex):
             if 'feature' in group.columns.names:
-                grouper = group.groupby(['feature', 'lag'])
+                grouper = group.groupby(['feature', 'lag'], sort=False)
         elif isinstance(group.columns, pd.Index):
             if group.columns.name == 'bin':
-                grouper = group.groupby('feature')
+                grouper = group.groupby('feature', sort=False)
                 colsAre = 'bin'
             elif group.columns.name == 'feature':
                 grouper = group.iteritems()
@@ -1686,6 +1686,7 @@ def alignedAsigDFtoSpikeTrain(
             else:
                 thisUnit = masterBlock.filter(
                     objects=Unit, name=cleanFeatName)[0]
+            # pdb.set_trace()
             if colsAre == 'bin':
                 spikeWaveformsDF = featGroup
             elif colsAre == 'feature':
@@ -1718,7 +1719,7 @@ def alignedAsigDFtoSpikeTrain(
             for cName in colsToKeep:
                 values = arrAnnDF[cName].to_numpy()
                 if isinstance(values[0], str):
-                    print('Converting {} to unicode'.format(cName))
+                    # print('Converting {} to unicode'.format(cName))
                     values = values.astype('U')
                 arrAnn.update({str(cName): values.flatten()})
             arrayAnnNames = {

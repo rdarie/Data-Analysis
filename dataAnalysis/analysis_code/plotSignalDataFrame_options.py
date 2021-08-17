@@ -113,7 +113,7 @@ argumentsLookup = {
     'mahal_illustration': {
         'recalcStats': True,
         'winStop': '700', 'winStart': '-700', 'limitPages': None,
-        'unitQuery': "chanName.isin(['mahal_ledoit_all#0'])", 'alignQuery': None,
+        'unitQuery': None, 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':

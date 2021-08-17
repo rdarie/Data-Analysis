@@ -982,7 +982,16 @@ class flatStandardScaler(StandardScaler):
             res = super().transform(X.to_numpy().reshape(-1, 1))
         else:
             res = super().transform(X.reshape(-1, 1))
-        return np.reshape(res, originalShape)
+        if isinstance(X, pd.DataFrame):
+            output = pd.DataFrame(np.reshape(res, originalShape), index=X.index, columns=X.columns)
+        else:
+            output = np.reshape(res, originalShape)
+        '''if False:
+            fig, ax = plt.subplots(2, 1)
+            ax[0].plot(X.xs(1, level='conditionUID').iloc[:, 0].to_numpy())
+            ax[1].plot(output.xs(1, level='conditionUID').iloc[:, 0].to_numpy())
+            plt.show()'''
+        return output
 
 
 def applyScalersGrouped(DF, listOfScalers):

@@ -34,7 +34,7 @@ ITERATOR="ca"
 ALIGNQUERYTERM="stimOn"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 #
-targets=(lfp_CAR lfp_CAR_spectral)
+targets=(lfp_CAR lfp_CAR_spectral_scaled)
 estimators=(mahal_ledoit)
 #
 for TARGET in "${targets[@]}"

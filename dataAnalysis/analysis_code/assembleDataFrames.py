@@ -198,9 +198,23 @@ if __name__ == '__main__':
                         thisBlockBaseName,
                         theseArgs['window'],
                         iteratorSuffix, arguments['selectionName']))
+                featureLoadingMetaCtrlPath = os.path.join(
+                    thisDFFolder,
+                    '{}_{}_df{}_ctrl_{}_meta.pickle'.format(
+                        thisBlockBaseName,
+                        theseArgs['window'],
+                        iteratorSuffix, arguments['selectionName']))
                 try:
-                    with open(featureLoadingMetaPath, 'rb') as _flf:
-                        featureLoadingMeta = pickle.load(_flf)
+                    print('Looking for meta in {}'.format(featureLoadingMetaPath))
+                    print('Looking for meta in {}'.format(featureLoadingMetaCtrlPath))
+                    if os.path.exists(featureLoadingMetaPath):
+                        with open(featureLoadingMetaPath, 'rb') as _flf:
+                            featureLoadingMeta = pickle.load(_flf)
+                            print('Loaded meta from {}'.format(featureLoadingMetaPath))
+                    elif os.path.exists(featureLoadingMetaCtrlPath):
+                        with open(featureLoadingMetaCtrlPath, 'rb') as _flf:
+                            featureLoadingMeta = pickle.load(_flf)
+                            print('Loaded meta from {}'.format(featureLoadingMetaCtrlPath))
                     for kN in ['outlierTrials']:
                         featureLoadingMeta['alignedAsigsKWargs'].pop(kN)
                     for kN in ['unitQuery', 'selectionName']:

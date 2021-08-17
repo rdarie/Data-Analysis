@@ -32,22 +32,18 @@ source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-#
-# ITERATOR=ca
-# TARGET=lfp_CAR_spectral
-# python -u './calcSignalNormalization.py' --estimatorName="scaled" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
 
 iterators=(ca cb ccs ccm)
-estimators=(mahal_emp mahal_ledoit)
+estimators=(mahal_ledoit mahal_emp)
 
-# TARGET="lfp_CAR"
-# for ITER in "${iterators[@]}"
-# do
-#   for EST in "${estimators[@]}"
-#   do
-#     python -u './calcSignalCovarianceMatrix.py' --estimatorName="${EST}" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
-#   done
-# done
+TARGET="lfp_CAR"
+for ITER in "${iterators[@]}"
+do
+  for EST in "${estimators[@]}"
+  do
+    python -u './calcSignalCovarianceMatrix.py' --estimatorName="${EST}" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+  done
+done
 
 TARGET="lfp_CAR_spectral_scaled"
 for ITER in "${iterators[@]}"
@@ -59,11 +55,11 @@ do
 done
 #
 
-#  TARGET="lfp_CAR"
-#  for EST in "${estimators[@]}"
-#  do
-#    python -u './compareSignalCovarianceMatrices.py' --estimatorName="${EST}" --iteratorSuffixList="ca, cb, ccs, ccm" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-#  done
+TARGET="lfp_CAR"
+for EST in "${estimators[@]}"
+do
+  python -u './compareSignalCovarianceMatrices.py' --estimatorName="${EST}" --iteratorSuffixList="ca, cb, ccs, ccm" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+done
 #
 TARGET="lfp_CAR_spectral_scaled"
 for EST in "${estimators[@]}"

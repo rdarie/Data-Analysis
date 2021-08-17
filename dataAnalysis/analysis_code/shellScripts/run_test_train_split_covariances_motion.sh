@@ -23,7 +23,7 @@
 #SBATCH --array=2,3
 #SBATCH --export=CCV_HEADLESS=1
 
-#    SLURM_ARRAY_TASK_ID=3
+#  SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 

@@ -215,7 +215,9 @@ allGroupIdx = pd.MultiIndex.from_tuples(
 allMask = pd.Series(True, index=exportDF.columns).to_frame()
 allMask.columns = allGroupIdx
 maskList.append(allMask.T)
-if arguments['selectionName'] == 'lfp_CAR_spectral':
+nFreqBands = exportDF.columns.get_level_values('freqBandName').unique().size
+# if 'lfp_CAR_spectral' in arguments['selectionName']:
+if nFreqBands > 1:
     # each freq band
     for name, group in exportDF.groupby('freqBandName', axis='columns'):
         attrValues = ['all' for fgn in featureGroupNames]

@@ -147,6 +147,7 @@ if __name__ == '__main__':
         featureMasks = featureMasks.loc[freqBandMask, :]
     #
     lOfColumnTransformers = []
+    outputFeatureNameList = []
     # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
@@ -162,6 +163,7 @@ if __name__ == '__main__':
             # columns
             dataGroup.columns.copy()
             ))
+        outputFeatureNameList.append(dataGroup.columns.to_frame().reset_index(drop=True))
     #
     chosenEstimator = ColumnTransformer(lOfColumnTransformers)
     chosenEstimator.fit(dataDF)
@@ -171,41 +173,43 @@ if __name__ == '__main__':
     #
     jb.dump(chosenEstimator, estimatorPath)
     #
-    outputFeatureNames = dataDF.columns.to_frame().reset_index(drop=True)
+    outputFeatureNames = pd.concat(outputFeatureNameList)
     outputFeatureNames.loc[:, 'feature'] = outputFeatureNames['feature'].apply(lambda x: '{}#0'.format(x))
     outputFeatureIndex = pd.MultiIndex.from_frame(outputFeatureNames)
-    # pdb.set_trace()
+    features = chosenEstimator.transform(dataDF)
+    featuresDF = pd.DataFrame(
+        features,
+        index=dataDF.index, columns=outputFeatureIndex)
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
         'name': estimatorName,
         'datasetName': datasetName,
         'selectionName': selectionName,
-        'outputFeatures': outputFeatureIndex
+        'outputFeatures': featuresDF.columns
         }
     with open(estimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
         pickle.dump(estimatorMetadata, f)
-    #
-    features = chosenEstimator.transform(dataDF)
-    #
-    featuresDF = pd.DataFrame(
-        features,
-        index=dataDF.index, columns=outputFeatureIndex)
     outputSelectionName = '{}_{}'.format(
         selectionName, estimatorName)
-    #
+    # pdb.set_trace()
+    featuresDF.sort_index(
+        axis='columns', inplace=True,
+        level=['feature', 'lag'],
+        kind='mergesort', sort_remaining=False)
+    ##
     maskList = []
     haveAllGroup = False
     allGroupIdx = pd.MultiIndex.from_tuples(
-        [tuple('all' for fgn in dataDF.columns.names)],
-        names=dataDF.columns.names)
+        [tuple('all' for fgn in featuresDF.columns.names)],
+        names=featuresDF.columns.names)
     allMask = pd.Series(True, index=featuresDF.columns).to_frame()
     allMask.columns = allGroupIdx
     maskList.append(allMask.T)
-    if selectionName == 'lfp_CAR_spectral':
+    if 'lfp_CAR_spectral' in selectionName:
         # each freq band
         for name, group in featuresDF.groupby('freqBandName', axis='columns'):
-            attrValues = ['all' for fgn in dataDF.columns.names]
-            attrValues[dataDF.columns.names.index('freqBandName')] = name
+            attrValues = ['all' for fgn in featuresDF.columns.names]
+            attrValues[featuresDF.columns.names.index('freqBandName')] = name
             thisMask = pd.Series(
                 featuresDF.columns.isin(group.columns),
                 index=featuresDF.columns).to_frame()
@@ -214,19 +218,19 @@ if __name__ == '__main__':
                 thisMask.columns = allGroupIdx
             else:
                 thisMask.columns = pd.MultiIndex.from_tuples(
-                    (attrValues, ), names=dataDF.columns.names)
+                    (attrValues, ), names=featuresDF.columns.names)
             maskList.append(thisMask.T)
     # each lag    
     for name, group in featuresDF.groupby('lag', axis='columns'):
-        attrValues = ['all' for fgn in dataDF.columns.names]
-        attrValues[dataDF.columns.names.index('lag')] = name
+        attrValues = ['all' for fgn in featuresDF.columns.names]
+        attrValues[featuresDF.columns.names.index('lag')] = name
         thisMask = pd.Series(
             featuresDF.columns.isin(group.columns),
             index=featuresDF.columns).to_frame()
         if not np.all(thisMask):
             # all group already covered
             thisMask.columns = pd.MultiIndex.from_tuples(
-                (attrValues, ), names=dataDF.columns.names)
+                (attrValues, ), names=featuresDF.columns.names)
             maskList.append(thisMask.T)
     #
     maskDF = pd.concat(maskList)

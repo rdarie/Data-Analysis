@@ -210,7 +210,7 @@ tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 if normalizeDataset is not None:
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
 alignedAsigsDF.rename(columns=lambda x: x.replace('#0', ''), level='feature', inplace=True)
-# pdb.set_trace()
+
 if hasattr(estimator, 'transform'):
     features = estimator.transform(alignedAsigsDF)
 if arguments['profile']:
@@ -235,29 +235,44 @@ alignedFeaturesDF = pd.DataFrame(
     )
 alignedFeaturesDF.columns.name = 'feature'
 
+alignedFeaturesDF.sort_index(
+    axis='columns', inplace=True,
+    level=['feature', 'lag'],
+    kind='mergesort', sort_remaining=False)
 '''if True:
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
     ax.plot(alignedFeaturesDF.index.get_level_values('t'), label='alignedFeatures')
     ax.plot(alignedAsigsDF.index.get_level_values('t'), label='alignedAsigs')
     ax.legend()
+    plt.show()
+if True:
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(2, 1)
+    plotColIdx = 0
+    ax[0].plot(alignedFeaturesDF.iloc[:1000, plotColIdx].to_numpy(), label='alignedFeatures')
+    ax[0].set_title('{}'.format(alignedFeaturesDF.columns[plotColIdx]))
+    ax[1].plot(alignedAsigsDF.iloc[:1000, plotColIdx].to_numpy(), label='alignedAsigs')
+    ax[0].set_title('{}'.format(alignedAsigsDF.columns[plotColIdx]))
+    plt.legend()
     plt.show()'''
 del alignedAsigsDF
 #
 spikeTrainMeta.update({
     'left_sweep': (-1) * tBins[0] * pq.s,
-    't_start': min(0, trialTimes[0]) * pq.s,
+    't_start': trialTimes[0] * pq.s,
     't_stop': trialTimes[-1] * pq.s,
     })
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
     alignedFeaturesDF, spikeTrainMeta=spikeTrainMeta,
-    matchSamplingRate=False)
+    matchSamplingRate=False, verbose=arguments['verbose'])
 if arguments['lazy']:
     dataReader.file.close()
 if os.path.exists(outputPath + '.nix'):
     os.remove(outputPath + '.nix')
 masterBlock = ns5.purgeNixAnn(masterBlock)
 print('Writing {}.nix...'.format(outputPath))
+
 writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
 writer.write_block(masterBlock, use_obj_names=True)
 writer.close()

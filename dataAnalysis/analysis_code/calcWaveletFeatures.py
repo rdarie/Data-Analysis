@@ -288,7 +288,7 @@ if __name__ == "__main__":
     spectralDF.loc[:, 'feature'] = newFeatNames
     spectralDF.set_index(['parentFeature', 'feature'], inplace=True, append=True)
     trialTimes = np.asarray((spectralDF.index.get_level_values('t')).unique())
-    #
+    # pdb.set_trace()
     spikeTrainMeta = {
         'units': pq.s,
         'wvfUnits': pq.dimensionless,
@@ -298,7 +298,6 @@ if __name__ == "__main__":
         't_stop': trialTimes[-1] * pq.s,
         'sampling_rate': dummySt.sampling_rate
         }
-    # pdb.set_trace()
     masterBlock = ns5.alignedAsigDFtoSpikeTrain(
         spectralDF, spikeTrainMeta=spikeTrainMeta,
         matchSamplingRate=False, verbose=arguments['verbose'])
@@ -312,3 +311,4 @@ if __name__ == "__main__":
     writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()
+    print('Finished {}.nix...'.format(outputPath))
