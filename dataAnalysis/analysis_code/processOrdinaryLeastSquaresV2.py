@@ -508,6 +508,7 @@ if __name__ == '__main__':
     if reProcessPredsCoefs or arguments['forceReprocess']:
         coefDict0 = {}
         predDict0 = {}
+        print('Calculating predicted waveforms per model')
         for lhsMaskIdx in range(lhsMasks.shape[0]):
             lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
             lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
@@ -529,7 +530,6 @@ if __name__ == '__main__':
             ensTemplate = lhsMaskParams['ensembleTemplate']
             selfTemplate = lhsMaskParams['selfTemplate']
             for rhsMaskIdx in range(rhsMasks.shape[0]):
-                print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
                 rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
                 rhsMaskParams = {k: v for k, v in zip(rhsMask.index.names, rhsMask.name)}
                 rhGroup = pd.read_hdf(
@@ -586,7 +586,8 @@ if __name__ == '__main__':
                         estimatorIdx = (lhsMaskIdx, rhsMaskIdx, targetName, foldIdx)
                         if int(arguments['verbose']) > 0:
                             print('estimator: {}'.format(estimatorIdx))
-                            print('in dataframe: {}'.format(estimatorIdx in estimatorsDF.index))
+                            if int(arguments['verbose']) > 3:
+                                print('in dataframe: {}'.format(estimatorIdx in estimatorsDF.index))
                         if not estimatorIdx in estimatorsDF.index:
                             continue
                         if foldIdx == cvIterator.n_splits:
@@ -617,7 +618,7 @@ if __name__ == '__main__':
                             estimator.predict(fullDesignDF.iloc[testIdx, :])
                             ])
                         mismatch = predictionSrs - predictionsNormalWay.reshape(-1)
-                        if int(arguments['verbose']) > 0:
+                        if int(arguments['verbose']) > 3:
                             print('max mismatch is {}'.format(mismatch.abs().max()))
                         assert (mismatch.abs().max() < 1e-3)
                         termNames = designTermNames + ensTermNames + selfTermNames

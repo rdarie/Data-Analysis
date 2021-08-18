@@ -6,15 +6,15 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=4
+#SBATCH --nodes=1
 #SBATCH --mem=120G
 
 # Specify a job name:
 #SBATCH -J ols_motion_lfp_prep_ta_td_fa_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ols_motion_lfp_prep_ta_td_fa_27.out
-#SBATCH -e ../../batch_logs/%j-%a-ols_motion_lfp_prep_ta_td_fa_27.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_27.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,13 +24,12 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_temp.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-# ITERATOR="rb"
-ITERATOR="rc"
-ITERATOR="rd"
+
+ITERATOR="ra"
 WINDOWTERM="XL"
 ################################################################################################################
 ## time domain, trial-averaged

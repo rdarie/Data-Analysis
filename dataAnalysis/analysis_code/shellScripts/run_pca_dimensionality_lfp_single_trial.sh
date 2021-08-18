@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=96G
 
 # Specify a job name:
-#SBATCH -J pca_dimen_motion_lfp_rb_st_27
+#SBATCH -J dimen_red_ra_st_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_motion_lfp_rb_st_27.out
-#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_motion_lfp_rb_st_27.out
+#SBATCH -o ../../batch_logs/%j-%a-pdimen_red_ra_st_28.out
+#SBATCH -e ../../batch_logs/%j-%a-pdimen_red_ra_st_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -31,12 +31,9 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 ##################################################
-# ITERATOR="ra"
-# ALIGNQUERYTERM="starting"
-##################################################
-ITERATOR="rb"
+ITERATOR="ra"
 ALIGNQUERYTERM="starting"
-##################################################
+################################################
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 #####
@@ -49,7 +46,7 @@ ESTIMATOR="fa"
 python -u ./calcGridSearchSignalDimensionality.py --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
 python -u ./processSignalDimensionality.py --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 
-TARGET="lfp_CAR_spectral"
+TARGET="lfp_CAR_spectral_scaled"
 ESTIMATOR="pca"
 # python -u ./calcGridSearchSignalDimensionality.py --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
 # python -u ./processSignalDimensionality.py --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting

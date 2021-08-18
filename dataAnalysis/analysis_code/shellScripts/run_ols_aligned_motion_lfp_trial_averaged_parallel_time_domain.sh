@@ -5,17 +5,20 @@
 
 # Default resources are 1 core with 2.8GB of memory.
 
+#   SBATCH --ntasks-per-core=1
 # Request memory:
 #SBATCH --ntasks=10
-#SBATCH --ntasks-per-core=1
+#SBATCH --cpus-per-task=1
+#SBATCH --ntasks-per-node=10
 #SBATCH --mem-per-cpu=8G
+#SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_ta_td_27
+#SBATCH -J ols_motion_lfp_ta_td_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_ta_td_27.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_ta_td_27.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_ta_td_28.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_ta_td_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,9 +31,7 @@ source shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=2 --processAll"
-# ITERATOR="rb"
-ITERATOR="rc"
-ITERATOR="rd"
+ITERATOR="ra"
 WINDOWTERM="XL"
 SUFFIX=""
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"

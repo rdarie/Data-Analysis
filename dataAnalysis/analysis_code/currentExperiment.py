@@ -501,7 +501,7 @@ def parseAnalysisOptions(
         pass
     # args for the sklearn StratifiedShuffleSplit
     defaultSamplerKWArgs = dict(random_state=42, test_size=0.5)
-    defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.1)
+    defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.2)
     # args for tdr.
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
@@ -618,7 +618,7 @@ def parseAnalysisOptions(
                 'winStop': None
             },
             'timeROIOpts_control': {
-                'alignQuery': None,
+                'alignQuery': 'startingOrStimOn',
                 'winStart': -600e-3,
                 'winStop': -200e-3
                 }

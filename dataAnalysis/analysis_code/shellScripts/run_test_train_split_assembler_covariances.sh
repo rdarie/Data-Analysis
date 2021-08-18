@@ -50,9 +50,20 @@ python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix='lfp_CAR_spectr
 # python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix='rig' --selectionName='pedalState' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix='rig' --selectionName='rig' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 
+ITERATOR="--iteratorSuffix=cd"
+ALIGNQUERYTERM="startingOrStimOn"
+CONTROLSTATUS="--controlSet"
+ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
+python -u './calcTestTrainSplit.py' $BLOCKSELECTOR $ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
+#
+python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix='lfp_CAR' --selectionName='lfp_CAR' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix='lfp_CAR_spectral_scaled' --selectionName='lfp_CAR_spectral_scaled' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix='rig' --selectionName='pedalState' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix='rig' --selectionName='rig' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+
 
 ITERATOR="--iteratorSuffix=ccm"
-ALIGNQUERYTERM="startingE5"
+ALIGNQUERYTERM="startingE9"
 CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR $ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
@@ -65,7 +76,7 @@ python -u './assembleDataFrames.py' $ITERATOR --inputBlockSuffix='rig' --selecti
 source ./shellScripts/calc_aligned_stim_preamble.sh
 BLOCKSELECTOR="--blockIdx=1 --processAll"
 ITERATOR="--iteratorSuffix=ccs"
-ALIGNQUERYTERM="stimOnE5"
+ALIGNQUERYTERM="stimOnE9"
 CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR $ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS

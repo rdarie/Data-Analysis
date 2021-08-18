@@ -14,11 +14,13 @@ Options:
     --showFigures                          load from raw, or regular? [default: False]
     --debugging                            load from raw, or regular? [default: False]
     --averageByTrial                       load from raw, or regular? [default: False]
+    --calculateFullModels                  load from raw, or regular? [default: False]
     --verbose=verbose                      print diagnostics? [default: 0]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
 """
+
 import logging
 logging.captureWarnings(True)
 import matplotlib, os
@@ -60,9 +62,10 @@ import gc, sys
 from docopt import docopt
 from copy import deepcopy
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
     font_scale=1.5, color_codes=True)
+###
 print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
@@ -103,10 +106,11 @@ if __name__ == '__main__':
     arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
     ##
     '''
+    
     consoleDebugging = True
     if consoleDebugging:
         arguments = {
-            'processAll': True, 'debugging': False, 'estimatorName': 'fa_ta', 'exp': 'exp202101271100',
+            'processAll': True, 'debugging': True, 'estimatorName': 'fa_ta', 'exp': 'exp202101271100',
             'analysisName': 'hiRes', 'lazy': False, 'blockIdx': '2', 'averageByTrial': True, 'verbose': '2',
             'selectionName': 'lfp_CAR', 'showFigures': False, 'datasetName': 'Block_XL_df_ra', 'plotting': True,
             'window': 'long', 'alignFolderName': 'motion'}
@@ -235,8 +239,10 @@ if __name__ == '__main__':
     featuresList = []
     featureColumnFields = dataDF.columns.names
     ###
-
-    maxNCompsToTest = min(80, featureMasks.sum(axis='columns').min())
+    if arguments['debugging']:
+        maxNCompsToTest = min(35, featureMasks.sum(axis='columns').min())
+    else:
+        maxNCompsToTest = min(80, featureMasks.sum(axis='columns').min())
     # pdb.set_trace()
     listOfNCompsToTest = []
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
@@ -250,16 +256,9 @@ if __name__ == '__main__':
         listOfNCompsToTest.append(nCompsToTest)
         trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
         ###
-        if arguments['averageByTrial']:
-            estimatorInstance = Pipeline([
-                ('averager', tdr.DataFrameAverager(
-                    stimConditionNames=stimulusConditionNames + ['bin'],
-                    addIndexFor=stimulusConditionNames, burnInPeriod=500e-3)),
-                ('dim_red', estimatorClass(**estimatorKWArgs))])
-        else:
-            estimatorInstance = Pipeline([
-                ('averager', tdr.DataFramePassThrough()),
-                ('dim_red', estimatorClass(**estimatorKWArgs))])
+        estimatorInstance = Pipeline([
+            ('averager', tdr.DataFramePassThrough()),
+            ('dim_red', estimatorClass(**estimatorKWArgs))])
         ###
         if arguments['verbose']:
             print('Fitting {} ...'.format(trfName))
@@ -282,29 +281,25 @@ if __name__ == '__main__':
         cvScoresDF.dropna(axis='columns', inplace=True)
         cvScoresDict[maskParams['freqBandName']] = cvScoresDF
         #
-        fullEstimatorKWArgs = estimatorKWArgs.copy()
-        fullEstimatorKWArgs['n_components'] = maxNCompsToTest
-        if arguments['averageByTrial']:
-            fullEstimatorInstance = Pipeline([
-                ('averager', tdr.DataFrameAverager(
-                    stimConditionNames=stimulusConditionNames + ['bin'], addIndexFor=stimulusConditionNames)),
-                ('dim_red', estimatorClass(**fullEstimatorKWArgs))])
-        else:
+        #############################################################################
+        if arguments['calculateFullModels']:
+            fullEstimatorKWArgs = estimatorKWArgs.copy()
+            fullEstimatorKWArgs['n_components'] = maxNCompsToTest
             fullEstimatorInstance = Pipeline([
                 ('averager', tdr.DataFramePassThrough()),
                 ('dim_red', estimatorClass(**fullEstimatorKWArgs))])
-        fullModelScores = tdr.crossValidationScores(
-            dataGroup,
-            # estimatorClass=estimatorClass, estimatorKWArgs=fullEstimatorKWArgs,
-            estimatorInstance=fullEstimatorInstance,
-            crossvalKWArgs=crossvalKWArgs,
-            joblibBackendArgs=joblibBackendArgs,
-            verbose=int(arguments['verbose']),)
-        fmScoresDF = pd.DataFrame(fullModelScores)
-        fmScoresDF.index.name = 'fold'
-        fmScoresDF.dropna(axis='columns', inplace=True)
-        fmScoresDict[maskParams['freqBandName']] = fmScoresDF
-        #
+            fullModelScores = tdr.crossValidationScores(
+                dataGroup,
+                # estimatorClass=estimatorClass, estimatorKWArgs=fullEstimatorKWArgs,
+                estimatorInstance=fullEstimatorInstance,
+                crossvalKWArgs=crossvalKWArgs,
+                joblibBackendArgs=joblibBackendArgs,
+                verbose=int(arguments['verbose']),)
+            fmScoresDF = pd.DataFrame(fullModelScores)
+            fmScoresDF.index.name = 'fold'
+            fmScoresDF.dropna(axis='columns', inplace=True)
+            fmScoresDict[maskParams['freqBandName']] = fmScoresDF
+        #########################################################################################
         lastFoldIdx = cvScoresDF.index.get_level_values('fold').max()
         bestEstimator = cvScoresDF.loc[lastFoldIdx, 'estimator']
         # bestEstimator = gridSearcherDict[maskParams['freqBandName']].best_estimator_
@@ -351,7 +346,10 @@ if __name__ == '__main__':
     featuresDF = pd.concat(featuresList, axis='columns')
     #
     scoresDF = pd.concat(cvScoresDict, names=['freqBandName'])
-    scoresFullModel = pd.concat(fmScoresDict, names=['freqBandName'])
+    #############################################################################
+    if arguments['calculateFullModels']:
+        scoresFullModel = pd.concat(fmScoresDict, names=['freqBandName'])
+    #############################################################################
     lastFoldIdx = scoresDF.index.get_level_values('fold').max()
     #
     gsScoresDF = pd.concat(gsScoresDict, names=['freqBandName'])
@@ -361,10 +359,20 @@ if __name__ == '__main__':
         print('Deleting contents of {}'.format(estimatorPath))
         os.remove(estimatorPath)
     #
+    if arguments['averageByTrial']:
+        for rowIdx, row in scoresDF.iterrows():
+            newEstimatorInstance = Pipeline([
+                ('averager', tdr.DataFrameAverager(
+                    stimConditionNames=stimulusConditionNames + ['bin'], addIndexFor=stimulusConditionNames)),
+                ('dim_red', row['estimator'].named_steps['dim_red'])])
+            scoresDF.loc[rowIdx, 'estimator'] = newEstimatorInstance
     print('\n\nSaving {}\n\n'.format(estimatorPath))
     try:
         scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
-        scoresFullModel.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'full_scores')
+        #############################################################################
+        if arguments['calculateFullModels']:
+            scoresFullModel.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'full_scores')
+        #############################################################################
         scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv_scores')
     except Exception:
         traceback.print_exc()
@@ -376,7 +384,10 @@ if __name__ == '__main__':
         nIters.to_hdf(estimatorPath, 'cv_estimators_n_iter')
     try:
         scoresDF['estimator'].to_hdf(estimatorPath, 'cv_estimators')
-        scoresFullModel['estimator'].to_hdf(estimatorPath, 'full_estimators')
+        #############################################################################
+        if arguments['calculateFullModels']:
+            scoresFullModel['estimator'].to_hdf(estimatorPath, 'full_estimators')
+        #############################################################################
     except Exception:
         traceback.print_exc()
         pdb.set_trace()

@@ -51,9 +51,10 @@ for ITER in "${iterators[@]}"
 do
   # python -u './plotMiscAdditionalFigures.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
   # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  # python -u './plotSignalDataFrame.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  # python -u './plotSignalDataFrame.py' --plotSuffix="lfp_illustration" --verbose=1 --selectionName=lfp_CAR $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  # python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  python -u './plotSignalDataFrame.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  python -u './plotSignalDataFrame.py' --plotSuffix="lfp_illustration" --verbose=1 --selectionName=lfp_CAR $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  #
   python -u './plotSignalDataFrame.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled_mahal_ledoit $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
 done

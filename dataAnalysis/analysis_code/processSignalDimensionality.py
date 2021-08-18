@@ -54,9 +54,9 @@ from numpy.random import default_rng
 rng = default_rng()
 idxSl = pd.IndexSlice
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
-    font_scale=0.5, color_codes=True)
+    font_scale=1.5, color_codes=True)
 print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)

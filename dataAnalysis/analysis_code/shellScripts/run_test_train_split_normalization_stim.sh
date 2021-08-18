@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_regression_stim_27
+#SBATCH -J test_train_split_normalization_stim_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_regression_stim_27.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_regression_stim_27.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_normalization_stim_27.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_normalization_stim_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
