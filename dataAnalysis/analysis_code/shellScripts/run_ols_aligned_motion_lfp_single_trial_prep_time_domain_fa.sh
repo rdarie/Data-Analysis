@@ -6,15 +6,16 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=1
-#SBATCH --mem=120G
+#SBATCH --ntasks=1
+#SBATCH --ntasks-per-core=1
+#SBATCH --mem-per-cpu=127G
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_prep_ta_td_fa_28
+#SBATCH -J ols_motion_lfp_prep_st_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_28.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_28.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_st_28.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_st_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -27,15 +28,15 @@ SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
+ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-
 ITERATOR="ra"
 WINDOWTERM="XL"
 ################################################################################################################
-## time domain, trial-averaged
+## time domain, single-trial
 SUFFIX=""
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
-#
-ESTIMATOR="enr_fa_ta${SUFFIX}"
-python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa_ta' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+
+ESTIMATOR="enr_fa${SUFFIX}"
+python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1

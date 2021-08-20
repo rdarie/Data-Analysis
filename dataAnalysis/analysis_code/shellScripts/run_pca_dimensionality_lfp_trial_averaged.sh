@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J dimen_red_ta_ra_27
+#SBATCH -J dimen_red_ta_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-dimen_red_ta_ra_27.out
-#SBATCH -e ../../batch_logs/%j-%a-dimen_red_ta_ra_27.out
+#SBATCH -o ../../batch_logs/dimen_red_ta_28.out
+#SBATCH -e ../../batch_logs/dimen_red_ta_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -27,7 +27,7 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble_temp.sh
+source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
@@ -43,11 +43,8 @@ targets=(lfp_CAR lfp_CAR_spectral_scaled)
 estimators=(fa_ta)
 for TARGET in "${targets[@]}"
 do
-  # python -u './testSignalNormality.py' --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
   for ESTIMATOR in "${estimators[@]}"
   do
-    # python -u './calcGridSearchSignalDimensionality.py' --debugging --averageByTrial --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
-    #
     python -u './calcGridSearchSignalDimensionalityV2.py' --debugging --averageByTrial --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
     python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
   done

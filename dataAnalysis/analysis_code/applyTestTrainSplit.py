@@ -286,3 +286,5 @@ for kN in ['selectionName', 'unitQuery']:
 ## update loadingMeta['alignedAsigsKW'] re: feature names
 with open(outputLoadingMetaPath, 'wb') as _f:
     pickle.dump(loadingMeta, _f)
+
+print('\n' + '#' * 50 + '\n{}\nComplete\n'.format(__file__) + '#' * 50 + '\n')

@@ -13,7 +13,7 @@ colorMaps = {
     'distHist': 'rocket'
     }
 iteratorDescriptions = pd.Series({
-    'ca': 'B',
+    'cd': 'B',
     'cb': 'M',
     'ccs': 'S',
     'ccm': 'SM',
@@ -76,7 +76,7 @@ def shadeAUCEpochsPerFacet(g, ro, co, hu, dataSubset):
 argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
-        'winStop': '700', 'winStart': '-700', 'limitPages': None,
+        'winStart': '-250', 'winStop': '500', 'limitPages': None,
         'unitQuery': "chanName.isin(['position#0', 'amplitude#0'])", 'alignQuery': "conditionUID == 0",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -88,9 +88,22 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'lfp_illustration': {
         'recalcStats': True,
-        'winStop': '700', 'winStart': '-700', 'limitPages': None,
-        # 'unitQuery': "chanName.isin(['utah18#0'])", 'alignQuery': None,
-        'unitQuery': None,
+        'winStart': '-250', 'winStop': '500', 'limitPages': None,
+        'unitQuery': "chanName.isin(['utah18#0', 'utah7#0'])", 'alignQuery': None,
+        # 'unitQuery': None,
+        'individualTraces': False, 'overlayStats': False,
+        'hueName': 'trialAmplitude', 'hueControl': '',
+        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        'colName': 'kinematicConditionNoSize', 'colControl': '', 'colOrder': [
+            'NA_NA', 'CW_outbound', 'CW_return'
+        ],
+        'sizeName': '', 'sizeControl': '',
+        'styleName': '', 'styleControl': ''},
+    'factor_illustration': {
+        'recalcStats': True,
+        'winStart': '-250', 'winStop': '500', 'limitPages': None,
+        'unitQuery': "chanName.isin(['fa_ta_all001#0', 'fa_ta_all002#0', 'fa_ta_all003#0', 'fa_ta_all004#0'])", 'alignQuery': None,
+        # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
@@ -101,9 +114,9 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'spectral_illustration': {
         'recalcStats': True,
-        'winStop': '700', 'winStart': '-700', 'limitPages': None,
-        # 'unitQuery': "chanName.isin(['utah18_alpha#0', 'utah18_beta#0', 'utah18_gamma#0', 'utah18_higamma#0', 'utah18_spb#0'])",
-        'unitQuery': None,
+        'winStart': '-250', 'winStop': '500', 'limitPages': None,
+        'unitQuery': "chanName.isin(['utah18_alpha#0', 'utah18_beta#0', 'utah18_gamma#0', 'utah18_higamma#0', 'utah18_spb#0'])",
+        # 'unitQuery': None,
         'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -115,7 +128,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'mahal_illustration': {
         'recalcStats': True,
-        'winStop': '700', 'winStart': '-700', 'limitPages': None,
+        'winStart': '-250', 'winStop': '500', 'limitPages': None,
         'unitQuery': None, 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -149,6 +162,16 @@ statsTestOptsLookup = {
         correctMultiple=True,
         ),
     'lfp_illustration': dict(
+        referenceTimeWindow=None,
+        # referenceTimeWindow=[-400e-3, -350e-3],
+        testStride=100e-3,
+        testWidth=100e-3,
+        tStart=-200e-3,
+        tStop=None,
+        pThresh=5e-2,
+        correctMultiple=True,
+        ),
+    'factor_illustration': dict(
         referenceTimeWindow=None,
         # referenceTimeWindow=[-400e-3, -350e-3],
         testStride=100e-3,
@@ -201,6 +224,21 @@ plotProcFunsLookup = {
     asp.genStimVLineAdder(
         'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
         tOnset=-.05, tOffset=.7, includeLeft=False, includeRight=False),
+    asp.genTitleChanger({
+        'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
+        'stimCondition = NA_0.0': 'No stimulation',
+        'kinematicConditionNoSize = NA_NA': 'No movement',
+        'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
+        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)'
+        })],
+    'factor_illustration': [
+    shadeAUCEpochsPerFacet,
+    asp.xLabelsTime,
+    asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}, dropNaNCol='trialUID'),
+    asp.genLegendRounder(decimals=2),
+    asp.genStimVLineAdder(
+        'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
+        tOnset=-.05, tOffset=.7, includeLeft=False, includeRight=False, dropNaNCol='trialUID'),
     asp.genTitleChanger({
         'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
         'stimCondition = NA_0.0': 'No stimulation',
@@ -280,6 +318,10 @@ relPlotKWArgsLookup = {
         'linewidth': .5, 'height': 1.5, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.1,light=0.7,reverse=1"
     },
+    'factor_illustration': {
+        'linewidth': .5, 'height': 1.5, 'aspect': 3,
+        'palette': "ch:1.6,-.3,dark=.1,light=0.7,reverse=1"
+    },
     'spectral_illustration': {
         'linewidth': .5, 'height': 1.5, 'aspect': 3,
         'palette': "ch:0.,-.3,dark=.1,light=0.7,reverse=1"
@@ -299,6 +341,10 @@ catPlotKWArgsLookup = {
         'linewidth': .5, 'height': 1, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.1,light=0.7,reverse=1"
     },
+    'factor_illustration': {
+        'linewidth': .5, 'height': 1, 'aspect': 3,
+        'palette': "ch:1.6,-.3,dark=.1,light=0.7,reverse=1"
+    },
     'spectral_illustration': {
         'linewidth': .5, 'height': 1, 'aspect': 3,
         'palette': "ch:0.,-.3,dark=.1,light=0.7,reverse=1"
@@ -315,6 +361,9 @@ legendTitleOverridesLookup = {
     'lfp_illustration': {
         'trialAmplitude': 'Stimulation\namplitude (uA)',
     },
+    'factor_illustration': {
+        'trialAmplitude': 'Stimulation\namplitude (uA)',
+    },
     'spectral_illustration': {
         'trialAmplitude': 'Stimulation\namplitude (uA)',
     }
@@ -325,6 +374,9 @@ styleOptsLookup = {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     },
     'lfp_illustration': {
+        'legend.lw': 2, 'tight_layout.pad': 2e-1,
+    },
+    'factor_illustration': {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     },
     'spectral_illustration': {
@@ -339,6 +391,9 @@ yAxisLabelLookup = {
         'position': 'Pedal position (deg.)',
     },
     'lfp_illustration': {
+        'utah18': 'LFP recording (uV)',
+    },
+    'factor_illustration': {
         'utah18': 'LFP recording (uV)',
     },
     'spectral_illustration': {

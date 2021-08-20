@@ -10,11 +10,11 @@
 #SBATCH --mem=120G
 
 # Specify a job name:
-#SBATCH -J compare_covariances_27
+#SBATCH -J compare_covariances_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-compare_covariances_27.out
-#SBATCH -e ../../batch_logs/%j-%a-compare_covariances_27.out
+#SBATCH -o ../../batch_logs/compare_covariances_28.out
+#SBATCH -e ../../batch_logs/compare_covariances_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -33,36 +33,36 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-iterators=(cd cb ccs ccm)
+iterators=(ca cb ccs ccm)
 estimators=(mahal_ledoit mahal_emp)
 
-# TARGET="lfp_CAR"
-# for ITER in "${iterators[@]}"
-# do
-#   for EST in "${estimators[@]}"
-#   do
-#     python -u './calcSignalCovarianceMatrix.py' --estimatorName="${EST}" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
-#   done
-# done
+TARGET="lfp_CAR"
+for ITER in "${iterators[@]}"
+do
+  for EST in "${estimators[@]}"
+  do
+    python -u './calcSignalCovarianceMatrix.py' --estimatorName="${EST}" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+  done
+done
 
-# TARGET="lfp_CAR_spectral_scaled"
-# for ITER in "${iterators[@]}"
-# do
-#   for EST in "${estimators[@]}"
-#   do
-#     python -u './calcSignalCovarianceMatrix.py' --estimatorName="${EST}" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
-#   done
-# done
+TARGET="lfp_CAR_spectral_scaled"
+for ITER in "${iterators[@]}"
+do
+  for EST in "${estimators[@]}"
+  do
+    python -u './calcSignalCovarianceMatrix.py' --estimatorName="${EST}" --datasetName="Block_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+  done
+done
 #
 
 TARGET="lfp_CAR"
 for EST in "${estimators[@]}"
 do
-  python -u './compareSignalCovarianceMatrices.py' --estimatorName="${EST}" --iteratorSuffixList="cd, cb, ccs, ccm" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './compareSignalCovarianceMatrices.py' --estimatorName="${EST}" --iteratorSuffixList="ca, cb, ccs, ccm" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done
 #
 TARGET="lfp_CAR_spectral_scaled"
 for EST in "${estimators[@]}"
 do
-  python -u './compareSignalCovarianceMatrices.py' --estimatorName="${EST}" --iteratorSuffixList="cd, cb, ccs, ccm" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './compareSignalCovarianceMatrices.py' --estimatorName="${EST}" --iteratorSuffixList="ca, cb, ccs, ccm" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done

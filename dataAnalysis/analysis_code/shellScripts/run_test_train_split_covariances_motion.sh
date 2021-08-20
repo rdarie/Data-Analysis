@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_covariances_motion_28
+#SBATCH -J test_train_split_covariances_motion_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_covariances_motion_28.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_covariances_motion_28.out
+#SBATCH -o ../../batch_logs/test_train_split_covariances_motion_27-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_covariances_motion_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 #SBATCH --export=CCV_HEADLESS=1
 
 #  SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_exp_preamble.sh
+source shellScripts/run_exp_preamble_temp.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 ITERATOR="--iteratorSuffix=ca"

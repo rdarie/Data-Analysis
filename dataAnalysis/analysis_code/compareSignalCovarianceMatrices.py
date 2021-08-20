@@ -409,7 +409,7 @@ colorMaps = {
     'distHist': 'rocket'
     }
 iteratorDescriptions = pd.Series({
-    'cd': 'B',
+    'ca': 'B',
     'cb': 'M',
     'ccs': 'S',
     'ccm': 'SM',
@@ -417,8 +417,8 @@ iteratorDescriptions = pd.Series({
 diagonalTerms = ['{}_{}'.format(tn, tn) for tn in listOfIteratorSuffixes]
 categoryDescriptions = pd.Series({
     'WE': diagonalTerms,
-    'deltaM': ['cb_cd'],
-    'deltaS': ['cb_ccm', 'ccs_cd'],
+    'deltaM': ['ca_cb'],
+    'deltaS': ['cb_ccm', 'ca_ccs'],
     'deltaSM': ['ccm_ccs'],
     })
 categoryLabels = pd.Series({

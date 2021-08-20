@@ -216,6 +216,7 @@ if __name__ == '__main__':
         else:
             normalizeDataset = None
     dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    # pdb.set_trace()
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
     #

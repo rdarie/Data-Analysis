@@ -10,11 +10,13 @@ Options:
     --showFigures                            show plots? [default: False]
     --verbose=verbose                        print diagnostics?
     --debugging                              print diagnostics? [default: False]
+    --forceReprocess                         print diagnostics? [default: False]
     --estimatorName=estimatorName            filename for resulting estimator (cross-validated n_comps)
     --datasetName=datasetName                filename for resulting estimator (cross-validated n_comps)
     --analysisName=analysisName              append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName        append a name to the resulting blocks? [default: motion]
 """
+
 import logging
 logging.captureWarnings(True)
 import matplotlib, os
@@ -27,6 +29,7 @@ else:
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -41,17 +44,17 @@ from scipy.stats import zscore, mode
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
-from sklego.preprocessing import PatsyTransformer
 from dataAnalysis.analysis_code.regression_parameters import *
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
-import dill as pickle
-import gc
 import patsy
+from sklego.preprocessing import PatsyTransformer
+import dill as pickle
+pickle.settings['recurse'] = True
+import gc
 from itertools import product
-from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import colorsys
 idxSl = pd.IndexSlice
@@ -93,7 +96,7 @@ mplRCParams = {
     }
 styleOpts = {
     'legend.lw': 2,
-    'tight_layout.pad': 3e-1, # units of font size
+    'tight_layout.pad': 3e-1,  # units of font size
     'panel_heading.pad': 0.
     }
 sns.set(
@@ -102,21 +105,18 @@ sns.set(
     font_scale=.8, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
-
+#
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 # if debugging in a console:
 '''
-
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_rc', 'plotting': True,
-        'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
-        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_fa_ta',
-        'blockIdx': '2', 'exp': 'exp202101271100'}
+        'showFigures': False, 'analysisName': 'hiRes', 'exp': 'exp202101271100', 'datasetName': 'Block_XL_df_ra',
+        'debugging': False, 'blockIdx': '2', 'alignFolderName': 'motion', 'estimatorName': 'enr_fa_ta',
+        'plotting': True, 'verbose': '1', 'processAll': True}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-    
 '''
 
 def optimalSVDThreshold(Y):
@@ -124,7 +124,8 @@ def optimalSVDThreshold(Y):
     omega = 0.56 * beta ** 3 - 0.95 * beta ** 2 + 1.82 * beta + 1.43
     return omega
 
-def ERAMittnik(N, maxNDim=None, endogNames=None, exogNames=None, plotting=False):
+def ERAMittnik(
+        N, maxNDim=None, endogNames=None, exogNames=None, plotting=False):
     tBins = np.unique(N.columns.get_level_values('bin'))
     nRegressors = len(endogNames + exogNames)
     H0 = pd.concat([N.shift(-nRegressors * it, axis='columns').fillna(0) for it in range(tBins.size)])
@@ -157,6 +158,7 @@ def ERAMittnik(N, maxNDim=None, endogNames=None, exogNames=None, plotting=False)
         ax.set_ylabel('eigenvalue of H0')
         ax.axvline(maxNDim)
         return A, B, C, D, fig, ax
+
 
 def ERA(
         Phi, maxNDim=None, endogNames=None, exogNames=None,
@@ -321,7 +323,9 @@ def ERA(
     K.index.name = 'state'
     return A, B, K, C, D, (fig, ax,)
 
-def makeImpulseLike(df, categoricalCols=[], categoricalIndex=[]):
+
+def makeImpulseLike(
+        df, categoricalCols=[], categoricalIndex=[]):
     for _, oneTrialDF in df.groupby('trialUID'):
         break
     impulseList = []
@@ -650,9 +654,11 @@ if (not loadedCoefs) or arguments['forceReprocess']:
                         estimator.regressor_.named_steps['regressor'].coef_, index=fullDesignDF.columns)
                     coefDict0[(lhsMaskIdx, designFormula, rhsMaskIdx, targetName, foldIdx)] = coefs
     coefDF = pd.concat(coefDict0, names=['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'factor'])
-    coefDF.to_hdf(estimatorPath, 'coefficients')
+    # not allowed to save coefDF 'might interfere with processOrdinaryLeastSquares
+    # coefDF.to_hdf(estimatorPath, 'coefficients')
 else:
-    print('Predictions and coefficients loaded from .h5 file')
+    print('Coefficients loaded from .h5 file')
+###
 if (not loadedPlotOpts) or arguments['forceReprocess']:
     termPalette = pd.concat({
         'exog': pd.Series(np.unique(np.concatenate([di.term_names for di in designInfoDF['designInfo']]))),
@@ -746,7 +752,7 @@ if (not loadedPlotOpts) or arguments['forceReprocess']:
     termPalette.to_hdf(estimatorPath, 'termPalette')
     factorPalette.to_hdf(estimatorPath, 'factorPalette')
     trialTypePalette.to_hdf(estimatorPath, 'trialTypePalette')
-
+##
 if (not loadedIR) or arguments['forceReprocess']:
     iRPerFactorDict0 = {}
     iRPerTermDict0 = {}
@@ -1012,7 +1018,7 @@ with cm as pdf:
         lhsMaskIdx, designFormula, rhsMaskIdx, fold = name
         if not designIsLinear[designFormula]:
             continue
-        if not (fold == lastFoldIdx):
+        if not (lhsMaskIdx in [0, 9, 10, 28, 29, 47, 48]):
             continue
         print('Calculating state space coefficients for {}'.format(lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']))
         lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
@@ -1133,6 +1139,60 @@ eigValPalette.index.name = 'eigValType'
 eigValPalette.name = 'color'
 eigValPalette.to_hdf(estimatorPath, 'eigValPalette')
 ##############################################################################################################
+
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
+with PdfPages(pdfPath) as pdf:
+    height, width = 2, 4
+    aspect = width / height
+    for (lhsMaskIdx, designFormula, rhsMaskIdx), thisIRPerTerm in iRPerTerm.groupby(
+            ['lhsMaskIdx', 'design', 'rhsMaskIdx']):
+        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+        lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+        thisTitleFormula = lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']
+        print('Saving impulse response plots for {}'.format(thisTitleFormula))
+        if designFormula != 'NULL':
+            designInfo = designInfoDict[designFormula]
+            termNames = designInfo.term_names
+            histLens = [sourceHistOptsDict[tN.replace(' ', '')]['historyLen'] for tN in termNames]
+        else:
+            histLens = []
+        ensTemplate = lhsMaskParams['ensembleTemplate']
+        if ensTemplate != 'NULL':
+            ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+            histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+        selfTemplate = lhsMaskParams['selfTemplate']
+        if selfTemplate != 'NULL':
+            selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+            histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+        tBins = thisIRPerTerm.index.get_level_values('bin')
+        kernelMask = (tBins >= 0) & (tBins <= max(histLens))
+        plotDF = thisIRPerTerm.loc[kernelMask, :].stack().to_frame(name='signal').reset_index()
+        kinOrder = kinConditionLookupIR.loc[kinConditionLookupIR.isin(plotDF['kinCondition'])].to_list()
+        stimOrder = stimConditionLookupIR.loc[stimConditionLookupIR.isin(plotDF['stimCondition'])].to_list()
+        thisTermPalette = termPalette.loc[termPalette['term'].isin(plotDF['term']), :]
+        g = sns.relplot(
+            # row='kinCondition', row_order=kinOrder,
+            # col='stimCondition', col_order=stimOrder,
+            row='target',
+            x='bin', y='signal', hue='term',
+            hue_order=thisTermPalette['term'].to_list(),
+            palette=thisTermPalette.loc[:, ['term', 'color']].set_index('term')['color'].to_dict(),
+            kind='line', errorbar='se', data=plotDF,
+        )
+        g.set_axis_labels("Lag (sec)", 'contribution to target')
+        g.suptitle('Impulse responses (per term) for model {}'.format(thisTitleFormula))
+        asp.reformatFacetGridLegend(
+            g, titleOverrides={},
+            contentOverrides=termPalette.loc[:, ['term', 'source']].set_index('term')['source'].to_dict(),
+            styleOpts=styleOpts)
+        g.tight_layout(pad=styleOpts['tight_layout.pad'])
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+#
 ##############################################################################################################
 ##############################################################################################################
 if False:

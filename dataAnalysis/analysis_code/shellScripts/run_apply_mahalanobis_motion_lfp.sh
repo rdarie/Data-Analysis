@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J apply_mahal_dist_motion_lfp_27
+#SBATCH -J apply_mahal_dist_motion_lfp_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-apply_mahal_dist_motion_lfp_27.out
-#SBATCH -e ../../batch_logs/%j-%a-apply_mahal_dist_motion_lfp_27.out
+#SBATCH -o ../../batch_logs/apply_mahal_dist_motion_lfp_28-%a.out
+#SBATCH -e ../../batch_logs/apply_mahal_dist_motion_lfp_28-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

@@ -120,43 +120,6 @@ for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
 
-
-def makeImpulseLike(df, categoricalCols=[], categoricalIndex=[]):
-    for _, oneTrialDF in df.groupby('trialUID'):
-        break
-    impulseList = []
-    fillIndexCols = [cN for cN in oneTrialDF.index.names if cN not in ['bin', 'trialUID', 'conditionUID']]
-    fillCols = [cN for cN in oneTrialDF.columns if cN not in categoricalCols]
-    if not len(categoricalCols):
-        grouper = [('all', df),]
-    else:
-        grouper = df.groupby(categoricalCols)
-    uid = 0
-    for elecName, _ in grouper:
-        thisImpulse = oneTrialDF.copy()
-        thisTI = thisImpulse.index.to_frame().reset_index(drop=True)
-        thisTI.loc[:, fillIndexCols] = 'NA'
-        thisTI.loc[:, 'trialUID'] = uid
-        uid += 1
-        if len(categoricalCols):
-            if len(categoricalCols) == 1:
-                thisImpulse.loc[:, categoricalCols[0]] = elecName
-                thisTI.loc[:, categoricalIndex[0]] = elecName
-            else:
-                for idx, cN in enumerate(categoricalCols):
-                    thisImpulse.loc[:, cN] = elecName[idx]
-                    thisTI.loc[:, categoricalIndex[idx]] = elecName[idx]
-        #
-        tBins = thisImpulse.index.get_level_values('bin')
-        zeroBin = np.min(np.abs(tBins))
-        thisImpulse.loc[:, fillCols] = 0.
-        thisImpulse.loc[tBins == zeroBin, fillCols] = 1.
-        thisImpulse.index = pd.MultiIndex.from_frame(thisTI)
-        impulseList.append(thisImpulse)
-    impulseDF = pd.concat(impulseList)
-    return impulseDF
-
-
 if __name__ == '__main__':
     arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
     # if debugging in a console:
@@ -237,6 +200,8 @@ if __name__ == '__main__':
     allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
     #
+    rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
+    ###
     lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
     lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
     lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
@@ -260,7 +225,34 @@ if __name__ == '__main__':
     htmlPath = os.path.join(
         figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'designs_info'))
     lhsMasksInfo.drop(columns=['lag', 'maskName']).to_html(htmlPath)
-    #
+    ##
+
+    ###
+    trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
+    stimCondition = pd.Series(np.nan, index=trialInfo.index)
+    stimOrder = []
+    for name, group in trialInfo.groupby(['electrode', 'trialRateInHz']):
+        stimCondition.loc[group.index] = '{} {}'.format(*name)
+        stimOrder.append('{} {}'.format(*name))
+    trialInfo.loc[:, 'stimCondition'] = stimCondition
+    stimConditionLookup = (
+        trialInfo
+            .loc[:, ['electrode', 'trialRateInHz', 'stimCondition']]
+            .drop_duplicates()
+            .set_index(['electrode', 'trialRateInHz'])['stimCondition'])
+    kinCondition = pd.Series(np.nan, index=trialInfo.index)
+    kinOrder = []
+    for name, group in trialInfo.groupby(['pedalMovementCat', 'pedalDirection']):
+        kinCondition.loc[group.index] = '{} {}'.format(*name)
+        kinOrder.append('{} {}'.format(*name))
+    trialInfo.loc[:, 'kinCondition'] = kinCondition
+    kinConditionLookup = (
+        trialInfo
+            .loc[:, ['pedalMovementCat', 'pedalDirection', 'kinCondition']]
+            .drop_duplicates()
+            .set_index(['pedalMovementCat', 'pedalDirection'])['kinCondition'])
+    ####
+    ################ define model comparisons
     # "test" should be the "bigger" model (we are adding coefficients and asking whether they improved performance
     modelsToTest = []
     for lhsMaskIdx in [1, 2, 20, 21, 39, 40]:
@@ -339,12 +331,13 @@ if __name__ == '__main__':
             })
     modelsToTestDF = pd.DataFrame(modelsToTest)
     modelsToTestDF.to_hdf(estimatorPath, 'modelsToTest')
-    rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
+    ################ end define model comparisons
     #
+    ################ collect estimators and scores
     estimatorsDict = {}
     scoresDict = {}
     if processSlurmTaskCount is not None:
-        slurmGroupSize  = int(np.ceil(allTargetsDF.shape[0] / processSlurmTaskCount))
+        slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / processSlurmTaskCount))
         allTargetsDF.loc[:, 'parentProcess'] = allTargetsDF['targetIdx'] // slurmGroupSize
     for rowIdx, row in allTargetsDF.iterrows():
         lhsMaskIdx, rhsMaskIdx, targetName = row.name
@@ -356,7 +349,7 @@ if __name__ == '__main__':
             thisEstimatorPath,
             'cv_scores/lhsMask_{}/rhsMask_{}/{}'.format(
                 lhsMaskIdx, rhsMaskIdx, targetName
-            ))
+                ))
         estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
             thisEstimatorPath,
             'cv_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
@@ -364,7 +357,9 @@ if __name__ == '__main__':
                 ))
     estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     scoresDF = pd.concat(scoresDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
-
+    ################ end define model comparisons
+    #
+    ################ collect estimators and scores
     with pd.HDFStore(estimatorPath) as store:
         if 'coefficients' in store:
             coefDF = pd.read_hdf(store, 'coefficients')
@@ -380,18 +375,6 @@ if __name__ == '__main__':
             loadedPlotOpts = True
         else:
             loadedPlotOpts = False
-        iRsExist = (
-            ('impulseResponsePerTerm' in store) &
-            ('impulseResponsePerFactor' in store)
-            )
-        if iRsExist:
-            iRPerTerm = pd.read_hdf(store, 'impulseResponsePerTerm')
-            iRPerFactor = pd.read_hdf(store, 'impulseResponsePerFactor')
-            stimConditionLookupIR = pd.read_hdf(store, 'impulseResponseStimConditionLookup')
-            kinConditionLookupIR = pd.read_hdf(store, 'impulseResponseKinConditionLookup')
-            loadedIR = True
-        else:
-            loadedIR = False
         if 'predictions' in store:
             predDF = pd.read_hdf(store, 'predictions')
             loadedPreds = True
@@ -408,34 +391,8 @@ if __name__ == '__main__':
             loadedProcessedScores = True
         else:
             loadedProcessedScores = False
-    ###
-    trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
-    stimCondition = pd.Series(np.nan, index=trialInfo.index)
-    stimOrder = []
-    for name, group in trialInfo.groupby(['electrode', 'trialRateInHz']):
-        stimCondition.loc[group.index] = '{} {}'.format(*name)
-        stimOrder.append('{} {}'.format(*name))
-    trialInfo.loc[:, 'stimCondition'] = stimCondition
-    stimConditionLookup = (
-        trialInfo
-            .loc[:, ['electrode', 'trialRateInHz', 'stimCondition']]
-            .drop_duplicates()
-            .set_index(['electrode', 'trialRateInHz'])['stimCondition'])
-    kinCondition = pd.Series(np.nan, index=trialInfo.index)
-    kinOrder = []
-    for name, group in trialInfo.groupby(['pedalMovementCat', 'pedalDirection']):
-        kinCondition.loc[group.index] = '{} {}'.format(*name)
-        kinOrder.append('{} {}'.format(*name))
-    trialInfo.loc[:, 'kinCondition'] = kinCondition
-    kinConditionLookup = (
-        trialInfo
-            .loc[:, ['pedalMovementCat', 'pedalDirection', 'kinCondition']]
-            .drop_duplicates()
-            .set_index(['pedalMovementCat', 'pedalDirection'])['kinCondition'])
-    ####
     # prep rhs dataframes
     histDesignInfoDict = {}
-    histImpulseDict = {}
     histSourceTermDict = {}
     for rhsMaskIdx in range(rhsMasks.shape[0]):
         prf.print_memory_usage('\n Prepping RHS dataframes (rhsRow: {})\n'.format(rhsMaskIdx))
@@ -456,19 +413,8 @@ if __name__ == '__main__':
                 print(ensDesignInfo.term_names)
                 print('\n')
                 histDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
-                #
-                impulseDF = makeImpulseLike(exampleRhGroup)
-                impulseDM = ensPt.transform(impulseDF)
-                ensImpulseDesignDF = (
-                    pd.DataFrame(
-                        impulseDM,
-                        index=impulseDF.index,
-                        columns=ensDesignInfo.column_names))
-                ensImpulseDesignDF.columns.name = 'factor'
-                histImpulseDict[(rhsMaskIdx, ensTemplate)] = ensImpulseDesignDF
     #
     designInfoDict = {}
-    impulseDict = {}
     for lhsMaskIdx in range(lhsMasks.shape[0]):
         lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
         lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
@@ -484,18 +430,7 @@ if __name__ == '__main__':
                 designMatrix = pt.fit_transform(exampleLhGroup)
                 designInfo = designMatrix.design_info
                 designInfoDict[designFormula] = designInfo
-                #
-                impulseDF = makeImpulseLike(
-                    exampleLhGroup, categoricalCols=['e'], categoricalIndex=['electrode'])
-                impulseDM = pt.transform(impulseDF)
-                impulseDesignDF = (
-                    pd.DataFrame(
-                        impulseDM,
-                        index=impulseDF.index,
-                        columns=designInfo.column_names))
-                impulseDesignDF.columns.name = 'factor'
-                impulseDict[designFormula] = impulseDesignDF
-
+    #
     designInfoDF = pd.Series(designInfoDict).to_frame(name='designInfo')
     designInfoDF.index.name = 'design'
     histDesignInfoDF = pd.DataFrame(
@@ -745,257 +680,15 @@ if __name__ == '__main__':
         trialTypePalette = pd.Series(
             sns.color_palette('Paired', 12)[::-1][:len(trialTypeOrder)],
             index=trialTypeOrder)
-        #
-        sourceTermLookup.to_hdf(estimatorPath, 'sourceTermLookup')
-        sourcePalette.to_hdf(estimatorPath, 'sourcePalette')
-        termPalette.to_hdf(estimatorPath, 'termPalette')
-        factorPalette.to_hdf(estimatorPath, 'factorPalette')
-        trialTypePalette.to_hdf(estimatorPath, 'trialTypePalette')
-        print('Loaded and saved plot options')
-
-    if (not loadedIR) or arguments['forceReprocess']:
-        iRPerFactorDict0 = {}
-        iRPerTermDict0 = {}
-        for lhsMaskIdx in range(lhsMasks.shape[0]):
-            lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
-            lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
-            designFormula = lhsMaskParams['designFormula']
-            if designFormula != 'NULL':
-                designInfo = designInfoDict[designFormula]
-                designDF = impulseDict[designFormula]
-                designTermNames = designInfo.term_names
-            else:
-                designInfo = None
-                designDF = None
-                designTermNames = []
-            theseEstimators = estimatorsDF.xs(lhsMaskIdx, level='lhsMaskIdx')
-            ensTemplate = lhsMaskParams['ensembleTemplate']
-            selfTemplate = lhsMaskParams['selfTemplate']
-            #
-            iRPerFactorDict1 = {}
-            iRPerTermDict1 = {}
-            for (rhsMaskIdx, targetName, fold), estimatorSrs in theseEstimators.groupby(['rhsMaskIdx', 'target', 'fold']):
-                estimator = estimatorSrs.iloc[0]
-                coefs = coefDF.loc[idxSl[lhsMaskIdx, designFormula, rhsMaskIdx, targetName, fold, :]]
-                coefs.index = coefs.index.get_level_values('factor')
-                allIRList = []
-                allIRPerSourceList = []
-                histDesignList = []
-                if ensTemplate != 'NULL':
-                    ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
-                    ensTermNames = [
-                        key
-                        for key in ensDesignInfo.term_names
-                        if key != ensTemplate.format(targetName)]
-                    ensFactorNames = np.concatenate([
-                        np.atleast_1d(ensDesignInfo.column_names[sl])
-                        for key, sl in ensDesignInfo.term_name_slices.items()
-                        if key != ensTemplate.format(targetName)])
-                    thisEnsDesignDF = histImpulseDict[(rhsMaskIdx, ensTemplate)].loc[:, ensFactorNames]
-                    histDesignList.append(thisEnsDesignDF)
-                    # columnsInDesign = [cN for cN in coefs.index if cN in ensFactorNames]
-                    # ensIR = thisEnsDesignDF * coefs.loc[columnsInDesign]
-                    # for cN in ensFactorNames:
-                    #     outputIR.loc[:, cN] = np.nan
-                else:
-                    ensTermNames = []
-                #
-                if selfTemplate != 'NULL':
-                    selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
-                    selfTermNames = [
-                        key
-                        for key in selfDesignInfo.term_names
-                        if key == selfTemplate.format(targetName)]
-                    selfFactorNames = np.concatenate([
-                        np.atleast_1d(selfDesignInfo.column_names[sl])
-                        for key, sl in selfDesignInfo.term_name_slices.items()
-                        if key == selfTemplate.format(targetName)])
-                    thisSelfDesignDF = histImpulseDict[(rhsMaskIdx, selfTemplate)].loc[:, selfFactorNames]
-                    histDesignList.append(thisSelfDesignDF)
-                    # columnsInDesign = [cN for cN in coefs.index if cN in selfFactorNames]
-                    # selfIR = thisSelfDesignDF * coefs.loc[columnsInDesign]
-                    # for cN in selfFactorNames:
-                    #     outputIR.loc[:, cN] = np.nan
-                else:
-                    selfTermNames = []
-                if len(histDesignList):
-                    histDesignDF = pd.concat(histDesignList, axis='columns')
-                    columnsInDesign = [cN for cN in coefs.index if cN in histDesignDF.columns]
-                    assert len(columnsInDesign) == histDesignDF.columns.shape[0]
-                    endogIR = histDesignDF.loc[:, columnsInDesign] * coefs.loc[columnsInDesign]
-                    iRLookup = pd.Series(
-                        endogIR.columns.map(factorPalette.loc[:, ['factor', 'term']].set_index('factor')['term']),
-                        index=endogIR.columns)
-                    histIpsList = []
-                    for endoTermName in termPalette['term']:
-                        nameMask = (iRLookup == endoTermName)
-                        if nameMask.any():
-                            histIpsList.append(endogIR.loc[:, nameMask].sum(axis='columns').to_frame(name=endoTermName))
-                    endogIRPerSource = pd.concat(histIpsList, axis='columns')
-                    allIRList.append(endogIR)
-                    allIRPerSourceList.append(endogIRPerSource)
-                else:
-                    endogIR = None
-                #####
-                if designFormula != 'NULL':
-                    columnsInDesign = [cN for cN in coefs.index if cN in designDF.columns]
-                    assert len(columnsInDesign) == designDF.columns.shape[0]
-                    # columnsNotInDesign = [cN for cN in coefs.index if cN not in designDF.columns]
-                    exogIR = designDF.loc[:, columnsInDesign] * coefs.loc[columnsInDesign]
-                    #####
-                    extDesignTermNames = []
-                    ipsList = []
-                    iRList = []
-                    for termIdx, (term, subTermInfoList) in enumerate(designInfo.term_codings.items()):
-                        # print(term)
-                        termName = designTermNames[termIdx]
-                        termSlice = designInfo.term_slices[term]
-                        offset = 0
-                        for subTermInfo in subTermInfoList:
-                            # print('\t{}'.format(subTermInfo))
-                            if len(subTermInfo.contrast_matrices):
-                                extTermNameSuffix = ':'.join([fac.name() for fac in subTermInfo.factors if fac not in subTermInfo.contrast_matrices])
-                                for factor, contrastMat in subTermInfo.contrast_matrices.items():
-                                    # print('\t\t{}'.format(factor))
-                                    # print('\t\t{}'.format(contrastMat))
-                                    # fig, ax = plt.subplots(len(contrastMat.column_suffixes))
-                                    for categIdx, categName in enumerate(contrastMat.column_suffixes):
-                                        idxMask = np.asarray([(elecName in categName) for elecName in exogIR.index.get_level_values('electrode')])
-                                        colMask = np.asarray([(categName in factorName) for factorName in exogIR.iloc[:, termSlice].columns])
-                                        theseIR = exogIR.iloc[:, termSlice].loc[idxMask, colMask].copy()
-                                        # sns.heatmap(theseIR.reset_index(drop=True), ax=ax[categIdx])
-                                        iRList.append(theseIR.reset_index(drop=True))
-                                        extTermName = '{}{}'.format(factor.name(), categName) + ':' + extTermNameSuffix
-                                        extDesignTermNames.append(extTermName)
-                                        thisIRPerSource = theseIR.reset_index(drop=True).sum(axis='columns').to_frame(name=extTermName)
-                                        ipsList.append(thisIRPerSource)
-                                        # update sourceTermLookup
-                                        if not (extTermName.replace(' ', '') in sourceTermLookup.index.get_level_values('term')):
-                                            stlEntry = sourceTermLookup.xs(termName.replace(' ', ''), level='term', drop_level=False).reset_index()
-                                            stlEntry.loc[:, 'term'] = extTermName.replace(' ', '')
-                                            stlEntry.loc[:, 'source'] = stlEntry.loc[:, 'source'].apply(lambda x: '{}{}'.format(categName, x))
-                                            stlEntry.set_index(['type', 'term'], inplace=True)
-                                            sourceTermLookup = sourceTermLookup.append(stlEntry)
-                                        # update termPalette
-                                        if not (extTermName in termPalette['term'].to_numpy()):
-                                            termPaletteEntry = termPalette.loc[termPalette['term'] == termName, :].reset_index()
-                                            termPaletteEntry.loc[:, 'index'] = termPalette.xs('exog', level='type').index.get_level_values('index').max() + 1
-                                            termPaletteEntry.loc[:, 'term'] = extTermName
-                                            termPaletteEntry.loc[:, 'source'] = termPaletteEntry.loc[:, 'source'].apply(lambda x: '{}{}'.format(categName, x))
-                                            termPaletteEntry.loc[:, 'termNoWS'] = extTermName.replace(' ', '')
-                                            termPaletteEntry.set_index(['type', 'index'], inplace=True)
-                                            termPalette = termPalette.append(termPaletteEntry)
-                                            # update factorPalette
-                                            factorPaletteMask = factorPalette['factor'].isin(theseIR.columns)
-                                            factorPalette.loc[factorPaletteMask, 'term'] = extTermName
-                                            factorPalette.loc[factorPaletteMask, 'termNoWS'] = extTermName.replace(' ', '')
-                            else:
-                                # no categoricals
-                                idxMask = np.asarray(exogIR.index.get_level_values('trialUID') == 0)
-                                theseIR = exogIR.iloc[idxMask, termSlice].copy()
-                                iRList.append(theseIR.reset_index(drop=True))
-                                extDesignTermNames.append(termName)
-                                thisIRPerSource = theseIR.reset_index(drop=True).sum(axis='columns').to_frame(name=termName)
-                                ipsList.append(thisIRPerSource)
-                    ####
-                    designTermNames = extDesignTermNames
-                    if endogIR is not None:
-                        saveIndex = endogIR.index
-                    else:
-                        saveIndex = exogIR.loc[exogIR.index.get_level_values('trialUID') == 0, :].index
-                    exogIR = pd.concat(iRList, axis='columns')
-                    exogIR.index = saveIndex
-                    exogIRPerSource = pd.concat(ipsList, axis='columns')
-                    exogIRPerSource.index = saveIndex
-                    allIRList.append(exogIR)
-                    allIRPerSourceList.append(exogIRPerSource)
-                else:
-                    exogIR = None
-                    exogIRPerSource = None
-                outputIR = pd.concat(allIRList, axis='columns')
-                outputIRPerSource = pd.concat(allIRPerSourceList, axis='columns')
-                termNames = designTermNames + ensTermNames + selfTermNames
-                ###########################
-                sanityCheckIRs = False
-                # check that the impulse responses are equivalent to the sum of the weighted basis functions
-                if sanityCheckIRs:
-                    plotIR = outputIR.copy()
-                    plotIR.index = plotIR.index.droplevel([idxName for idxName in plotIR.index.names if idxName not in ['trialUID', 'bin']])
-                    fig, ax = plt.subplots()
-                    sns.heatmap(plotIR, ax=ax)
-                    ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha='right')
-                    for termName, termSlice in designInfo.term_name_slices.items():
-                        histOpts = sourceHistOptsDict[termName.replace(' ', '')]
-                        factorNames = designInfo.column_names[termSlice]
-                        if 'rcb(' in termName:
-                            basisApplier = tdr.raisedCosTransformer(histOpts)
-                            fig, ax = basisApplier.plot_basis()
-                            if histOpts['useOrtho']:
-                                basisDF = basisApplier.orthobasisDF
-                            else:
-                                basisDF = basisApplier.ihbasisDF
-                            # hack to multiply by number of electrodes
-                            assert (len(factorNames) % basisDF.shape[1]) == 0
-                            nReps = int(len(factorNames) / basisDF.shape[1])
-                            for trialUID in range(nReps):
-                                basisDF.columns = factorNames[trialUID::nReps]
-                                irDF = plotIR.xs(trialUID, level='trialUID')
-                                fig, ax = plt.subplots(2, 1, sharex=True)
-                                for cN in basisDF.columns:
-                                    ax[0].plot(basisDF.index, basisDF[cN], label='basis {}'.format(cN))
-                                    ax[1].plot(basisDF.index, basisDF[cN] * coefs[cN], label='basis {} * coef'.format(cN))
-                                    ax[1].plot(irDF.index.get_level_values('bin'), irDF[cN], '--', label='IR {}'.format(cN))
-                                ax[0].legend()
-                                ax[1].legend()
-                ###########################
-                prf.print_memory_usage('Calculated IR for {}, {}\n'.format((lhsMaskIdx, designFormula), (rhsMaskIdx, targetName, fold)))
-                iRPerFactorDict1[(rhsMaskIdx, targetName, fold)] = outputIR
-                iRPerTermDict1[(rhsMaskIdx, targetName, fold)] = outputIRPerSource
-            iRPerFactorDict0[(lhsMaskIdx, designFormula)] = pd.concat(iRPerFactorDict1, names=['rhsMaskIdx', 'target', 'fold'])
-            iRPerTermDict0[(lhsMaskIdx, designFormula)] = pd.concat(iRPerTermDict1, names=['rhsMaskIdx', 'target', 'fold'])
-        #
-        iRPerFactor = pd.concat(iRPerFactorDict0, names=['lhsMaskIdx', 'design'])
-        iRPerFactor.columns.name = 'factor'
-        iRPerTerm = pd.concat(iRPerTermDict0, names=['lhsMaskIdx', 'design'])
-        iRPerTerm.columns.name = 'term'
-        #
-        trialInfoIR = iRPerTerm.index.to_frame().reset_index(drop=True)
-        stimConditionIR = pd.Series(np.nan, index=trialInfoIR.index)
-        stimOrderIR = []
-        for name, group in trialInfoIR.groupby(['electrode', 'trialRateInHz']):
-            stimConditionIR.loc[group.index] = '{} {}'.format(*name)
-            stimOrderIR.append('{} {}'.format(*name))
-        trialInfoIR.loc[:, 'stimCondition'] = stimConditionIR
-        stimConditionLookupIR = (
-            trialInfoIR
-                .loc[:, ['electrode', 'trialRateInHz', 'stimCondition']]
-                .drop_duplicates()
-                .set_index(['electrode', 'trialRateInHz'])['stimCondition'])
-        kinConditionIR = pd.Series(np.nan, index=trialInfoIR.index)
-        kinOrderIR = []
-        for name, group in trialInfoIR.groupby(['pedalMovementCat', 'pedalDirection']):
-            kinConditionIR.loc[group.index] = '{} {}'.format(*name)
-            kinOrderIR.append('{} {}'.format(*name))
-        trialInfoIR.loc[:, 'kinCondition'] = kinConditionIR
-        kinConditionLookupIR = (
-            trialInfoIR
-                .loc[:, ['pedalMovementCat', 'pedalDirection', 'kinCondition']]
-                .drop_duplicates()
-                .set_index(['pedalMovementCat', 'pedalDirection'])['kinCondition'])
-        iRPerTerm.index = pd.MultiIndex.from_frame(trialInfoIR)
-        #
-        iRPerTerm.to_hdf(estimatorPath, 'impulseResponsePerTerm')
-        iRPerFactor.to_hdf(estimatorPath, 'impulseResponsePerFactor')
-        stimConditionLookupIR.to_hdf(estimatorPath, 'impulseResponseStimConditionLookup')
-        kinConditionLookupIR.to_hdf(estimatorPath, 'impulseResponseKinConditionLookup')
-        #
-        termPalette.sort_index(inplace=True)
-        termPalette.to_hdf(estimatorPath, 'termPalette')
-        sourceTermLookup.sort_index(inplace=True)
-        sourceTermLookup.to_hdf(estimatorPath, 'sourceTermLookup')
-        factorPalette.to_hdf(estimatorPath, 'factorPalette')
-        print('Loaded and saved impulse responses')
-    #
+        # not allowed to save plot options - processOrdinaryLeastSquaresTransferFunction does it now.
+        '''
+            sourceTermLookup.to_hdf(estimatorPath, 'sourceTermLookup')
+            sourcePalette.to_hdf(estimatorPath, 'sourcePalette')
+            termPalette.to_hdf(estimatorPath, 'termPalette')
+            factorPalette.to_hdf(estimatorPath, 'factorPalette')
+            trialTypePalette.to_hdf(estimatorPath, 'trialTypePalette')
+            print('Loaded and saved plot options')'''
+    ###
     if (not loadedProcessedScores) or arguments['forceReprocess']:
         scoresStack = pd.concat({
                 'test': scoresDF['test_score'],
@@ -1253,58 +946,6 @@ if __name__ == '__main__':
                 kind='box', height=height, aspect=aspect)
             g.suptitle('AIC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
             g.set_xticklabels(rotation=-30, ha='left')
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-
-    pdfPath = os.path.join(
-        figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
-    with PdfPages(pdfPath) as pdf:
-        height, width = 2, 4
-        aspect = width / height
-        for (lhsMaskIdx, designFormula, rhsMaskIdx), thisIRPerTerm in iRPerTerm.groupby(['lhsMaskIdx', 'design', 'rhsMaskIdx']):
-            lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
-            lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
-            thisTitleFormula = lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']
-            print('Saving impulse response plots for {}'.format(thisTitleFormula))
-            if designFormula != 'NULL':
-                designInfo = designInfoDict[designFormula]
-                termNames = designInfo.term_names
-                histLens = [sourceHistOptsDict[tN.replace(' ', '')]['historyLen'] for tN in termNames]
-            else:
-                histLens = []
-            ensTemplate = lhsMaskParams['ensembleTemplate']
-            if ensTemplate != 'NULL':
-                ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
-                histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
-            selfTemplate = lhsMaskParams['selfTemplate']
-            if selfTemplate != 'NULL':
-                selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
-                histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
-            tBins = thisIRPerTerm.index.get_level_values('bin')
-            kernelMask = (tBins >= 0) & (tBins <= max(histLens))
-            plotDF = thisIRPerTerm.loc[kernelMask, :].stack().to_frame(name='signal').reset_index()
-            kinOrder = kinConditionLookupIR.loc[kinConditionLookupIR.isin(plotDF['kinCondition'])].to_list()
-            stimOrder = stimConditionLookupIR.loc[stimConditionLookupIR.isin(plotDF['stimCondition'])].to_list()
-            thisTermPalette = termPalette.loc[termPalette['term'].isin(plotDF['term']), :]
-            g = sns.relplot(
-                # row='kinCondition', row_order=kinOrder,
-                # col='stimCondition', col_order=stimOrder,
-                row='target',
-                x='bin', y='signal', hue='term',
-                hue_order=thisTermPalette['term'].to_list(),
-                palette=thisTermPalette.loc[:, ['term', 'color']].set_index('term')['color'].to_dict(),
-                kind='line', errorbar='se', data=plotDF,
-                )
-            g.set_axis_labels("Lag (sec)", 'contribution to target')
-            g.suptitle('Impulse responses (per term) for model {}'.format(thisTitleFormula))
-            asp.reformatFacetGridLegend(
-                g, titleOverrides={},
-                contentOverrides=termPalette.loc[:, ['term', 'source']].set_index('term')['source'].to_dict(),
-                styleOpts=styleOpts)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:

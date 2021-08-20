@@ -10,11 +10,11 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_plots_motion_27
+#SBATCH -J test_train_split_plots_motion_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_plots_motion_27.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_plots_motion_27.out
+#SBATCH -o ../../batch_logs/test_train_split_plots_motion_28-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_plots_motion_28-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

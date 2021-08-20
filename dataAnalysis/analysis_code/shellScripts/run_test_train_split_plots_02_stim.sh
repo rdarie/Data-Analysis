@@ -10,11 +10,11 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_plots_stim_27
+#SBATCH -J test_train_split_plots_stim_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_plots_stim_27.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_plots_stim_27.out
+#SBATCH -o ../../batch_logs/test_train_split_plots_stim_28-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_plots_stim_28-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -23,7 +23,7 @@
 #SBATCH --array=1
 
 #     SLURM_ARRAY_TASK_ID=1
-source shellScripts/run_exp_preamble.sh
+source shellScripts/run_exp_preamble_temp.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 #
 ITERATOR="--iteratorSuffix=pa"
@@ -36,7 +36,8 @@ python -u './calcTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --un
 ##
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --selectionName="lfp_CAR" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" --selectionName="lfp_CAR_spectral" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-##
+python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName="rig" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+#
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral_scaled" --unitQuery="lfp" --selectionName="lfp_CAR_spectral_scaled" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 ESTIMATOR='mahal_ledoit'
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_${ESTIMATOR}" --unitQuery="mahal" --selectionName="lfp_CAR_${ESTIMATOR}" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

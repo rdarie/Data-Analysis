@@ -14,8 +14,8 @@
 #SBATCH -J ols_motion_lfp_post_eigen_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ols_motion_lfp_post_eigen_27.out
-#SBATCH -e ../../batch_logs/%j-%a-ols_motion_lfp_post_eigen_27.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_post_eigen_27.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_post_eigen_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,13 +25,12 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source shellScripts/run_exp_preamble.sh
+source shellScripts/run_exp_preamble_temp.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-ITERATOR="rc"
-ITERATOR="rd"
+ITERATOR="ra"
 WINDOWTERM="XL"
 #
 SUFFIX=""
@@ -46,8 +45,8 @@ ESTIMATOR="enr_pca_ta${SUFFIX}"
 #  --forceReprocess
 ESTIMATOR="enr_fa_ta${SUFFIX}"
 # python -u './processOrdinaryLeastSquaresV2.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-# python -u './processOrdinaryLeastSquaresTransferFunctionV2.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-python -u './processOrdinaryLeastSquaresStateSpaceV2.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+python -u './processOrdinaryLeastSquaresTransferFunctionV2.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# python -u './processOrdinaryLeastSquaresStateSpaceV2.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 
 SUFFIX="_spectral"
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
