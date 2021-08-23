@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J test_train_split_assembler_rauc_27
+#SBATCH -J test_train_split_assembler_rauc_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_split_assembler_rauc_27.out
-#SBATCH -e ../../batch_logs/test_train_split_assembler_rauc_27.out
+#SBATCH -o ../../batch_logs/test_train_split_assembler_rauc_28.out
+#SBATCH -e ../../batch_logs/test_train_split_assembler_rauc_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -23,7 +23,7 @@
 #SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble_temp.sh
+source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
@@ -35,7 +35,7 @@ python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --
 # --preScale
 COMMONOPTS=" --iteratorSuffix=${ITERATOR} --loadFromFrames --exp=${EXP} ${WINDOW} ${ALIGNQUERY} ${ANALYSISFOLDER} ${ALIGNFOLDER} ${BLOCKSELECTOR} --plotting --verbose=2"
 python -u './assembleDataFrames.py' --inputBlockSuffix="lfp_CAR_${ESTIMATOR}" --selectionName="lfp_CAR_${ESTIMATOR}" $COMMONOPTS
-python -u './assembleDataFrames.py' --inputBlockSuffix="lfp_CAR_spectral_${ESTIMATOR}" --selectionName="lfp_CAR_spectral_${ESTIMATOR}" $COMMONOPTS
+python -u './assembleDataFrames.py' --inputBlockSuffix="lfp_CAR_spectral_scaled_${ESTIMATOR}" --selectionName="lfp_CAR_spectral_scaled_${ESTIMATOR}" $COMMONOPTS
 python -u './assembleDataFrames.py' --inputBlockSuffix="lfp_CAR" --selectionName="lfp_CAR" $COMMONOPTS
-python -u './assembleDataFrames.py' --inputBlockSuffix="lfp_CAR_spectral" --selectionName="lfp_CAR_spectral" $COMMONOPTS
+python -u './assembleDataFrames.py' --inputBlockSuffix="lfp_CAR_spectral_scaled" --selectionName="lfp_CAR_spectral_scaled" $COMMONOPTS
 python -u './assembleDataFrames.py' --inputBlockSuffix='rig' --selectionName='rig' $COMMONOPTS

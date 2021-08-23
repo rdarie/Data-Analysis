@@ -23,7 +23,7 @@
 #SBATCH --array=1
 
 #     SLURM_ARRAY_TASK_ID=1
-source shellScripts/run_exp_preamble_temp.sh
+source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 #
 ITERATOR="--iteratorSuffix=ma"

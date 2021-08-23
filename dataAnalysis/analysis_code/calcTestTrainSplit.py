@@ -54,8 +54,9 @@ from imblearn.under_sampling import RandomUnderSampler
 # import gc
 from docopt import docopt
 import pandas as pd
+from datetime import datetime
 from copy import copy, deepcopy
-print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -405,7 +406,7 @@ print('saving\n{}\n'.format(iteratorPath))
 with open(iteratorPath, 'wb') as f:
     pickle.dump(
         iteratorMetadata, f)
-
+print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
 '''if arguments['saveDataFrame']:
     outputDFPath = os.path.join(
         dataFramesFolder,

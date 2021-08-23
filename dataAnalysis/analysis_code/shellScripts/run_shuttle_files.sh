@@ -55,9 +55,12 @@ python --version
 
 # python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize
 
+# scratch to data
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.nix' --fromScratchToData --moveItems --filesIncluded
+
 # global operations
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_lfp_*.nix' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_lfp_*.nix' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.*' --fromDataToScratch --filesIncluded

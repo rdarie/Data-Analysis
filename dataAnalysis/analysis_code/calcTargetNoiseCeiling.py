@@ -68,7 +68,7 @@ alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
-calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+calcSubFolder = os.path.join(analysisSubFolder, 'dataframes')
 if not os.path.exists(calcSubFolder):
     os.makedirs(calcSubFolder, exist_ok=True)
 

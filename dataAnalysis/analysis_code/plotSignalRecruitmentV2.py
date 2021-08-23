@@ -159,6 +159,7 @@ limitPages = None
 #  End Overrides
 
 rawRecCurve = pd.read_hdf(resultPath, 'raw')
+recCurveFeatureInfo = rawRecCurve.columns.to_frame().reset_index(drop=True)
 rawRecCurve.columns = rawRecCurve.columns.get_level_values('feature')
 recCurve = rawRecCurve.stack().to_frame(name='rawRAUC')
 rauc = pd.read_hdf(resultPath, 'scaled')
@@ -180,6 +181,7 @@ pdfPath = os.path.join(
         'RAUC'))
 
 plotRC = recCurve.reset_index()
+plotRC.loc[:, 'freqBandName'] = plotRC['feature'].map(recCurveFeatureInfo[['feature', 'freqBandName']].set_index('feature')['freqBandName'])
 keepCols = ['segment', 'originalIndex', 'feature', 'lag', 'kinematicCondition'] + stimulusConditionNames
 dropCols = [
     idxName
@@ -190,6 +192,7 @@ refGroup = plotRC.loc[plotRC['electrode'] == 'NA', :]
 testGroup = plotRC.loc[plotRC['electrode'] != 'NA', :]
 
 averageRaucDF.loc[:, 'feature'] = 'averageFeature'
+averageRaucDF.loc[:, 'freqBandName'] = 'averageFeature'
 refGroupAverage = averageRaucDF.loc[averageRaucDF['electrode'] == 'NA', :]
 testGroupAverage = averageRaucDF.loc[averageRaucDF['electrode'] != 'NA', :]
 
@@ -201,7 +204,7 @@ hueName = 'kinematicCondition'
 hueOrder = sorted(np.unique(plotRC[hueName]))
 pal = sns.color_palette("Set2")
 huePalette = {hN: pal[hIdx] for hIdx, hN in enumerate(hueOrder)}
-rowName = 'feature'
+rowName = 'freqBandName'
 rowOrder = sorted(np.unique(plotRC[rowName]))
 colWrap = min(3, len(colOrder))
 height, width = 3, 3
@@ -232,7 +235,7 @@ def statsAnnotator(g, ro, co, hu, dataSubset):
     return
 
 
-
+# pdb.set_trace()
 titleLabelLookup = {
     'electrode = + E16 - E5': 'Stimulation (+ E16 - E5)',
     'electrode = NA': 'No stimulation',

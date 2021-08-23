@@ -584,10 +584,16 @@ if __name__ == '__main__':
                             ])
                         predDict0[(lhsMaskIdx, designFormula, rhsMaskIdx, targetName, foldIdx, foldType)] = predictionPerSource
         #
-        predDF = pd.concat(predDict0, names=['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'foldType'])
-        predDF.columns.name = 'term'
+        prf.print_memory_usage('Abount to concatenate coefficient DF')
         coefDF = pd.concat(coefDict0, names=['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'factor'])
+        del coefDict0
         coefDF.to_hdf(estimatorPath, 'coefficients')
+        ########################
+        prf.print_memory_usage('Abount to concatenate prediction DF')
+        predDF = pd.concat(predDict0, names=['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'foldType'])
+        del predDict0
+        predDF.columns.name = 'term'
+        prf.print_memory_usage('Saving prediction DF')
         predDF.to_hdf(estimatorPath, 'predictions')
         print('Loaded and saved predictions and coefficients')
     else:
