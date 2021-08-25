@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=250G
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_post_eigen_28
+#SBATCH -J ols_motion_lfp_post_scores_st_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_post_eigen_28.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_post_eigen_28.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_post_scores_st_27.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_post_scores_st_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -38,7 +38,6 @@ RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 
 #  --forceReprocess
-ESTIMATOR="enr_fa${SUFFIX}"
-python -u './processOrdinaryLeastSquaresV3.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-# python -u './processOrdinaryLeastSquaresTransferFunctionV3.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting &
-# python -u './processOrdinaryLeastSquaresStateSpaceV2.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+ESTIMATOR="enr_fa"
+python -u './processOrdinaryLeastSquaresVP2.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# python -u './processOrdinaryLeastSquaresPaperPlots.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting

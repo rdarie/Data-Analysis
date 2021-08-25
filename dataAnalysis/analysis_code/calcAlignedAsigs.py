@@ -37,9 +37,13 @@ import pandas as pd
 import quantities as pq
 import json
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
-from namedQueries import namedQueries
-from currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
+from datetime import datetime
+print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+for arg in sys.argv:
+    print(arg)
 arguments = {
     arg.lstrip('-'): value
     for arg, value in docopt(__doc__).items()}

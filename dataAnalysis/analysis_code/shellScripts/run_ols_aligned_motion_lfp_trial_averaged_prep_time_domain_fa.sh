@@ -10,11 +10,11 @@
 #SBATCH --mem=120G
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_prep_ta_td_fa_28
+#SBATCH -J ols_motion_lfp_prep_ta_td_fa_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_28.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_28.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_25.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_temp.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"

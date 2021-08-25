@@ -47,6 +47,251 @@ sns.set_style("whitegrid")
 
 eps = np.spacing(1)
 
+def optimalSVDThreshold(Y):
+    beta = Y.shape[0] / Y.shape[1]
+    omega = 0.56 * beta ** 3 - 0.95 * beta ** 2 + 1.82 * beta + 1.43
+    return omega
+
+def ERAMittnik(
+        N, maxNDim=None, endogNames=None, exogNames=None, plotting=False):
+    tBins = np.unique(N.columns.get_level_values('bin'))
+    nRegressors = len(endogNames + exogNames)
+    H0 = pd.concat([N.shift(-nRegressors * it, axis='columns').fillna(0) for it in range(tBins.size)])
+    H1 = H0.shift(-nRegressors, axis='columns').fillna(0)
+    u, s, vh = np.linalg.svd(H0, full_matrices=False)
+    if maxNDim is None:
+        optThresh = optimalSVDThreshold(H0) * np.median(s)
+        maxNDim = (s > optThresh).sum()
+    stateSpaceNDim = min(maxNDim, u.shape[0])
+    u = u[:, :stateSpaceNDim]
+    s = s[:stateSpaceNDim]
+    vh = vh[:stateSpaceNDim, :]
+    O = u @ np.diag(np.sqrt(s))
+    R = np.diag(np.sqrt(s)) @ vh
+    F = np.diag(np.sqrt(s) ** -1) @ u.T @ H1 @ vh.T @ np.diag(np.sqrt(s) ** -1)
+    C = pd.DataFrame(O[:len(endogNames), :], index=endogNames)
+    K = pd.DataFrame(R[:, :len(endogNames)], columns=endogNames)
+    G = pd.DataFrame(R[:, len(endogNames):len(endogNames) + len(exogNames)], columns=exogNames)
+    A = pd.DataFrame(F + K @ C)
+    A.columns.name = 'state'
+    A.index.name = 'state'
+    D = pd.DataFrame(N.xs(0, level='bin', axis='columns').loc[:, exogNames], index=endogNames, columns=exogNames)
+    B = pd.DataFrame(G + K @ D, columns=exogNames)
+    B.index.name = 'state'
+    if not plotting:
+        return A, B, C, D
+    else:
+        fig, ax = plt.subplots()
+        ax.plot(s)
+        ax.set_ylabel('eigenvalue of H0')
+        ax.axvline(maxNDim)
+        return A, B, C, D, fig, ax
+
+
+def ERA(
+        Phi, maxNDim=None, endogNames=None, exogNames=None,
+        plotting=False, nLags=None, method='ERA'):
+    tBins = np.unique(Phi.columns.get_level_values('bin'))
+    bins2Index = {bN: bIdx for bIdx, bN in enumerate(tBins)}
+    Phi.rename(columns=bins2Index, inplace=True)
+    # following notation from vicario 2014 (thesis)
+    p = Phi.columns.get_level_values('bin').max() # order of the varx model
+    Phi.loc[:, Phi.columns.get_level_values('bin') == p] = 0
+    q = len(endogNames)
+    m = len(exogNames)
+    N = nLags
+    Phi1 = {}
+    Phi2 = {}
+    Phi1[0] = Phi.xs(0, level='bin', axis='columns').loc[:, exogNames] # D
+    D = Phi1[0]
+    for j in range(1, N+1):
+        if j <= p:
+            Phi1[j] = Phi.xs(j, level='bin', axis='columns').loc[:, exogNames]
+            Phi2[j] = Phi.xs(j, level='bin', axis='columns').loc[:, endogNames]
+        else:
+            Phi1[j] = Phi.xs(p, level='bin', axis='columns').loc[:, exogNames] * 0
+            Phi2[j] = Phi.xs(p, level='bin', axis='columns').loc[:, endogNames] * 0
+    # matrix form from Juang 1992 (p. 324)
+    # lPhiMat * Psi_sDF = rPhiMat_s
+    # lPhiMat * Psi_gDF = rPhiMat_g
+    lPhiMatLastRowList = [
+        Phi2[k].reset_index(drop=True) * (-1) for k in range(N-1, 0, -1)
+    ] + [pd.DataFrame(np.eye(q))]
+    lPhiMatLastRow = pd.concat(lPhiMatLastRowList, axis='columns', ignore_index=True)
+    lPhiMat = pd.concat([
+        lPhiMatLastRow.shift(k * q * (-1), axis='columns').fillna(0)
+        for k in range(N-1, -1, -1)
+        ])
+    lPhiMatInv = np.linalg.inv(lPhiMat)
+    #
+    if D.any().any():
+        rPhiMat_s = pd.concat({
+            k: Phi1[k] + Phi2[k].to_numpy() @ D.to_numpy()
+            for k in range(1, N+1)
+            }, names=['bin'])
+    else:
+        rPhiMat_s = pd.concat({
+            k: Phi1[k]
+            for k in range(1, N+1)
+            }, names=['bin'])
+    Psi_sDF = lPhiMatInv @ rPhiMat_s
+    Psi_sDF.index = rPhiMat_s.index
+    Psi_sDF = Psi_sDF.unstack(level='bin')
+    Psi_sDF.sort_index(
+        axis='columns', level='bin', sort_remaining=False,
+        kind='mergesort', inplace=True)
+    #
+    rPhiMat_g = pd.concat({
+        k: Phi2[k]
+        for k in range(1, N+1)
+        }, names=['bin'])
+    Psi_gDF = lPhiMatInv @ rPhiMat_g
+    Psi_gDF.index = rPhiMat_g.index
+    Psi_gDF = Psi_gDF.unstack(level='bin')
+    Psi_gDF.sort_index(
+        axis='columns', level='bin',
+        sort_remaining=False, kind='mergesort',
+        inplace=True)
+    '''
+    # recursive substitution way
+    Psi_s = {}
+    Psi_g = {}
+    Psi_s[0] = Phi1[0]  # also D
+    for j in range(1, nLags):
+        print('j = {}'.format(j))
+        if j <= p:
+            Phi1[j] = Phi.xs(j, level='bin', axis='columns').loc[:, exogNames]
+            Phi2[j] = Phi.xs(j, level='bin', axis='columns').loc[:, endogNames]
+        else:
+            Phi1[j] = Phi.xs(p, level='bin', axis='columns').loc[:, exogNames] * 0
+            Phi2[j] = Phi.xs(p, level='bin', axis='columns').loc[:, endogNames] * 0
+        Psi_s[j] = Phi1[j]
+        Psi_g[j] = Phi2[j]
+        #
+        print('\tnorm(Phi1) = {}'.format(np.linalg.norm(Phi1[j])))
+        print('\tnorm(Phi2) = {}'.format(np.linalg.norm(Phi2[j])))
+        for h in range(1, j+1):
+            # print('\th = {}'.format(h))
+            Psi_s[j] += Phi2[h].to_numpy() @ Psi_s[j-h].to_numpy()
+            if h < j:
+                Psi_g[j] += Phi2[h].to_numpy() @ Psi_g[j-h].to_numpy()
+    #
+    Psi_sDF = pd.concat(Psi_s, axis='columns', names=['bin'])
+    Psi_gDF = pd.concat(Psi_g, axis='columns', names=['bin'])'''
+    if plotting:
+        dt = scipy.stats.mode(np.diff(tBins))[0][0]
+        fig, ax = plt.subplots(3, 1)
+        plotS = Psi_sDF.stack('feature')
+        plotG = Psi_gDF.stack('feature')
+        for rowName, row in plotS.iterrows():
+            ax[0].plot(row.index * dt, row, label=rowName)
+        for rowName, row in plotG.iterrows():
+            ax[1].plot(row.index * dt, row, label=rowName)
+        ax[0].set_title('System Markov parameters (Psi_s)')
+        ax[0].axvline(p * dt)
+        ax[0].legend()
+        ax[1].set_title('Gain Markov parameters (Psi_g)')
+        ax[1].axvline(p * dt)
+        ax[1].legend()
+        ax[1].set_xlabel('Time (sec)')
+    else:
+        fig, ax = None, None
+    PsiDF = pd.concat([Psi_gDF, Psi_sDF], axis='columns')
+    PsiDF.sort_index(
+        axis='columns', level=['bin'],
+        kind='mergesort', sort_remaining=False, inplace=True)
+    PsiDF.loc[:, PsiDF.columns.get_level_values('bin') == N] = 0.
+    ####
+    HComps = []
+    PsiBins = PsiDF.columns.get_level_values('bin')
+    for hIdx in range(1, int(N / 2) + 1):
+        HMask = (PsiBins >= hIdx) & (PsiBins < (hIdx + int(N / 2) - 1))
+        HComps.append(PsiDF.loc[:, HMask].to_numpy())
+    H0 = np.concatenate(HComps[:-1])
+    H1 = np.concatenate(HComps[1:])
+    if method == 'ERA':
+        svdTargetH = H0
+    elif method == 'ERADC':
+        HH0 = H0 @ H0.T
+        HH1 = H1 @ H0.T
+        svdTargetH = HH0
+    u, s, vh = np.linalg.svd(svdTargetH, full_matrices=False)
+    if maxNDim is None:
+        optThresh = optimalSVDThreshold(svdTargetH) * np.median(s[:int(N)])
+        maxNDim = (s > optThresh).sum()
+    stateSpaceNDim = min(maxNDim, u.shape[0])
+    if plotting:
+        ax[2].plot(s)
+        ax[2].set_title('singular values of Hankel matrix (ERA)')
+        ax[2].set_ylabel('s')
+        ax[2].axvline(stateSpaceNDim)
+        ax[2].set_xlabel('Count')
+    #
+    u = u[:, :stateSpaceNDim]
+    s = s[:stateSpaceNDim]
+    vh = vh[:stateSpaceNDim, :]
+    ###
+    O = u @ np.diag(np.sqrt(s))
+    RColMask = PsiDF.columns.get_level_values('bin').isin(range(len(HComps)))
+    if method == 'ERA':
+        R = pd.DataFrame(np.diag(np.sqrt(s)) @ vh, index=None, columns=PsiDF.loc[:, RColMask].columns)
+        ARaw = np.diag(np.sqrt(s) ** -1) @ u.T @ H1 @ vh.T @ np.diag(np.sqrt(s) ** -1)
+    elif method == 'ERADC':
+        R = pd.DataFrame(np.diag(np.sqrt(s)) @ u.T @ H0, index=None, columns=PsiDF.loc[:, RColMask].columns)
+        ARaw = np.diag(np.sqrt(s) ** -1) @ u.T @ HH1 @ vh.T @ np.diag(np.sqrt(s) ** -1)
+    ###
+    A = pd.DataFrame(ARaw)
+    A.columns.name = 'state'
+    A.index.name = 'state'
+    C = pd.DataFrame(O[:len(endogNames), :], index=endogNames)
+    BK = R.xs(1, level='bin', axis='columns')
+    B = BK.loc[:, exogNames]
+    B.index.name = 'state'
+    K = BK.loc[:, endogNames]
+    K.index.name = 'state'
+    ###
+    outputH = pd.DataFrame(svdTargetH)
+    outputH.columns.name = 'state'
+    outputH.index.name = 'state'
+    return A, B, K, C, D, outputH, (fig, ax,)
+
+
+def makeImpulseLike(
+        df, categoricalCols=[], categoricalIndex=[]):
+    for _, oneTrialDF in df.groupby('trialUID'):
+        break
+    impulseList = []
+    fillIndexCols = [cN for cN in oneTrialDF.index.names if cN not in ['bin', 'trialUID', 'conditionUID']]
+    fillCols = [cN for cN in oneTrialDF.columns if cN not in categoricalCols]
+    if not len(categoricalCols):
+        grouper = [('all', df),]
+    else:
+        grouper = df.groupby(categoricalCols)
+    uid = 0
+    for elecName, _ in grouper:
+        thisImpulse = oneTrialDF.copy()
+        thisTI = thisImpulse.index.to_frame().reset_index(drop=True)
+        thisTI.loc[:, fillIndexCols] = 'NA'
+        thisTI.loc[:, 'trialUID'] = uid
+        uid += 1
+        if len(categoricalCols):
+            if len(categoricalCols) == 1:
+                thisImpulse.loc[:, categoricalCols[0]] = elecName
+                thisTI.loc[:, categoricalIndex[0]] = elecName
+            else:
+                for idx, cN in enumerate(categoricalCols):
+                    thisImpulse.loc[:, cN] = elecName[idx]
+                    thisTI.loc[:, categoricalIndex[idx]] = elecName[idx]
+        #
+        tBins = thisImpulse.index.get_level_values('bin')
+        zeroBin = np.min(np.abs(tBins))
+        thisImpulse.loc[:, fillCols] = 0.
+        thisImpulse.loc[tBins == zeroBin, fillCols] = 1.
+        thisImpulse.index = pd.MultiIndex.from_frame(thisTI)
+        impulseList.append(thisImpulse)
+    impulseDF = pd.concat(impulseList)
+    return impulseDF
+
 
 def getR2(srs):
     lls = float(srs.xs('llSat', level='llType'))
@@ -612,6 +857,14 @@ class trialAwareStratifiedKFold:
             stratifyGroup = pd.DataFrame(np.nan, index=infoPerTrial.index, columns=['stratifyGroup'])
             for idx, (name, group) in enumerate(labelsPerTrial.groupby(self.stratifyFactors)):
                 stratifyGroup.loc[group.index, :] = idx
+            ## check that there are no single element groups
+            #
+            sgvc = stratifyGroup['stratifyGroup'].value_counts()
+            badIndices = stratifyGroup.index[stratifyGroup['stratifyGroup'].isin(sgvc.index[sgvc < 2].to_numpy())]
+            if not badIndices.empty:
+                print('trialAwareStratifiedKFold: ignoring single element groups:\n{}'.format(labelsPerTrial.loc[badIndices, :]))
+                infoPerTrial.drop(badIndices, inplace=True)
+                stratifyGroup.drop(badIndices, inplace=True)
         else:
             labelsPerTrial = pd.DataFrame(
                 np.ones((infoPerTrial.shape[0], 1)),
@@ -692,7 +945,6 @@ class trainTestValidationSplitter:
         (workIdx, validationIdx) = self.prelimSplitter.folds[0]
         # NB! workIdx, validationIdx might have repeats or missing values if we are resampling
         self.work, self.validation = self.prelimSplitter.raw_folds[0]
-        assert (np.union1d(self.work, self.validation) == np.arange(dataDF.shape[0])).all()
         self.workIterator = dummyFold(folds=[(workIdx, validationIdx,)])
         # however, prelimCV[1:] contains workIdx indices that are part of the validation set
         # here, we will re-split prelimCV's workIdx indices

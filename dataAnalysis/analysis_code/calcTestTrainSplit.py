@@ -54,8 +54,8 @@ from imblearn.under_sampling import RandomUnderSampler
 # import gc
 from docopt import docopt
 import pandas as pd
-from datetime import datetime
 from copy import copy, deepcopy
+from datetime import datetime
 print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)

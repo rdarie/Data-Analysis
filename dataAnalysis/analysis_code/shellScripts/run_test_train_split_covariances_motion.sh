@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_covariances_motion_27
+#SBATCH -J test_train_split_covariances_motion_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_split_covariances_motion_27-%a.out
-#SBATCH -e ../../batch_logs/test_train_split_covariances_motion_27-%a.out
+#SBATCH -o ../../batch_logs/test_train_split_covariances_motion_25-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_covariances_motion_25-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

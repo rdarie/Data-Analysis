@@ -500,8 +500,8 @@ def parseAnalysisOptions(
     except Exception:
         pass
     # args for the sklearn StratifiedShuffleSplit
-    defaultSamplerKWArgs = dict(random_state=42, test_size=0.5)
-    defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.2)
+    defaultSamplerKWArgs = dict(random_state=43, test_size=0.5)
+    defaultPrelimSamplerKWArgs = dict(random_state=43, test_size=0.2)
     # args for tdr.
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,

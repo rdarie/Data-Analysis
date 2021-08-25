@@ -148,7 +148,7 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'startingOnHighOrNone': '&'.join([
         namedQueries['align']['starting'],
-        namedQueries['align']['trialRateInHz==100or0']
+        namedQueries['align']['trialRateInHz>20or0']
         ])
     })
 namedQueries['align'].update({

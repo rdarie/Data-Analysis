@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J test_train_split_assembler_plots_27
+#SBATCH -J test_train_split_assembler_plots_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_assembler_plots_27.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_assembler_plots_27.out
+#SBATCH -o ../../batch_logs/test_train_split_assembler_plots_25.out
+#SBATCH -e ../../batch_logs/test_train_split_assembler_plots_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -23,7 +23,7 @@
 #SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_temp.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"

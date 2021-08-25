@@ -554,7 +554,7 @@ if __name__ == "__main__":
         writer.write_block(eventBlock, use_obj_names=True)
         writer.close()
     # 
-    minNObservations = 5
+    minNObservations = 0
     firstBinTrialInfo = trialInfo.loc[firstBinMask, :]
     goodTrialInfo = firstBinTrialInfo.loc[~outlierTrials['rejectBlock'].to_numpy().flatten().astype(bool), :]
     goodTrialCount = goodTrialInfo.groupby(stimulusConditionNames).count().iloc[:, 0].to_frame(name='count').reset_index()

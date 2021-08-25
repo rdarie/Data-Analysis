@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_regression_motion_27
+#SBATCH -J test_train_split_regression_motion_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_regression_motion_27.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_regression_motion_27.out
+#SBATCH -o ../../batch_logs/test_train_split_regression_motion_25-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_regression_motion_25-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 #SBATCH --export=CCV_HEADLESS=1
 
 #     SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_exp_preamble.sh
+source shellScripts/run_exp_preamble_temp.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 ITERATOR="--iteratorSuffix=ra"
@@ -37,7 +37,7 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 python -u './calcTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS
 ###
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --selectionName='lfp_CAR' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral_scaled" --unitQuery="lfp" --selectionName='lfp_CAR_spectral_scaled' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+#  python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral_scaled" --unitQuery="lfp" --selectionName='lfp_CAR_spectral_scaled' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 
 # next, go to run_test_train_split_assembler_xxx.sh

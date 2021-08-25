@@ -128,10 +128,10 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_rd', 'plotting': True,
+        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_ra', 'plotting': True,
         'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
         'verbose': '1', 'debugging': False, 'estimatorName': 'enr_fa_ta',
-        'blockIdx': '2', 'exp': 'exp202101271100'}
+        'blockIdx': '2', 'exp': 'exp202101281100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     
 '''
@@ -195,23 +195,80 @@ lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
 lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
 lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
 lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormula', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
-#
+for key in ['nb', 'logBasis', 'historyLen', 'useOrtho', 'normalize', 'addInputToOutput']:
+    # lhsMasksInfo.loc[:, key] = np.nan
+    for rowIdx, row in lhsMasksInfo.iterrows():
+        if row['designFormula'] in designHistOptsDict:
+            theseHistOpts = designHistOptsDict[row['designFormula']]
+            lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+        elif row['ensembleTemplate'] in templateHistOptsDict:
+            theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
+            lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+        else:
+            lhsMasksInfo.loc[rowIdx, key] = 'NULL'
+# lhsMasksInfo.loc[:, 'lagSpec'] = np.nan
+for rowIdx, row in lhsMasksInfo.iterrows():
+    if row['designFormula'] in designHistOptsDict:
+        theseHistOpts = designHistOptsDict[row['designFormula']]
+        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
+    elif row['ensembleTemplate'] in templateHistOptsDict:
+        theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
+        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
+    else:
+        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'NULL'
+###
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
 rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
 #
-with pd.HDFStore(estimatorPath) as store:
-    ADF = pd.read_hdf(store, 'A')
-    BDF = pd.read_hdf(store, 'B')
-    CDF = pd.read_hdf(store, 'C')
-    DDF = pd.read_hdf(store, 'D')
-    eigDF = pd.read_hdf(store, 'eigenvalues')
-    eigValPalette = pd.read_hdf(store, 'eigValPalette')
+
+if processSlurmTaskCount is not None:
+    ################ collect estimators and scores
+    AList = []
+    BList = []
+    CList = []
+    DList = []
+    HList = []
+    eigList = []
+    for workerIdx in range(processSlurmTaskCount):
+        thisEstimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(workerIdx))
+        AList.append(pd.read_hdf(thisEstimatorPath, 'A'))
+        BList.append(pd.read_hdf(thisEstimatorPath, 'B'))
+        CList.append(pd.read_hdf(thisEstimatorPath, 'C'))
+        DList.append(pd.read_hdf(thisEstimatorPath, 'D'))
+        HList.append(pd.read_hdf(thisEstimatorPath, 'H'))
+        eigList.append(pd.read_hdf(thisEstimatorPath, 'eigenvalues'))
+    ADF = pd.concat(AList)
+    BDF = pd.concat(BList)
+    CDF = pd.concat(CList)
+    DDF = pd.concat(DList)
+    HDF = pd.concat(HList)
+    eigDF = pd.concat(eigList)
+else:
+    with pd.HDFStore(estimatorPath) as store:
+        ADF = pd.read_hdf(store, 'A')
+        BDF = pd.read_hdf(store, 'B')
+        CDF = pd.read_hdf(store, 'C')
+        DDF = pd.read_hdf(store, 'D')
+        eigDF = pd.read_hdf(store, 'eigenvalues')
+        eigValPalette = pd.read_hdf(store, 'eigValPalette')
+#
+eigValTypes = ['oscillatory decay', 'pure decay', 'oscillatory growth', 'pure growth']
+eigValColors = sns.color_palette('Set2')
+eigValPaletteDict = {}
+eigValColorAlpha = 0.5
+for eIx, eType in enumerate(eigValTypes):
+    eigValPaletteDict[eType] = tuple([col for col in eigValColors[eIx]] + [eigValColorAlpha])
+eigValPalette = pd.Series(eigValPaletteDict)
+eigValPalette.index.name = 'eigValType'
+eigValPalette.name = 'color'
+eigValPalette.to_hdf(estimatorPath, 'eigValPalette')
 # check eigenvalue persistence over reduction of the state space dimensionality
 eigDF.loc[:, 'freqBandName'] = eigDF.reset_index()['rhsMaskIdx'].map(rhsMasksInfo['freqBandName']).to_numpy()
 eigDF.loc[:, 'designFormula'] = eigDF.reset_index()['lhsMaskIdx'].map(lhsMasksInfo['designFormula']).to_numpy()
 eigDF.loc[:, 'designFormulaLabel'] = eigDF.reset_index()['designFormula'].apply(lambda x: x.replace(' + ', ' +\n')).to_numpy()
 eigDF.loc[:, 'fullFormula'] = eigDF.reset_index()['lhsMaskIdx'].map(lhsMasksInfo['fullFormulaDescr']).to_numpy()
 eigDF.loc[:, 'fullFormulaLabel'] = eigDF.reset_index()['fullFormula'].apply(lambda x: x.replace(' + ', ' +\n')).to_numpy()
+########################################
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalue_reduction'))
 if False:
@@ -288,7 +345,9 @@ with PdfPages(pdfPath) as pdf:
             x='chi', data=eigGroup, ax=ax[1],
             color=eigValPalette['pure decay'], **commonOpts)
         ax[0].set_xlabel('Oscillation period (sec)')
+        ax[0].set_xlim(eigGroup.query('tau > 0')['tau'].quantile([0, .85]).to_list())
         ax[1].set_xlabel('Decay time constant (sec)')
+        ax[1].set_xlim(eigGroup['chi'].quantile([0, .99]).to_list())
         sns.despine(fig)
         fig.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
@@ -325,6 +384,32 @@ with PdfPages(pdfPath) as pdf:
         for inpIdx in range(sys.ninputs):
             for outIdx in range(sys.noutputs):
                 ax[inpIdx, outIdx].semilogy(f, mag[outIdx, inpIdx, :])'''
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'OKID_ERA'))
+with PdfPages(pdfPath) as pdf:
+    for name, thisH in HDF.groupby(['lhsMaskIdx', 'design', 'rhsMaskIdx']):
+        lhsMaskIdx, designFormula, rhsMaskIdx = name
+        # lhsMasksInfo.loc[lhsMaskIdx, :]
+        nLags = int(lhsMasksInfo.loc[lhsMaskIdx, 'historyLen'] / binInterval)
+        plotH = thisH.xs(lastFoldIdx, level='fold').dropna(axis='columns')
+        u, s, vh = np.linalg.svd(plotH, full_matrices=False)
+        optThresh = tdr.optimalSVDThreshold(plotH) * np.median(s[:int(nLags)])
+        optNDim = (s > optThresh).sum()
+        stateSpaceNDim = min(optNDim, u.shape[0])
+        fig, ax = plt.subplots(figsize=(3, 2))
+        ax.plot(s)
+        ax.set_title('singular values of Hankel matrix (ERA)\n{}'.format(lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']))
+        ax.set_ylabel('s')
+        ax.axvline(stateSpaceNDim, c='b', label='state space model order: {}'.format(stateSpaceNDim))
+        ax.axvline(nLags, c='g', label='AR(p) order: {}'.format(nLags))
+        ax.set_xlabel('Count')
+        ax.set_xlim([-1, stateSpaceNDim * 10])
+        ax.legend()
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
 
 '''pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues'))

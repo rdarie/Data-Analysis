@@ -11,11 +11,11 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_2021_01_27
+#SBATCH -J analysis_calc_2021_01_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-analysis_calc_2021_01_27.out
-#SBATCH -e ../../batch_logs/%j-%a-analysis_calc_2021_01_27.out
+#SBATCH -o ../../batch_logs/analysis_calc_2021_01_25-%a.out
+#SBATCH -e ../../batch_logs/analysis_calc_2021_01_25-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,8 +29,8 @@
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
-# EXP="exp202101251100"
-EXP="exp202101271100"
+EXP="exp202101251100"
+# EXP="exp202101271100"
 # EXP="exp202101281100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"

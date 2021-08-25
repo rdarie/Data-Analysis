@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J align_stim_2021_01_27_lfp
+#SBATCH -J align_stim_2021_01_25_lfp
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_align_stim_2021_01_27_lfp.out
-#SBATCH -e ../../batch_logs/%j_%a_align_stim_2021_01_27_lfp.out
+#SBATCH -o ../../batch_logs/align_stim_2021_01_25_lfp-%a.out
+#SBATCH -e ../../batch_logs/align_stim_2021_01_25_lfp-%a.out
 
 # Request custom resources
 #SBATCH --array=1,2

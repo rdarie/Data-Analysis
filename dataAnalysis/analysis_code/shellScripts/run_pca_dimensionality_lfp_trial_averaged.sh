@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J dimen_red_ta_28
+#SBATCH -J dimen_red_ta_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/dimen_red_ta_28.out
-#SBATCH -e ../../batch_logs/dimen_red_ta_28.out
+#SBATCH -o ../../batch_logs/dimen_red_ta_25.out
+#SBATCH -e ../../batch_logs/dimen_red_ta_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -27,7 +27,7 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_temp.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
@@ -36,10 +36,10 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ITERATOR="ra"
 ##################################################
 
-# targets=(lfp_CAR lfp_CAR_spectral)
+# targets=(lfp_CAR lfp_CAR_spectral lfp_CAR_spectral_scaled)
 # estimators=(fa_ta pca_ta)
 #
-targets=(lfp_CAR lfp_CAR_spectral_scaled)
+targets=(lfp_CAR)
 estimators=(fa_ta)
 for TARGET in "${targets[@]}"
 do

@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J dimen_red_st_27
+#SBATCH -J dimen_red_st_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/dimen_red_st_27.out
-#SBATCH -e ../../batch_logs/dimen_red_st_27.out
+#SBATCH -o ../../batch_logs/dimen_red_st_25.out
+#SBATCH -e ../../batch_logs/dimen_red_st_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
