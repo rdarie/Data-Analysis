@@ -57,10 +57,13 @@ pickle.settings['recurse'] = True
 import gc
 from itertools import product
 from docopt import docopt
-import colorsys
+import colorsys, sys
+
 idxSl = pd.IndexSlice
 #
 print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 # if debugging in a console:

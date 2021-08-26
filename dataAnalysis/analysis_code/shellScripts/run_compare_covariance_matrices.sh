@@ -10,11 +10,11 @@
 #SBATCH --mem=120G
 
 # Specify a job name:
-#SBATCH -J compare_covariances_28
+#SBATCH -J compare_covariances_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/compare_covariances_28.out
-#SBATCH -e ../../batch_logs/compare_covariances_28.out
+#SBATCH -o ../../batch_logs/compare_covariances_25.out
+#SBATCH -e ../../batch_logs/compare_covariances_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,13 +28,13 @@
 #   SBATCH --ntasks-per-core=4
 #   SBATCH --mem-per-cpu=64G
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_temp.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 iterators=(ca cb ccs ccm)
-estimators=(mahal_ledoit mahal_emp)
+estimators=(mahal_ledoit)
 
 TARGET="lfp_CAR"
 for ITER in "${iterators[@]}"

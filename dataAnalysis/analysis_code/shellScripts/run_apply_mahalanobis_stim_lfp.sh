@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J apply_mahal_dist_stim_lfp_28
+#SBATCH -J apply_mahal_dist_stim_lfp_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/apply_mahal_dist_stim_lfp_28-%a.out
-#SBATCH -e ../../batch_logs/apply_mahal_dist_stim_lfp_28-%a.out
+#SBATCH -o ../../batch_logs/apply_mahal_dist_stim_lfp_25-%a.out
+#SBATCH -e ../../batch_logs/apply_mahal_dist_stim_lfp_25-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 
 #   SLURM_ARRAY_TASK_ID=1
 
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_temp.sh
 source ./shellScripts/calc_aligned_stim_preamble.sh
 
 ####################

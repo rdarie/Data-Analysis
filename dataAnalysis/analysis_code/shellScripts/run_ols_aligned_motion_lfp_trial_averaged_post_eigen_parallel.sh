@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_post_eigen_27
+#SBATCH -J ols_motion_lfp_post_eigen_ta_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_post_eigen_27-%a.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_post_eigen_27-%a.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_post_eigen_ta_27-%a.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_post_eigen_ta_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
