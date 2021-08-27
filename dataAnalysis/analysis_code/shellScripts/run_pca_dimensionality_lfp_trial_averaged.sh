@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J dimen_red_ta_25
+#SBATCH -J dimen_red_ta_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/dimen_red_ta_25.out
-#SBATCH -e ../../batch_logs/dimen_red_ta_25.out
+#SBATCH -o ../../batch_logs/dimen_red_ta_27.out
+#SBATCH -e ../../batch_logs/dimen_red_ta_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -27,7 +27,7 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble_temp.sh
+source ./shellScripts/run_exp_preamble.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"

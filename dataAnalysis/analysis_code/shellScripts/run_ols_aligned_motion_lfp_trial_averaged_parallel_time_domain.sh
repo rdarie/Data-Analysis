@@ -16,8 +16,8 @@
 #SBATCH -J ols_motion_lfp_regression_ta_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_regression_ta_27.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_regression_ta_27.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/ols_motion_lfp_regression_ta_27-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/ols_motion_lfp_regression_ta_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -37,6 +37,6 @@ WINDOWTERM="XL"
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 #
-DIMRED="fa_ta"
+DIMRED="select_ta"
 ESTIMATOR="enr_${DIMRED}"
 python -u './calcGridSearchRegressionWithPipelinesV2.py' --transformerNameRhs="${DIMRED}" --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2

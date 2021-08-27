@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J apply_spectral_norm_motion_lfp_27
+#SBATCH -J apply_td_norm_motion_lfp_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/apply_spectral_norm_motion_lfp_27-%a.out
-#SBATCH -e ../../batch_logs/apply_spectral_norm_motion_lfp_27-%a.out
+#SBATCH -o ../../batch_logs/apply_td_norm_motion_lfp_27-%a.out
+#SBATCH -e ../../batch_logs/apply_td_norm_motion_lfp_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -33,10 +33,6 @@ ITERATOR="na"
 
 ALIGNQUERYTERM="starting"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
-
-TARGET=lfp_CAR_spectral
-ESTIMATOR=scaled
-python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET $VERBOSITY --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
 TARGET=lfp_CAR
 ESTIMATOR=scaled
 python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET $VERBOSITY --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS

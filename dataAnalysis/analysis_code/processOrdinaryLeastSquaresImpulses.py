@@ -849,3 +849,56 @@ sourceTermLookup.sort_index(inplace=True)
 sourceTermLookup.to_hdf(estimatorPath, 'sourceTermLookup')
 factorPalette.to_hdf(estimatorPath, 'factorPalette')
 #
+
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
+with PdfPages(pdfPath) as pdf:
+    height, width = 2, 4
+    aspect = width / height
+    for (lhsMaskIdx, designFormula, rhsMaskIdx), thisIRPerTerm in iRPerTerm.groupby(
+            ['lhsMaskIdx', 'design', 'rhsMaskIdx']):
+        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+        lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+        thisTitleFormula = lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']
+        print('Saving impulse response plots for {}'.format(thisTitleFormula))
+        if designFormula != 'NULL':
+            designInfo = designInfoDict[designFormula]
+            termNames = designInfo.term_names
+            histLens = [sourceHistOptsDict[tN.replace(' ', '')]['historyLen'] for tN in termNames]
+        else:
+            histLens = []
+        ensTemplate = lhsMaskParams['ensembleTemplate']
+        if ensTemplate != 'NULL':
+            ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+            histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+        selfTemplate = lhsMaskParams['selfTemplate']
+        if selfTemplate != 'NULL':
+            selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+            histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+        tBins = thisIRPerTerm.index.get_level_values('bin')
+        kernelMask = (tBins >= 0) & (tBins <= max(histLens))
+        plotDF = thisIRPerTerm.loc[kernelMask, :].stack().to_frame(name='signal').reset_index()
+        kinOrder = kinConditionLookupIR.loc[kinConditionLookupIR.isin(plotDF['kinCondition'])].to_list()
+        stimOrder = stimConditionLookupIR.loc[stimConditionLookupIR.isin(plotDF['stimCondition'])].to_list()
+        thisTermPalette = termPalette.loc[termPalette['term'].isin(plotDF['term']), :]
+        g = sns.relplot(
+            # row='kinCondition', row_order=kinOrder,
+            # col='stimCondition', col_order=stimOrder,
+            row='target',
+            x='bin', y='signal', hue='term',
+            hue_order=thisTermPalette['term'].to_list(),
+            palette=thisTermPalette.loc[:, ['term', 'color']].set_index('term')['color'].to_dict(),
+            kind='line', errorbar='se', data=plotDF,
+        )
+        g.set_axis_labels("Lag (sec)", 'contribution to target')
+        g.suptitle('Impulse responses (per term) for model {}'.format(thisTitleFormula))
+        asp.reformatFacetGridLegend(
+            g, titleOverrides={},
+            contentOverrides=termPalette.loc[:, ['term', 'source']].set_index('term')['source'].to_dict(),
+            styleOpts=styleOpts)
+        g.tight_layout(pad=styleOpts['tight_layout.pad'])
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()

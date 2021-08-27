@@ -641,7 +641,7 @@ def parseAnalysisOptions(
                 ),
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
-                'winStart': -0.2,  # start 0.2 before whatever the query was
+                'winStart': -0.7,  # start 0.2 before whatever the query was
                 'winStop': .5  # stop .5 sec after startingOrStimOn
             },
             'timeROIOpts_control': {

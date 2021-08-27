@@ -372,4 +372,4 @@ allD = pd.concat(DDict, names=iRGroupNames)
 allD.to_hdf(estimatorPath, 'D')
 allH = pd.concat(HDict, names=iRGroupNames)
 allH.to_hdf(estimatorPath, 'H')
-####
+print('\n' + '#' * 50 + '\n{} Complete.\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

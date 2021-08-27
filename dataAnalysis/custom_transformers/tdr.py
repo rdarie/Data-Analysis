@@ -701,7 +701,7 @@ class raisedCosTransformer(object):
             resDF = resDF.loc[vecSrs.index, :]
             resDF.columns = columnNames
         if self.addInputToOutput:
-            sig = self.preprocFun(vercSrs)
+            sig = self.preprocFun(vecSrs)
             resDF.insert(0, 0., sig)
         if self.selectColumns is not None:
             resDF = resDF.iloc[:, self.selectColumns]
@@ -749,6 +749,25 @@ class DataFrameAverager(TransformerMixin, BaseEstimator):
     def inverse_transform(self, X):
         return X
 
+
+class DataFrameBinTrimmer(TransformerMixin, BaseEstimator):
+    def __init__(
+            self, burnInPeriod=None):
+        self.burnInPeriod = burnInPeriod
+        return
+    #
+    def fit(self, X, y=None):
+        return self
+    #
+    def transform(self, X):
+        if self.burnInPeriod is not None:
+            tBins = X.index.get_level_values('bin')
+            burnInMask = tBins > (tBins.min() + self.burnInPeriod)
+            X = X.loc[burnInMask, :]
+        return X
+    #
+    def inverse_transform(self, X):
+        return X
 
 class DataFramePassThrough(TransformerMixin, BaseEstimator):
     def __init__(self):
@@ -1223,22 +1242,25 @@ class flatStandardScaler(StandardScaler):
 
     def fit(self, X, y=None):
         if isinstance(X, pd.DataFrame):
+            self.means_per_column_ = X.mean()
             super().fit(X.to_numpy().reshape(-1, 1), y=y)
         else:
+            self.means_per_column_ = np.mean(X)
             super().fit(X.reshape(-1, 1), y=y)
         return self
 
     def transform(self, X):
         originalShape = X.shape
         if isinstance(X, pd.DataFrame):
-            res = super().transform(X.to_numpy().reshape(-1, 1))
+            res = super().transform(
+                (X - self.means_per_column_).to_numpy().reshape(-1, 1))
         else:
-            res = super().transform(X.reshape(-1, 1))
+            res = super().transform((X - self.means_per_column_).reshape(-1, 1))
         if isinstance(X, pd.DataFrame):
             output = pd.DataFrame(np.reshape(res, originalShape), index=X.index, columns=X.columns)
         else:
             output = np.reshape(res, originalShape)
-        '''if False:
+        '''if True:
             fig, ax = plt.subplots(2, 1)
             ax[0].plot(X.xs(1, level='conditionUID').iloc[:, 0].to_numpy())
             ax[1].plot(output.xs(1, level='conditionUID').iloc[:, 0].to_numpy())

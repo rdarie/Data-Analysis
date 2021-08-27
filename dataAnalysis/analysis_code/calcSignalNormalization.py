@@ -154,7 +154,7 @@ if __name__ == '__main__':
         dataGroup = dataDF.loc[:, featureMask]
         print('dataGroup.shape = {}'.format(dataGroup.shape))
         trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
-        estimator = tdr.flatStandardScaler()
+        estimator = tdr.flatStandardScaler(with_mean=False)
         lOfColumnTransformers.append((
             # transformer name
             trfName,

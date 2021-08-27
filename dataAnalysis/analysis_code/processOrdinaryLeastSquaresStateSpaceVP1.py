@@ -411,6 +411,7 @@ with PdfPages(pdfPath) as pdf:
         else:
             plt.close()
 
+#
 '''pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues'))
 with PdfPages(pdfPath) as pdf:

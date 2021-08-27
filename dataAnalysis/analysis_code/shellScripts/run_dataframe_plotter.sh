@@ -29,7 +29,7 @@
 #   SBATCH --mem-per-cpu=64G
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble_temp.sh
+source ./shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
@@ -47,21 +47,21 @@ OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW
 #   done
 # done
 
-iterators=(pa)
-for ITER in "${iterators[@]}"
-do
-  # python -u './plotMiscAdditionalFigures.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  ##
-  python -u './plotSignalDataFrame.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  python -u './plotSignalDataFrame.py' --plotSuffix="lfp_illustration" --verbose=1 --selectionName=lfp_CAR $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  #
-  # python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  # python -u './plotSignalDataFrame.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled_mahal_ledoit $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  # python -u './plotSignalDataFrame.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName=lfp_CAR_mahal_ledoit $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-done
+#  iterators=(pa)
+#  for ITER in "${iterators[@]}"
+#  do
+#    # python -u './plotMiscAdditionalFigures.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#    # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#    # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#    ##
+#    python -u './plotSignalDataFrame.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#    python -u './plotSignalDataFrame.py' --plotSuffix="lfp_illustration" --verbose=1 --selectionName=lfp_CAR $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#    python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#    #
+#    # python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#    # python -u './plotSignalDataFrame.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled_mahal_ledoit $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#    # python -u './plotSignalDataFrame.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName=lfp_CAR_mahal_ledoit $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+#  done
 
-# ITER=ra
-# python -u './plotSignalDataFrame.py' --plotSuffix="factor_illustration" --verbose=1 --selectionName=lfp_CAR_fa_ta $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+ITER=ra
+python -u './plotSignalDataFrame.py' --plotSuffix="factor_illustration" --verbose=1 --selectionName=lfp_CAR_fa $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"

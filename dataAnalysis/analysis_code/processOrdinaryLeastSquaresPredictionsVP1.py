@@ -232,7 +232,6 @@ if __name__ == '__main__':
                 # pdb.set_trace()
                 maskForPlot = (
                     (thisPred['lhsMaskIdx'].isin([19, 28, 29])) &
-                    (thisPred['target'] == 'fa_all001') &
                     (thisPred['trialType'] == trialTypeToPlot) &
                     (thisPred['trialRateInHz'] > 50)
                     )
@@ -251,7 +250,6 @@ if __name__ == '__main__':
                     # pdb.set_trace()
                     maskForPlotScore = (
                             (thisScoresStack['lhsMaskIdx'].isin([19, 28, 29])) &
-                            (thisScoresStack['target'] == 'fa_all001') &
                             (thisScoresStack['foldType'] == trialTypeToPlot)
                         )
                     print('these scoresStack, thisScoresStack.shape = {}'.format(thisScoresStack.shape))

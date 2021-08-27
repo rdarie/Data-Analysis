@@ -102,7 +102,7 @@ argumentsLookup = {
     'factor_illustration': {
         'recalcStats': True,
         'winStart': '-250', 'winStop': '500', 'limitPages': None,
-        'unitQuery': "chanName.isin(['fa_ta_all001#0', 'fa_ta_all002#0', 'fa_ta_all003#0', 'fa_ta_all004#0'])", 'alignQuery': None,
+        'unitQuery': "chanName.isin(['fa_all001#0', 'fa_all002#0', 'fa_all003#0', 'fa_all004#0'])", 'alignQuery': None,
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',

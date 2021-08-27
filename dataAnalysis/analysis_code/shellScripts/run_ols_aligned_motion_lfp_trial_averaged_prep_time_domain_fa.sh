@@ -32,10 +32,10 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ITERATOR="ra"
 WINDOWTERM="XL"
 ################################################################################################################
+#
 ## time domain, trial-averaged
 SUFFIX=""
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
-#
 ESTIMATOR="enr_fa_ta${SUFFIX}"
 python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa_ta' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1

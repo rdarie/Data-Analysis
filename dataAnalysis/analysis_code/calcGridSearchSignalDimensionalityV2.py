@@ -43,6 +43,7 @@ import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.custom_transformers.tdr import reconstructionR2
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.regression_parameters import *
 import pdb
 import numpy as np
 import pandas as pd
@@ -257,7 +258,7 @@ if __name__ == '__main__':
         trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
         ###
         estimatorInstance = Pipeline([
-            ('averager', tdr.DataFramePassThrough()),
+            ('averager', tdr.DataFrameBinTrimmer(burnInPeriod=burnInPeriod)),
             ('dim_red', estimatorClass(**estimatorKWArgs))])
         ###
         if arguments['verbose']:
@@ -280,6 +281,7 @@ if __name__ == '__main__':
         cvScoresDF.index.name = 'fold'
         cvScoresDF.dropna(axis='columns', inplace=True)
         cvScoresDict[maskParams['freqBandName']] = cvScoresDF
+        pdb.set_trace()
         #
         #############################################################################
         if arguments['calculateFullModels']:
@@ -363,7 +365,8 @@ if __name__ == '__main__':
         for rowIdx, row in scoresDF.iterrows():
             newEstimatorInstance = Pipeline([
                 ('averager', tdr.DataFrameAverager(
-                    stimConditionNames=stimulusConditionNames + ['bin'], addIndexFor=stimulusConditionNames)),
+                    stimConditionNames=stimulusConditionNames + ['bin'],
+                    addIndexFor=stimulusConditionNames, burnInPeriod=burnInPeriod)),
                 ('dim_red', row['estimator'].named_steps['dim_red'])])
             scoresDF.loc[rowIdx, 'estimator'] = newEstimatorInstance
     print('\n\nSaving {}\n\n'.format(estimatorPath))
@@ -376,7 +379,6 @@ if __name__ == '__main__':
         scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv_scores')
     except Exception:
         traceback.print_exc()
-        pdb.set_trace()
     #
     if hasattr(scoresDF['estimator'].iloc[0].named_steps['dim_red'], 'n_iter_'):
         nIters = scoresDF['estimator'].apply(lambda es: es.named_steps['dim_red'].n_iter_)

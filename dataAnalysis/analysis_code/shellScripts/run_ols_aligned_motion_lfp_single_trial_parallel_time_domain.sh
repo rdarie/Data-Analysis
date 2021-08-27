@@ -16,15 +16,16 @@
 #SBATCH -J ols_motion_lfp_st_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_st_27.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_st_27.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/ols_motion_lfp_st_27-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/ols_motion_lfp_st_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
 #SBATCH --array=0-56
-source shellScripts/run_exp_preamble_temp.sh
+
+source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="starting"
