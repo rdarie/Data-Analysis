@@ -192,6 +192,15 @@ windowSize = [
 #       'elec77#0_raster', 'elec77#1_raster', 'elec77#2_raster',
 #       ]
 
+#### diagnostics
+diagnosticFolder = os.path.join(
+    processedFolder,
+    'figures', 'preprocDiagnostics',
+    # fileName + nameSuffix + partNameSuffix
+)
+if not os.path.exists(diagnosticFolder):
+    os.makedirs(diagnosticFolder, exist_ok=True)
+
 ns5.getAsigsAlignedToEvents(
     eventBlock=eventBlock, signalBlock=signalBlock,
     chansToTrigger=arguments['chanNames'],
@@ -204,5 +213,7 @@ ns5.getAsigsAlignedToEvents(
     verbose=arguments['verbose'],
     fileName=prefix + '_{}_{}'.format(
         arguments['outputBlockSuffix'], arguments['window']),
-    folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)
+    folderPath=alignSubFolder,
+    breakdownFolderPath=diagnosticFolder,
+    chunkSize=alignedAsigsChunkSize)
 print('Done calcAlignedAsigs')

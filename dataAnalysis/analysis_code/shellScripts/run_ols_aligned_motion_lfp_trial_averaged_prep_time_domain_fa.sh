@@ -10,11 +10,11 @@
 #SBATCH --mem=120G
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_prep_ta_td_fa_25
+#SBATCH -J ols_motion_lfp_prep_ta_td_fa_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_25.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_25.out
+#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_28.out
+#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_ta_td_fa_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -38,4 +38,4 @@ SUFFIX=""
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 ESTIMATOR="enr_fa_ta${SUFFIX}"
-python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa_ta' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs='fa_ta' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1

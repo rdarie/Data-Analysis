@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=200G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J test_train_split_regression_stim_27
@@ -28,7 +28,7 @@ source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 ###
 
-ITERATOR="--iteratorSuffix=ra"
+ITERATOR="--iteratorSuffix=re"
 ALIGNQUERYTERM="stimOnHighRate"
 CONTROLSTATUS=""
 #

@@ -10,16 +10,16 @@
 #SBATCH --mem=64G
 
 # Specify a job name:
-#SBATCH -J qa_motion_2021_01_28
+#SBATCH -J qa_motion_2021_01_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_28.out
-#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_28.out
+#SBATCH -o ../../batch_logs/qa_motion_2021_01_27.out
+#SBATCH -e ../../batch_logs/qa_motion_2021_01_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_exp_preamble.sh

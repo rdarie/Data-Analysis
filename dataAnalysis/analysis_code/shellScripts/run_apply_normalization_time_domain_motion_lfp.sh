@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J apply_td_norm_motion_lfp_27
+#SBATCH -J apply_td_norm_motion_lfp_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/apply_td_norm_motion_lfp_27-%a.out
-#SBATCH -e ../../batch_logs/apply_td_norm_motion_lfp_27-%a.out
+#SBATCH -o ../../batch_logs/apply_td_norm_motion_lfp_20-%a.out
+#SBATCH -e ../../batch_logs/apply_td_norm_motion_lfp_20-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 
 #  SLURM_ARRAY_TASK_ID=3
 
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_20.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 ###################

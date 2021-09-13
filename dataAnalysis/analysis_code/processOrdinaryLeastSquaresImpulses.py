@@ -45,7 +45,21 @@ from scipy.stats import zscore, mode
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
-from dataAnalysis.analysis_code.regression_parameters import *
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+# if debugging in a console:
+'''
+
+consoleDebugging = True
+if consoleDebugging:
+    arguments = {
+        'showFigures': False, 'analysisName': 'hiRes', 'exp': 'exp202101271100', 'datasetName': 'Block_XL_df_rb',
+        'debugging': False, 'blockIdx': '2', 'alignFolderName': 'motion', 'estimatorName': 'enr2_select_scaled',
+        'plotting': True, 'verbose': '1', 'processAll': True}
+    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+'''
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
+
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
@@ -56,7 +70,7 @@ import dill as pickle
 pickle.settings['recurse'] = True
 import gc
 from itertools import product
-from docopt import docopt
+
 import colorsys
 idxSl = pd.IndexSlice
 useDPI = 200
@@ -101,25 +115,13 @@ styleOpts = {
     'panel_heading.pad': 0.
     }
 sns.set(
-    context='paper', style='white',
+    context='paper', style='whitegrid',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 #
 print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-
-# if debugging in a console:
-'''
-consoleDebugging = True
-if consoleDebugging:
-    arguments = {
-        'showFigures': False, 'analysisName': 'hiRes', 'exp': 'exp202101271100', 'datasetName': 'Block_XL_df_ra',
-        'debugging': False, 'blockIdx': '2', 'alignFolderName': 'motion', 'estimatorName': 'enr_fa_ta',
-        'plotting': True, 'verbose': '1', 'processAll': True}
-    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-'''
 
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -180,163 +182,10 @@ lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
 allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
 #
-lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
-lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
-lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
-lhsMasksInfo.loc[:, 'designFormulaShortHand'] = lhsMasksInfo['designFormula'].apply(lambda x: formulasShortHand[x])
-lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormulaShortHand', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
+lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
+stimConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'stimConditionLookup')
+kinConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'kinConditionLookup')
 #
-rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
-
-#
-rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
-rhsMasksInfo.to_hdf(estimatorPath, 'rhsMasksInfo')
-###
-lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
-lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
-lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
-lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:,
-                                          ['designFormula', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(
-    lambda x: ' + '.join(x), axis='columns')
-for key in ['nb', 'logBasis', 'historyLen', 'useOrtho', 'normalize', 'addInputToOutput']:
-    # lhsMasksInfo.loc[:, key] = np.nan
-    for rowIdx, row in lhsMasksInfo.iterrows():
-        if row['designFormula'] in designHistOptsDict:
-            theseHistOpts = designHistOptsDict[row['designFormula']]
-            lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
-        elif row['ensembleTemplate'] in templateHistOptsDict:
-            theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
-            lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
-        else:
-            lhsMasksInfo.loc[rowIdx, key] = 'NULL'
-# lhsMasksInfo.loc[:, 'lagSpec'] = np.nan
-for rowIdx, row in lhsMasksInfo.iterrows():
-    if row['designFormula'] in designHistOptsDict:
-        theseHistOpts = designHistOptsDict[row['designFormula']]
-        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
-    elif row['ensembleTemplate'] in templateHistOptsDict:
-        theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
-        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
-    else:
-        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'NULL'
-    for rowIdx, row in lhsMasksInfo.iterrows():
-        if row['designFormula'] in designHistOptsDict:
-            theseHistOpts = designHistOptsDict[row['designFormula']]
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
-        else:
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'NULL'
-htmlPath = os.path.join(
-    figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'designs_info'))
-lhsMasksInfo.drop(columns=['lag', 'maskName']).to_html(htmlPath)
-lhsMasksInfo.to_hdf(estimatorPath, 'lhsMasksInfo')
-###
-trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
-stimCondition = pd.Series(np.nan, index=trialInfo.index)
-stimOrder = []
-for name, group in trialInfo.groupby(['electrode', 'trialRateInHz']):
-    stimCondition.loc[group.index] = '{} {}'.format(*name)
-    stimOrder.append('{} {}'.format(*name))
-trialInfo.loc[:, 'stimCondition'] = stimCondition
-stimConditionLookup = (
-    trialInfo
-        .loc[:, ['electrode', 'trialRateInHz', 'stimCondition']]
-        .drop_duplicates()
-        .set_index(['electrode', 'trialRateInHz'])['stimCondition'])
-kinCondition = pd.Series(np.nan, index=trialInfo.index)
-kinOrder = []
-for name, group in trialInfo.groupby(['pedalMovementCat', 'pedalDirection']):
-    kinCondition.loc[group.index] = '{} {}'.format(*name)
-    kinOrder.append('{} {}'.format(*name))
-trialInfo.loc[:, 'kinCondition'] = kinCondition
-kinConditionLookup = (
-    trialInfo
-        .loc[:, ['pedalMovementCat', 'pedalDirection', 'kinCondition']]
-        .drop_duplicates()
-        .set_index(['pedalMovementCat', 'pedalDirection'])['kinCondition'])
-#
-stimConditionLookup.to_hdf(estimatorPath, 'stimConditionLookup')
-kinConditionLookup.to_hdf(estimatorPath, 'kinConditionLookup')
-####
-################ define model comparisons
-# "test" should be the "bigger" model (we are adding coefficients and asking whether they improved performance
-modelsToTest = []
-for lhsMaskIdx in [1, 2, 20, 21, 39, 40]:
-    modelsToTest.append({
-        'testDesign': lhsMaskIdx,
-        'refDesign': lhsMaskIdx + 2,
-        'testCaption': 'v + a + r + va + vr + ar (+ var)',
-        'refCaption': 'v + a + r + va + vr + ar',
-        'captionStr': 'partial R2 of adding second order interaction terms',
-        'testType': 'secondOrderInteractions',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-    })
-for lhsMaskIdx in [3, 4, 22, 23, 41, 42]:
-    modelsToTest.append({
-        'testDesign': lhsMaskIdx,
-        'refDesign': lhsMaskIdx + 2,
-        'testCaption': 'v + a + r + va + vr (+ ar)',
-        'refCaption': 'v + a + r + va + vr',
-        'captionStr': 'partial R2 of adding the AR interaction term',
-        'testType': 'ARInteractions',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-    })
-    modelsToTest.append({
-        'testDesign': lhsMaskIdx,
-        'refDesign': lhsMaskIdx + 4,
-        'testCaption': 'v + a + r (+ va + vr) + ar',
-        'refCaption': 'v + a + r + ar',
-        'captionStr': 'partial R2 of adding the VR and VA interaction terms',
-        'testType': 'VAVRInteractions',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-    })
-for lhsMaskIdx in [9, 10, 28, 29, 47, 48]:
-    modelsToTest.append({
-        'testDesign': lhsMaskIdx,
-        'refDesign': lhsMaskIdx + 8,
-        'testCaption': 'v + (a + r)',
-        'refCaption': 'v',
-        'captionStr': 'partial R2 of adding terms for A and R',
-        'testType': 'ARTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-    })
-    modelsToTest.append({
-        'testDesign': lhsMaskIdx,
-        'refDesign': lhsMaskIdx + 6,
-        'testCaption': '(v +) a + r',
-        'refCaption': 'a + r',
-        'captionStr': 'partial R2 of adding terms for V',
-        'testType': 'VTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-    })
-for lhsMaskIdx in [10, 29, 48]:
-    modelsToTest.append({
-        'testDesign': lhsMaskIdx,
-        'refDesign': lhsMaskIdx - 1,
-        'testCaption': 'v + a + r (+ ensemble_history)',
-        'refCaption': 'v + a + r',
-        'captionStr': 'partial R2 of adding terms for signal ensemble history to V+A+R',
-        'testType': 'ensembleTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-    })
-    modelsToTest.append({
-        'testDesign': lhsMaskIdx,
-        'refDesign': lhsMaskIdx - 10,
-        'testCaption': '(v + a + r +) ensemble_history',
-        'refCaption': 'ensemble_history',
-        'captionStr': 'partial R2 of adding terms for V+A+R to ensemble history',
-        'testType': 'VARNoEnsembleTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-    })
-modelsToTestDF = pd.DataFrame(modelsToTest)
-modelsToTestDF.to_hdf(estimatorPath, 'modelsToTest')
-#################
 estimatorsDict = {}
 if processSlurmTaskCount is not None:
     slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / processSlurmTaskCount))
@@ -347,11 +196,20 @@ for rowIdx, row in allTargetsDF.iterrows():
         thisEstimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(row['parentProcess']))
     else:
         thisEstimatorPath = estimatorPath
-    estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
+    '''estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
         thisEstimatorPath,
         'cv_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
             lhsMaskIdx, rhsMaskIdx, targetName
-            ))
+            ))'''
+    thisEstimatorJBPath = os.path.join(
+        thisEstimatorPath.replace('.h5', ''),
+        'cv_estimators__lhsMask_{}__rhsMask_{}__{}.joblib'.format(
+            lhsMaskIdx, rhsMaskIdx, targetName
+        ))
+    thisEstimatorJBDict = jb.load(thisEstimatorJBPath)
+    thisEstimatorJB = pd.Series(thisEstimatorJBDict)
+    thisEstimatorJB.index.name = 'fold'
+    estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = thisEstimatorJB
 estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
 
 # prep rhs dataframes
@@ -442,12 +300,11 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
         designInfo = None
         designDF = None
         designTermNames = []
-    #
     # add ensemble to designDF?
     ensTemplate = lhsMaskParams['ensembleTemplate']
     selfTemplate = lhsMaskParams['selfTemplate']
     for rhsMaskIdx in range(rhsMasks.shape[0]):
-        print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
+        print('\n    Extracting coefficients on rhsRow {}\n'.format(rhsMaskIdx))
         rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
         rhsMaskParams = {k: v for k, v in zip(rhsMask.index.names, rhsMask.name)}
         rhGroup = pd.read_hdf(
@@ -518,14 +375,14 @@ coefDF.to_hdf(estimatorPath, 'coefficients')
 termPalette = pd.concat({
     'exog': pd.Series(np.unique(np.concatenate([di.term_names for di in designInfoDF['designInfo']]))),
     'endog': pd.Series(np.unique(np.concatenate([di.term_names for di in histDesignInfoDF['designInfo']]))),
-    'other': pd.Series(['prediction', 'ground_truth']),
+    'other': pd.Series(['prediction', 'ground_truth', 'residuals']),
     }, names=['type', 'index']).to_frame(name='term')
 sourceTermLookup = pd.concat({
     'exog': pd.Series(sourceTermDict).to_frame(name='source'),
     'endog': pd.Series(histSourceTermDict).to_frame(name='source'),
     'other': pd.Series(
-        ['prediction', 'ground_truth'],
-        index=['prediction', 'ground_truth']).to_frame(name='source'),}, names=['type', 'term'])
+        ['prediction', 'ground_truth', 'residuals'],
+        index=['prediction', 'ground_truth', 'residuals']).to_frame(name='source'),}, names=['type', 'term'])
 #
 primaryPalette = pd.DataFrame(sns.color_palette('colorblind'), columns=['r', 'g', 'b'])
 pickingColors = False
@@ -535,8 +392,8 @@ if pickingColors:
     for tIdx, tN in enumerate(primaryPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
 rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 0, 2, 4, 7], :].to_numpy(),
-    columns=['r', 'g', 'b'], index=['v', 'a', 'r', 'ens', 'prediction'])
+    primaryPalette.iloc[[1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
+    columns=['r', 'g', 'b'], index=['v', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
 hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
 hls.loc['v*r', :] = hls.loc[['v', 'r'], :].mean()
@@ -553,8 +410,6 @@ for rhsMaskIdx in range(rhsMasks.shape[0]):
     for cIdx, cN in enumerate(rhGroup.columns):
         hls.loc[cN, :] = hls.loc['ens', :]
         hls.loc[cN, 'l'] = lumVals[cIdx]
-hls.loc['ground_truth', :] = hls.loc['prediction', :]
-hls.loc['ground_truth', 'l'] = hls.loc['prediction', 'l'] * 0.25
 primarySourcePalette = hls.apply(lambda x: pd.Series(colorsys.hls_to_rgb(*x), index=['r', 'g', 'b']), axis='columns')
 sourcePalette = primarySourcePalette.apply(lambda x: tuple(x), axis='columns')
 if pickingColors:
@@ -562,6 +417,23 @@ if pickingColors:
     palAx = plt.gca()
     for tIdx, tN in enumerate(sourcePalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
+#
+predictionLineStyleDF = pd.DataFrame([
+    {
+        'factor': .5,
+        'component': .5,
+        'prediction': 1.,
+        'ground_truth': 1.,
+        'residuals': 1.,
+    },
+    {
+        'factor': (1, 1),
+        'component': (3, 1),
+        'prediction': (2, 1),
+        'ground_truth': (8, 0),
+        'residuals': (2, 1),
+    }
+], index=['sizes', 'dashes'])
 ########################################################################################
 factorPaletteDict = {}
 endoFactors = []
@@ -602,11 +474,6 @@ trialTypePalette = pd.Series(
     sns.color_palette('Paired', 12)[::-1][:len(trialTypeOrder)],
     index=trialTypeOrder)
 #
-sourceTermLookup.to_hdf(estimatorPath, 'sourceTermLookup')
-sourcePalette.to_hdf(estimatorPath, 'sourcePalette')
-termPalette.to_hdf(estimatorPath, 'termPalette')
-factorPalette.to_hdf(estimatorPath, 'factorPalette')
-trialTypePalette.to_hdf(estimatorPath, 'trialTypePalette')
 ##
 iRPerFactorDict0 = {}
 iRPerTermDict0 = {}
@@ -849,6 +716,10 @@ sourceTermLookup.sort_index(inplace=True)
 sourceTermLookup.to_hdf(estimatorPath, 'sourceTermLookup')
 factorPalette.to_hdf(estimatorPath, 'factorPalette')
 #
+sourcePalette.to_hdf(estimatorPath, 'sourcePalette')
+trialTypePalette.to_hdf(estimatorPath, 'trialTypePalette')
+predictionLineStyleDF.to_hdf(estimatorPath, 'termLineStyleDF')
+#
 
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
@@ -888,7 +759,7 @@ with PdfPages(pdfPath) as pdf:
             x='bin', y='signal', hue='term',
             hue_order=thisTermPalette['term'].to_list(),
             palette=thisTermPalette.loc[:, ['term', 'color']].set_index('term')['color'].to_dict(),
-            kind='line', errorbar='se', data=plotDF,
+            kind='line', errorbar='se', data=plotDF, facet_kws=dict(sharex=False),
         )
         g.set_axis_labels("Lag (sec)", 'contribution to target')
         g.suptitle('Impulse responses (per term) for model {}'.format(thisTitleFormula))

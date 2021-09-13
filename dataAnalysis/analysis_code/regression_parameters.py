@@ -2,7 +2,8 @@
 import dataAnalysis.custom_transformers.tdr as tdr
 import pdb
 
-processSlurmTaskCount = 57
+processSlurmTaskCount = 48
+lhsMaskIdxToPlot = [2, 5, 8]
 '''joblibBackendArgs = dict(
     backend='dask',
     daskComputeOpts=dict(
@@ -18,46 +19,38 @@ joblibBackendArgs = dict(
 addHistoryTerms = [
     # hto0
     {
-        'nb': 5, 'logBasis': False,
+        'nb': 12, 'logBasis': False,
         'dt': None,
-        'historyLen': 250e-3,
+        'historyLen': 120e-3,
         'b': 5e-2, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,
         'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs':joblibBackendArgs, 'convolveMethod': 'auto'},
+        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
     # hto1
     {
-        'nb': 5, 'logBasis': True,
+        'nb': 9, 'logBasis': False,
         'dt': None,
-        'historyLen': 250e-3,
+        'historyLen': 90e-3,
         'b': 5e-2, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,
         'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs':joblibBackendArgs, 'convolveMethod': 'auto'},
+        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
     # hto2
     {
-        'nb': 10, 'logBasis': False,
+        'nb': 6, 'logBasis': False,
         'dt': None,
-        'historyLen': 500e-3,
+        'historyLen': 60e-3,
         'b': 5e-2, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,
         'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs':joblibBackendArgs, 'convolveMethod': 'auto'},
+        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
     ]
-
-'''
-lOfDesignFormulas = [
-    'velocity + electrode:(rcb(amplitude, **hto0) + electrode:rcb(amplitude * RateInHz, **hto0))',
-    'velocity + velocity:electrode:(rcb(amplitude, **hto0) + velocity:electrode:rcb(amplitude * RateInHz, **hto0))',
-    'velocity + electrode:(amplitude/RateInHz)',
-    'velocity * electrode:(amplitude/RateInHz)', ]
-    '''
 
 regressionColumnsToUse = ['velocity_abs', 'amplitude', 'RateInHz', 'electrode']
 regressionColumnRenamer = {
@@ -95,15 +88,7 @@ def absWrap(x):
     return('abv({})'.format(x))
 
 designFormulaTemplates = [
-    '{v} + {a} + {r} + {v*a} + {v*r} + {a*r} + {v*a*r} - 1',
-    '{v} + {a} + {r} + {v*a} + {v*r} + {a*r} - 1',
-    '{v} + {a} + {r} + {v*a} + {v*r} - 1',
-    '{v} + {a} + {r} + {a*r} - 1',
     '{v} + {a} + {r} - 1',
-    '{v} + {a} - 1',
-    '{v} + {r} - 1',
-    '{a} + {r} - 1',
-    '{v} - 1',
     ]
 
 lOfDesignFormulas = []
@@ -140,10 +125,7 @@ for lagSpecIdx in range(len(addHistoryTerms)):
     formulasShortHand.update({
         dft.format(**laggedModels): '({}, **{})'.format(dft, lagSpec)
         for dft in designFormulaTemplates})
-    for fIdx in range(4):
-        designIsLinear.update({
-            theseFormulas[fIdx]: False})
-    for fIdx in range(4, 9):
+    for fIdx in range(1):
         designIsLinear.update({
             theseFormulas[fIdx]: True})
     masterExogFormulas.append(theseFormulas[0])
@@ -158,7 +140,7 @@ for lagSpecIdx in range(len(addHistoryTerms)):
     templateHistOptsDict[histTemplate] = addHistoryTerms[lagSpecIdx]
     for exogFormula in ['NULL'] + theseFormulas:
         for endogFormula in ['NULL', histTemplate]:
-            if not ((exogFormula == 'NULL') and (endogFormula=='NULL')):
+            if not ((exogFormula == 'NULL') and (endogFormula == 'NULL')):
                 lOfEndogAndExogTemplates.append((exogFormula, endogFormula, endogFormula,))
 #
 lOfDesignFormulas.append('NULL')
@@ -170,8 +152,9 @@ lOfEnsembleTemplates = [
     (hT, hT) for hT in lOfHistTemplates
     ]
 
-lhsMasksOfInterest = [0, 9, 10, 19, 28, 29, 38, 47, 48]
-burnInPeriod = 500e-3
+# lhsMasksOfInterest = [0, 1, 2]
+burnInPeriod = 200e-3
+
 def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
     hTDict['dt'] = binInterval
@@ -180,6 +163,7 @@ def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
 fullFormulaReadableLabels = {
     '({v} + {a} + {r} - 1, **hto1) + rcb(ensemble, **hto1) + rcb(self, **hto1)': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v + a + r)$',
     }
+
 modelsTestReadable = {
     'ensemble_history': r'$\dot{x} = \mathbf{A}x$',
     '(v + a + r +) ensemble_history': '$\dot{x} = \mathbf{A}x + \mathbf{B}(\mathbf{v + a + r})$',
@@ -190,71 +174,3 @@ modelsTestReadable = {
     'v + a + r (+ va + vr) + ar': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v + a + r \mathbf{+ v\dot a + v\dot r }+ a\dot r)$',
     'v + a + r + ar': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v + a + r + a\dot r)$',
     }
-# test should be the "bigger" model (we are adding coefficients and asking whether they improved performance
-'''
-modelsToTest = [
-        {
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'refDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0))',
-            'captionStr': 'partial R2 of allowing pedal velocity to modulate electrode coefficients, vs assuming their independence'
-        },
-        {
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'refDesign': 'rcb(v,**hto0)',
-            'captionStr': 'partial R2 of including any electrode coefficients'
-        },
-        {
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'refDesign': 'e:(rcb(a,**hto0)+rcb(a*r,**hto0))',
-            'captionStr': 'partial R2 of including any pedal velocity coefficients'
-        },
-        {
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'refDesign': 'rcb(v,**hto0) + e:rcb(a,**hto0) + e:rcb(v*a,**hto0)',
-            'captionStr': 'partial R2 of including a term for modulation of electrode coefficients by RateInHz'
-        },
-        {
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'refDesign': None,
-            'captionStr': 'R2 of the full model, V + AR + VAR'
-        },
-    ]
-
-def vStr(
-        modFun=iWrap):
-    return '{}'.format(modFun('v'))
-
-
-def aStr(
-        modFun=iWrap):
-    return 'e:{}'.format(modFun('a'))
-
-
-def rStr(
-        modFun=iWrap):
-    return 'e:{}'.format(modFun('r'))
-
-
-def vaStr(
-        modFun=iWrap):
-    return 'e:{}'.format(modFun('v*a'))
-
-
-def varStr(
-        modFun=iWrap):
-    return 'e:({}+{})'.format(modFun('v*a'), modFun('v*a*r'))
-
-
-def arStr(
-        modFun=iWrap):
-    return 'e:({}+{})'.format(modFun('a'), modFun('a*r'))
-
-def vrStr(
-        modFun=iWrap):
-    return 'e:({}+{})'.format(modFun('r'), modFun('v*r'))
-
-
-zeroLagModels = {
-    'v': vStr(), 'a': aStr(), 'r': rStr(), 'va': vaStr(), 'ar': arStr(), 'vr': vrStr(), 'var': varStr()
-}
-'''

@@ -16,4 +16,6 @@ conda activate
 source activate nda2
 python --version
 
+export OUTDATED_IGNORE=1
+
 /gpfs/home/rdarie/pycharm/pycharm-community-2020.2.3/bin/pycharm.sh

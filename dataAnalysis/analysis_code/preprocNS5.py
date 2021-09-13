@@ -24,7 +24,10 @@ Options:
     --ISIRaw                           special options for parsing Ripple files from ISI [default: False]
     
 """
-import matplotlib
+
+import logging
+logging.captureWarnings(True)
+import matplotlib, os, sys
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 # matplotlib.use('PS')   # generate postscript output
@@ -35,9 +38,14 @@ import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import pdb, traceback, shutil, os
 
 #  load options
-from currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 #
+from datetime import datetime
+print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+for arg in sys.argv:
+    print(arg)
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -58,25 +66,31 @@ def preprocNS5():
         if 'rawBlockName' in spikeSortingOpts[arrayName]:
             ns5FileName = ns5FileName.replace(
                 'Block', spikeSortingOpts[arrayName]['rawBlockName'])
+        mapDF = mapDF.loc[mapDF['elecName'] == arrayName, :].reset_index(drop=True)
     idealDataPath = os.path.join(nspFolder, ns5FileName + '.ns5')
     if not os.path.exists(idealDataPath):
-        fallBackPath = os.path.join(
-            nspFolder,
-            '{}{:0>4}'.format(arrayName, blockIdx) + '.ns5')
-        print('{} not found;\nFalling back to {}'.format(
-            idealDataPath, fallBackPath
-        ))
-        if os.path.exists(fallBackPath):
-            shutil.move(
-                fallBackPath,
-                idealDataPath)
-            try:
-                shutil.move(
-                    fallBackPath.replace('.ns5', '.nev'),
-                    idealDataPath.replace('.ns5', '.nev'))
-            except Exception:
-                traceback.print_exc()
-                print('Ignoring exception...')
+        fallBackPathList = [
+            os.path.join(
+                nspFolder,
+                '{}{:0>4}'.format(arrayName, blockIdx) + '.ns5'),
+            os.path.join(
+                nspFolder,
+                '{}{:0>3}'.format('Block', blockIdx) + '.ns5'),
+            ]
+        for fbp in fallBackPathList:
+            if os.path.exists(fbp):
+                print('{} not found;\nFalling back to {}'.format(
+                    idealDataPath, fbp))
+                shutil.move(fbp, idealDataPath)
+                for auxExt in ['.nev', '.ccf']:
+                    try:
+                        shutil.move(
+                            fbp.replace('.ns5', auxExt),
+                            idealDataPath.replace('.ns5', auxExt))
+                        print('Moved \n{} to \n{}'.format(fbp, idealDataPath))
+                    except Exception:
+                        traceback.print_exc()
+                        print('Ignoring exception...')
 
     if arguments['chunkSize'] is not None:
         chunkSize = int(arguments['chunkSize'])
@@ -408,4 +422,4 @@ if __name__ == "__main__":
             nameSuffix=nameSuffix, outputUnits=1e-3)
     else:
         preprocNS5()
-    print('Done running preprocNS5.py')
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

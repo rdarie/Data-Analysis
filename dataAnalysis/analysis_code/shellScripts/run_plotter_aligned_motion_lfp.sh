@@ -10,11 +10,11 @@
 #SBATCH --mem=128G
 
 # Specify a job name:
-#SBATCH -J plots_motion_lfp
+#SBATCH -J plots_motion_lfp_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a-plots_motion_lfp.out
-#SBATCH -e ../../batch_logs/%j_%a-plots_motion_lfp.out
+#SBATCH -o ../../batch_logs/plots_motion_lfp_21.out
+#SBATCH -e ../../batch_logs/plots_motion_lfp_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_21.sh
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh
 
 # PAGELIMITS="--limitPages=8"
@@ -34,7 +34,9 @@ echo $OPTS
 # python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" $OPTS
 # python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" $OPTS
 #
+python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR $PAGELIMITS --groupPagesBy="electrode, pedalMovementCat, pedalDirection, pedalSizeCat" $HUEOPTS $OUTLIERMASK
 python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR $PAGELIMITS --groupPagesBy="electrode, pedalMovementCat, pedalDirection, pedalSizeCat" $HUEOPTS $OUTLIERMASK
+# python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_CAR_scaled" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR $PAGELIMITS --groupPagesBy="electrode, pedalMovementCat, pedalDirection, pedalSizeCat" $HUEOPTS $OUTLIERMASK
 # python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_spectral" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR --groupPagesBy="electrode, pedalMovementCat, pedalDirection, pedalSizeCat, freqBandName" $HUEOPTS $OUTLIERMASK
 #
 # python3 -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" $OPTS

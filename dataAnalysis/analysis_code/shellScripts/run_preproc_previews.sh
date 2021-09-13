@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_previews_2021_02_15
+#SBATCH -J preproc_previews_20190126
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-preproc_previews_2021_02_15.out
-#SBATCH -e ../../batch_logs/%j-%a-preproc_previews_2021_02_15.out
+#SBATCH -o ../../batch_logs/preproc_previews_20190126.out
+#SBATCH -e ../../batch_logs/preproc_previews_20190126.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -30,6 +30,10 @@ source activate nda2
 python --version
 
 # EXP="exp201901070700"
+EXP="exp201901261000"
+# EXP="exp201901271000"
+
+# EXP="exp202101111100"
 # EXP="exp202101141100"
 # EXP="exp202101061100"
 # EXP="exp202101191100"
@@ -37,17 +41,17 @@ python --version
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
-EXP="exp202101271100"
+# EXP="exp202101271100"
 # EXP="exp202101281100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"
 # EXP="exp202102101100"
 # EXP="exp202102151100"
 
-python -u ./previewINSSessionSummary.py --exp=$EXP
+# python -u ./previewINSSessionSummary.py --exp=$EXP
 # python -u ./saveImpedances.py --exp=$EXP --processAll --reprocess
 
-for BLOCKIDX in 1 2 3
+for BLOCKIDX in 1 2 3 4
 do
-    python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP --usedTENSPulses
+    python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP
 done

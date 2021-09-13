@@ -184,7 +184,10 @@ if theseIteratorOpts['nCovariateBasisTerms'] > 1:
     alignedAsigsKWargs['addLags'] = {'all': lags.astype(int).tolist()}
 if theseIteratorOpts['forceBinInterval'] is not None:
     alignedAsigsKWargs['decimate'] = int(theseIteratorOpts['forceBinInterval'] / binOpts['binInterval'])
-    alignedAsigsKWargs['rollingWindow'] = alignedAsigsKWargs['decimate']
+    if 'forceRollingWindow' in theseIteratorOpts:
+        alignedAsigsKWargs['rollingWindow'] = theseIteratorOpts['forceRollingWindow']
+    else:
+        alignedAsigsKWargs['rollingWindow'] = alignedAsigsKWargs['decimate']
     binInterval = theseIteratorOpts['forceBinInterval']
 else:
     binInterval = binOpts['binInterval']
@@ -322,9 +325,13 @@ elif len(listOfDataFrames) > 1:
             listOfDataFrames[dfIdx] = listOfDataFrames[dfIdx].reorder_levels(firstIndexOrder, axis=0)
 if not arguments['processAll']:
     for dataDF in listOfDataFrames:
-        cvIterator = tdr.trainTestValidationSplitter(
-            dataDF=dataDF, **theseIteratorOpts['cvKWArgs'])
-        listOfIterators.append(cvIterator)
+        try:
+            cvIterator = tdr.trainTestValidationSplitter(
+                dataDF=dataDF, **theseIteratorOpts['cvKWArgs'])
+            listOfIterators.append(cvIterator)
+        except Exception:
+            traceback.print_exc()
+            cvIterator = None
 else:
     exportDF = pd.concat(listOfDataFrames)
     print('exportDF.shape[0] =  {}'.format(exportDF.shape[0]))
@@ -371,10 +378,14 @@ else:
         print('After minBinMask exportDF.shape[0] = {}'.format(exportDF.shape[0]))
     else:
         minBinMask = None
-    cvIterator = tdr.trainTestValidationSplitter(
-        dataDF=exportDF, **theseIteratorOpts['cvKWArgs'])
-    listOfIterators.append(cvIterator)
-###
+    try:
+        cvIterator = tdr.trainTestValidationSplitter(
+            dataDF=exportDF, **theseIteratorOpts['cvKWArgs'])
+        listOfIterators.append(cvIterator)
+    except Exception:
+        traceback.print_exc()
+        cvIterator = None
+    ###
 # import matplotlib.pyplot as plt; cvIterator.plot_schema(); plt.show()
 
 exportAAKWA = alignedAsigsKWargs.copy()

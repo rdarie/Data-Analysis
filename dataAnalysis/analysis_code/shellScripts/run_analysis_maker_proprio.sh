@@ -8,20 +8,23 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=250G
+#SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_2021_01_25
+#SBATCH -J analysis_calc_20190126
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/analysis_calc_2021_01_25-%a.out
-#SBATCH -e ../../batch_logs/analysis_calc_2021_01_25-%a.out
+#SBATCH -o ../../batch_logs/analysis_calc_20190126-%a.out
+#SBATCH -e ../../batch_logs/analysis_calc_20190126-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=4
+
+EXP="exp201901261000"
+# EXP="exp201901271000"
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -29,7 +32,7 @@
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
-EXP="exp202101251100"
+# EXP="exp202101251100"
 # EXP="exp202101271100"
 # EXP="exp202101281100"
 # EXP="exp202102041100"
@@ -69,7 +72,7 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=2
+#   SLURM_ARRAY_TASK_ID=5
 echo --blockIdx=$SLURM_ARRAY_TASK_ID
 
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
@@ -83,7 +86,7 @@ python -u ./calcRefinedStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK
 # or, if wanting to trim down the dataset (e.g. for time consuming uperations such as CSD calculation, can remove the stimOff labels
 # python -u ./calcRefinedStimAlignTimes.py --removeLabels='stimOff' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --inputNSPBlockSuffix=analog_inputs --plotParamHistograms $LAZINESS
 
-python -u ./calcMotionStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS --plotParamHistograms
+python -u ./calcMotionStimAlignTimesV2.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS --plotParamHistograms
 
 # python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER
 # python -u ./calcFRsqrt.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

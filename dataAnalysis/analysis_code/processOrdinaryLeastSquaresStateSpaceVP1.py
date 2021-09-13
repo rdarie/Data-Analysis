@@ -191,34 +191,10 @@ selectionNameLhs = estimatorMeta['arguments']['selectionNameLhs']
 selectionNameRhs = estimatorMeta['arguments']['selectionNameRhs']
 #
 lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
-lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
-lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
-lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
-lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormula', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
-for key in ['nb', 'logBasis', 'historyLen', 'useOrtho', 'normalize', 'addInputToOutput']:
-    # lhsMasksInfo.loc[:, key] = np.nan
-    for rowIdx, row in lhsMasksInfo.iterrows():
-        if row['designFormula'] in designHistOptsDict:
-            theseHistOpts = designHistOptsDict[row['designFormula']]
-            lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
-        elif row['ensembleTemplate'] in templateHistOptsDict:
-            theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
-            lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
-        else:
-            lhsMasksInfo.loc[rowIdx, key] = 'NULL'
-# lhsMasksInfo.loc[:, 'lagSpec'] = np.nan
-for rowIdx, row in lhsMasksInfo.iterrows():
-    if row['designFormula'] in designHistOptsDict:
-        theseHistOpts = designHistOptsDict[row['designFormula']]
-        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
-    elif row['ensembleTemplate'] in templateHistOptsDict:
-        theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
-        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
-    else:
-        lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'NULL'
+lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
 ###
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
-rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
+rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
 #
 
 if processSlurmTaskCount is not None:
@@ -231,12 +207,16 @@ if processSlurmTaskCount is not None:
     eigList = []
     for workerIdx in range(processSlurmTaskCount):
         thisEstimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(workerIdx))
-        AList.append(pd.read_hdf(thisEstimatorPath, 'A'))
-        BList.append(pd.read_hdf(thisEstimatorPath, 'B'))
-        CList.append(pd.read_hdf(thisEstimatorPath, 'C'))
-        DList.append(pd.read_hdf(thisEstimatorPath, 'D'))
-        HList.append(pd.read_hdf(thisEstimatorPath, 'H'))
-        eigList.append(pd.read_hdf(thisEstimatorPath, 'eigenvalues'))
+        try:
+            AList.append(pd.read_hdf(thisEstimatorPath, 'A'))
+            BList.append(pd.read_hdf(thisEstimatorPath, 'B'))
+            CList.append(pd.read_hdf(thisEstimatorPath, 'C'))
+            DList.append(pd.read_hdf(thisEstimatorPath, 'D'))
+            HList.append(pd.read_hdf(thisEstimatorPath, 'H'))
+            eigList.append(pd.read_hdf(thisEstimatorPath, 'eigenvalues'))
+            print('oaded state transition froomn {}'.format(thisEstimatorPath))
+        except Exception:
+            traceback.print_exc()
     ADF = pd.concat(AList)
     BDF = pd.concat(BList)
     CDF = pd.concat(CList)
@@ -302,8 +282,8 @@ with PdfPages(pdfPath) as pdf:
     aspect = width / height
     for name, eigGroup in plotEig.groupby(['lhsMaskIdx', 'fullFormula']):
         lhsMaskIdx, fullFormula = name
-        if lhsMaskIdx not in [29]:
-            continue
+        # if lhsMaskIdx not in [29]:
+        #     continue
         g = sns.relplot(
             col='freqBandName',
             x='real', y='imag', hue='eigValType',
@@ -373,6 +353,7 @@ with PdfPages(pdfPath) as pdf:
                 plt.show()
             else:
                 plt.close()
+            print('Saving to {}'.format(pdfPath))
         '''thisA = ADF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
         
         thisC = CDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
@@ -410,6 +391,7 @@ with PdfPages(pdfPath) as pdf:
             plt.show()
         else:
             plt.close()
+        print('Saving to {}'.format(pdfPath))
 
 #
 '''pdfPath = os.path.join(

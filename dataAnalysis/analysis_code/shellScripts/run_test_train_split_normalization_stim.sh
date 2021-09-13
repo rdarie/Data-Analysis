@@ -7,14 +7,14 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=200G
+#SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_normalization_stim_27
+#SBATCH -J test_train_split_normalization_stim_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_split_normalization_stim_27-%a.out
-#SBATCH -e ../../batch_logs/test_train_split_normalization_stim_27-%a.out
+#SBATCH -o ../../batch_logs/test_train_split_normalization_stim_21-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_normalization_stim_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 #SBATCH --export=CCV_HEADLESS=1
 
 # SLURM_ARRAY_TASK_ID=2
-source shellScripts/run_exp_preamble.sh
+source shellScripts/run_exp_preamble_21.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 ###
 

@@ -10,11 +10,11 @@
 #SBATCH --mem=120G
 
 # Specify a job name:
-#SBATCH -J spectral_normalize_27
+#SBATCH -J spectral_normalize_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/spectral_normalize_27.out
-#SBATCH -e ../../batch_logs/spectral_normalize_27.out
+#SBATCH -o ../../batch_logs/spectral_normalize_21.out
+#SBATCH -e ../../batch_logs/spectral_normalize_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,7 +28,7 @@
 #   SBATCH --ntasks-per-core=4
 #   SBATCH --mem-per-cpu=64G
 #  SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_21.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=2 --processAll"

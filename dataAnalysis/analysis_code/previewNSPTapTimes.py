@@ -5,6 +5,7 @@ Usage:
 Options:
     --blockIdx=blockIdx                             which trial to analyze
     --exp=exp                                       which experimental day to analyze
+    --arrayName=arrayName                           which electrode array map to use [default: utah]
     --lazy                                          whether to fully load data from blocks [default: True]
     --plotting                                      whether to display confirmation plots [default: False]
     --usedTENSPulses                                whether the sync was done using TENS pulses (as opposed to mechanical taps) [default: False]
@@ -15,22 +16,24 @@ matplotlib.rcParams['ps.fonttype'] = 42
 if 'DISPLAY' in os.environ:
     matplotlib.use('QT5Agg')   # generate postscript output
 else:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('Agg')   # generate postscript output
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import pdb, traceback
-import os
+import shutil
 import seaborn as sns
 import quantities as pq
 from neo.io import BlackrockIO
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
+'''
 from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 import neo
 import elephant.pandas_bridge as elphpdb
+'''
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
@@ -74,13 +77,49 @@ globals().update(expOpts)
 globals().update(allOpts)
 #  Load NSP Data
 ############################################################
-if 'rawBlockName' in spikeSortingOpts['utah']:
-    BlackrockFileName = ns5FileName.replace(
-        'Block', spikeSortingOpts['utah']['rawBlockName'])
-else:
-    BlackrockFileName = ns5FileName
-nspPath = os.path.join(
-    nspFolder, BlackrockFileName + '.ns5')
+# weird scope issue with ns5FileName in particular
+ns5FileName = allOpts['ns5FileName']
+arrayName = arguments['arrayName']
+if arguments['arrayName'] != 'Block':
+    electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
+    mapExt = electrodeMapPath.split('.')[-1]
+    if mapExt == 'cmp':
+        mapDF = prb_meta.cmpToDF(electrodeMapPath)
+    elif mapExt == 'map':
+        mapDF = prb_meta.mapToDF(electrodeMapPath)
+    else:
+        raise(Exception("Invalid electrode map path!"))
+    if 'rawBlockName' in spikeSortingOpts[arrayName]:
+        ns5FileName = ns5FileName.replace(
+            'Block', spikeSortingOpts[arrayName]['rawBlockName'])
+    mapDF = mapDF.loc[mapDF['elecName'] == arrayName, :].reset_index(drop=True)
+idealDataPath = os.path.join(nspFolder, ns5FileName + '.ns5')
+if not os.path.exists(idealDataPath):
+    fallBackPathList = [
+        os.path.join(
+            nspFolder,
+            '{}{:0>4}'.format(arrayName, blockIdx) + '.ns5'),
+        os.path.join(
+            nspFolder,
+            '{}{:0>3}'.format('Block', blockIdx) + '.ns5'),
+        ]
+    for fbp in fallBackPathList:
+        if os.path.exists(fbp):
+            print('{} not found;\nFalling back to {}'.format(
+                idealDataPath, fbp))
+            shutil.move(fbp, idealDataPath)
+            for auxExt in ['.nev', '.ccf']:
+                try:
+                    shutil.move(
+                        fbp.replace('.ns5', auxExt),
+                        idealDataPath.replace('.ns5', auxExt))
+                    print('Moved \n{} to \n{}'.format(
+                        fbp.replace('.ns5', auxExt),
+                        idealDataPath.replace('.ns5', auxExt)))
+                except Exception:
+                    traceback.print_exc()
+                    print('Ignoring exception...')
+nspPath = idealDataPath
 print('Loading NSP Block: {}'.format(nspPath))
 reader = BlackrockIO(
     filename=nspPath, nsx_to_load=5)
@@ -104,50 +143,8 @@ recEndTime = recDateTime + pd.Timedelta(float(dummyAsig.t_stop), unit='s')
 summaryText += '<h3>Block ended {}</h3>\n<br>\n'.format(
     recEndTime.tz_convert("America/New_York").strftime('%Y-%m-%d %H:%M:%S'))
 #
-orcaFolderPath = os.path.join(remoteBasePath, 'ORCA Logs')
-listOfSummarizedPath = os.path.join(
-    orcaFolderPath,
-    subjectName + '_list_of_summarized.json'
-    )
-if os.path.exists(listOfSummarizedPath):
-    summaryDF = pd.read_json(
-        listOfSummarizedPath,
-        orient='records',
-        convert_dates=['tStart', 'tEnd'],
-        dtype={
-            'unixStartTime': int,
-            'tStart': pd.DatetimeIndex,
-            'tEnd': pd.DatetimeIndex,
-            'hasTD': bool,
-            'duration': float,
-            'maxAmp': int,
-            'minAmp': int,
-        })
-    sessionStarts = pd.DatetimeIndex(summaryDF['tStart']).tz_localize(tz="UTC")
-    sessionEnds = pd.DatetimeIndex(summaryDF['tEnd']).tz_localize(tz="UTC")
-    compatibleSessionsMask = (
-        (sessionStarts > (recDateTime - pd.Timedelta('1M'))) &
-        (sessionEnds < recEndTime) &
-        (summaryDF['hasTD']) &
-        (summaryDF['maxAmp'].notna()))
-    insSessions = summaryDF.loc[compatibleSessionsMask, :].copy()
-    insSessions.loc[:, 'tStart'] = sessionStarts[compatibleSessionsMask].tz_convert("America/New_York")
-    insSessions.loc[:, 'tEnd'] = sessionEnds[compatibleSessionsMask].tz_convert("America/New_York")
-    insSessions.loc[:, 'delayFromNSP'] = (sessionStarts[compatibleSessionsMask] - recDateTime).total_seconds()
-    summaryText += '<h3>Companion INS sessions: </h3>'
-    summaryText += insSessions.rename(
-        columns={
-            'tStart': 'Start Time', 'tEnd': 'End Time',
-            'duration': 'Duration (sec)', 'delayFromNSP': 'delay after NSP start (sec)'
-            }).to_html()
-    summaryText += '<br> insSessions = [{}]'.format(
-        ', '.join(
-            [
-                "'Session{}'".format(unT)
-                for unT in insSessions['unixStartTime']
-            ]
-        )
-    )
+tapTimeBuffer = [-2., 2.]
+approxStartTimes = None
 if 'tapSync' in eventInfo['inputIDs']:
     print('Detecting NSP Tap Timestamps...')
     nspChannelName = eventInfo['inputIDs']['tapSync']
@@ -167,8 +164,12 @@ if 'tapSync' in eventInfo['inputIDs']:
         'data': nspDF,
         't': nspDF['t']
         }
-    # nspLims = nspSrs.quantile([1e-6, 1-1e-6]).to_list()
-    if arguments['usedTENSPulses']:
+    usedTENSPulses = False
+    if blockIdx in synchInfo['nsp']:
+        tapOptsNSP = synchInfo['nsp'][blockIdx]
+        for sessIdx, sessTapOptsNSP in tapOptsNSP.items():
+            usedTENSPulses = sessTapOptsNSP['usedTENSPulses']
+    if usedTENSPulses:
         interTriggerInterval = 39.7e-3  # 20 Hz
         minAnalogValue = 200  # mV (determined empirically)
         nspSrs.loc[nspSrs <= minAnalogValue] = 0
@@ -191,18 +192,20 @@ if 'tapSync' in eventInfo['inputIDs']:
     approxTapTimes = pd.DataFrame([allNSPTapTimes]).T
     approxTapTimes.columns = ['NSP']
     tapIntervals = approxTapTimes['NSP'].diff()
-    approxTapTimes['tapGroup'] = (tapIntervals > 60).cumsum()
-    autoTimeRanges = {
-        'NSP': [],
-        }
+    approxTapTimes.loc[:, 'tapGroup'] = (tapIntervals > 5).cumsum()
+    approxTapTimes.loc[:, 'tapMeanTime'] = np.nan
     for trialSegment, group in approxTapTimes.groupby('tapGroup'):
         firstNSPTap = (
             recDateTime +
             pd.Timedelta(int(group['NSP'].min() * 1e3), unit='milli'))
+        tapMeanTime = np.round(group['NSP'].mean(), decimals=1)
+        approxTapTimes.loc[group.index, 'tapMeanTime'] = tapMeanTime
         summaryText += (
             '<h3>Segment {} started: '.format(trialSegment) +
-            firstNSPTap.strftime('%Y-%m-%d %H:%M:%S') +
+            firstNSPTap.tz_convert(tz="America/New_York").strftime('%Y-%m-%d %H:%M:%S') +
             ' (t = {:.3f} sec)</h3>\n'.format(group['NSP'].min()))
+        summaryText += (
+            '<h3>time ranges: ({:.1f}, {:.1f})</h3>\n'.format(tapMeanTime + tapTimeBuffer[0], tapMeanTime + tapTimeBuffer[1]))
         if trialSegment == approxTapTimes['tapGroup'].max():
             lastNSPTime = (
                 recDateTime +
@@ -211,10 +214,78 @@ if 'tapSync' in eventInfo['inputIDs']:
             nextGroup = approxTapTimes.loc[(approxTapTimes['tapGroup'] == trialSegment + 1), :]
             lastNSPTime = recDateTime + pd.Timedelta(int(nextGroup['NSP'].min() * 1e3), unit='milli')
         segDur = lastNSPTime - firstNSPTap
+        formattedSegDur = '{:d}:{:d}:{:d}'.format(
+            int(segDur.total_seconds() // 3600), int(segDur.total_seconds() % 3600 // 60), int(segDur.total_seconds() % 60))
         summaryText += (
             '<h3>             ended: '.format(trialSegment) +
-            lastNSPTime.strftime('%Y-%m-%d %H:%M:%S') +
-            ' (lasted up to {} sec)</h3>\n'.format(segDur.total_seconds()))
+            lastNSPTime.tz_convert(tz="America/New_York").strftime('%Y-%m-%d %H:%M:%S') +
+            ' (lasted up to {} ({} sec))</h3>\n'.format(formattedSegDur, segDur.total_seconds()))
+    #
+    approxStartTimes = approxTapTimes.drop_duplicates(subset='tapGroup').copy()
+    approxStartTimes.loc[:, 'unixTime'] = recDateTime + pd.TimedeltaIndex(approxStartTimes['tapMeanTime'], unit='s')
+orcaFolderPath = os.path.join(remoteBasePath, 'ORCA Logs')
+listOfSummarizedPath = os.path.join(
+    orcaFolderPath,
+    subjectName + '_list_of_summarized.json'
+    )
+
+if os.path.exists(listOfSummarizedPath):
+    summaryDF = pd.read_json(
+        listOfSummarizedPath,
+        orient='records',
+        convert_dates=['tStart', 'tEnd'],
+        dtype={
+            'unixStartTime': int,
+            'tStart': pd.DatetimeIndex,
+            'tEnd': pd.DatetimeIndex,
+            'hasTD': bool,
+            'duration': float,
+            'maxAmp': int,
+            'minAmp': int,
+        })
+    summaryDF.loc[:, 'tStart'] = pd.DatetimeIndex(summaryDF['tStart']).tz_convert(tz="utc")
+    summaryDF.loc[:, 'tEnd'] = pd.DatetimeIndex(summaryDF['tEnd']).tz_localize(tz="utc")
+    # pdb.set_trace()
+    # sessionStarts = summaryDF['tStart'].copy()
+    # sessionEnds = pd.DatetimeIndex(summaryDF['tEnd']).tz_localize(tz="utc")
+    compatibleSessionsMask = (
+        (summaryDF['tStart'] > (recDateTime - pd.Timedelta('1M'))) &
+        (summaryDF['tEnd'] < recEndTime) &
+        (summaryDF['hasTD']) &
+        (summaryDF['maxAmp'].notna()))
+    insSessions = summaryDF.loc[compatibleSessionsMask, :].copy()
+    # pdb.set_trace()
+    if approxStartTimes is not None:
+        closestTimes, closestIdx = hf.closestSeries(
+            takeFrom=insSessions['tStart'].apply(lambda x: x.timestamp()), compareTo=approxStartTimes['unixTime'].apply(lambda x: x.timestamp())
+            )
+        insSessions.loc[:, 'approxSynchPulseTime'] = (
+            approxStartTimes.loc[closestIdx, 'unixTime'].reset_index(drop=True) -
+            insSessions['tStart'].reset_index(drop=True)
+            ).to_numpy()
+        insSessions.loc[:, 'approxSynchTimeRanges'] = (
+            insSessions['approxSynchPulseTime']
+                .apply(
+                lambda x: '({}, {})'.format(
+                    np.round(x.total_seconds() + tapTimeBuffer[0], decimals=1),
+                    np.round(x.total_seconds() + tapTimeBuffer[1], decimals=1))))
+    insSessions.loc[:, 'delayFromNSP'] = pd.TimedeltaIndex(
+        summaryDF.loc[compatibleSessionsMask, 'tStart'] - recDateTime).total_seconds()
+    ###
+    summaryText += '<h3>Companion INS sessions: </h3>'
+    summaryText += insSessions.rename(
+        columns={
+            'tStart': 'Start Time', 'tEnd': 'End Time',
+            'duration': 'Duration (sec)', 'delayFromNSP': 'delay after NSP start (sec)'
+            }).to_html()
+    summaryText += '<br> insSessions = [{}]'.format(
+        ', '.join(
+            [
+                "'Session{}'".format(unT)
+                for unT in insSessions['unixStartTime']
+            ]
+        )
+    )
 #### impedances
 impedanceFilePath = os.path.join(
     remoteBasePath,
@@ -222,8 +293,9 @@ impedanceFilePath = os.path.join(
 if os.path.exists(impedanceFilePath):
     impedances = prb_meta.getLatestImpedance(
         block=nspBlock, impedanceFilePath=impedanceFilePath)
-    impedances.sort_values('impedance')
-    summaryText += impedances.to_html()
+    if impedances.size > 0:
+        impedances.sort_values('impedance')
+        summaryText += impedances.to_html()
 #### problem channel id
 try:
     segIdx = 0
@@ -270,7 +342,7 @@ try:
 except Exception:
     traceback.print_exc()
 preprocDiagnosticsFolder = os.path.join(
-    processedFolder, 'preprocDiagnostics'
+    processedFolder, 'figures', 'preprocDiagnostics'
     )
 if not os.path.exists(preprocDiagnosticsFolder):
     os.makedirs(preprocDiagnosticsFolder, exist_ok=True)

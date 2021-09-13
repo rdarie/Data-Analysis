@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=200G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J test_train_split_regression_motion_27
@@ -27,7 +27,7 @@
 source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
-ITERATOR="--iteratorSuffix=ra"
+ITERATOR="--iteratorSuffix=re"
 ALIGNQUERYTERM="starting"
 CONTROLSTATUS=""
 

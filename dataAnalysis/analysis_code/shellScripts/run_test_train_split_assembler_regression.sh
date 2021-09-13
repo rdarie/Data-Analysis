@@ -13,8 +13,8 @@
 #SBATCH -J test_train_assembler_regression_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_assembler_regression_27.out
-#SBATCH -e ../../batch_logs/test_train_assembler_regression_27.out
+#SBATCH -o ../../batch_logs/regression/test_train_assembler_regression_27.out
+#SBATCH -e ../../batch_logs/regression/test_train_assembler_regression_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,7 +29,7 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-ITERATOR="ra"
+ITERATOR="re"
 #
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
 # --preScale

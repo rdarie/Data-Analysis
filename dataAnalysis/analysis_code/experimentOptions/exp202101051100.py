@@ -131,18 +131,18 @@ def getExpOpts():
     #         [275, 1732]
     #         ],
     #     }
-    outlierDetectOptions = dict(
-        targetEpochSize=100e-3,
-        windowSize=(-.2, .8),
-        conditionNames=[
-            'pedalDirection'],
-        # conditionNames=[
-        #     'electrode', 'amplitude', 'RateInHz',
-        #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
-        # conditionNames=[
-        #     'electrode', 'amplitude', 'RateInHz'],
-        twoTailed=True,
-        )
+    #   outlierDetectOptions = dict(
+    #       targetEpochSize=100e-3,
+    #       windowSize=(-.2, .8),
+    #       conditionNames=[
+    #           'pedalDirection'],
+    #       # conditionNames=[
+    #       #     'electrode', 'amplitude', 'RateInHz',
+    #       #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
+    #       # conditionNames=[
+    #       #     'electrode', 'amplitude', 'RateInHz'],
+    #       twoTailed=True,
+    #       )
     #
     minNConditionRepetitions = {
         'n': 1,

@@ -34,12 +34,14 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ITERATOR="ra"
 ###
 WINDOWTERM="XL"
+SUFFIX="_scaled"
 #
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 
 #  --forceReprocess
-ESTIMATOR="enr_fa"
-# python -u './processOrdinaryLeastSquaresVP1.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting &
-# python -u './processOrdinaryLeastSquaresTransferFunctionVP1.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+
+#  --forceReprocess
+DIMRED="select"
+ESTIMATOR="enr_${DIMRED}${SUFFIX}"
 python -u './processOrdinaryLeastSquaresStateSpaceVP1.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting

@@ -45,6 +45,7 @@ import pingouin as pg
 from sklearn.pipeline import make_pipeline, Pipeline
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
@@ -143,8 +144,8 @@ if consoleDebugging:
     arguments = {
         'selectionName': 'lfp_CAR', 'verbose': '1', 'exp': 'exp202101271100',
         'analysisName': 'hiRes', 'blockIdx': '2', 'alignFolderName': 'motion', 'processAll': True,
-        'plotting': True, 'datasetPrefix': 'Block_XL_df', 'iteratorSuffixList': 'ca, cb, ccs, ccm',
-        'debugging': False, 'estimatorName': 'mahal_emp', 'showFigures': False}
+        'plotting': True, 'datasetPrefix': 'Block_XL_df', 'iteratorSuffixList': 'ca, cb, ccs, ccm, ra',
+        'debugging': False, 'estimatorName': 'mahal_ledoit', 'showFigures': False}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
 
@@ -413,6 +414,7 @@ iteratorDescriptions = pd.Series({
     'cb': 'M',
     'ccs': 'S',
     'ccm': 'SM',
+    'ra': 'A'
     })
 diagonalTerms = ['{}_{}'.format(tn, tn) for tn in listOfIteratorSuffixes]
 categoryDescriptions = pd.Series({
@@ -426,12 +428,12 @@ categoryLabels = pd.Series({
     'deltaM': '$BE_{\mathbf{M}}$',
     'deltaS': '$BE_{\mathbf{S}}$',
     'deltaSM': '$BE_{\mathbf{SM}}$',
-})
+    })
 NACategory = 'Other'
 #
 pickingColors = False
 singlesPalette = pd.DataFrame(
-    sns.color_palette(colorMaps['points'], 4), columns=['r', 'g', 'b'], index=iteratorDescriptions.to_list())
+    sns.color_palette(colorMaps['points'], 5), columns=['r', 'g', 'b'], index=iteratorDescriptions.to_list())
 singlesPaletteHLS = singlesPalette.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 if pickingColors:
     sns.palplot(singlesPalette.apply(lambda x: tuple(x), axis='columns'))
@@ -542,6 +544,24 @@ def annotateLine(
         ax.text(xpos, ypos, text, **textKWArgs)
     return
 
+def distanceBetweenSites(
+        inputSrs=None, mapDF=None,
+        spacing=400, xSpacing=400, ySpacing=400):
+    # fromFeat = 'utah1'
+    # toFeat = 'utah10'
+    dX = xSpacing * (mapDF.loc[inputSrs['fromFeat'], 'xcoords'] - mapDF.loc[inputSrs['toFeat'], 'xcoords'])
+    dY = ySpacing * (mapDF.loc[inputSrs['fromFeat'], 'ycoords'] - mapDF.loc[inputSrs['toFeat'], 'ycoords'])
+    distance = np.sqrt(dX**2 + dY**2)
+    return distance
+
+electrodeMapPath = spikeSortingOpts['utah']['electrodeMapPath']
+mapExt = electrodeMapPath.split('.')[-1]
+if mapExt == 'cmp':
+    mapDF = prb_meta.cmpToDF(electrodeMapPath)
+elif mapExt == 'map':
+    mapDF = prb_meta.mapToDF(electrodeMapPath)
+mapDF = mapDF.loc[:, ['label', 'xcoords', 'ycoords']].drop_duplicates().set_index('label')
+
 pdfPath = os.path.join(
     figureOutputFolder, '{}_covMatSimilarity_comparison.pdf'.format(
         fullEstimatorName))
@@ -561,7 +581,8 @@ with PdfPages(pdfPath) as pdf:
             )
         suppressTicks = True
         for axIdx, (iteratorName, _) in enumerate(estimatorGroup.groupby('iterator')):
-            thisCovMat = covMatDF.loc[idxSl[iteratorName, freqBandName, lastFoldIdx, :], :].clip(lower=groupCovMinVal, upper=groupCovMaxVal)
+            maxFoldIdx = covMatDF.loc[idxSl[iteratorName, freqBandName, :, :], :].index.get_level_values('fold').max()
+            thisCovMat = covMatDF.loc[idxSl[iteratorName, freqBandName, maxFoldIdx, :], :].copy().clip(lower=groupCovMinVal, upper=groupCovMaxVal)
             thisCovMat.index = thisCovMat.index.get_level_values('feature')
             newTickLabels = thisCovMat.index.to_numpy()
             if suppressTicks:
@@ -602,6 +623,56 @@ with PdfPages(pdfPath) as pdf:
         fig.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(
             bbox_inches='tight', pad_inches=0, bbox_extra_artists=[footer])
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        fig, ax = plt.subplots(
+            1, nSubGroups, figsize=(2 * nSubGroups, 2), sharey=True)
+        #
+        for axIdx, (iteratorName, _) in enumerate(estimatorGroup.groupby('iterator')):
+            maxFoldIdx = covMatDF.loc[idxSl[iteratorName, freqBandName, :, :], :].index.get_level_values('fold').max()
+            #
+            thisCovMat = covMatDF.loc[idxSl[iteratorName, freqBandName, maxFoldIdx, :], :].copy()  #.clip(lower=groupCovMinVal, upper=groupCovMaxVal)
+            thisCovMat.index = thisCovMat.index.get_level_values('feature')
+            thisCovMat.index.name = 'fromFeat'
+            thisCovMat.columns = thisCovMat.columns.get_level_values('feature')
+            thisCovMat.columns.name = 'toFeat'
+            #
+            flatCovMat = thisCovMat.where(np.triu(np.ones(thisCovMat.shape)).astype(np.bool)).stack()
+            flatCovMat = flatCovMat.to_frame(name='covariance').reset_index()
+            flatCovMat.loc[:, 'siteDistance'] = flatCovMat.apply(
+                distanceBetweenSites, axis='columns', mapDF=mapDF)
+            #
+            sdSrs = (
+                flatCovMat
+                    .loc[flatCovMat['fromFeat'] == flatCovMat['toFeat'], ['fromFeat', 'covariance']]
+                    .set_index('fromFeat').apply(np.sqrt).rename(columns={'covariance': 'sd'})['sd'])
+            flatCovMat.loc[:, 'correlation'] = flatCovMat.apply(lambda x: x['covariance'] / (sdSrs[x['fromFeat']] * sdSrs[x['toFeat']]), axis='columns')
+            sns.scatterplot(
+                x='siteDistance', y='correlation',
+                data=flatCovMat.loc[flatCovMat['siteDistance'] > 0, :],
+                ax=ax[axIdx],
+                s=2, color=".2", alpha=0.2, marker = "+",
+                )
+            sns.lineplot(
+                x='siteDistance', y='correlation',
+                data=flatCovMat.loc[flatCovMat['siteDistance'] > 0, :],
+                errorbar='sd', color=".2",
+                ax=ax[axIdx]
+                )
+            ax[axIdx].set_title(iteratorDescriptions.loc[iteratorName])
+            ax[axIdx].set_xlabel('Distance (um)')
+            if axIdx == 0:
+                ax[-1].set_ylabel('Correlation (a.u.)')
+            else:
+                ax[axIdx].set_ylabel('')
+        #
+        fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+        pdf.savefig(
+            bbox_inches='tight', pad_inches=0,
+            #bbox_extra_artists=[footer]
+            )
         if arguments['showFigures']:
             plt.show()
         else:

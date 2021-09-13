@@ -113,16 +113,16 @@ def getExpOpts():
             '-rostralZ_e24+rostralZ_e19',
             ]
     }
-    outlierDetectOptions = dict(
-        targetEpochSize=10e-3,
-        windowSize=(0, 300e-3),
-        # conditionNames=[
-        #     'electrode', 'amplitude', 'RateInHz',
-        #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
-        conditionNames=[
-            'electrode', 'nominalCurrent', 'RateInHz'],
-        twoTailed=True,
-        )
+    #   outlierDetectOptions = dict(
+    #       targetEpochSize=10e-3,
+    #       windowSize=(0, 300e-3),
+    #       # conditionNames=[
+    #       #     'electrode', 'amplitude', 'RateInHz',
+    #       #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
+    #       conditionNames=[
+    #           'electrode', 'nominalCurrent', 'RateInHz'],
+    #       twoTailed=True,
+    #       )
     outlierDetectColumns = [
             # 'LThoracolumbarFasciaEmg#0',
             # 'LGracilisEmg#0',

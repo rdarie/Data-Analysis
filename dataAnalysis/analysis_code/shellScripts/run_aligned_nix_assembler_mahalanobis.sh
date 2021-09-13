@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J nix_assembly_mahal_28
+#SBATCH -J nix_assembly_mahal_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-nix_assembly_mahal_28.out
-#SBATCH -e ../../batch_logs/%j-%a-nix_assembly_mahal_28.out
+#SBATCH -o ../../batch_logs/nix_assembly_mahal_27.out
+#SBATCH -e ../../batch_logs/nix_assembly_mahal_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

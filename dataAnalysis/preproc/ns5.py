@@ -488,12 +488,12 @@ def concatenateBlocks(
         tdDF.set_index('t', inplace=True)
         if samplingRate != dummyAsig.sampling_rate:
             lowPassOpts = {
-                'low': {
-                    'Wn': float(samplingRate / 3),
-                    'N': 4,
-                    'btype': 'low',
-                    'ftype': 'butter'
-                },
+                # 'low': {
+                #     'Wn': float(samplingRate / 3),
+                #     'N': 4,
+                #     'btype': 'low',
+                #     'ftype': 'butter'
+                # },
                 'high': {
                     'Wn': .1,
                     'N': 4,
@@ -1332,7 +1332,9 @@ def getAsigsAlignedToEvents(
         minNReps=None,
         appendToExisting=False,
         checkReferences=True, verbose=False,
-        fileName=None, folderPath=None, chunkSize=None
+        fileName=None, folderPath=None,
+        breakdownFolderPath=None,
+        chunkSize=None
         ):
     #  get signals from same block as events?
     if signalBlock is None:
@@ -1390,19 +1392,19 @@ def getAsigsAlignedToEvents(
                 .format(eventName)))
         allAlignEventsList.append(allAlignEvents)
     allAlignEventsDF = unitSpikeTrainArrayAnnToDF(allAlignEventsList)
-    #
-    breakDownData = (
-        allAlignEventsDF
-        .groupby(minNReps['categories'])
-        .agg('count')
-        .iloc[:, 0]
-        )
+    breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(allAlignEventsDF, breakDownBy=minNReps['categories'])
+    breakDownData = breakDownData['count']
     try:
-        breakDownData[breakDownData > minNReps['n']].to_csv(
-            os.path.join(
-                folderPath, 'numRepetitionsEachCondition.csv'
-            ), header=True
-        )
+        if breakdownFolderPath is not None:
+            breakDownInspectPath = os.path.join(
+                breakdownFolderPath,
+                fileName.split('_')[0] + '_trialsBreakDown.html')
+        else:
+            breakDownInspectPath = os.path.join(
+                folderPath,
+                fileName.split('_')[0] + '_trialsBreakDown.html')
+        with open(breakDownInspectPath, 'w') as _f:
+            _f.write(breakDownHtml)
     except Exception:
         traceback.print_exc()
     allAlignEventsDF.loc[:, 'keepMask'] = False
@@ -2306,6 +2308,7 @@ def readBlockFixNames(
     asigLikeList = (
         seg0.filter(objects=AnalogSignalProxy) +
         seg0.filter(objects=AnalogSignal))
+    # pdb.set_trace()
     if mapDF is not None:
         if headerSignalChan.size > 0:
             asigNameChanger = {}
@@ -2487,7 +2490,10 @@ def readBlockFixNames(
         for stP in dataBlock.filter(objects=SpikeTrainProxy):
             if 'unitAnnotations' in stP.annotations:
                 unAnnStr = stP.annotations['unitAnnotations']
-                stP.unit.annotations.update(json.loads(unAnnStr))
+                try:
+                    stP.unit.annotations.update(json.loads(unAnnStr))
+                except Exception:
+                    pdb.set_trace()
     if (loadList is not None) and lazy:
         if 'asigs' in loadList:
             loadAsigList(
@@ -2736,7 +2742,6 @@ def preproc(
         block_index=0, lazy=True,
         signal_group_mode=signal_group_mode,
         mapDF=mapDF, reduceChannelIndexes=True,
-        # swapMaps=swapMaps
         )
     segLen = dummyBlock.segments[0].analogsignals[0].shape[0] / (
         dummyBlock.segments[0].analogsignals[0].sampling_rate)
@@ -2767,6 +2772,7 @@ def preproc(
             block_index=0, lazy=True,
             signal_group_mode=signal_group_mode,
             mapDF=mapDF, reduceChannelIndexes=True,
+            purgeNixNames=True
             # swapMaps=swapMaps
             )
         if spikeReader is not None:
@@ -2774,6 +2780,7 @@ def preproc(
                 spikeReader, block_index=0, lazy=True,
                 signal_group_mode=signal_group_mode,
                 mapDF=mapDF, reduceChannelIndexes=True,
+                purgeNixNames=True
                 # swapMaps=swapMaps
                 )
             spikeBlock = purgeNixAnn(spikeBlock)
@@ -2842,7 +2849,7 @@ def preproc(
         #### diagnostics
         diagnosticFolder = os.path.join(
             outputFolderPath,
-            'preprocDiagnostics',
+            'figures', 'preprocDiagnostics',
             # fileName + nameSuffix + partNameSuffix
             )
         if not os.path.exists(diagnosticFolder):
@@ -2982,6 +2989,7 @@ def preprocBlockToNix(
                 file_origin=block.channel_indexes[-1].file_origin
                 )
             tempChIdx.merge_annotations(block.channel_indexes[-1])
+            tempChIdx.annotations['nix_name'] = '{}_rawAverage_{}'.format(electrodeArrayName, meanChIdx)
             block.channel_indexes.append(tempChIdx)
             meanChIdxList.append(tempChIdx)
             lastIndex += 1
@@ -3000,6 +3008,7 @@ def preprocBlockToNix(
                     file_origin=block.channel_indexes[-1].file_origin
                     )
                 tempChIdx.merge_annotations(block.channel_indexes[-1])
+                tempChIdx.annotations['nix_name'] = '{}_artifact_{}'.format(electrodeArrayName, artChIdx)
                 block.channel_indexes.append(tempChIdx)
                 artChIdxList.append(tempChIdx)
                 lastIndex += 1
@@ -3016,6 +3025,7 @@ def preprocBlockToNix(
                     file_origin=block.channel_indexes[-1].file_origin
                     )
                 tempChIdx.merge_annotations(block.channel_indexes[-1])
+                tempChIdx.annotations['nix_name'] = '{}_deviation_{}'.format(electrodeArrayName, devChIdx)
                 block.channel_indexes.append(tempChIdx)
                 devChIdxList.append(tempChIdx)
                 lastIndex += 1
@@ -3030,6 +3040,7 @@ def preprocBlockToNix(
                     file_origin=block.channel_indexes[-1].file_origin
                     )
                 tempChIdx.merge_annotations(block.channel_indexes[-1])
+                tempChIdx.annotations['nix_name'] = '{}_smoothed_deviation_{}'.format(electrodeArrayName, devChIdx)
                 block.channel_indexes.append(tempChIdx)
                 smDevChIdxList.append(tempChIdx)
                 lastIndex += 1
@@ -3046,6 +3057,7 @@ def preprocBlockToNix(
                     file_origin=block.channel_indexes[-1].file_origin
                     )
                 tempChIdx.merge_annotations(block.channel_indexes[-1])
+                tempChIdx.annotations['nix_name'] = '{}_outlierMask_{}'.format(electrodeArrayName, outMaskChIdx)
                 block.channel_indexes.append(tempChIdx)
                 outMaskChIdxList.append(tempChIdx)
                 lastIndex += 1
@@ -3151,11 +3163,15 @@ def preprocBlockToNix(
                     time_slice=(tStart, tStop),
                     magnitude_mode='rescaled')
                 if 'tempLFPStore' not in locals():
-                    tempLFPStore = pd.DataFrame(
-                        np.zeros(
-                            (asig.shape[0], nAsigs),
-                            dtype=float),
-                        columns=asigNameListSeg)
+                    try:
+                        tempLFPStore = pd.DataFrame(
+                            np.zeros(
+                                (asig.shape[0], nAsigs),
+                                dtype=float),
+                            columns=asigNameListSeg)
+                    except:
+                        traceback.print_exc()
+                        pdb.set_trace()
                 if 'dummyAsig' not in locals():
                     dummyAsig = asig.copy()
                 #  perform requested preproc operations
@@ -3933,8 +3949,14 @@ def preprocBlockToNix(
     # descend into ChannelIndexes
     for chanIdx in block.channel_indexes:
         if chanIdx.analogsignals or chanIdx.units:
-            chanIdx = writer._write_channelindex(chanIdx, nixblock)
+            try:
+                chanIdx = writer._write_channelindex(chanIdx, nixblock)
+                print('Wrote ch {}'.format(chanIdx.name))
+            except:
+                traceback.print_exc()
+                pdb.set_trace()
         else:
+            print('      Did not write ch {}'.format(chanIdx.name))
             chanIdxDiscardNames.append(chanIdx.name)
     block.channel_indexes = [
         i

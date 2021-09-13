@@ -11,17 +11,20 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_dual_2021_01_25
+#SBATCH -J preproc_dual_20190126
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-preproc_dual_2021_01_25.out
-#SBATCH -e ../../batch_logs/%j-%a-preproc_dual_2021_01_25.out
+#SBATCH -o ../../batch_logs/preproc_dual_20190126-%a.out
+#SBATCH -e ../../batch_logs/preproc_dual_20190126-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=4
+
+EXP="exp201901261000"
+# EXP="exp201901271000"
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -29,7 +32,7 @@
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
-EXP="exp202101251100"
+# EXP="exp202101251100"
 # EXP="exp202101271100"
 # EXP="exp202101281100"
 # EXP="exp202102041100"
@@ -44,7 +47,7 @@ conda activate
 source activate nda2
 python --version
 
-#  SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=1
 
 ########### get analog inputs separately to run synchronization, etc
 # !! --maskMotorEncoder ignores all motor events outside alignTimeBounds

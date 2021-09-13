@@ -288,7 +288,10 @@ def parseAnalysisOptions(
         eventInfo = {'inputIDs': expOpts['fullRigInputs']}
     #
     trialFilesFrom['utah'].update({'eventInfo': eventInfo})
-    
+    minNConditionRepetitions = {
+        'n': 1,
+        'categories': stimulusConditionNames
+        }
     nspCmpPath = os.path.join('.', 'murdoc_map.cmp')
     cmpDF = prb_meta.cmpToDF(nspCmpPath)
     experimentDateStr = re.search(r'(\d*)', experimentName).groups()[0]
@@ -500,8 +503,8 @@ def parseAnalysisOptions(
     except Exception:
         pass
     # args for the sklearn StratifiedShuffleSplit
-    defaultSamplerKWArgs = dict(random_state=43, test_size=0.5)
-    defaultPrelimSamplerKWArgs = dict(random_state=43, test_size=0.2)
+    defaultSamplerKWArgs = dict(random_state=42, test_size=0.2)
+    defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.15)
     # args for tdr.
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
@@ -629,7 +632,61 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 5e-3,
+            'forceBinInterval': 1e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=10,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.45,  # start 0.2 before whatever the query was
+                'winStop': .5  # stop .5 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
+        # perimovement, any stim, for regression
+        'rb': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 1e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=10,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.4,  # start 0.2 before whatever the query was
+                'winStop': .5  # stop .5 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
+        # perimovement, any stim, for regression
+        'rc': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 1e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -642,6 +699,61 @@ def parseAnalysisOptions(
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
                 'winStart': -0.7,  # start 0.2 before whatever the query was
+                'winStop': .5  # stop .5 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
+        # perimovement, any stim, for regression
+        'rd': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 1e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=5,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.3,  # start 0.2 before whatever the query was
+                'winStop': .5  # stop .5 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
+        # perimovement, any stim, for regression
+        're': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 1e-3,
+            'forceRollingWindow': None,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=5,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.3,  # start 0.2 before whatever the query was
                 'winStop': .5  # stop .5 sec after startingOrStimOn
             },
             'timeROIOpts_control': {

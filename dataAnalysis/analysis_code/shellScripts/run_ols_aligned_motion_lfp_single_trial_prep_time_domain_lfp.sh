@@ -10,11 +10,11 @@
 #SBATCH --mem=120G
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_prep_lfp_st_27
+#SBATCH -J ols_motion_lfp_prep_lfp_ste_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_lfp_st_27.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_lfp_st_27.out
+#SBATCH -o ../../batch_logs/regression/ols_motion_lfp_prep_lfp_ste_27.out
+#SBATCH -e ../../batch_logs/regression/ols_motion_lfp_prep_lfp_ste_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,7 +29,7 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-ITERATOR="ra"
+ITERATOR="re"
 WINDOWTERM="XL"
 ##
 ESTIMATOR="select"
@@ -40,5 +40,4 @@ python -u './calcSignalColumnSelector.py' --estimatorName="${ESTIMATOR}" --datas
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR_scaled"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 #
-ESTIMATOR="enr_select"
-python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='select' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs='select' --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1

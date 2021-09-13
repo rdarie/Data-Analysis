@@ -200,7 +200,7 @@ def getExpOpts():
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97)]
+                    for i in range(1, 97) if i not in [39, 89]]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
@@ -261,4 +261,61 @@ def getExpOpts():
             }
         }
     }
+    expIteratorOpts = {
+        'ca': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [2, 3],
+                }
+            },
+        'cb': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [2, 3],
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2],
+                }
+            },
+        'ccm': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [2],
+                }
+            },
+        'ccs': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1],
+                }
+            },
+        'cd': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            },
+        'ra': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            },
+        'rb': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            },
+        'pa': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            },
+        'na': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            }
+        }
     return locals()

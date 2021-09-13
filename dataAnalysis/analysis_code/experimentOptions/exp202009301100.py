@@ -91,16 +91,16 @@ def getExpOpts():
     alignTimeBoundsLookup = {
         1: None,
         }
-    outlierDetectOptions = dict(
-        targetEpochSize=10e-3,
-        windowSize=(-1, 1),
-        # conditionNames=[
-        #     'electrode', 'amplitude', 'RateInHz',
-        #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
-        conditionNames=[
-            'electrode', 'amplitude', 'RateInHz'],
-        twoTailed=True,
-        )
+    #   outlierDetectOptions = dict(
+    #       targetEpochSize=10e-3,
+    #       windowSize=(-1, 1),
+    #       # conditionNames=[
+    #       #     'electrode', 'amplitude', 'RateInHz',
+    #       #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
+    #       conditionNames=[
+    #           'electrode', 'amplitude', 'RateInHz'],
+    #       twoTailed=True,
+    #       )
     #
     minNConditionRepetitions = {
         'n': 1,

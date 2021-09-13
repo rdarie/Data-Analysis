@@ -281,7 +281,7 @@ if __name__ == '__main__':
         cvScoresDF.index.name = 'fold'
         cvScoresDF.dropna(axis='columns', inplace=True)
         cvScoresDict[maskParams['freqBandName']] = cvScoresDF
-        pdb.set_trace()
+        # pdb.set_trace()
         #
         #############################################################################
         if arguments['calculateFullModels']:

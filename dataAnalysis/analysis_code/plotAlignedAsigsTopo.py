@@ -210,8 +210,8 @@ if groupPagesBy is not None:
 alignedAsigsKWargs.update(dict(
     getMetaData=requiredAnns,
     transposeToColumns='bin', concatOn='index'))
-alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
-#
+# alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-300e-3, -100e-3))
+
 #############################
 # for stim spike report
 # alignedAsigsKWargs.update(dict(
@@ -250,7 +250,7 @@ relplotKWArgs.update({
     'height': 1,
     'aspect': 1,
     'facet_kws': {
-        'sharey': False,
+        'sharey': True,
         'legend_out': False,
         'gridspec_kws': {
             'wspace': 0.01,
@@ -272,13 +272,13 @@ plotProcFuns = [
         top=True, right=True,
         left=True, bottom=True,
         offset=None, trim=False),
-    # asp.genGridAnnotator(
-    #     xpos=1, ypos=1, template='{}',
-    #     colNames=['feature'],
-    #     textOpts={
-    #         'verticalalignment': 'top',
-    #         'horizontalalignment': 'right'
-    #     }, shared=False),
+    asp.genGridAnnotator(
+        xpos=1, ypos=1, template='{}',
+        colNames=['feature'],
+        textOpts={
+            'verticalalignment': 'top',
+            'horizontalalignment': 'right'
+        }, shared=False),
     # for evoked lfp report, add stim times
     asp.genBlockVertShader([
             max(0e-3, alignedAsigsKWargs['windowSize'][0]),
@@ -455,10 +455,6 @@ if saveFigMetaToPath is not None:
     figMetaData = []
 with PdfPages(pdfName) as pdf:
     for pageIdx, (pageName, pageGroup) in enumerate(tqdm(pageGrouper)):
-        #
-        if limitPages is not None:
-            if pageCount > limitPages:
-                break
         for probeName, probeGroup in pageGroup.groupby('mapGroup'):
             if pd.isnull(probeName):
                 continue
@@ -581,6 +577,13 @@ with PdfPages(pdfName) as pdf:
             # plt.show()
             plt.close()
             pageCount += 1
+            print('On page {}'.format(pageCount))
+            if limitPages is not None:
+                if pageCount >= limitPages:
+                    break
+        if limitPages is not None:
+            if pageCount >= limitPages:
+                break
     if saveFigMetaToPath is not None:
         with open(saveFigMetaToPath, 'wb') as _f:
             pickle.dump(figMetaData, _f)

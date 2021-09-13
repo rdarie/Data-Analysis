@@ -145,14 +145,8 @@ lhsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsDF')
 lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
 allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
-#
-lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
-lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
-lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
-lhsMasksInfo.loc[:, 'designFormulaShortHand'] = lhsMasksInfo['designFormula'].apply(lambda x: formulasShortHand[x])
-lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormulaShortHand', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
-#
-rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
+rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
+lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
 #
 iRPerTerm = pd.read_hdf(estimatorPath, 'impulseResponsePerTerm')
 iRPerFactor = pd.read_hdf(estimatorPath, 'impulseResponsePerFactor')

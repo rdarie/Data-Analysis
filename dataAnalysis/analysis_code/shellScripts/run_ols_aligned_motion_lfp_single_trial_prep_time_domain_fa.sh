@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=127G
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_prep_st_27
+#SBATCH -J ols_motion_fa_prep_st_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_prep_st_27.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_prep_st_27.out
+#SBATCH -o ../../batch_logs/ols_motion_fa_prep_st_28.out
+#SBATCH -e ../../batch_logs/ols_motion_fa_prep_st_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,7 +25,7 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_28.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="starting"
@@ -39,4 +39,4 @@ RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 
 ESTIMATOR="enr_fa${SUFFIX}"
-python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='fa' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs='fa' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1

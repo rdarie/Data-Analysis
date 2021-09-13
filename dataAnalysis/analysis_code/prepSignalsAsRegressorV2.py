@@ -213,19 +213,7 @@ if __name__ == '__main__':
     ######## make lhs masks
     maskList = []
     attrNames = ['feature', 'lag', 'designFormula', 'ensembleTemplate', 'selfTemplate']
-    '''
-    for designFormula in lOfDesignFormulas:
-        for ensembleTemplate, selfTemplate in lOfEnsembleTemplates:
-            if (ensembleTemplate == 'NULL') and (selfTemplate == 'NULL') and (designFormula == 'NULL'):
-                continue
-            attrValues = ['all', 0, designFormula, ensembleTemplate, selfTemplate]
-            thisMask = pd.Series(
-                True,
-                index=lhsDF.columns).to_frame()
-            thisMask.columns = pd.MultiIndex.from_tuples(
-                (attrValues,), names=attrNames)
-            maskList.append(thisMask.T)
-    '''
+    #
     for designFormula, ensembleTemplate, selfTemplate in lOfEndogAndExogTemplates:
         if (ensembleTemplate == 'NULL') and (selfTemplate == 'NULL') and (designFormula == 'NULL'):
                 continue
@@ -248,6 +236,7 @@ if __name__ == '__main__':
     lhsMasks.set_index('maskName', append=True, inplace=True)
     lhsMasks.to_hdf(
         designMatrixPath, 'featureMasks', mode='a')
+    ####
     if arguments['plotting']:
         pdfPath = os.path.join(
             figureOutputFolder, 'history_basis.pdf'
@@ -360,17 +349,6 @@ if __name__ == '__main__':
             theseColumns = designInfo.column_names
             designDF = pd.read_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
             designDF = designDF.loc[:, theseColumns]
-            '''
-            pt.fit(exampleLhGroup)
-            designMatrix = pt.transform(lhsDF)
-            designInfo = designMatrix.design_info
-            designDF = (
-                pd.DataFrame(
-                    designMatrix,
-                    index=lhsDF.index,
-                    columns=designInfo.column_names))
-            designDF.columns.name = 'factor'
-            '''
             designDF.to_hdf(designMatrixPath, 'designs/formula_{}'.format(formulaIdx))
     print('Complete.')
     #####################################################################################################################

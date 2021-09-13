@@ -31,7 +31,23 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from dask.distributed import Client, LocalCluster
 import os, traceback
-from dataAnalysis.analysis_code.regression_parameters import *
+
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+# if debugging in a console:
+'''
+
+consoleDebugging = True
+if consoleDebugging:
+    arguments = {
+        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_rb', 'plotting': True,
+        'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
+        'verbose': '1', 'debugging': False, 'estimatorName': 'enr_select_scaled', 'forceReprocess': True,
+        'blockIdx': '2', 'exp': 'exp202101271100'}
+    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+'''
+
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -60,7 +76,7 @@ from sklego.preprocessing import PatsyTransformer
 import dill as pickle
 pickle.settings['recurse'] = True
 import gc, sys
-from docopt import docopt
+import pingouin as pg
 from copy import deepcopy
 import colorsys
 sns.set(
@@ -73,19 +89,6 @@ idxSl = pd.IndexSlice
 
 if __name__ == '__main__':
     print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
-    arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-    # if debugging in a console:
-    '''
-    
-    consoleDebugging = True
-    if consoleDebugging:
-        arguments = {
-            'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_ra', 'plotting': True,
-            'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
-            'verbose': '1', 'debugging': False, 'estimatorName': 'enr_fa_ta', 'forceReprocess': True,
-            'blockIdx': '2', 'exp': 'exp202101271100'}
-        os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-    '''
 
     expOpts, allOpts = parseAnalysisOptions(
         int(arguments['blockIdx']), arguments['exp'])
@@ -153,7 +156,7 @@ if __name__ == '__main__':
     allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
     #
-    lhsMasksInfo = pd.read_hdf(estimatorPath, 'lhsMasksInfo')
+    lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
     ####
     if os.getenv('SLURM_ARRAY_TASK_ID') is not None:
         slurmTaskID = int(os.getenv('SLURM_ARRAY_TASK_ID'))
@@ -164,7 +167,12 @@ if __name__ == '__main__':
         slurmTaskCount = int(os.getenv('SLURM_ARRAY_TASK_COUNT'))
     else:
         slurmTaskCount = 1
+    ########
+    # if rerunning a subset of jobs from an original array
+    slurmTaskCount = processSlurmTaskCount
+    #### how many regressions per job?
     slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
+    ####
     if os.getenv('SLURM_ARRAY_TASK_MIN') is not None:
         slurmTaskMin = int(os.getenv('SLURM_ARRAY_TASK_MIN'))
     else:
@@ -172,8 +180,8 @@ if __name__ == '__main__':
     savingResults = True
     ################
     # savingResults = False
-    # slurmTaskID = 23
-    # slurmTaskCount = 57
+    # slurmTaskID = 14
+    # slurmTaskCount = processSlurmTaskCount
     # slurmTaskMin = 0
     # slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
     # estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
@@ -184,11 +192,20 @@ if __name__ == '__main__':
         lhsMaskIdx, rhsMaskIdx, targetName = row.name
         if (row['targetIdx'] // slurmGroupSize) != slurmTaskID:
             continue
-        estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
+        '''estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
             estimatorPath,
             'cv_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
                 lhsMaskIdx, rhsMaskIdx, targetName
-                ))
+                ))'''
+        thisEstimatorJBPath = os.path.join(
+            estimatorPath.replace('.h5', ''),
+            'cv_estimators__lhsMask_{}__rhsMask_{}__{}.joblib'.format(
+                lhsMaskIdx, rhsMaskIdx, targetName
+            ))
+        thisEstimatorJBDict = jb.load(thisEstimatorJBPath)
+        thisEstimatorJB = pd.Series(thisEstimatorJBDict)
+        thisEstimatorJB.index.name = 'fold'
+        estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = thisEstimatorJB
         scoresDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
             estimatorPath,
             'cv_scores/lhsMask_{}/rhsMask_{}/{}'.format(
@@ -200,7 +217,7 @@ if __name__ == '__main__':
     histDesignInfoDict = {}
     histSourceTermDict = {}
     for rhsMaskIdx in range(rhsMasks.shape[0]):
-        prf.print_memory_usage('\n Prepping RHS dataframes (rhsRow: {})\n'.format(rhsMaskIdx))
+        prf.print_memory_usage('Prepping RHS dataframes (rhsRow: {})'.format(rhsMaskIdx))
         rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
         rhsMaskParams = {k: v for k, v in zip(rhsMasks.index.names, rhsMask.name)}
         rhGroup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
@@ -246,10 +263,15 @@ if __name__ == '__main__':
         names=['rhsMaskIdx', 'ensTemplate'])
     ################################################################################################
     predDF = None
+    residualsAutoCorrDF = None
+    resNormTestDict = {}
     print('Calculating predicted waveforms per model')
+    indexNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'foldType']
     for lhsMaskIdx in range(lhsMasks.shape[0]):
         lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
         lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+        thisModelHistoryLen = lhsMasksInfo.loc[lhsMaskIdx, 'historyLen']
+        #
         designFormula = lhsMaskParams['designFormula']
         lhGroup = lhsDF.loc[:, lhsMask]
         if designFormula != 'NULL':
@@ -340,8 +362,14 @@ if __name__ == '__main__':
                         trainStr, testStr = 'train', 'test'
                         foldType = 'train'
                     estimator = estimatorsDF.loc[estimatorIdx]
+                    regressor = estimator.regressor_.named_steps['regressor']
                     coefs = pd.Series(
-                        estimator.regressor_.named_steps['regressor'].coef_, index=fullDesignDF.columns)
+                        regressor.coef_, index=fullDesignDF.columns)
+                    if hasattr(regressor, 'results_'):
+                        K = regressor.results_.df_model
+                        assert K == (coefs != 0).sum()
+                    else:
+                        K = (coefs != 0).sum()
                     estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
                     estPreprocessorRhs = estimator.transformer_
                     predictionPerComponent = pd.concat({
@@ -385,8 +413,8 @@ if __name__ == '__main__':
                         estPreprocessorRhs.transform(targetDF.iloc[trainIdx, :]),
                         estPreprocessorRhs.transform(targetDF.iloc[testIdx, :])
                         ])
+                    predictionPerSource.loc[:, 'residuals'] = predictionPerSource['ground_truth'] - predictionSrs
                     predIndexDF = predictionPerSource.index.to_frame().reset_index(drop=True)
-                    indexNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'foldType']
                     indexValues = [lhsMaskIdx, designFormula, rhsMaskIdx, targetName, foldIdx, foldType]
                     for indexName, indexValue in zip(indexNames[::-1], indexValues[::-1]):
                         predIndexDF.insert(0, indexName, indexValue)
@@ -397,27 +425,60 @@ if __name__ == '__main__':
                         predDF = predDF.append(predictionPerSource)
                     prf.print_memory_usage('Calculated predictions for {}'.format(indexValues))
                     print('predDF.shape = {}'.format(predDF.shape))
+                    #### residual autocorrelation
+                    nLags = int(thisModelHistoryLen / binInterval)
+                    nLagsSec = np.arange(0, nLags) * binInterval
+                    residualsAutoCorrDict = {}
+                    for lagIdx, lagSec in enumerate(nLagsSec):
+                        residualsAutoCorrDict[lagSec] = predDF['residuals'].groupby('trialUID').apply(lambda x: x.autocorr(lag=lagIdx))
+                    theseResAutoCorrDF = pd.concat(residualsAutoCorrDict, names=['lag', 'trialUID'])
+                    del residualsAutoCorrDict
+                    resAutoCorrIndexDF = theseResAutoCorrDF.index.to_frame().reset_index(drop=True)
+                    for indexName, indexValue in zip(indexNames[::-1], indexValues[::-1]):
+                        resAutoCorrIndexDF.insert(0, indexName, indexValue)
+                    theseResAutoCorrDF.index = pd.MultiIndex.from_frame(resAutoCorrIndexDF)
+                    if residualsAutoCorrDF is None:
+                        residualsAutoCorrDF = theseResAutoCorrDF
+                    else:
+                        residualsAutoCorrDF = residualsAutoCorrDF.append(theseResAutoCorrDF)
+                    ##### residuals goodness of fit tests
+                    minBin = predIndexDF['bin'].min()
+                    shiftedRes = predDF['residuals'].shift(1).drop(minBin, level='bin')
+                    residT = predDF['residuals'].drop(minBin, level='bin')
+                    residTDiff = residT - shiftedRes
+                    kDW = (residTDiff ** 2).sum() / (predDF['residuals'] ** 2).sum()
+                    #
+                    resNormAlpha = 0.05
+                    resNormality = pg.normality(
+                        predDF['residuals'], method='normaltest', alpha=resNormAlpha).iloc[0, :]
+                    resNormality.loc['kDW'] = kDW
+                    resNormality.loc['alpha'] = resNormAlpha
+                    resNormTestDict[tuple(indexValues)] = resNormality
+                    #
+    resNormTestDF = pd.concat(resNormTestDict, names=indexNames, axis='columns').T
     predDF.columns.name = 'term'
     prf.print_memory_usage('Saving prediction DF')
     if savingResults:
         predDF.to_hdf(estimatorPath, 'predictions')
+        resNormTestDF.to_hdf(estimatorPath, 'residualNormality')
+        residualsAutoCorrDF.to_hdf(estimatorPath, 'residualAutocorrelation')
     print('Loaded and saved predictions and coefficients')
 
     scoresStack = pd.concat({
         'test': scoresDF['test_score'],
         'train': scoresDF['train_score']},
-        names=['trialType']
-    ).to_frame(name='score').reset_index()
+        names=['foldType']
+        ).to_frame(name='score').reset_index()
     #
     lastFoldMask = (scoresStack['fold'] == cvIterator.n_splits)
-    trainMask = (scoresStack['trialType'] == 'train')
-    testMask = (scoresStack['trialType'] == 'test')
+    trainMask = (scoresStack['foldType'] == 'train')
+    testMask = (scoresStack['foldType'] == 'test')
     #
-    scoresStack.loc[:, 'foldType'] = ''
-    scoresStack.loc[(trainMask & lastFoldMask), 'foldType'] = 'work'
-    scoresStack.loc[(trainMask & (~lastFoldMask)), 'foldType'] = 'train'
-    scoresStack.loc[(testMask & lastFoldMask), 'foldType'] = 'validation'
-    scoresStack.loc[(testMask & (~lastFoldMask)), 'foldType'] = 'test'
+    scoresStack.loc[:, 'trialType'] = ''
+    scoresStack.loc[(trainMask & lastFoldMask), 'trialType'] = 'work'
+    scoresStack.loc[(trainMask & (~lastFoldMask)), 'trialType'] = 'train'
+    scoresStack.loc[(testMask & lastFoldMask), 'trialType'] = 'validation'
+    scoresStack.loc[(testMask & (~lastFoldMask)), 'trialType'] = 'test'
     scoresStack.loc[:, 'dummyX'] = 0
     scoresStack.loc[:, 'design'] = scoresStack['lhsMaskIdx'].apply(lambda x: lhsMasksInfo.loc[x, 'designFormula'])
     scoresStack.loc[:, 'designAsLabel'] = scoresStack['design'].apply(lambda x: x.replace(' + ', ' +\n'))
@@ -437,20 +498,25 @@ if __name__ == '__main__':
         thesePred = predDF.xs(targetName, level='target').xs(lhsMaskIdx, level='lhsMaskIdx').xs(fold, level='fold')
         llDict2 = {}
         aicDict2 = {}
+        if hasattr(regressor, 'results_'):
+            probaFamily = regressor.results_.family
+        else:
+            from statsmodels.genmod.families.family import Gaussian
+            probaFamily = Gaussian()
         for name, predGroup in thesePred.groupby(['electrode', 'trialType']):
             llDict3 = dict()
-            llDict3['llSat'] = regressor.results_.family.loglike(predGroup['ground_truth'].to_numpy(), predGroup['ground_truth'].to_numpy())
+            llDict3['llSat'] = probaFamily.loglike(predGroup['ground_truth'].to_numpy(), predGroup['ground_truth'].to_numpy())
             nullModel = ((predGroup['ground_truth'] ** 0) * predGroup['ground_truth'].mean()).to_numpy()
-            llDict3['llNull'] = regressor.results_.family.loglike(nullModel, predGroup['ground_truth'].to_numpy())
-            llDict3['llFull'] = regressor.results_.family.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
+            llDict3['llNull'] = probaFamily.loglike(nullModel, predGroup['ground_truth'].to_numpy())
+            llDict3['llFull'] = probaFamily.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
             llDict2[name] = pd.Series(llDict3)
             aicDict2[name] = 2 * K - 2 * llDict3['llFull']
         for trialType, predGroup in thesePred.groupby('trialType'):
             llDict3 = dict()
-            llDict3['llSat'] = regressor.results_.family.loglike(predGroup['ground_truth'].to_numpy(), predGroup['ground_truth'].to_numpy())
+            llDict3['llSat'] = probaFamily.loglike(predGroup['ground_truth'].to_numpy(), predGroup['ground_truth'].to_numpy())
             nullModel = ((predGroup['ground_truth'] ** 0) * predGroup['ground_truth'].mean()).to_numpy()
-            llDict3['llNull'] = regressor.results_.family.loglike(nullModel, predGroup['ground_truth'].to_numpy())
-            llDict3['llFull'] = regressor.results_.family.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
+            llDict3['llNull'] = probaFamily.loglike(nullModel, predGroup['ground_truth'].to_numpy())
+            llDict3['llFull'] = probaFamily.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
             llDict2[('all', trialType)] = pd.Series(llDict3)
             aicDict2[('all', trialType)] = 2 * K - 2 * llDict3['llFull']
         llDict1[(lhsMaskIdx, designFormula, targetName, fold)] = pd.concat(llDict2, names=['electrode', 'trialType', 'llType'])
@@ -472,6 +538,8 @@ if __name__ == '__main__':
     #
     R2Per = llDF['ll'].groupby(['lhsMaskIdx', 'design', 'target', 'electrode', 'fold', 'trialType']).apply(
         tdr.getR2).to_frame(name='score')
+    R2Per.loc[:, 'fullFormulaDescr'] = R2Per.reset_index()['lhsMaskIdx'].map(lhsMasksInfo['fullFormulaDescr']).to_numpy()
+    R2Per.set_index('fullFormulaDescr', append=True, inplace=True)
     if savingResults:
         R2Per.to_hdf(estimatorPath, 'processedR2')
     print('Loaded and saved scores and partial scores')

@@ -46,7 +46,56 @@ sns.set_context("talk")
 sns.set_style("whitegrid")
 
 eps = np.spacing(1)
-
+#####
+## WIP durbin watson test
+'''
+def durbinWatson(X, E, timeVarName='bin'):
+    # function [dw,pval] = durbinwatson(X,E)
+    # X is the data series
+    # E are the residuals
+    # [n,m] = size(X);
+    # n,nvars    number of variables
+    # m,nobs     number of observations (time steps)
+    # N,ntrials  number of trials (realisations) of a process
+    #
+    # % calculate Durbin Watson (DW) statistic: rule of thumb: if < 1 or > 3 then
+    # % high chance of residual correlation
+    #
+    # dw = sum(diff(E).^2)/sum(E.^2);
+    minBin = E.index.get_level_values(timeVarName).min()
+    shiftedRes = E.shift(1).drop(minBin, level='bin')
+    residT = E.drop(minBin, level='bin')
+    residTDiff = residT - shiftedRes
+    dw = (residTDiff ** 2).sum() / (X ** 2).sum()
+    
+def durbinWatsonCriticalValues(X, timeVarName='bin'):
+    # % calculate critical values for the DW statistic using approx method (ref. [1])
+    # [1] J. Durbin and G. S. Watson, "Testing for Serial Correlation in Least
+    # Squares Regression I", _Biometrika_, 37, 1950.
+    #
+    # A = X*X';
+    # covariance matrix of the data, n x n
+    # X' is m x n, time on the rows, feature on the columns
+    # B = filter([-1,2,-1],1,X');
+    # B is a filtered version of the data
+    # B([1,m],:) = (X(:,[1,m])-X(:,[2,m-1]))';
+    # B is m x n
+    # correct the last timestep
+    # D = B/A;
+    # B times A inverse, D is m x n
+    # C = X*D;
+    # C is m x n
+    # nu1 = 2*(m-1)-trace(C);
+    # nu2 = 2*(3*m-4)-2*trace(B'*D)+trace(C*C);
+    # mu = nu1/(m-n);
+    # sigma = sqrt(2/((m-n)*(m-n+2))*(nu2-nu1*mu));
+    #
+    # % evaluate p-value
+    #
+    # pval = normcdf(dw,mu,sigma);
+    # pval = 2*min(pval,1-pval); % two tailed test
+    return dw, pval
+'''
 def optimalSVDThreshold(Y):
     beta = Y.shape[0] / Y.shape[1]
     omega = 0.56 * beta ** 3 - 0.95 * beta ** 2 + 1.82 * beta + 1.43
@@ -1710,6 +1759,9 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             self.results_ = self.model_.fit_regularized(
                 **regular_opts, **fit_opts)
         self.coef_ = self.results_.params
+        # pdb.set_trace()
+        self.summary_ = self.results_.summary()
+        self.summary2_ = self.results_.summary2()
         self.results_.remove_data()
     #
     def predict(self, X):

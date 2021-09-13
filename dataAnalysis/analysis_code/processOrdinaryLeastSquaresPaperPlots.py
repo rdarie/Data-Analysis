@@ -205,28 +205,9 @@ if __name__ == '__main__':
     lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
     allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
-    #
-    lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
-    lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
-    lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
-    lhsMasksInfo.loc[:, 'designFormulaShortHand'] = lhsMasksInfo['designFormula'].apply(lambda x: formulasShortHand[x])
-    lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormulaShortHand', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
-    for key in ['nb', 'logBasis', 'historyLen', 'useOrtho', 'normalize', 'addInputToOutput']:
-        # lhsMasksInfo.loc[:, key] = np.nan
-        for rowIdx, row in lhsMasksInfo.iterrows():
-            if row['designFormula'] in designHistOptsDict:
-                theseHistOpts = designHistOptsDict[row['designFormula']]
-                lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
-            else:
-                lhsMasksInfo.loc[rowIdx, key] = 'NULL'
-    # lhsMasksInfo.loc[:, 'lagSpec'] = np.nan
-    for rowIdx, row in lhsMasksInfo.iterrows():
-        if row['designFormula'] in designHistOptsDict:
-            theseHistOpts = designHistOptsDict[row['designFormula']]
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
-        else:
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'NULL'
-    rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
+    lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
+    rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
+    modelsToTestDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'modelsToTest')
     #
     estimatorsDict = {}
     scoresDict = {}
@@ -289,7 +270,6 @@ if __name__ == '__main__':
             llDF = pd.read_hdf(store, 'processedLogLike')
             aicDF = pd.read_hdf(store, 'processedAIC')
             R2Per = pd.read_hdf(store, 'processedR2')
-            modelsToTestDF = pd.read_hdf(store, 'modelsToTest')
             modelCompareFUDE = pd.read_hdf(store, 'modelCompareFUDE')
             modelCompareFUDEStats = pd.read_hdf(store, 'modelCompareFUDEStats')
             modelCompareScores = pd.read_hdf(store, 'modelCompareScores')

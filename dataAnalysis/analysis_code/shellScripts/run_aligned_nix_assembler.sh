@@ -10,21 +10,21 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J nix_assembly_27
+#SBATCH -J nix_assembly_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-nix_assembly_27.out
-#SBATCH -e ../../batch_logs/%j-%a-nix_assembly_27.out
+#SBATCH -o ../../batch_logs/nix_assembly_20.out
+#SBATCH -e ../../batch_logs/nix_assembly_20.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-# EE              SBATCH --array=2,3
+#SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
 
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_20.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"

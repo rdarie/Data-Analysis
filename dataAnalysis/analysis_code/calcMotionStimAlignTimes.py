@@ -155,6 +155,9 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         stimEvDF.loc[:, annName] = np.nan
     stimEvDF.loc[:, 'assignedTo'] = np.nan
     movementCatTypes = list(motionEvDF['pedalMovementCat'].unique())
+
+    allStimOffEvents = stimEvDF.loc[stimEvDF['stimCat'] == 'stimOff', :]
+    allStimOnEvents = stimEvDF.loc[stimEvDF['stimCat'] == 'stimOn', :]
     for mvRound, group in motionEvDF.groupby('movementRound'):
         outboundT = group.loc[group['pedalMovementCat'] == 'outbound', 't']
         outboundIdx = outboundT.index
@@ -212,10 +215,11 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         else:
             # if no onsets detected
             roundHasOutBStim = False
-            closestTimes, closestIdx = hf.closestSeries(
-                takeFrom=outboundT, compareTo=stimEvDF['t'],
-                strictly='less')
-            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+            # RD 09/10/21 taking this out, check if it breaks anything
+            # closestTimes, closestIdx = hf.closestSeries(
+            #     takeFrom=outboundT, compareTo=stimEvDF['t'],
+            #     strictly='less')
+            # theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
             for annName in stimAnnNames:
                 motionEvDF.loc[outboundIdx, annName] = noStimFiller[annName]
                 motionEvDF.loc[reachPeakIdx, annName] = noStimFiller[annName]
@@ -267,10 +271,10 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
         else:
             roundHasRetStim = False
-            closestTimes, closestIdx = hf.closestSeries(
-                takeFrom=returnT, compareTo=stimEvDF['t'],
-                strictly='less')
-            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+            # closestTimes, closestIdx = hf.closestSeries(
+            #     takeFrom=returnT, compareTo=stimEvDF['t'],
+            #     strictly='less')
+            # theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
             for annName in stimAnnNames:
                 motionEvDF.loc[returnIdx, annName] = noStimFiller[annName]
                 motionEvDF.loc[reachBaseIdx, annName] = noStimFiller[annName]
@@ -307,7 +311,13 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                     stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
             else:
                 stimOffTs = reachPeakT + searchRadius
-                raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(float(reachPeakT))))
+                closestTimes, closestIdx = hf.closestSeries(
+                    takeFrom=reachPeakT, compareTo=allStimOffEvents.loc[allStimOffEvents['t'] > outBStimOn, 't'],
+                    strictly='neither')
+                if closestTimes.empty:
+                    raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(float(reachPeakT))))
+                elif (closestTimes.min() - outBStimOn) > 10:
+                    raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(float(reachPeakT))))
         if roundHasRetStim:
             stimInSearchRadius = (
                 (stimEvDF['t'] > retStimOn) &

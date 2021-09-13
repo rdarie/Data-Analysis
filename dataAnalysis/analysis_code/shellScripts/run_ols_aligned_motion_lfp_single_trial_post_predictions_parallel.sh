@@ -13,30 +13,32 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J ols_motion_lfp_post_predictions_st_27
+#SBATCH -J ols_motion_lfp_post_predictions_ste_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/ols_motion_lfp_post_predictions_st_27-%a.out
-#SBATCH -e ../../batch_logs/ols_motion_lfp_post_predictions_st_27-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/ols_motion_lfp_post_predictions_ste_27-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/ols_motion_lfp_post_predictions_ste_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 #SBATCH --export=CCV_HEADLESS=1
 
 # Request custom resources
-#SBATCH --array=0-56
+#SBATCH --array=0-23
 
 source shellScripts/run_exp_preamble.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=2 --processAll"
-ITERATOR="ra"
+ITERATOR="re"
 WINDOWTERM="XL"
 #
+SUFFIX="_scaled"
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 
 #  --forceReprocess
-ESTIMATOR="enr_fa"
+DIMRED="select"
+ESTIMATOR="enr_${DIMRED}${SUFFIX}"
 python -u './processOrdinaryLeastSquaresPredictions_parallelV2.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting

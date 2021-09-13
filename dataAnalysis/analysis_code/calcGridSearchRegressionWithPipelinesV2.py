@@ -37,35 +37,55 @@ else:
     matplotlib.use('QT5Agg')   # generate interactive output
 #
 from dask.distributed import Client, LocalCluster
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
+# import matplotlib.pyplot as plt
+# from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 import os
 from sklearn.pipeline import make_pipeline, Pipeline
 import dataAnalysis.helperFunctions.profiling as prf
-import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+# import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
-from dataAnalysis.analysis_code.namedQueries import namedQueries
+# from dataAnalysis.analysis_code.namedQueries import namedQueries
 import pdb, traceback
 import numpy as np
 import pandas as pd
-import dataAnalysis.preproc.ns5 as ns5
+# import dataAnalysis.preproc.ns5 as ns5
 import statsmodels.api as sm
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
-from sklearn.compose import ColumnTransformer
+# from sklearn.compose import ColumnTransformer
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
-from sklearn.linear_model import ElasticNet, ElasticNetCV, SGDRegressor, LinearRegression
-from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
-from sklearn.svm import LinearSVR
-from sklearn.utils.validation import check_is_fitted
+# from sklearn.linear_model import ElasticNet, ElasticNetCV, SGDRegressor, LinearRegression
+# from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
+# from sklearn.svm import LinearSVR
+# from sklearn.utils.validation import check_is_fitted
 from sklearn.base import clone
-from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
+import shutil
+# from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 from dataAnalysis.custom_transformers.target_transformer import TransformedTargetRegressor
-from dataAnalysis.analysis_code.regression_parameters import *
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+# if debugging in a console:
+'''
+
+consoleDebugging = True
+if consoleDebugging:
+    arguments = {
+        'selector': None, 'transformerNameRhs': 'select', 'analysisName': 'hiRes', 'alignFolderName': 'motion',
+        'selectionNameRhs': 'lfp_CAR_scaled', 'processAll': True, 'datasetNameRhs': 'Block_XL_df_ra',
+        'datasetNameLhs': 'Block_XL_df_ra', 'selectionNameLhs': 'rig', 'verbose': '1',
+        'transformerNameLhs': None, 'blockIdx': '2', 'winStop': '400', 'alignQuery': 'midPeak',
+        'winStart': '200', 'debugging': True, 'window': 'long', 'showFigures': False,
+        'estimatorName': 'enr3_select_scaled', 'lazy': False, 'plotting': True, 'exp': 'exp202101271100'
+        }
+    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+    
+'''
+
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetNameRhs'].split('_')[-1]))
 from sklego.preprocessing import PatsyTransformer
-from sklearn_pandas import gen_features, DataFrameMapper
+# from sklearn_pandas import gen_features, DataFrameMapper
 from sklearn.linear_model._coordinate_descent import _alpha_grid
 import joblib as jb
 from copy import copy, deepcopy
@@ -74,8 +94,7 @@ import patsy
 import sys
 import gc
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
-from docopt import docopt
-from itertools import product
+# from itertools import product
 idxSl = pd.IndexSlice
 sns.set(
     context='talk', style='dark',
@@ -84,24 +103,6 @@ sns.set(
 print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-# if debugging in a console:
-'''
-
-consoleDebugging = True
-if consoleDebugging:
-    arguments = {
-        'selectionNameLhs': 'rig_regressor', 'selectionNameRhs': 'lfp_CAR', 'verbose': '2',
-        'selector': None, 'debugging': True, 'processAll': True, 'winStop': '400', 'showFigures': True, 'window': 'long',
-        'lazy': False, 'alignFolderName': 'motion', 'plotting': True,
-        'estimatorName': 'enr3_ta',
-        'datasetNameRhs': 'Synthetic_XL_df_g', 'transformerNameRhs': 'pca_ta',
-        'datasetNameLhs': 'Synthetic_XL_df_g', 'transformerNameLhs': None,
-        'blockIdx': '2', 'analysisName': 'hiRes', 'alignQuery': 'midPeak',
-        'winStart': '200', 'exp': 'exp202101281100'}
-    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-    
-'''
 
 
 if __name__ == '__main__':
@@ -215,7 +216,7 @@ if __name__ == '__main__':
     gridSearchKWArgs = dict(
         return_train_score=True,
         refit=False,
-        param_grid={l1_ratio_name: [.1, .5, .75, .95]}
+        param_grid={l1_ratio_name: [.1, .9]}
         )
     #
     '''regressorClass = ElasticNet
@@ -249,6 +250,7 @@ if __name__ == '__main__':
     estimatorMetadata['nAlphas'] = nAlphas
     #
     lhsMasks = pd.read_hdf(designMatrixPath, '/featureMasks')
+    lhsMasksInfo = pd.read_hdf(designMatrixPath, '/lhsMasksInfo')
     allTargetsDF = pd.read_hdf(designMatrixPath, 'allTargets')
     rhsMasks = pd.read_hdf(rhsDatasetPath, '/{}/featureMasks'.format(arguments['selectionNameRhs']))
     #
@@ -328,11 +330,21 @@ if __name__ == '__main__':
         slurmTaskID = 0
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
+    ####
+    estimatorPathJoblib = estimatorPath.replace('.h5', '')
+    if os.path.exists(estimatorPathJoblib):
+        shutil.rmtree(estimatorPathJoblib)
+    os.makedirs(estimatorPathJoblib)
+    ####
     if os.getenv('SLURM_ARRAY_TASK_COUNT') is not None:
         slurmTaskCount = int(os.getenv('SLURM_ARRAY_TASK_COUNT'))
     else:
         slurmTaskCount = 1
+    ####
+    # if rerunning a subset of tasks, get the original task count from the file
+    slurmTaskCount = processSlurmTaskCount
     print('slurmTaskCount = {}'.format(slurmTaskCount))
+    ############
     slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
     if os.getenv('SLURM_ARRAY_TASK_MIN') is not None:
         slurmTaskMin = int(os.getenv('SLURM_ARRAY_TASK_MIN'))
@@ -373,7 +385,8 @@ if __name__ == '__main__':
             ####
             pipelineRhs = Pipeline([('averager', rhsPipelineAverager, ), ])
             pipelineLhs = Pipeline([('averager', rhsPipelineAverager, ), ('regressor', regressorClass(**regressorKWArgs)), ])
-            estimatorInstance = TransformedTargetRegressor(regressor=pipelineLhs, transformer=pipelineRhs, check_inverse=False)
+            estimatorInstance = TransformedTargetRegressor(
+                regressor=pipelineLhs, transformer=pipelineRhs, check_inverse=False)
             ###
             if ensTemplate != 'NULL':
                 ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
@@ -433,19 +446,27 @@ if __name__ == '__main__':
                         lOfL1Ratios = paramGrid.pop(l1_ratio_name)
                         gsParams = []
                         for l1Ratio in lOfL1Ratios:
-                            alphas = _alpha_grid(
-                                dummyDesign, dummyRhs,
-                                l1_ratio=l1Ratio, n_alphas=nAlphas)
-                            alphasStr = ['{:.3g}'.format(a) for a in alphas]
-                            print('Evaluating alphas: {}'.format(alphasStr))
+                            fastTrack = True
+                            if fastTrack:
+                                alphas = [1e-4, 5e-4]
+                            else:
+                                alphas = _alpha_grid(
+                                    dummyDesign, dummyRhs,
+                                    l1_ratio=l1Ratio, n_alphas=nAlphas)
+                                alphas = np.atleast_1d(alphas).tolist()
                             gsParams.append(
                                 {
                                     l1_ratio_name: [l1Ratio],
-                                    alpha_name: np.atleast_1d(alphas).tolist()
+                                    alpha_name: alphas
                                 }
                             )
+                            alphasStr = ['{:.3g}'.format(a) for a in alphas]
+                            print('Evaluating alphas: {}'.format(alphasStr))
                         gsKWA['param_grid'] = gsParams
-                cvScores, gridSearcherDict1[targetName], gsScoresDict1[targetName] = tdr.gridSearchHyperparameters(
+                #############
+                #  estimatorInstance.fit(fullDesignDF, targetDF)
+                ##############
+                cvScores, gridSearcherDict1[targetName], gsScoresDF = tdr.gridSearchHyperparameters(
                     fullDesignDF, targetDF,
                     estimatorInstance=estimatorInstance,
                     verbose=int(arguments['verbose']),
@@ -462,10 +483,57 @@ if __name__ == '__main__':
                     'cv_scores/lhsMask_{}/rhsMask_{}/{}'.format(
                         lhsMaskIdx, rhsMaskIdx, targetName
                         ))
+                '''
                 cvScoresDF['estimator'].to_hdf(
                     estimatorPath,
                     'cv_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
                         lhsMaskIdx, rhsMaskIdx, targetName
+                        ))'''
+                estimatorSaveName = 'cv_estimators__lhsMask_{}__rhsMask_{}__{}.joblib'.format(
+                    lhsMaskIdx, rhsMaskIdx, targetName
+                    )
+                estimatorSavePath = os.path.join(estimatorPathJoblib, estimatorSaveName)
+                jb.dump(cvScoresDF['estimator'].to_dict(), estimatorSavePath)
+                #
+                if hasattr(cvScoresDF['estimator'].iloc[0].regressor_.named_steps['regressor'], 'n_iter_'):
+                    nIters = cvScoresDF['estimator'].apply(lambda es: es.regressor_.named_steps['regressor'].n_iter_)
+                    print('n iterations per estimator:\n{}'.format(nIters))
+                    nIters.to_hdf(
+                    estimatorPath,
+                    'cv_estimators/lhsMask_{}/rhsMask_{}/{}/cv_estimators_n_iter'.format(
+                        lhsMaskIdx, rhsMaskIdx, targetName
+                        ))
+                #
+                gsScoresStack = pd.concat({
+                    'test': gsScoresDF['test_score'],
+                    'train': gsScoresDF['train_score']},
+                    names=['foldType']
+                ).to_frame(name='score').reset_index()
+                #
+                lastFoldMask = (gsScoresStack['fold'] == cvIterator.n_splits)
+                trainMask = (gsScoresStack['foldType'] == 'train')
+                testMask = (gsScoresStack['foldType'] == 'test')
+                #
+                gsScoresStack.loc[:, 'trialType'] = ''
+                gsScoresStack.loc[(trainMask & lastFoldMask), 'trialType'] = 'work'
+                gsScoresStack.loc[(trainMask & (~lastFoldMask)), 'trialType'] = 'train'
+                gsScoresStack.loc[(testMask & lastFoldMask), 'trialType'] = 'validation'
+                gsScoresStack.loc[(testMask & (~lastFoldMask)), 'trialType'] = 'test'
+                gsScoresStack.loc[:, 'lhsMaskIdx'] = lhsMaskIdx
+                gsScoresStack.loc[:, 'rhsMaskIdx'] = rhsMaskIdx
+                gsScoresStack.loc[:, 'dummyX'] = 0
+                gsScoresStack.loc[:, 'design'] = gsScoresStack['lhsMaskIdx'].apply(
+                    lambda x: lhsMasksInfo.loc[x, 'designFormula'])
+                gsScoresStack.loc[:, 'designAsLabel'] = gsScoresStack['design'].apply(
+                    lambda x: x.replace(' + ', ' +\n'))
+                gsScoresStack.loc[:, 'fullDesign'] = gsScoresStack['lhsMaskIdx'].apply(
+                    lambda x: lhsMasksInfo.loc[x, 'fullFormulaDescr'])
+                gsScoresStack.loc[:, 'fullDesignAsLabel'] = gsScoresStack['fullDesign'].apply(
+                    lambda x: x.replace(' + ', ' +\n'))
+                gsScoresStack.to_hdf(
+                    estimatorPath,
+                    'gs_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
+                        lhsMaskIdx, rhsMaskIdx, targetName
                         ))
                 prf.print_memory_usage('\n\nCompleted fit {} to {}...\n\n'.format(lhsMask.name[-1], targetName))
-print('All fits complete.')
+prf.print_memory_usage('All fits complete.')

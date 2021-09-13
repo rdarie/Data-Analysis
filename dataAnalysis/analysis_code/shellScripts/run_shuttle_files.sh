@@ -53,21 +53,37 @@ conda activate
 source activate nda2
 python --version
 
+# radujobinfo
+# Info about jobs for user 'rdarie' submitted since 2021-08-31T00:00:00
+# Use option '-S' for a different date
+#  or option '-j' for a specific Job ID.
+
+# examine folder sizes
 python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize
 
 # scratch to data
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_XL.nix' --fromScratchToData --moveItems --filesIncluded
+#
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.json' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.h5' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.pickle' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.csv' --fromScratchToData --moveItems --filesIncluded
+
 ###### data to scratch
 ## required by qa_proprio
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*lfp_XL.nix' --fromDataToScratch --filesIncluded
 ## required to make epoch align times
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*analog_inputs*.*' --fromDataToScratch --filesIncluded
 ## required by test train splitter
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*rig_XL.nix' --fromDataToScratch --moveItems --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp_CAR_XL.nix' --fromDataToScratch --moveItems --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp_CAR_spectral_XL.nix' --fromDataToScratch --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*rig_XL.nix' --fromDataToScratch --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp_CAR_scaled_XL.nix' --fromDataToScratch --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp_CAR_spectral_XL.nix' --fromDataToScratch --moveItems --filesIncluded
+## required by plotting qa
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp_XL.nix' --fromDataToScratch --filesIncluded
 
 # global operations
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded

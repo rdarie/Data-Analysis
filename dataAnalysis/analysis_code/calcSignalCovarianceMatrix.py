@@ -18,6 +18,7 @@ Options:
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
 """
+
 import logging
 logging.captureWarnings(True)
 import matplotlib, os, sys
@@ -55,6 +56,7 @@ from sklearn.model_selection import cross_val_score, cross_validate, GridSearchC
 import joblib as jb
 import dill as pickle
 import gc
+#
 from docopt import docopt
 print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
@@ -64,8 +66,8 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 '''
 
 arguments = {
-    'analysisName': 'hiRes', 'processAll': True, 'selectionName': 'lfp_CAR', 'datasetName': 'Block_XL_df_ca',
-    'window': 'long', 'estimatorName': 'mahal', 'verbose': 2, 'exp': 'exp202101251100',
+    'analysisName': 'hiRes', 'processAll': True, 'selectionName': 'lfp_CAR', 'datasetName': 'Block_XL_df_ra',
+    'window': 'long', 'estimatorName': 'mahal_ledoit', 'verbose': 2, 'exp': 'exp202101271100',
     'alignFolderName': 'motion', 'showFigures': False, 'blockIdx': '2', 'debugging': False,
     'plotting': True, 'lazy': False}
 os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')

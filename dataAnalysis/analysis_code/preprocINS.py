@@ -24,11 +24,20 @@ sns.set(
     palette='dark', font='sans-serif',
     font_scale=0.75, color_codes=True)
 import dataAnalysis.preproc.mdt as mdt
-import os, pdb, traceback
+import os, pdb, traceback, sys
 from importlib import reload
 import warnings
 #  load options
 from currentExperiment import parseAnalysisOptions
+
+from datetime import datetime
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
+
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
@@ -36,12 +45,6 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
-import line_profiler
-import atexit
-# profile = line_profiler.LineProfiler()
-# atexit.register(profile.print_stats)
-# warnings.filterwarnings("error")
 figureOutputFolder = os.path.join(
     figureFolder, 'insDiagnostics')
 if not os.path.exists(figureOutputFolder):
@@ -98,3 +101,4 @@ if __name__ == "__main__":
         insDataPath=insDataPath,
         figureOutputFolder=figureOutputFolder,
         arguments=arguments)
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

@@ -75,7 +75,7 @@ def getExpOpts():
     ############################################################
     # manually add special instructions, e.g.
     # synchInfo['ins'][3][0].update({'minStimAmp': 0})
-    synchInfo['ins'][2][0].update({'unixTimeAdjust': 5.})
+    synchInfo['ins'][2][0].update({'unixTimeAdjust': 6.4})
     # #synchInfo['ins'][1][1] = {
     # #    'timeRanges': None,
     # #    'chan': ['ins_td2'],
@@ -99,7 +99,7 @@ def getExpOpts():
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
-                'minAnalogValue': None, 'thres': 4}
+                'minAnalogValue': None, 'thres': 5}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -115,7 +115,7 @@ def getExpOpts():
         'timeRanges': [(221, 9999)]
         })
     #
-    synchInfo['nsp'][2][0].update({'timeRanges': [(57, 9999)]})
+    synchInfo['nsp'][2][0].update({'timeRanges': [(90, 9999)]})
     synchInfo['nsp'][2][1].update({'timeRanges': [(417, 9999)]})
     #
     synchInfo['nsp'][3][0].update({'timeRanges': [(38, 9999)]})
@@ -182,7 +182,9 @@ def getExpOpts():
     #     ]
     # }
     pedalPositionZeroEpochs = None
-    dropMotionRounds = None
+    dropMotionRounds = {
+        3: [83]
+    }
 
     ############################################################
     ############################################################
@@ -206,7 +208,7 @@ def getExpOpts():
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97)]
+                    for i in range(1, 97) if i not in [39, 89]]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
@@ -243,4 +245,61 @@ def getExpOpts():
                 for i in [1,  2]]
         }
     }
+    expIteratorOpts = {
+        'ca': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [2, 3, 4],
+                }
+            },
+        'cb': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [2, 3, 4],
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3],
+                }
+            },
+        'ccm': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [2, 3],
+                }
+            },
+        'ccs': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1],
+                }
+            },
+        'cd': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'ra': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'rb': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'pa': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'na': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            }
+        }
     return locals()

@@ -10,11 +10,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J qa_stim_2021_01_25
+#SBATCH -J qa_stim_2021_01_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/qa_stim_2021_01_25-%a.out
-#SBATCH -e ../../batch_logs/qa_stim_2021_01_25-%a.out
+#SBATCH -o ../../batch_logs/qa_stim_2021_01_21-%a.out
+#SBATCH -e ../../batch_logs/qa_stim_2021_01_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -22,7 +22,7 @@
 #SBATCH --array=1
 
 # SLURM_ARRAY_TASK_ID=1
-source shellScripts/run_exp_preamble.sh
+source shellScripts/run_exp_preamble_21.sh
 source shellScripts/run_align_stim_preamble.sh
 #
 ALIGNQUERY="--alignQuery=stimOn"

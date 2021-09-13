@@ -1255,11 +1255,18 @@ def peekAtTaps(
 
 def peekAtTapsV2(
         nspDF, insDF, insAuxDataDF=None,
-        plotMaskNSP=None, plotMaskINS=None,
+        plotMaskNSP=slice(None), plotMaskINS=slice(None),
         tapTimestampsINS=None, tapTimestampsNSP=None,
-        tapDetectOptsNSP=None, tapDetectOptsINS=None
+        tapDetectOptsNSP=None, tapDetectOptsINS=None,
+        procFunINS=None, procFunNSP=None,
+        plotGuideLines=False,
         ):
     #
+    if procFunINS is None:
+        procFunINS = lambda x: x
+    if procFunNSP is None:
+        procFunNSP = lambda x: x
+
     tempClick = {
         'ins': [],
         'nsp': []
@@ -1268,6 +1275,7 @@ def peekAtTapsV2(
     def onpick(event):
         if 'INS' in event.artist.axes.get_title():
             tempClick['ins'].append(event.pickx[0])
+            print(tempClick)
             print('Clicked on ins {:.3f}'.format(event.pickx[0]))
         elif 'NSP' in event.artist.axes.get_title():
             tempClick['nsp'].append(event.pickx[0])
@@ -1290,22 +1298,22 @@ def peekAtTapsV2(
     #
     for cN in insAuxDataDF.columns:
         insDataAx.plot(
-            insDF.loc[plotMaskINS, 't'],
-            stats.zscore(insAuxDataDF.loc[plotMaskINS, cN]),
+            insDF.loc[plotMaskINS, 't'].to_numpy(),
+            procFunINS(insAuxDataDF.loc[plotMaskINS, cN].to_numpy()),
             label=cN)
     insDataAx.set_title('INS data')
     insDataAx.set_ylabel('Z Score (a.u.)')
     insTapsAx.plot(
-        insDF.loc[plotMaskINS, 't'],
-        stats.zscore(insDF.loc[plotMaskINS, 'tapDetectSignal']),
+        insDF.loc[plotMaskINS, 't'].to_numpy(),
+        procFunINS(insDF.loc[plotMaskINS, 'tapDetectSignal'].to_numpy()),
         '.-', label='tap detect signal',
         picker=line_picker
         )
     insTapsAx.set_title('INS tap detect signal')
     insTapsAx.set_ylabel('Z Score (a.u.)')
     twinAx.plot(
-        insDF.loc[plotMaskINS, 't'],
-        stats.zscore(insDF.loc[plotMaskINS, 'tapDetectSignal']),
+        insDF.loc[plotMaskINS, 't'].to_numpy(),
+        procFunINS(insDF.loc[plotMaskINS, 'tapDetectSignal'].to_numpy()),
         label='tap detect signal')
     if tapTimestampsINS is not None:
         if tapTimestampsINS.size > 0:
@@ -1316,7 +1324,7 @@ def peekAtTapsV2(
     #
     nspTapsAx.plot(
         nspDF.loc[plotMaskNSP, 't'],
-        stats.zscore(nspDF.loc[plotMaskNSP, 'tapDetectSignal']),
+        procFunNSP(nspDF.loc[plotMaskNSP, 'tapDetectSignal'].to_numpy()),
         'c', label='NSP tap detect signal',
         # picker=line_picker
         )
@@ -1328,25 +1336,27 @@ def peekAtTapsV2(
     #
     xmin, xmax = insDF.loc[plotMaskINS, 't'].min(), insDF.loc[plotMaskINS, 't'].max()
     insDataAx.set_xlim(xmin, xmax)
-    xTicks = np.arange(xmin, xmax, tapDetectOptsINS['iti'])
-    for linePos in xTicks:
-        insDataAx.axvline(x=linePos, alpha=0.75)
-        insTapsAx.axvline(x=linePos, alpha=0.75)
-        insTapsAx.axvline(x=linePos, alpha=0.75)
+    if plotGuideLines:
+        xTicks = np.arange(xmin, xmax, tapDetectOptsINS['iti'])
+        for linePos in xTicks:
+            insDataAx.axvline(x=linePos, alpha=0.75)
+            insTapsAx.axvline(x=linePos, alpha=0.75)
+            insTapsAx.axvline(x=linePos, alpha=0.75)
     #
     xmin, xmax = nspDF.loc[plotMaskNSP, 't'].min(), nspDF.loc[plotMaskNSP, 't'].max()
     nspTapsAx.set_xlim(xmin, xmax)
-    xTicks2 = np.arange(xmin, xmax, tapDetectOptsINS['iti'])
-    for linePos in xTicks2:
-        nspTapsAx.axvline(x=linePos, alpha=0.75, c='c')
+    if plotGuideLines:
+        xTicks2 = np.arange(xmin, xmax, tapDetectOptsINS['iti'])
+        for linePos in xTicks2:
+            nspTapsAx.axvline(x=linePos, alpha=0.75, c='c')
     nspTapsAx.legend()
     nspTapsAx.set_title('NSP Data')
     #
     fig.canvas.mpl_connect('pick_event', onpick)
     # remove double detections
-    for key, value in tempClick.items():
-        tempVal = pd.Series(value)
-        tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 10e-3]
+    # for key, value in tempClick.items():
+    #     tempVal = pd.Series(value)
+    #     tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 10e-3]
     return tempClick, fig, ax
 
 

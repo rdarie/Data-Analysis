@@ -29,7 +29,7 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-ITERATOR="ra"
+ITERATOR="rb"
 WINDOWTERM="XL"
 ##
 ESTIMATOR="select_ta"
@@ -42,5 +42,5 @@ python -u './calcSignalColumnSelector.py' --averageByTrial --estimatorName="${ES
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR_scaled"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 #
-ESTIMATOR="enr_select_ta"
-python -u './prepSignalsAsRegressorV2.py' --transformerNameRhs='select_ta' --maxNumFeatures=8 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+ESTIMATOR="enr2_select_ta"
+python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs='select_ta' --maxNumFeatures=16 --debugging --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1

@@ -10,11 +10,11 @@
 #SBATCH --mem=150G
 
 # Specify a job name:
-#SBATCH -J spectral_calc_stim_lfp_28
+#SBATCH -J spectral_calc_stim_lfp_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-spectral_calc_stim_lfp_28.out
-#SBATCH -e ../../batch_logs/%j-%a-spectral_calc_stim_lfp_28.out
+#SBATCH -o ../../batch_logs/spectral_calc_stim_lfp_21-%a.out
+#SBATCH -e ../../batch_logs/spectral_calc_stim_lfp_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,11 +24,11 @@
 #SBATCH --array=1,2
 
 # SLURM_ARRAY_TASK_ID=3
-source ./shellScripts/run_exp_preamble.sh
+source ./shellScripts/run_exp_preamble_21.sh
 source ./shellScripts/calc_aligned_stim_preamble.sh
 #
 python -u ./calcWaveletFeatures.py --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" $VERBOSITY --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" $VERBOSITY --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+# python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" $VERBOSITY --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 #
 # python -u ./calcWaveletFeatures.py --inputBlockSuffix="lfp" --unitQuery="lfp" $VERBOSITY --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 # python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="lfp_spectral" --unitQuery="lfp" $VERBOSITY --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

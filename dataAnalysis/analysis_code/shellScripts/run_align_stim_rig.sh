@@ -10,20 +10,20 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J align_stim_2021_01_27_rig
+#SBATCH -J align_stim_20190126_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_align_stim_2021_01_27_rig.out
-#SBATCH -e ../../batch_logs/%j_%a_align_stim_2021_01_27_rig.out
+#SBATCH -o ../../batch_logs/align_stim_20190126_rig-%a.out
+#SBATCH -e ../../batch_logs/align_stim_20190126_rig-%a.out
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=4
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # #####
 #   SLURM_ARRAY_TASK_ID=2
-source shellScripts/run_exp_preamble.sh
+source shellScripts/run_exp_preamble_26.sh
 source shellScripts/run_align_stim_preamble.sh
 
 python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockSuffix="rig" --eventBlockSuffix='epochs' --signalBlockSuffix='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER $SIGNALFOLDER $EVENTFOLDER

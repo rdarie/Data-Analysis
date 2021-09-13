@@ -32,7 +32,21 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from dask.distributed import Client, LocalCluster
 import os, traceback
-from dataAnalysis.analysis_code.regression_parameters import *
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+# if debugging in a console:
+'''
+
+consoleDebugging = True
+if consoleDebugging:
+    arguments = {
+        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_rb', 'plotting': True,
+        'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
+        'verbose': '1', 'debugging': False, 'estimatorName': 'enr2_select_scaled', 'forceReprocess': True,
+        'blockIdx': '2', 'exp': 'exp202101271100'}
+    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+'''
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -61,7 +75,6 @@ from sklego.preprocessing import PatsyTransformer
 import dill as pickle
 pickle.settings['recurse'] = True
 import gc, sys
-from docopt import docopt
 from copy import deepcopy
 import colorsys
 sns.set(
@@ -123,19 +136,6 @@ for rcK, rcV in mplRCParams.items():
 
 if __name__ == '__main__':
     print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
-    arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-    # if debugging in a console:
-    '''
-    
-    consoleDebugging = True
-    if consoleDebugging:
-        arguments = {
-            'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_ra', 'plotting': True,
-            'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
-            'verbose': '1', 'debugging': False, 'estimatorName': 'enr_fa', 'forceReprocess': True,
-            'blockIdx': '2', 'exp': 'exp202101281100'}
-        os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-    '''
 
     expOpts, allOpts = parseAnalysisOptions(
         int(arguments['blockIdx']), arguments['exp'])
@@ -203,25 +203,38 @@ if __name__ == '__main__':
     allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
     ##
+    rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
+    lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
+    modelsToTestDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'modelsToTest')
+    #
+    stimConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'stimConditionLookup')
+    kinConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'kinConditionLookup')
     ################ collect estimators and scores
     #
-    trialTypeToPlot = 'test'
+    trialTypeToPlot = 'validation'
     #
     predIndexNames = None
+    R2PerIndexNames = None
     #
     memoryEfficientLoad = True
     if memoryEfficientLoad:
         predDF = None
         scoresStack = None
+        R2Per = None
     else:
         # predDF = None
         predList = []
         scoresStackList = []
+        R2PerList = []
     #
     if processSlurmTaskCount is not None:
         slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / processSlurmTaskCount))
         allTargetsDF.loc[:, 'parentProcess'] = allTargetsDF['targetIdx'] // slurmGroupSize
+        lhsTargetMask = allTargetsDF.index.get_level_values('lhsMaskIdx').isin(lhsMasksOfInterest['plotPredictions'])
+        jobsToLoad = allTargetsDF.loc[lhsTargetMask, 'parentProcess'].unique()
         for modelIdx in range(processSlurmTaskCount):
+            if modelIdx not in jobsToLoad:
+                continue
             thisEstimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(modelIdx))
             prf.print_memory_usage('Loading predictions from {}'.format(thisEstimatorPath))
             with pd.HDFStore(thisEstimatorPath) as store:
@@ -229,9 +242,8 @@ if __name__ == '__main__':
                 if predIndexNames is None:
                     predIndexNames = thisPred.index.names
                 thisPred.reset_index(inplace=True)
-                # pdb.set_trace()
                 maskForPlot = (
-                    (thisPred['lhsMaskIdx'].isin([19, 28, 29])) &
+                    (thisPred['lhsMaskIdx'].isin(lhsMasksOfInterest['plotPredictions'])) &
                     (thisPred['trialType'] == trialTypeToPlot) &
                     (thisPred['trialRateInHz'] > 50)
                     )
@@ -247,9 +259,8 @@ if __name__ == '__main__':
                         predList.append(thisPred)
                     ##
                     thisScoresStack = pd.read_hdf(store, 'processedCVScores')
-                    # pdb.set_trace()
                     maskForPlotScore = (
-                            (thisScoresStack['lhsMaskIdx'].isin([19, 28, 29])) &
+                            (thisScoresStack['lhsMaskIdx'].isin(lhsMasksOfInterest['plotPredictions'])) &
                             (thisScoresStack['foldType'] == trialTypeToPlot)
                         )
                     print('these scoresStack, thisScoresStack.shape = {}'.format(thisScoresStack.shape))
@@ -260,6 +271,23 @@ if __name__ == '__main__':
                             scoresStack = scoresStack.append(thisScoresStack)
                     else:
                         scoresStackList.append(thisScoresStack)
+                    ##
+                    thisR2Per = pd.read_hdf(store, 'processedR2')
+                    if R2PerIndexNames is None:
+                        R2PerIndexNames = thisR2Per.index.names
+                    thisR2Per.reset_index(inplace=True)
+                    maskForPlotScore = (
+                            (thisR2Per['lhsMaskIdx'].isin(lhsMasksOfInterest['plotPredictions'])) &
+                            (thisR2Per['trialType'] == trialTypeToPlot)
+                        )
+                    print('these R2, thisR2.shape = {}'.format(thisR2Per.shape))
+                    if memoryEfficientLoad:
+                        if R2Per is None:
+                            R2Per = thisR2Per
+                        else:
+                            R2Per = R2Per.append(thisR2Per)
+                    else:
+                        R2PerList.append(thisR2Per)
     #  else:
     #      print('Loading predictions from {}'.format(estimatorPath))
     #      thisPred = pd.read_hdf(estimatorPath, 'predictions')
@@ -283,7 +311,15 @@ if __name__ == '__main__':
     print('all scoresStack, scoresStack.shape = {}'.format(scoresStack.shape))
     gc.collect()
     prf.print_memory_usage('done concatenating scoresStack from .h5 array')
-    #
+    prf.print_memory_usage('concatenating R2 from .h5 array')
+    gc.collect()
+    if not memoryEfficientLoad:
+        R2Per = pd.concat(R2PerList, copy=False)
+        del R2PerList
+    R2Per.set_index(R2PerIndexNames, inplace=True)
+    print('all predictions, R2PerDF.shape = {}'.format(R2Per.shape))
+    gc.collect()
+    prf.print_memory_usage('done concatenating R2 from .h5 array')
     estimatorsDict = {}
     # scoresDict = {}
     for rowIdx, row in allTargetsDF.iterrows():
@@ -298,11 +334,20 @@ if __name__ == '__main__':
         #     'cv_scores/lhsMask_{}/rhsMask_{}/{}'.format(
         #         lhsMaskIdx, rhsMaskIdx, targetName
         #         ))
-        estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
+        '''estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
             thisEstimatorPath,
             'cv_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
                 lhsMaskIdx, rhsMaskIdx, targetName
-                ))
+                ))'''
+        thisEstimatorJBPath = os.path.join(
+            thisEstimatorPath.replace('.h5', ''),
+            'cv_estimators__lhsMask_{}__rhsMask_{}__{}.joblib'.format(
+                lhsMaskIdx, rhsMaskIdx, targetName
+            ))
+        thisEstimatorJBDict = jb.load(thisEstimatorJBPath)
+        thisEstimatorJB = pd.Series(thisEstimatorJBDict)
+        thisEstimatorJB.index.name = 'fold'
+        estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = thisEstimatorJB
     prf.print_memory_usage('concatenating estimators from .h5 array')
     estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     del estimatorsDict
@@ -314,65 +359,21 @@ if __name__ == '__main__':
     # gc.collect()
     #
     with pd.HDFStore(estimatorPath) as store:
-        modelsToTestDF = pd.read_hdf(store, 'modelsToTest')
-        rhsMasksInfo = pd.read_hdf(store, 'rhsMasksInfo')
-        lhsMasksInfo = pd.read_hdf(store, 'lhsMasksInfo')
-        #
-        stimConditionLookup = pd.read_hdf(store, 'stimConditionLookup')
-        kinConditionLookup = pd.read_hdf(store, 'kinConditionLookup')
         coefDF = pd.read_hdf(store, 'coefficients')
         sourcePalette = pd.read_hdf(store, 'sourcePalette')
         termPalette = pd.read_hdf(store, 'termPalette')
         factorPalette = pd.read_hdf(store, 'factorPalette')
         trialTypePalette = pd.read_hdf(store, 'trialTypePalette')
         sourceTermLookup = pd.read_hdf(store, 'sourceTermLookup')
+        predictionLineStyleDF = pd.read_hdf(store, 'termLineStyleDF')
+    # hotfix termp
+    # termPalette.loc[('other', 2), :] = pd.Series({
+    #     'term': 'residuals',
+    #     'termNoWS': 'residuals',
+    #     'source': 'residuals',
+    #     'color': (0.145, 0.145, 0.145)
+    #     })
     # prep rhs dataframes
-    histDesignInfoDict = {}
-    histSourceTermDict = {}
-    for rhsMaskIdx in range(rhsMasks.shape[0]):
-        prf.print_memory_usage('\n Prepping RHS dataframes (rhsRow: {})\n'.format(rhsMaskIdx))
-        rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
-        rhsMaskParams = {k: v for k, v in zip(rhsMasks.index.names, rhsMask.name)}
-        rhGroup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
-        for ensTemplate in lOfHistTemplates:
-            if ensTemplate != 'NULL':
-                histSourceTermDict.update({ensTemplate.format(cN): cN for cN in rhGroup.columns})
-                ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
-                ensFormula += ' - 1'
-                print('Generating endog design info for {}'.format(ensFormula))
-                ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
-                exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
-                ensPt.fit(exampleRhGroup)
-                ensDesignMatrix = ensPt.transform(exampleRhGroup)
-                ensDesignInfo = ensDesignMatrix.design_info
-                histDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
-    #
-    designInfoDict = {}
-    for lhsMaskIdx in range(lhsMasks.shape[0]):
-        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
-        lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
-        designFormula = lhsMaskParams['designFormula']
-        #
-        if designFormula != 'NULL':
-            if designFormula not in designInfoDict:
-                print('Generating exog design info for {}'.format(designFormula))
-                formulaIdx = lOfDesignFormulas.index(designFormula)
-                lhGroup = lhsDF.loc[:, lhsMask]
-                pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
-                exampleLhGroup = lhGroup.loc[lhGroup.index.get_level_values('conditionUID') == 0, :]
-                designMatrix = pt.fit_transform(exampleLhGroup)
-                designInfo = designMatrix.design_info
-                designInfoDict[designFormula] = designInfo
-    #
-    designInfoDF = pd.Series(designInfoDict).to_frame(name='designInfo')
-    designInfoDF.index.name = 'design'
-    histDesignInfoDF = pd.DataFrame(
-        [value for key, value in histDesignInfoDict.items()],
-        columns=['designInfo'])
-    histDesignInfoDF.index = pd.MultiIndex.from_tuples(
-        [key for key, value in histDesignInfoDict.items()],
-        names=['rhsMaskIdx', 'ensTemplate'])
-    #
     def drawUnityLine(g, ro, co, hu, dataSubset):
         emptySubset = (
                 (dataSubset.empty) or
@@ -405,21 +406,31 @@ if __name__ == '__main__':
                     fontsize=snsRCParams['font.size'], transform=g.axes[ro, co].transAxes)
             return
     #
+    featsToPlot = (
+        scoresStack.loc[scoresStack['fullDesign'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmax(),
+        scoresStack.loc[scoresStack['fullDesign'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmin())
     height, width = 2, 4
     aspect = width / height
     commonOpts = dict(
         )
     groupPagesBy = ['rhsMaskIdx', 'lhsMaskIdx']
     groupSubPagesBy = ['trialType', 'foldType', 'electrode', 'trialRateInHz', 'target']
-    pdfPath = os.path.join(
-        figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'reconstructions'))
+    plotSingleTrials = False
+    if plotSingleTrials:
+        predDF = predDF.xs(0, level='conditionUID')
+        pdfPath = os.path.join(
+            figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'reconstructions_single_trial'))
+    else:
+        pdfPath = os.path.join(
+            figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'reconstructions'))
+    
     with PdfPages(pdfPath) as pdf:
         for name0, predGroup0 in predDF.groupby(groupPagesBy):
-            nmLk0 = {key: value for key, value in zip(groupPagesBy, name0)} # name lookup
+            nmLk0 = {key: value for key, value in zip(groupPagesBy, name0)}  # name lookup
             nmLk0['design'] = lhsMasksInfo.loc[nmLk0['lhsMaskIdx'], 'designFormula']
             nmLk0['fullFormulaDescr'] = lhsMasksInfo.loc[nmLk0['lhsMaskIdx'], 'fullFormulaDescr']
-            # if not (nmLk0['lhsMaskIdx'] in [19, 28, 29]):
-            #     continue
+            if not (nmLk0['lhsMaskIdx'] in lhsMasksOfInterest['plotPredictions']):
+                continue
             scoreMasks = [
                 scoresStack[cN] == nmLk0[cN]
                 for cN in groupPagesBy]
@@ -444,8 +455,8 @@ if __name__ == '__main__':
             for name1, predGroup1 in predGroup0.groupby(groupSubPagesBy):
                 nmLk1 = {key: value for key, value in zip(groupSubPagesBy, name1)}  # name lookup
                 nmLk0.update(nmLk1)
-                # if not (nmLk0['target'] in ['fa_ta_all001']):
-                #     continue
+                if not (nmLk0['target'] in featsToPlot):
+                    continue
                 # if nmLk0['trialType'] != trialTypeToPlot:
                 #     continue
                 # if nmLk0['trialRateInHz'] < 100:
@@ -454,6 +465,7 @@ if __name__ == '__main__':
                 plotDF.loc[:, 'predType'] = 'component'
                 plotDF.loc[plotDF['term'] == 'ground_truth', 'predType'] = 'ground_truth'
                 plotDF.loc[plotDF['term'] == 'prediction', 'predType'] = 'prediction'
+                plotDF.loc[plotDF['term'] == 'residuals', 'predType'] = 'residuals'
                 plotDF.loc[:, 'kinCondition'] = plotDF.loc[:, ['pedalMovementCat', 'pedalDirection']].apply(lambda x: tuple(x), axis='columns').map(kinConditionLookup)
                 plotDF.loc[:, 'stimCondition'] = plotDF.loc[:, ['electrode', 'trialRateInHz']].apply(lambda x: tuple(x), axis='columns').map(stimConditionLookup)
                 plotDF.loc[:, 'fullFormulaDescr'] = plotDF['lhsMaskIdx'].apply(lambda x: lhsMasksInfo.loc[x, 'fullFormulaDescr'])
@@ -462,29 +474,17 @@ if __name__ == '__main__':
                 thisTermPalette = termPalette.loc[termPalette['term'].isin(plotDF['term']), :]
                 theseColors = thisTermPalette.loc[:, ['term', 'color']].set_index('term')['color'].to_dict()
                 theseLegendUpdates = thisTermPalette.loc[:, ['term', 'source']].set_index('term')['source'].to_dict()
-                predictionLineStyleDF = pd.DataFrame([
-                    {
-                        'factor': .5,
-                        'component': .5,
-                        'prediction': 1.,
-                        'ground_truth': 1.,
-                        },
-                    {
-                        'factor': (1, 1),
-                        'component': (3, 1),
-                        'prediction': (2, 1),
-                        'ground_truth': (8, 0),
-                        }
-                ], index=['sizes', 'dashes'])
                 #
-                def plotRoutine(inputDF, inputColorPalette, inputLegendUpdates, hueName=None):
+                def plotRoutine(
+                        inputDF, inputColorPalette, inputLegendUpdates,
+                        hueName=None, axLims=None):
                     g = sns.relplot(
                         data=inputDF,
                         col='trialAmplitude', row='kinCondition',
                         row_order=kinOrder,
                         x='bin', y='signal', hue=hueName,
                         height=height, aspect=aspect, palette=inputColorPalette,
-                        kind='line', errorbar='sd',
+                        kind='line', errorbar='se',
                         size='predType', sizes=predictionLineStyleDF.loc['sizes', :].to_dict(),
                         style='predType', dashes=predictionLineStyleDF.loc['dashes', :].to_dict(),
                         style_order=predictionLineStyleDF.columns,
@@ -499,6 +499,15 @@ if __name__ == '__main__':
                         g, titleOverrides={},
                         contentOverrides=inputLegendUpdates,
                         styleOpts=styleOpts)
+                    currAxLims = {
+                        'x': g.axes.flatten()[0].get_xlim(),
+                        'y': g.axes.flatten()[0].get_ylim()
+                        }
+                    if axLims is not None:
+                        if 'x' in axLims:
+                            g.axes.flatten()[0].set_xlim(axLims['x'])
+                        if 'y' in axLims:
+                            g.axes.flatten()[0].set_ylim(axLims['y'])
                     g.tight_layout(pad=styleOpts['tight_layout.pad'])
                     pdf.savefig(
                         bbox_inches='tight',
@@ -508,10 +517,20 @@ if __name__ == '__main__':
                         plt.show()
                     else:
                         plt.close()
-                    return g
-                plotRoutine(plotDF.loc[plotDF['predType'].isin(['ground_truth', 'prediction']), :], theseColors, theseLegendUpdates, hueName='term')
-                plotRoutine(plotDF.loc[plotDF['predType'] == 'component', :], theseColors, theseLegendUpdates, hueName='term')
+                    return g, currAxLims
+                g, predAxLims = plotRoutine(
+                        plotDF.loc[plotDF['predType'].isin(['ground_truth', 'prediction']), :],
+                        theseColors, theseLegendUpdates, hueName='term')
+                g, _ = plotRoutine(
+                        plotDF.loc[plotDF['predType'].isin(['residuals']), :],
+                        theseColors, theseLegendUpdates, hueName='term',
+                        axLims=predAxLims)
+                g, _ = plotRoutine(
+                        plotDF.loc[plotDF['predType'] == 'component', :],
+                        theseColors, theseLegendUpdates, hueName='term',
+                        axLims=predAxLims)
                 ####
+                '''
                 designFormula = lhsMasksInfo.loc[nmLk0['lhsMaskIdx'], 'designFormula']
                 if designFormula != 'NULL':
                     designInfo = designInfoDict[designFormula]
@@ -534,5 +553,5 @@ if __name__ == '__main__':
                     meanCoefs = coefValues.groupby('term').mean()['coef']
                     for termName, plotDesignTerm in plotDesign.groupby('term'):
                         if meanCoefs[termName] != 0:
-                            plotRoutine(plotDesignTerm, theseColorsFactor, theseLegendUpdatesFactor, hueName='factor')
+                            plotRoutine(plotDesignTerm, theseColorsFactor, theseLegendUpdatesFactor, hueName='factor')'''
     print('\n' + '#' * 50 + '\n{}\nCompleted.\n'.format(__file__) + '#' * 50 + '\n')

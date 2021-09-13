@@ -62,6 +62,7 @@ globals().update(allOpts)
 
 electrodeMapLookup = {
     'Rupert': './Utah_SN6251_002374_Rupert.cmp',
+    'Murdoc': './Utah_Murdoc.cmp',
     }
 electrodeMapPath = electrodeMapLookup[subjectName]
 mapExt = electrodeMapPath.split('.')[-1]
@@ -85,13 +86,14 @@ else:
     impList = []
     if os.path.exists(impedanceFilePath):
         os.remove(impedanceFilePath)
+
 if impedanceFileType == 'blackrock':
     def stripImpedance(x):
         return int(x[:-5])
-
+    #
     def stripName(x):
         return re.split(r'\d*', x)[0]
-
+    #
     utahLabels = mapDF.loc[mapDF['bank'].isin(['A', 'B', 'C', 'D']), 'label']
     if arguments['processAll']:
         fileList = impedanceFileCandidatePaths
@@ -100,7 +102,11 @@ if impedanceFileType == 'blackrock':
     for filename in fileList:
         folderPath = os.path.basename(os.path.dirname(filename))
         print(folderPath)
-        newImpedances = pd.read_csv(filename, sep='\t', skiprows=6, header=None, names=['elec', 'impedance'])
+        newImpedances = pd.read_csv(
+            filename, sep='\t',
+            header=None, names=['elec', 'impedance'])
+        newImpedances = newImpedances.loc[newImpedances['elec'].apply(lambda x: x[0] != '*'), :]
+        pdb.set_trace()
         newImpedances['impedance'] = newImpedances['impedance'].apply(stripImpedance)
         newImpedances['elec'] = newImpedances['elec'].apply(str.strip)
         # newImpedances['elec'] = newImpedances['elec'].apply(stripName)

@@ -144,9 +144,7 @@ for asig in nspBlock.filter(objects=AnalogSignal):
         nspSamplingRate = float(asig.sampling_rate)
         dummyAsig = asig.copy()
 try:
-    alignTimeBounds = [
-    alignTimeBoundsLookup[int(arguments['blockIdx'])]
-    ]
+    alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
 except Exception:
     alignTimeBounds = [
         [
@@ -184,7 +182,6 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     stimStatus = mdt.stimStatusSerialtoLong(
         eventDF, idxT='t', namePrefix='', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
-    print('Usign alignTimeBounds {}'.format(alignTimeBounds[segIdx]))
     #
     # stimStatus = stimStatus.loc[tMask, :].reset_index(drop=True)
     #
@@ -344,43 +341,44 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
                     plt.close()
                 categories.loc[group.loc[group['stimCat'] == 'stimOn', :].index, 'detectionDelay'] = maxLag
                 categories.loc[group.loc[group['stimCat'] == 'stimOn', :].index, 't'] += maxLag
-            # pdb.set_trace()
+    # pdb.set_trace()
     if (segIdx == 0) and arguments['plotParamHistograms']:
         fig, ax = plt.subplots()
         # phantomAx = ax.twinx()
         theseEvents = (
             categories
             .loc[categories['detectionDelay'] < 999, :])
-        # pdb.set_trace()
-        # customMessages = []
-        listOfLegends = []
-        for evN, evG in theseEvents.groupby('RateInHz'):
-            thisLegend = 'RateInHz = {} median = {:.3f} msec, std = {:.3f} msec'.format(evN, 1000 * evG['detectionDelay'].median(), 1000 * evG['detectionDelay'].std())
-            sns.distplot(
-                evG.loc[~evG['detectionDelay'].isna(), 'detectionDelay'],
-                # bins=200, kde=False,
-                ax=ax, label=thisLegend)
-            # customMessages.append('\n'.join([
-            #     
-            #     ]))
-        '''
-        customLines = [
-            Line2D([0], [0], color='k', alpha=0)
-            for custMess in customMessages
-            ]
-        phantomAx.set_yticks([])
-        listOfLegends.append(phantomAx.legend(customLines, customMessages, loc='upper left'))
-        '''
-        listOfLegends.append(ax.legend())
-        print(
-            theseEvents
-            .sort_values('detectionDelay', ascending=False)
-            .loc[:, ['t', 'detectionDelay']]
-            .head(10)
-            )
-        fig.savefig(
-            os.path.join(
-                figureFolder, 'stimDetectionDelayDistribution{}.pdf'.format(inputINSBlockSuffix)))
+        if theseEvents.size > 0:
+            # pdb.set_trace()
+            # customMessages = []
+            listOfLegends = []
+            for evN, evG in theseEvents.groupby('RateInHz'):
+                thisLegend = 'RateInHz = {} median = {:.3f} msec, std = {:.3f} msec'.format(evN, 1000 * evG['detectionDelay'].median(), 1000 * evG['detectionDelay'].std())
+                sns.distplot(
+                    evG.loc[~evG['detectionDelay'].isna(), 'detectionDelay'],
+                    # bins=200, kde=False,
+                    ax=ax, label=thisLegend)
+                # customMessages.append('\n'.join([
+                #
+                #     ]))
+            '''
+            customLines = [
+                Line2D([0], [0], color='k', alpha=0)
+                for custMess in customMessages
+                ]
+            phantomAx.set_yticks([])
+            listOfLegends.append(phantomAx.legend(customLines, customMessages, loc='upper left'))
+            '''
+            listOfLegends.append(ax.legend())
+            print(
+                theseEvents
+                .sort_values('detectionDelay', ascending=False)
+                .loc[:, ['t', 'detectionDelay']]
+                .head(10)
+                )
+            fig.savefig(
+                os.path.join(
+                    figureFolder, 'stimDetectionDelayDistribution{}.pdf'.format(inputINSBlockSuffix)))
     #
     if arguments['makeControl']:
         midTimes = []
@@ -405,7 +403,6 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     else:
         alignEventsDF = categories
     alignEventsDF.sort_values('t', inplace=True, kind='mergesort')
-    #
     uniqProgs = pd.unique(alignEventsDF['program'])
     #  pull actual electrode names
     alignEventsDF['electrode'] = np.nan

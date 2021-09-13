@@ -1177,11 +1177,11 @@ def findTrains(
 
 
 def getTriggers(
-        dataSeries, iti = .01, fs = 3e4, thres = 2.58,
-        edgeType = 'rising', itiWiggle = 0.05,
-        minAmp = None,
-        minTrainLength = None,
-        expectedTime = None, keep_max=True, plotting = False):
+        dataSeries, iti=.01, fs=3e4, thres=2.58,
+        edgeType='rising', itiWiggle=0.05,
+        minAmp=None,
+        minTrainLength=None,
+        expectedTime=None, keep_max=True, plotting=False):
     # iti: expected inter trigger interval
 
     # minimum distance between triggers (units of samples), 5% wiggle room
@@ -3679,11 +3679,15 @@ def parseFSE103Events(spikesBlock, delay=0, clipLimit=100, formatForce='f'):
     return data
 
     
-def calcBreakDown(asigWide, rowName, colName, hueName):
-    breakDownBy = [
-        i
-        for i in [rowName, colName, hueName]
-        if i is not None]
+def calcBreakDown(
+        asigWide,
+        rowName=None, colName=None, hueName=None,
+        breakDownBy=None):
+    if breakDownBy is None:
+        breakDownBy = [
+            i
+            for i in [rowName, colName, hueName]
+            if i is not None]
     if len(breakDownBy) == 1:
         breakDownBy = breakDownBy[0]
         
@@ -3699,7 +3703,11 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
     # indexNames = breakDownData.index.names + ['count']
     # breakDownData = breakDownData.reset_index()
     # breakDownData.columns = indexNames
-    unitName = asigWide.reset_index()['feature'].unique()[0]
+    try:
+        unitName = asigWide.reset_index()['feature'].unique()[0]
+    except Exception:
+        traceback.print_exc()
+        unitName = 'feature'
     breakDownText = (
         '{}\n'.format(unitName) +
         '# of observations:\n' +

@@ -43,7 +43,7 @@ import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.custom_transformers.tdr import reconstructionR2
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
-from dataAnalysis.analysis_code.regression_parameters import *
+from dataAnalysis.analysis_code.regression_parameters_rd import *
 import pdb
 import numpy as np
 import pandas as pd
@@ -139,18 +139,6 @@ if __name__ == '__main__':
         loadingMeta['arguments'].pop(argName, None)
     arguments.update(loadingMeta['arguments'])
     cvIterator = iteratorsBySegment[0]
-    #
-    estimatorClass = ColumnTransformer
-    listOfColumns = [
-        ('utah1', 0, 9.0, 1.0, 'NA', 'NA'),
-        ('utah20', 0, 7.0, 1.0, 'NA', 'NA'),
-        ('utah40', 0, 5.0, 1.0, 'NA', 'NA'),
-        ('utah60', 0, 3.0, 1.0, 'NA', 'NA'),
-        ('utah74', 0, 2.0, 5.0, 'NA', 'NA'),
-        ('utah55', 0, 4.0, 6.0, 'NA', 'NA'),
-        ('utah84', 0, 1.0, 5.0, 'NA', 'NA'),
-        ('utah63', 0, 3.0, 4.0, 'NA', 'NA')
-        ]
     ###
     dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
     featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
@@ -159,6 +147,26 @@ if __name__ == '__main__':
     dataDF = dataDF.loc[:, lagMask]
     featureMasks = featureMasks.loc[:, lagMask]
     #
+    estimatorClass = ColumnTransformer
+    listOfColumns = [
+        ('utah18', 0, 8.0, 9.0, 'NA', 'NA'),
+        ('utah29', 0, 6.0, 0.0, 'NA', 'NA'),
+        ('utah32', 0, 6.0, 3.0, 'NA', 'NA'),
+        ('utah35', 0, 6.0, 6.0, 'NA', 'NA'),
+        ('utah38', 0, 6.0, 9.0, 'NA', 'NA'),
+        ( 'utah4', 0, 9.0, 4.0, 'NA', 'NA'),
+        ('utah59', 0, 3.0, 0.0, 'NA', 'NA'),
+        ('utah62', 0, 3.0, 3.0, 'NA', 'NA'),
+        ('utah65', 0, 3.0, 6.0, 'NA', 'NA'),
+        ('utah68', 0, 3.0, 9.0, 'NA', 'NA'),
+        ( 'utah7', 0, 9.0, 7.0, 'NA', 'NA'),
+        ('utah79', 0, 1.0, 0.0, 'NA', 'NA'),
+        ( 'utah9', 0, 8.0, 0.0, 'NA', 'NA'),
+        ('utah90', 0, 0.0, 2.0, 'NA', 'NA'),
+        ('utah93', 0, 0.0, 5.0, 'NA', 'NA'),
+        ('utah96', 0, 0.0, 8.0, 'NA', 'NA')
+        ]
+    listOfColumns = dataDF.columns.to_list()
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     workIdx = cvIterator.work
     workingDataDF = dataDF.iloc[workIdx, :]
