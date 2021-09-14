@@ -146,14 +146,32 @@ namedQueries['align'].update({
         ]) + ')'
     })
 namedQueries['align'].update({
+    'startingSizeM': '(' + '&'.join([
+        namedQueries['align']['starting'],
+        '(pedalSizeCat == \'M\')'
+        ]) + ')'
+    })
+namedQueries['align'].update({
     'startingOnHighOrNone': '&'.join([
         namedQueries['align']['starting'],
         namedQueries['align']['trialRateInHz>20or0']
         ])
     })
 namedQueries['align'].update({
-    'startingOnHighOrNoneSizeS': '&'.join([
+    'startingOn100OrNone': '&'.join([
+        namedQueries['align']['starting'],
+        namedQueries['align']['trialRateInHz==100or0']
+        ])
+    })
+namedQueries['align'].update({
+    'startingOn100OrNoneSizeS': '&'.join([
         namedQueries['align']['startingSizeS'],
+        namedQueries['align']['trialRateInHz==100or0']
+        ])
+    })
+namedQueries['align'].update({
+    'startingOn100OrNoneSizeM': '&'.join([
+        namedQueries['align']['startingSizeM'],
         namedQueries['align']['trialRateInHz==100or0']
         ])
     })

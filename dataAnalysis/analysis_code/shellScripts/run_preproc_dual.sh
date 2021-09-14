@@ -11,17 +11,17 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_dual_20190126
+#SBATCH -J preproc_dual_201901_26
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/preproc_dual_20190126-%a.out
-#SBATCH -e ../../batch_logs/preproc_dual_20190126-%a.out
+#SBATCH -o ../../batch_logs/preproc_dual_201901_26-%a.out
+#SBATCH -e ../../batch_logs/preproc_dual_201901_26-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=1,2,3
 
 EXP="exp201901261000"
 # EXP="exp201901271000"

@@ -81,9 +81,11 @@ argumentsLookup = {
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
-        'colName': 'kinematicConditionNoSize', 'colControl': '', 'colOrder': [
-            'NA_NA', 'CW_outbound', 'CW_return'
-        ],
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
+            'NA_NA', 'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return'
+            ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'lfp_illustration': {
@@ -94,9 +96,11 @@ argumentsLookup = {
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
-        'colName': 'kinematicConditionNoSize', 'colControl': '', 'colOrder': [
-            'NA_NA', 'CW_outbound', 'CW_return'
-        ],
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        #  'colOrder': [
+        #      'NA_NA', 'CW_outbound', 'CW_return',
+        #      'CCW_outbound', 'CCW_return'
+        #      ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'factor_illustration': {
@@ -107,9 +111,11 @@ argumentsLookup = {
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
-        'colName': 'kinematicConditionNoSize', 'colControl': '', 'colOrder': [
-            'NA_NA', 'CW_outbound', 'CW_return'
-        ],
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
+            'NA_NA', 'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return'
+            ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'spectral_illustration': {
@@ -121,9 +127,11 @@ argumentsLookup = {
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
-        'colName': 'kinematicConditionNoSize', 'colControl': '', 'colOrder': [
-            'NA_NA', 'CW_outbound', 'CW_return'
-        ],
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
+            'NA_NA', 'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return'
+            ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'mahal_illustration': {
@@ -133,9 +141,11 @@ argumentsLookup = {
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
-        'colName': 'kinematicConditionNoSize', 'colControl': '', 'colOrder': [
-            'NA_NA', 'CW_outbound', 'CW_return'
-        ],
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
+            'NA_NA', 'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return'
+            ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''}
     }
@@ -229,7 +239,9 @@ plotProcFunsLookup = {
         'stimCondition = NA_0.0': 'No stimulation',
         'kinematicConditionNoSize = NA_NA': 'No movement',
         'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)'
+        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
+        'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
+        'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
         })],
     'factor_illustration': [
     shadeAUCEpochsPerFacet,
@@ -244,7 +256,9 @@ plotProcFunsLookup = {
         'stimCondition = NA_0.0': 'No stimulation',
         'kinematicConditionNoSize = NA_NA': 'No movement',
         'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)'
+        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
+        'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
+        'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
         })],
     'spectral_illustration': [
     shadeAUCEpochsPerFacet,
@@ -259,7 +273,9 @@ plotProcFunsLookup = {
         'stimCondition = NA_0.0': 'No stimulation',
         'kinematicConditionNoSize = NA_NA': 'No movement',
         'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)'
+        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
+        'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
+        'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
         })],
     'mahal_illustration': [
     shadeAUCEpochsPerFacet,
@@ -274,7 +290,9 @@ plotProcFunsLookup = {
         'stimCondition = NA_0.0': 'No stimulation',
         'kinematicConditionNoSize = NA_NA': 'No movement',
         'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)'
+        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
+        'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
+        'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
         })]
     }
 unusedPlotProcFuns = [

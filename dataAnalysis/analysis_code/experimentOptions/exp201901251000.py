@@ -4,9 +4,7 @@ def getExpOpts():
     #
     blockExperimentTypeLookup = {
         1: 'proprio',
-        2: 'proprio',
-        3: 'proprio',
-        4: 'proprio-miniRC'
+        2: 'proprio-miniRC',
         }
     fullRigInputs = {
         'A+': 'ainp1',
@@ -29,22 +27,20 @@ def getExpOpts():
     RCRigInputs = {
         'kinectSync': 'ainp16',
         }
-    
-    experimentName = '201901261000-Murdoc'
+
+    experimentName = '201901251000-Murdoc'
     deviceName = 'DeviceNPC700373H'
     subjectName = 'Murdoc'
     
     jsonSessionNames = {
         #  per trial
-        1: [
-            # 'Session1548517963713', 'Session1548518261171',
-            # 'Session1548518496294', 'Session1548518727243',
-            'Session1548518982240'
-        ],
-        2: ['Session1548520562275'],
-        3: ['Session1548521956580'],
-        4: ['Session1548524126669', ],
+        1: ['Session1548429682595', 'Session1548430735314'],
+        2: [
+            'Session1548431390236', 'Session1548431581704',
+            'Session1548432081534', 'Session1548432470771',
+            'Session1548432860813', 'Session1548433261877'],
         }
+
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
     for blockIdx in jsonSessionNames.keys():
@@ -61,19 +57,16 @@ def getExpOpts():
                 'unixTimeAdjust': None,
                 'zeroOutsideTargetLags': False,
                 'thres': 5,
-                'iti': 300e-3,  # not tens taps!
+                'iti': 10e-3,
                 'minAnalogValue': None,
                 'keepIndex': slice(None)
                 }
     ############################################################
     ############################################################
     # manually add special instructions, e.g.
-    synchInfo['ins'][4][0].update({
-        'timeRanges': [(66.0, 70.0)],
-        'unixTimeAdjust': None})
-    #
-    #
-    ############################################################
+    # synchInfo['ins'][1][0].update({
+    #     'timeRanges': [(39, 42)],
+    #     'unixTimeAdjust': 2.})
     ############################################################
     synchInfo['nsp'] = {
         # per block
@@ -93,9 +86,8 @@ def getExpOpts():
         for i in jsonSessionNames.keys()
         }
     ############################################################
-    ############################################################
     # manually add special instructions, e.g
-    synchInfo['nsp'][4][0].update({'timeRanges': [(937.6, 941.6)]})
+    # synchInfo['nsp'][5][0].update({'timeRanges': [(142.9, 146.9)]})
     #
     #
     ############################################################
@@ -115,59 +107,42 @@ def getExpOpts():
         1: None,
         # 2: [96.43, 191.689],
     }
-    #########################################
-    # options for stim artifact detection
+    ####################
     detectStim = True
-    stimDetectThresDefault = 1000
+    stimDetectThresDefault = 500
     stimDetectChansDefault = ['ins_td2', 'ins_td3']
-    stimDetectOverrideStartTimes = {
-        1: None,
-        2: None,
-        3: None,
-        4: None,
-        # 4: [
-        #     402.074, 404.084, 406.084, 408.094, 410.114, 412.124,
-        #     414.144, 416.164, 418.194, 420.204, 422.224, 424.244,
-        #     426.264, 428.284, 430.304],
-    }
     stimDetectOptsByChannelSpecific = {
         # group
         0: {
             # program
-            0: {'detectChannels': ['ins_td2'], 'thres': 1000, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td3'], 'thres': 1000, 'useForSlotDetection': True},
-            2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 2000, 'useForSlotDetection': True},
-            3: {'detectChannels': stimDetectChansDefault, 'thres': 1000, 'useForSlotDetection': True}
-        },
-        1: {
-            # program
-            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 500, 'useForSlotDetection': True},
-            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            3: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
+            0: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 125, 'useForSlotDetection': True},
+            2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            3: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
+        
+    triFolderSourceBase = 1
+    triDestinations = [
+        'Block00{}'.format(blockIdx)
+        for blockIdx in [2, 3, 4]]
+    
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901261000-Proprio': [4],
+        '201901251000-Murdoc': [1, 2],
         }
 
+    # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
+    #
     alignTimeBoundsLookup = {
+        # e.g.
+        #  per trial
+        #2: [
+        #    #  per trialSegment
+        #    [238, 1198],
+        #    ],
         }
-    motorEncoderBoundsLookup = {
-        1: [
-            [860, 882], [1092, 1149.8],
-            [1408, 1476], [1589, 2561]
-        ],
-        2: [
-            [159, 989]
-        ],
-        3: [
-            [131, 1085.8]
-        ]
-    }
-    ##############
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
@@ -211,6 +186,80 @@ def getExpOpts():
                     'nameSuffix': 'mean_subtracted'}
                 for i in blockExperimentTypeLookup.keys()]
         }
+    }
+    #
+    expIteratorOpts = {
+        'ca': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cb': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ccm': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ccs': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cd': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ra': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rb': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rc': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rd': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        're': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'pa': {
+            'experimentsToAssemble': {
+                '201901261000-Murdoc': [4],
+                experimentName: [1, 2, 3, 4],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                experimentName: [1, 2, 3, 4],
+                }
+            },
+        'na': {
+            'experimentsToAssemble': {
+                '201901261000-Murdoc': [4],
+                experimentName: [1, 2, 3, 4],
+                }
+            }
         }
-    
     return locals()

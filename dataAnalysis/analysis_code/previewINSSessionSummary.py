@@ -55,6 +55,7 @@ def summarizeINSSession(
         'unixStartTime': sessionUnixTime,
         'tStart': sessionTime.isoformat(),
         'hasTD': False,
+        'hasStim': False,
         'tEnd': None,
         'duration': None,
         'maxAmp': None,
@@ -99,12 +100,13 @@ def summarizeINSSession(
             ampsPresent = (
                 pd.Series(
                     stimStatusSerial.loc[ampOnMask, 'ins_value']
-                    .unique())
+                    .value_counts())
                 .to_frame(name='amplitudesTested'))
             summaryText += '<h3>Unique amplitudes: </h3>\n'
             summaryText += ampsPresent.to_html()
             logEntry['minAmp'] = int(ampsPresent['amplitudesTested'].min())
             logEntry['maxAmp'] = int(ampsPresent['amplitudesTested'].max())
+            logEntry['hasStim'] = True
     except Exception:
         traceback.print_exc()
         summaryText += '<h3>Unable to read Stim Log</h3>\n'
@@ -130,25 +132,35 @@ def summarizeINSSession(
             deviceName=deviceName)
         summaryText += '<h2>Sense Configuration</h2>\n'
         summaryText += senseInfoDF.to_html()
-        elecConfigList = []
-        for grpIdx, grpConfig in enumerate(electrodeConfiguration):
-            for progIdx, progConfig in enumerate(grpConfig):
-                thisCycleOnTime = (
-                    progConfig['cycleOnTime']['time'] *
-                    mdt_constants.cycleUnits[progConfig['cycleOnTime']['units']] *
-                    pq.s).magnitude
-                thisCycleOffTime = (
-                    progConfig['cycleOffTime']['time'] *
-                    mdt_constants.cycleUnits[progConfig['cycleOffTime']['units']] *
-                    pq.s).magnitude
-                progConfig['cycleOnTime'] = thisCycleOnTime
-                progConfig['cycleOffTime'] = thisCycleOffTime
-                progConfig['group'] = grpIdx
-                progConfig['program'] = progIdx
-                elecConfigList.append(pd.Series(progConfig))
-        elecConfigDF = pd.concat(elecConfigList, axis='columns').transpose()
-        summaryText += '<h2>Stim Configuration</h2>\n'
-        summaryText += elecConfigDF.to_html()
+        if logEntry['hasStim']:
+            elecConfigList = []
+            for grpIdx, grpConfig in enumerate(electrodeConfiguration):
+                for progIdx, progConfig in enumerate(grpConfig):
+                    thisCycleOnTime = (
+                        progConfig['cycleOnTime']['time'] *
+                        mdt_constants.cycleUnits[progConfig['cycleOnTime']['units']] *
+                        pq.s).magnitude
+                    thisCycleOffTime = (
+                        progConfig['cycleOffTime']['time'] *
+                        mdt_constants.cycleUnits[progConfig['cycleOffTime']['units']] *
+                        pq.s).magnitude
+                    progConfig['cycleOnTime'] = thisCycleOnTime
+                    progConfig['cycleOffTime'] = thisCycleOffTime
+                    progConfig['group'] = grpIdx
+                    progConfig['program'] = progIdx
+                    elecConfigList.append(pd.Series(progConfig))
+            elecConfigDF = pd.concat(elecConfigList, axis='columns').transpose()
+            elecConfigDF = elecConfigDF.loc[elecConfigDF['cathodes'].apply(lambda x: len(x) > 0), :]
+            elecConfigDF.loc[:, 'cathodeStr'] = elecConfigDF.apply(
+                lambda x: ''.join(['-E{}'.format(ct) for ct in x['cathodes']]),
+                axis='columns')
+            elecConfigDF.loc[:, 'anodeStr'] = elecConfigDF.apply(
+                lambda x: ''.join(['+E{}'.format(ct) for ct in x['anodes']]),
+                axis='columns')
+            summaryText += '<h2>Stim Configuration</h2>\n'
+            summaryText += elecConfigDF.to_html()
+        else:
+            elecConfigDF = None
     except Exception:
         traceback.print_exc()
         elecConfigDF, senseInfoDF = None, None

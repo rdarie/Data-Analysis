@@ -10,11 +10,11 @@
 #SBATCH --mem=128G
 
 # Specify a job name:
-#SBATCH -J plots_motion_lfp_21
+#SBATCH -J plots_motion_lfp_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/plots_motion_lfp_21.out
-#SBATCH -e ../../batch_logs/plots_motion_lfp_21.out
+#SBATCH -o ../../batch_logs/plots_motion_lfp_27.out
+#SBATCH -e ../../batch_logs/plots_motion_lfp_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble_21.sh
+source ./shellScripts/run_exp_preamble_27.sh
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh
 
 # PAGELIMITS="--limitPages=8"

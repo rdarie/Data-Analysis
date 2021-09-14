@@ -28,7 +28,7 @@ source shellScripts/calc_aligned_motion_preamble.sh
 
 ITERATOR="--iteratorSuffix=pa"
 #
-ALIGNQUERYTERM="startingOnHighOrNoneSizeS"
+ALIGNQUERYTERM="startingOn100OrNoneSizeS"
 CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 

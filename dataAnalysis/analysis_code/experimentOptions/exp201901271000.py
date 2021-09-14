@@ -188,8 +188,8 @@ def getExpOpts():
     
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901261000-Proprio': [4],
-        '201901271000-Proprio': [1, 2, 3, 4],
+        '201901261000-Murdoc': [4],
+        '201901271000-Murdoc': [1, 2, 3, 4],
         }
 
     # Options relevant to the classifcation of proprio trials
@@ -275,4 +275,79 @@ def getExpOpts():
                 for i in blockExperimentTypeLookup.keys()]
         }
     }
+    #
+    expIteratorOpts = {
+        'ca': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cb': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ccm': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ccs': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cd': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ra': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rb': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rc': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rd': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        're': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'pa': {
+            'experimentsToAssemble': {
+                '201901261000-Murdoc': [4],
+                experimentName: [1, 2, 3, 4],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                experimentName: [1, 2, 3, 4],
+                }
+            },
+        'na': {
+            'experimentsToAssemble': {
+                '201901261000-Murdoc': [4],
+                experimentName: [1, 2, 3, 4],
+                }
+            }
+        }
     return locals()

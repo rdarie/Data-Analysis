@@ -10,25 +10,25 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_plots_motion_21
+#SBATCH -J test_train_split_plots_motion_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_split_plots_motion_21-%a.out
-#SBATCH -e ../../batch_logs/test_train_split_plots_motion_21-%a.out
+#SBATCH -o ../../batch_logs/test_train_split_plots_motion_27-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_plots_motion_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=1,2,3,4
 
 # SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_exp_preamble_21.sh
+source shellScripts/run_exp_preamble_27.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 ITERATOR="--iteratorSuffix=pa"
 #
-ALIGNQUERYTERM="startingOnHighOrNoneSizeS"
+ALIGNQUERYTERM="startingOn100OrNone"
 CONTROLSTATUS=""
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 

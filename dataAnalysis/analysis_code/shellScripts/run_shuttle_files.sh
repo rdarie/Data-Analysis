@@ -23,6 +23,8 @@
 #SBATCH --array=1,2,3
 
 ####
+EXP="exp201901271000"
+
 # EXP="exp202010151400"
 # EXP="exp202012171300"
 # EXP="exp202012221300"
@@ -62,7 +64,8 @@ python --version
 python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize
 
 # scratch to data
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_XL.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block_*XL.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*lfp_XL.nix' --fromScratchToData --moveItems --filesIncluded
 #
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.nix' --fromScratchToData --moveItems --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.json' --fromScratchToData --moveItems --filesIncluded

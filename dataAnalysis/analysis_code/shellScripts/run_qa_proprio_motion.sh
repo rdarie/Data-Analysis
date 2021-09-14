@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=2,3,4
+#SBATCH --array=1
 
 # SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_exp_preamble_21.sh

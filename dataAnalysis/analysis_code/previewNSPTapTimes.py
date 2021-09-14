@@ -102,6 +102,9 @@ if not os.path.exists(idealDataPath):
         os.path.join(
             nspFolder,
             '{}{:0>3}'.format('Block', blockIdx) + '.ns5'),
+        os.path.join(
+            nspFolder,
+            '{}{:0>3}'.format('Trial', blockIdx) + '.ns5'),
         ]
     for fbp in fallBackPathList:
         if os.path.exists(fbp):

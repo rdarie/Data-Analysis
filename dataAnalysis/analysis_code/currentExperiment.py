@@ -769,7 +769,7 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 5e-3,
-            'minBinCount': 5,
+            'minBinCount': 2,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(

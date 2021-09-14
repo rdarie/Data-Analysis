@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J nix_assembly_20
+#SBATCH -J nix_assembly_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/nix_assembly_20.out
-#SBATCH -e ../../batch_logs/nix_assembly_20.out
+#SBATCH -o ../../batch_logs/nix_assembly_27.out
+#SBATCH -e ../../batch_logs/nix_assembly_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,13 +24,13 @@
 
 SLURM_ARRAY_TASK_ID=2
 
-source ./shellScripts/run_exp_preamble_20.sh
+source ./shellScripts/run_exp_preamble_27.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 # primary data
-blocks=(lfp lfp_CAR rig)
+blocks=(lfp lfp_CAR lfp_CAR_spectral rig)
 #
 # alignfolders=(stim motion)
 alignfolders=(motion)

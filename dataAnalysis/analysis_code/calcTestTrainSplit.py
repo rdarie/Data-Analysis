@@ -335,6 +335,24 @@ if not arguments['processAll']:
 else:
     exportDF = pd.concat(listOfDataFrames)
     print('exportDF.shape[0] =  {}'.format(exportDF.shape[0]))
+    breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
+        exportDF.index.to_frame().drop_duplicates(['segment', 'originalIndex', 't']).reset_index(drop=True),
+        breakDownBy=stimulusConditionNames)
+    breakDownFolder = os.path.join(
+        figureFolder, 'testTrainSplits',
+        )
+    if not os.path.exists(breakDownFolder):
+        os.makedirs(breakDownFolder)
+    breakDownInspectPath = (
+        os.path.join(
+            breakDownFolder,
+            '{}_{}_{}{}{}_cvIterators.html'.format(
+                blockBaseName,
+                arguments['window'],
+                arguments['alignQuery'],
+                iteratorSuffix, controlSuffix)))
+    with open(breakDownInspectPath, 'w') as _f:
+        _f.write(breakDownHtml)
     if theseIteratorOpts['controlProportion'] is not None:
         trialInfo = exportDF.index.to_frame().reset_index(drop=True)
         infoPerTrial = trialInfo.drop_duplicates(subset=['controlFlag', 'segment', 'originalIndex', 't'])

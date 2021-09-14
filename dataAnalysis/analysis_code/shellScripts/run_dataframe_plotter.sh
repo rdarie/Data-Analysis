@@ -10,11 +10,11 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J plot_dataframes_21
+#SBATCH -J plot_dataframes_201901_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/plot_dataframes_21.out
-#SBATCH -e ../../batch_logs/plot_dataframes_21.out
+#SBATCH -o ../../batch_logs/plot_dataframes_201901_27.out
+#SBATCH -e ../../batch_logs/plot_dataframes_201901_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,7 +29,7 @@
 #   SBATCH --mem-per-cpu=64G
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble_21.sh
+source ./shellScripts/run_exp_preamble_27.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
@@ -54,9 +54,9 @@ do
   # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
   # python -u './plotSignalDataFrameHistogram.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
   #
-  python -u './plotSignalDataFrame.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  # python -u './plotSignalDataFrame.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName=rig $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
   python -u './plotSignalDataFrame.py' --plotSuffix="lfp_illustration" --verbose=1 --selectionName=lfp_CAR $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
-  python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
+  # python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
   #
   # python -u './plotSignalDataFrame.py' --plotSuffix="spectral_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"
   # python -u './plotSignalDataFrame.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName=lfp_CAR_spectral_scaled_mahal_ledoit $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITER}"

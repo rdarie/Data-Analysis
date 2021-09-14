@@ -30,7 +30,8 @@ source activate nda2
 python --version
 
 # EXP="exp201901070700"
-EXP="exp201901261000"
+EXP="exp201901251000"
+# EXP="exp201901261000"
 # EXP="exp201901271000"
 
 # EXP="exp202101111100"
@@ -51,7 +52,7 @@ EXP="exp201901261000"
 # python -u ./previewINSSessionSummary.py --exp=$EXP
 # python -u ./saveImpedances.py --exp=$EXP --processAll --reprocess
 
-for BLOCKIDX in 1 2 3 4
+for BLOCKIDX in 1 2
 do
     python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP
 done
