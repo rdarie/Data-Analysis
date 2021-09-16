@@ -23,12 +23,13 @@
 #SBATCH --array=1,2,3
 
 ####
+# EXP="exp201901070700"
 EXP="exp201901271000"
 
 # EXP="exp202010151400"
 # EXP="exp202012171300"
 # EXP="exp202012221300"
-# EXP="exp201901070700"
+#
 # EXP="exp202101141100"
 # EXP="exp202101191100"
 # EXP="exp202101201100"
@@ -36,7 +37,7 @@ EXP="exp201901271000"
 # EXP="exp202101221100"
 #
 # EXP="exp202101251100"
-EXP="exp202101271100"
+# EXP="exp202101271100"
 # EXP="exp202101281100"
 #
 # EXP="exp202102041100"
@@ -60,11 +61,9 @@ python --version
 # Use option '-S' for a different date
 #  or option '-j' for a specific Job ID.
 
-# examine folder sizes
-python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize
-
 # scratch to data
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block_*XL.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*pt*' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*XL.nix' --fromScratchToData --moveItems --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*lfp_XL.nix' --fromScratchToData --moveItems --filesIncluded
 #
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.nix' --fromScratchToData --moveItems --filesIncluded
@@ -88,25 +87,6 @@ python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize
 ## required by plotting qa
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp_XL.nix' --fromDataToScratch --filesIncluded
 
-# global operations
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_lfp_*.nix' --fromDataToScratch --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze*' --fromDataToScratch --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.*' --fromDataToScratch --filesIncluded
-#
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp*.nix' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze.nix' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.json' --fromScratchToData --moveItems --filesIncluded
-
-#
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.parquet' --fromDataToScratch --foldersIncluded --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*loRes*' --fromDataToScratch --foldersIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*outlierTrials*' --fromDataToScratch --foldersIncluded
-
-# everything to data
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --fromScratchToData --searchTerm='*' --moveItems --foldersIncluded --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*pt*' --fromDataToScratch --filesIncluded
+# examine folder sizes
+python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize

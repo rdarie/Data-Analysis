@@ -11,7 +11,7 @@ OUTLIERMASK="--maskOutlierBlocks"
 STATSOVERLAY="--overlayStats"
 # STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=-300 --winStop=600"
+TIMEWINDOWOPTS="--winStart=-200 --winStop=500"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"

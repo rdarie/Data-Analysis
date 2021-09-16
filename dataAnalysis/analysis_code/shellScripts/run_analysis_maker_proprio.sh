@@ -8,23 +8,27 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=200G
+#SBATCH --mem=125G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_20190126
+#SBATCH -J analysis_calc_201901_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/analysis_calc_20190126-%a.out
-#SBATCH -e ../../batch_logs/analysis_calc_20190126-%a.out
+#SBATCH -o ../../batch_logs/analysis_calc_201901_27-%a.out
+#SBATCH -e ../../batch_logs/analysis_calc_201901_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=1-5
 
-EXP="exp201901261000"
-# EXP="exp201901271000"
+# EXP="exp201901251000"
+# has 1 minirc 2 motion
+# EXP="exp201901261000"
+# has 1-3 motion 4 minirc
+EXP="exp201901271000"
+# has 1-4 motion 5 minirc
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -72,7 +76,7 @@ conda activate
 source activate nda2
 python --version
 
-#   SLURM_ARRAY_TASK_ID=5
+# SLURM_ARRAY_TASK_ID=1
 echo --blockIdx=$SLURM_ARRAY_TASK_ID
 
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
@@ -80,7 +84,7 @@ python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
 # python -u ./synchronizeSIMItoNSP_stimBased.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --showFigures --inputBlockSuffix=analog_inputs  --inputBlockPrefix=utah --plotting --forceRecalc
 # python -u ./calcProprioAnalysisNix.py --hasKinematics --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 
-python -u ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
+python -u ./calcMotionAlignTimesV3.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
 
 python -u ./calcRefinedStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --inputNSPBlockSuffix=analog_inputs --plotParamHistograms $LAZINESS
 # or, if wanting to trim down the dataset (e.g. for time consuming uperations such as CSD calculation, can remove the stimOff labels

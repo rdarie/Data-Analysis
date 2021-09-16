@@ -2490,9 +2490,18 @@ def readBlockFixNames(
         for stP in dataBlock.filter(objects=SpikeTrainProxy):
             if 'unitAnnotations' in stP.annotations:
                 unAnnStr = stP.annotations['unitAnnotations']
+                if ';' in unAnnStr:
+                    try:
+                        raise(Warning('loading unit annotations for spiketrain {}\n{}'.format(stp.name, unAnnStr)))
+                    except:
+                        traceback.print_exc()
+                        pass
+                    unAnnStr = unAnnStr.split(';')[0]
+                #
                 try:
                     stP.unit.annotations.update(json.loads(unAnnStr))
                 except Exception:
+                    traceback.print_exc()
                     pdb.set_trace()
     if (loadList is not None) and lazy:
         if 'asigs' in loadList:

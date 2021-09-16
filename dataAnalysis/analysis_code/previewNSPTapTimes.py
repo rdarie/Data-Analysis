@@ -195,6 +195,7 @@ if 'tapSync' in eventInfo['inputIDs']:
     approxTapTimes = pd.DataFrame([allNSPTapTimes]).T
     approxTapTimes.columns = ['NSP']
     tapIntervals = approxTapTimes['NSP'].diff()
+    # trains separated by more than 5 seconds count as new trains
     approxTapTimes.loc[:, 'tapGroup'] = (tapIntervals > 5).cumsum()
     approxTapTimes.loc[:, 'tapMeanTime'] = np.nan
     for trialSegment, group in approxTapTimes.groupby('tapGroup'):
@@ -248,16 +249,12 @@ if os.path.exists(listOfSummarizedPath):
         })
     summaryDF.loc[:, 'tStart'] = pd.DatetimeIndex(summaryDF['tStart']).tz_convert(tz="utc")
     summaryDF.loc[:, 'tEnd'] = pd.DatetimeIndex(summaryDF['tEnd']).tz_localize(tz="utc")
-    # pdb.set_trace()
-    # sessionStarts = summaryDF['tStart'].copy()
-    # sessionEnds = pd.DatetimeIndex(summaryDF['tEnd']).tz_localize(tz="utc")
     compatibleSessionsMask = (
-        (summaryDF['tStart'] > (recDateTime - pd.Timedelta('1M'))) &
+        (summaryDF['tStart'] > (recDateTime - pd.Timedelta(5, unit='min'))) &
         (summaryDF['tEnd'] < recEndTime) &
         (summaryDF['hasTD']) &
         (summaryDF['maxAmp'].notna()))
     insSessions = summaryDF.loc[compatibleSessionsMask, :].copy()
-    # pdb.set_trace()
     if approxStartTimes is not None:
         closestTimes, closestIdx = hf.closestSeries(
             takeFrom=insSessions['tStart'].apply(lambda x: x.timestamp()), compareTo=approxStartTimes['unixTime'].apply(lambda x: x.timestamp())
@@ -266,20 +263,30 @@ if os.path.exists(listOfSummarizedPath):
             approxStartTimes.loc[closestIdx, 'unixTime'].reset_index(drop=True) -
             insSessions['tStart'].reset_index(drop=True)
             ).to_numpy()
+        insSessions.loc[:, 'approxSynchPulseNSPTime'] = approxStartTimes.loc[closestIdx, 'tapMeanTime'].to_numpy()
         insSessions.loc[:, 'approxSynchTimeRanges'] = (
             insSessions['approxSynchPulseTime']
                 .apply(
                 lambda x: '({}, {})'.format(
                     np.round(x.total_seconds() + tapTimeBuffer[0], decimals=1),
                     np.round(x.total_seconds() + tapTimeBuffer[1], decimals=1))))
+    else:
+        insSessions.loc[:, 'approxSynchPulseNSPTime'] = np.nan
+        insSessions.loc[:, 'approxSynchTimeRanges'] = np.nan
     insSessions.loc[:, 'delayFromNSP'] = pd.TimedeltaIndex(
         summaryDF.loc[compatibleSessionsMask, 'tStart'] - recDateTime).total_seconds()
     ###
     summaryText += '<h3>Companion INS sessions: </h3>'
-    summaryText += insSessions.rename(
+    columnsToPrint = [
+        'unixStartTime', 'tStart', 'tEnd', 'duration',
+        'approxSynchTimeRanges', 'approxSynchPulseNSPTime'
+        ]
+    summaryText += insSessions.loc[:, columnsToPrint].rename(
         columns={
             'tStart': 'Start Time', 'tEnd': 'End Time',
-            'duration': 'Duration (sec)', 'delayFromNSP': 'delay after NSP start (sec)'
+            'duration': 'Duration (sec)', 'delayFromNSP': 'delay after NSP start (sec)',
+            'approxSynchTimeRanges': 'synch pulse time ranges (sec, INS time)',
+            'approxSynchPulseNSPTime': 'synch pulse time (sec, NSP time)'
             }).to_html()
     summaryText += '<br> insSessions = [{}]'.format(
         ', '.join(
@@ -309,12 +316,12 @@ try:
         '<h3>.95 voltage intervals:</h3>\n<p>\n'
         .format(2 * problemThreshold))
     asigList = []
+    print('Loading channels to check signal ranges....')
     for asigP in nspBlock.segments[segIdx].analogsignals:
         chName = asigP.channel_index.name
         bankID = asigP.channel_index.annotations['connector_ID']
         # if 'ainp' not in chName:
         if True:
-            print('    Loading {}'.format(chName))
             firstT = max(spikeSortingOpts['utah']['previewOffset'] * pq.s,  asigP.t_start)
             lastT = min(firstT + spikeSortingOpts['utah']['previewDuration'] * pq.s,  asigP.t_stop)
             # lastT = min(firstT + 30 * pq.s, asigP.t_stop)
@@ -340,7 +347,7 @@ try:
             asigDF.columns.name = 'time'
             asigList.append(asigDF)
             ##
-    summaryText += ('</p>\n<h3>List view: </h3>\n')
+    summaryText += ('</p>\n<h3>List view of problematic channels: </h3>\n')
     summaryText += '{}\n'.format(problemChannelsList)
 except Exception:
     traceback.print_exc()
@@ -355,8 +362,9 @@ approxTimesPath = os.path.join(
         experimentName, ns5FileName))
 with open(approxTimesPath, 'w') as _file:
     _file.write(summaryText)
+
 allAsigDF = pd.concat(asigList).stack('time').to_frame(name='signal').reset_index()
-#
+print('Plotting channel signal ranges')
 signalRangesFigPath = os.path.join(
     preprocDiagnosticsFolder,
     '{}_{}_NS5_Preview_ranges.pdf'.format(

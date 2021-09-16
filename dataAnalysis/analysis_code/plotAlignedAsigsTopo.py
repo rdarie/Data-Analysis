@@ -32,10 +32,10 @@ Options:
     --limitPages=limitPages                              limit page count
     --noStim                                             process entire experimental day? [default: False]
 """
-
-import matplotlib, os
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
+import logging
+logging.captureWarnings(True)
+import os, sys
+import matplotlib
 if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('Agg')   # generate postscript output
 else:
@@ -49,6 +49,10 @@ for font_file in font_files:
         pass
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
+#
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
 #
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.kilosort_analysis as ksa
@@ -57,7 +61,6 @@ import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.profiling as prf
 import traceback
 #
-from namedQueries import namedQueries
 import neo
 from neo.core import (Block, Segment, ChannelIndex,
     AnalogSignal, Unit, SpikeTrain, Event)
@@ -72,26 +75,25 @@ import pdb
 from tqdm import tqdm
 import dill as pickle
 #
-from currentExperiment import parseAnalysisOptions
-from docopt import docopt
-import seaborn as sns
-#
+sns.set(
+    context='talk', style='darkgrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
 useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': .5,
-        'lines.markersize': 2.5,
-        'patch.linewidth': .5,
+        'lines.linewidth': 1,
+        'lines.markersize': 2.4,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
         "axes.spines.top": True,
         "axes.linewidth": .125,
         "grid.linewidth": .2,
-        "font.size": 7,
-        "axes.labelsize": 8,
-        "axes.titlesize": 9,
+        "font.size": 5,
+        "axes.labelsize": 7,
+        "axes.titlesize": 5,
         "xtick.labelsize": 5,
         "ytick.labelsize": 5,
         "legend.fontsize": 5,
@@ -113,17 +115,31 @@ snsRCParams = {
     }
 mplRCParams = {
     'figure.titlesize': 7,
+    'mathtext.default': 'regular',
     'font.family': "Nimbus Sans",
     'pdf.fonttype': 42,
     'ps.fonttype': 42,
     }
+styleOpts = {
+    'legend.lw': 2,
+    'tight_layout.pad': 3e-1, # units of font size
+    'panel_heading.pad': 0.
+    }
 sns.set(
-    context='talk', style='whitegrid',
+    context='paper', style='whitegrid',
     palette='dark', font='sans-serif',
-    font_scale=2, color_codes=True, rc=snsRCParams)
+    font_scale=.8, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
+from docopt import docopt
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
@@ -587,3 +603,4 @@ with PdfPages(pdfName) as pdf:
     if saveFigMetaToPath is not None:
         with open(saveFigMetaToPath, 'wb') as _f:
             pickle.dump(figMetaData, _f)
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

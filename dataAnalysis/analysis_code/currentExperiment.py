@@ -196,6 +196,7 @@ def parseAnalysisOptions(
             # 'interpKind': 'akima',
             'forceRecalc': True,
             'detectStim': expOpts['detectStim'],
+            'fractionForRollover': expOpts['fractionForRollover'] if 'fractionForRollover' in expOpts else 0.1,
             'getINSkwargs': {}
             }
         }

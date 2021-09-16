@@ -7,14 +7,14 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=200G
+#SBATCH --mem=64G
 
 # Specify a job name:
-#SBATCH -J align_stim_20190126_rig
+#SBATCH -J align_stim_201901_26_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/align_stim_20190126_rig-%a.out
-#SBATCH -e ../../batch_logs/align_stim_20190126_rig-%a.out
+#SBATCH -o ../../batch_logs/align_stim_201901_26_rig-%a.out
+#SBATCH -e ../../batch_logs/align_stim_201901_26_rig-%a.out
 
 # Request custom resources
 #SBATCH --array=4

@@ -18,42 +18,52 @@ Options:
     --forceRecalc                                         whether to overwrite any previous calculated synch [default: False]
     --usedTENSPulses                                      whether the sync was done using TENS pulses (as opposed to mechanical taps) [default: False]
 """
-
-import matplotlib, pdb, traceback
-matplotlib.use('Qt5Agg')   # generate interactive output by default
-#  matplotlib.rcParams['agg.path.chunksize'] = 10000
-#  matplotlib.use('PS')   # noninteract output
-from matplotlib.lines import Line2D
-from matplotlib import pyplot as plt
+import logging
+logging.captureWarnings(True)
+import os, sys
+import matplotlib
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-import dill as pickle
+# from matplotlib.lines import Line2D
+# import dill as pickle
 from scipy import signal
 from scipy import stats
-from importlib import reload
+# from importlib import reload
 import peakutils
 import shutil
 import numpy as np
 import pandas as pd
-import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
-import dataAnalysis.helperFunctions.motor_encoder_new as mea
+# import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
+# import dataAnalysis.helperFunctions.motor_encoder_new as mea
 import dataAnalysis.helperFunctions.helper_functions_new as hf
-import dataAnalysis.helperFunctions.estimateElectrodeImpedances as eti
+# import dataAnalysis.helperFunctions.estimateElectrodeImpedances as eti
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.preproc.mdt as mdt
-import dataAnalysis.preproc.mdt_constants as mdt_constants
-import warnings
-import h5py
-import os
-import math as m
+# import dataAnalysis.preproc.mdt_constants as mdt_constants
+# import warnings
+# import h5py
+import traceback
+# import math as m
 import seaborn as sns
-import scipy.interpolate as intrp
+# import scipy.interpolate as intrp
 import quantities as pq
 import json
-from statsmodels import robust
-import rcsanalysis.packetizer as rcsa
-import rcsanalysis.packet_func as rcsa_helpers
+# from statsmodels import robust
+# import rcsanalysis.packetizer as rcsa
+# import rcsanalysis.packet_func as rcsa_helpers
 from datetime import datetime as dt
-from datetime import timezone
+# from datetime import timezone
 import pytz
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
@@ -61,15 +71,65 @@ from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 import neo
-import elephant as elph
-import elephant.pandas_bridge as elphpdb
+# import elephant as elph
+# import elephant.pandas_bridge as elphpdb
 from elephant.conversion import binarize
-from sklearn.preprocessing import MinMaxScaler
+# from sklearn.preprocessing import MinMaxScaler
 from sklearn.covariance import EmpiricalCovariance, MinCovDet
+useDPI = 200
+dpiFactor = 72 / useDPI
+snsRCParams = {
+        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+        'lines.linewidth': .5,
+        'lines.markersize': 2.5,
+        'patch.linewidth': .5,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.spines.right": True,
+        "axes.spines.top": True,
+        "axes.linewidth": .125,
+        "grid.linewidth": .2,
+        "font.size": 5,
+        "axes.labelsize": 7,
+        "axes.titlesize": 5,
+        "xtick.labelsize": 5,
+        "ytick.labelsize": 5,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": False,
+        "ytick.left": True,
+        "ytick.right": False,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
+    }
+
+mplRCParams = {
+    'figure.titlesize': 7,
+    'font.family': "Nimbus Sans",
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
+    }
+styleOpts = {
+    'legend.lw': 2,
+    'tight_layout.pad': 3e-1,  # units of font size
+    'panel_heading.pad': 0.
+    }
 sns.set(
-    context='talk', style='darkgrid',
+    context='paper', style='white',
     palette='dark', font='sans-serif',
-    font_scale=.7, color_codes=True)
+    font_scale=.8, color_codes=True, rc=snsRCParams)
+for rcK, rcV in mplRCParams.items():
+    matplotlib.rcParams[rcK] = rcV
+
 #  load options
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 
@@ -87,6 +147,11 @@ if consoleDebugging:
         'preparationStage': False, 'addToBlockSuffix': None}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
+
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
 
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
@@ -248,7 +313,15 @@ else:
 nspDF = ns5.analogSignalsToDataFrame(asigList)
 nspSamplingRate = float(asigList[0].sampling_rate)
 
+alignByXCorr = True
+alignByUnixTime = False
+getINSTrigTimes = True
+plotSynchReport = True
 
+if plotSynchReport and alignByXCorr:
+    insDiagnosticsFolder = os.path.join(figureFolder, 'insDiagnostics')
+    if not os.path.exists(insDiagnosticsFolder):
+        os.mkdirs(insDiagnosticsFolder)
 if os.path.exists(synchFunPath) and not arguments['forceRecalc']:
     with open(synchFunPath, 'r') as _f:
         interpFunLoaded = json.load(_f)
@@ -261,6 +334,11 @@ if os.path.exists(synchFunPath) and not arguments['forceRecalc']:
         for key, value in interpFunLoaded['nspToIns'].items()
     }
 else:
+    if plotSynchReport and alignByXCorr:
+        synchReportPDF = PdfPages(
+            os.path.join(
+                insDiagnosticsFolder,
+                'ins_synch_report_Block{:0>3}{}.pdf'.format(blockIdx, inputINSBlockSuffix)))
     sessionUnixTimeList = [
         int(sessionName.split('Session')[-1])
         for sessionName in jsonSessionNames
@@ -280,20 +358,6 @@ else:
             'nsp': []
             }
         for insSessIdx, insGroup in insDF.groupby('trialSegment')}
-    #
-    alignByXCorr = True
-    alignByUnixTime = False
-    getINSTrigTimes = True
-    #
-    plotSynchReport = True
-    if plotSynchReport and alignByXCorr:
-        insDiagnosticsFolder = os.path.join(figureFolder, 'insDiagnostics')
-        if not os.path.exists(insDiagnosticsFolder):
-            os.mkdirs(insDiagnosticsFolder)
-        synchReportPDF = PdfPages(
-            os.path.join(
-                insDiagnosticsFolder,
-                'ins_synch_report_Block{:0>3}{}.pdf'.format(blockIdx, inputINSBlockSuffix)))
     for insSessIdx, insGroup in insDF.groupby('trialSegment'):
         print('aligning session nb {}'.format(insSessIdx))
         sessTapOptsNSP = tapDetectOptsNSP[insSessIdx]
@@ -437,9 +501,10 @@ else:
                     manualAlignTimes[insSessIdx], fig, ax = mdt.peekAtTapsV2(
                         thisNspDF, thisInsDF,
                         insAuxDataDF=insGroup.loc[insSearchMask, :].drop(columns=['t', 'unixTime', 'trialSegment']).reset_index(drop=True),
-                        tapTimestampsINS=insTapTimes.to_numpy(), tapTimestampsNSP=nspTapTimes,
+                        tapTimestampsINS=insTapTimes, tapTimestampsNSP=nspTapTimes,
                         tapDetectOptsNSP=sessTapOptsNSP, tapDetectOptsINS=sessTapOptsINS,
-                        # procFunINS=stats.zscore, procFunNSP=stats.zscore
+                        procFunINS=stats.zscore,
+                        # procFunNSP=stats.zscore
                         )
                     plt.show()
                     if len(manualAlignTimes[insSessIdx]['ins']) > 0:
@@ -455,6 +520,7 @@ else:
             ###
             if (insTapTimes.size == nspTapTimes.size):
                 unixDeltaT = (nspTapTimes - insTapTimes).mean()
+                print('    Aligning preliminary tap times: new delta T = {}'.format(unixDeltaT))
         if sessTapOptsINS['synchStimUnitName'] is not None:
             insTapTimes = None
             insTapTimesStList = [
@@ -749,29 +815,102 @@ outPathName = os.path.join(
     scratchFolder,
     ns5FileName + '{}.nix'.format(outputINSBlockSuffix))
 if os.path.exists(outPathName):
+    print('Found existing file and deleting {}...'.format(outPathName))
     os.remove(outPathName)
 writer = neo.io.NixIO(filename=outPathName)
 writer.write_block(insBlockInterp, use_obj_names=True)
 writer.close()
-'''
-saveEventsToNSPBlock = True
-if saveEventsToNSPBlock:
-    # if nsp block already has the spike stuff, revert from the copy; else, save a copy and add them
-    nspReader.file.close()
-    backupNspPath = os.path.join(
-        scratchFolder,
-        BlackrockFileName + inputNSPBlockSuffix +
-        '_backup.nix')
-    shutil.copyfile(nspPath, backupNspPath)
-    ns5.addBlockToNIX(
-        insBlockInterp, neoSegIdx=[0],
-        writeAsigs=False, writeSpikes=True, writeEvents=True,
-        fileName=BlackrockFileName + inputNSPBlockSuffix,
-        folderPath=scratchFolder,
-        purgeNixNames=True,
-        nixBlockIdx=0, nixSegIdx=[0],
-        )
-'''
+
+print('Done writing synchronized .nix file.')
+
+if plotSynchReport and alignByXCorr:
+    print('Saving confirmation plots...')
+    synchConfirmPDF = PdfPages(
+        os.path.join(
+            insDiagnosticsFolder,
+            'ins_synch_illustration_Block{:0>3}{}.pdf'.format(blockIdx, inputINSBlockSuffix)))
+    ###
+    nspChanNames += ['seg0_position', 'seg0_utah_artifact_0']
+    if arguments['lazy']:
+        asigListNSP = [
+            asigP.load()
+            for asigP in nspBlock.filter(objects=AnalogSignalProxy)
+            if asigP.name in nspChanNames
+            ]
+    else:
+        asigListNSP = [
+            asig
+            for asig in nspBlock.filter(objects=AnalogSignal)
+            if asig.name in nspChanNames
+            ]
+    nspChanNames = [asig.name for asig in asigListNSP]
+    nspDF = ns5.analogSignalsToDataFrame(asigListNSP)
+    insSignalsToPlot = insSignalsToSave
+    asigListINS = [
+        asig
+        for asig in insBlockInterp.filter(objects=AnalogSignal)
+        if asig.name in insSignalsToPlot
+        ]
+    insSignalsToPlot = [asig.name for asig in asigListINS]
+    insDF = ns5.analogSignalsToDataFrame(asigListINS)
+    ####
+    confPlotWinSize = 50.  # seconds
+    plotRounds = nspDF['t'].apply(lambda x: np.floor(x / confPlotWinSize))
+    plotRoundsINS = insDF['t'].apply(lambda x: np.floor(x / confPlotWinSize))
+    spikesToPlot = [st for st in insBlockInterp.filter(objects=SpikeTrain)]
+    for pr in plotRounds.unique():
+        plotMask = (plotRounds == pr)
+        plotMaskINS = (plotRoundsINS == pr)
+        fig, ax = plt.subplots(2, 1, figsize=(21, 3))
+        for cNIdx, cN in enumerate(nspChanNames):
+            try:
+                plotTrace = stats.zscore(nspDF.loc[plotMask, cN]) + cNIdx
+                ax[0].plot(nspDF.loc[plotMask, 't'], plotTrace, label=cN, alpha=0.5, rasterized=True)
+            except Exception:
+                traceback.print_exc()
+        for cNIdx, cN in enumerate(insSignalsToPlot):
+            try:
+                plotTrace = stats.zscore(insDF.loc[plotMaskINS, cN]) + cNIdx
+                ax[1].plot(insDF.loc[plotMaskINS, 't'], plotTrace, label=cN, alpha=0.5, rasterized=True)
+            except Exception:
+                traceback.print_exc()
+        fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+        rasterLevels0 = np.linspace(
+            ax[0].get_ylim()[0], ax[0].get_ylim()[1],
+            len(spikesToPlot) + 2)
+        rasterLevels1 = np.linspace(
+            ax[1].get_ylim()[0], ax[1].get_ylim()[1],
+            len(spikesToPlot) + 2)
+        for stId, st in enumerate(spikesToPlot):
+            if len(st):
+                plotTMask = (st.times >= nspDF.loc[plotMask, 't'].min()) & (st.times < nspDF.loc[plotMask, 't'].max())
+                ax[0].scatter(
+                    st.times[plotTMask], st.times[plotTMask] ** 0 - 1 + rasterLevels0[stId + 1],
+                    label=st.name, rasterized=True, marker='+')
+                ax[1].scatter(
+                    st.times[plotTMask], st.times[plotTMask] ** 0 - 1 + rasterLevels1[stId + 1],
+                    label=st.name, rasterized=True, marker='+')
+        ax[0].legend(loc='lower left')
+        ax[1].legend(loc='lower left')
+        ax[1].set_xlabel('Time (s)')
+        ax[0].set_xlim(
+            [nspDF.loc[plotMask, 't'].min(),
+             nspDF.loc[plotMask, 't'].max()])
+        ax[1].set_xlim(
+            [insDF.loc[plotMaskINS, 't'].min(),
+             insDF.loc[plotMaskINS, 't'].max()])
+        ax[0].set_ylabel('time domain data (a.u.)')
+        ax[1].set_ylabel('time domain data (a.u.)')
+        fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+        figSaveOpts = dict(
+            bbox_extra_artists=tuple([ta.get_legend() for ta in ax]),
+            bbox_inches='tight')
+        synchConfirmPDF.savefig(**figSaveOpts)
+        plt.close()
+    synchConfirmPDF.close()
+
+print(
+    '\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
 #
 #
 # get absolute timestamps of file extents (by INS session)

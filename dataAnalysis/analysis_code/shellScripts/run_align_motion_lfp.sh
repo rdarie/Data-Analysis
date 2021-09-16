@@ -7,23 +7,23 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=200G
+#SBATCH --mem=125G
 
 # Specify a job name:
-#SBATCH -J align_motion_lfp_20190127
+#SBATCH -J align_motion_201901_26_lfp
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/align_motion_20190127_lfp-%a.out
-#SBATCH -e ../../batch_logs/align_motion_20190127_lfp-%a.out
+#SBATCH -o ../../batch_logs/align_motion_201901_26_lfp-%a.out
+#SBATCH -e ../../batch_logs/align_motion_201901_26_lfp-%a.out
 
 # Request custom resources
-#SBATCH --array=1,2,3,4
+#SBATCH --array=1-3
 
 # Specify account details
-#   SBATCH --account=carney-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # SLURM_ARRAY_TASK_ID=2
-source shellScripts/run_exp_preamble_21.sh
+source shellScripts/run_exp_preamble_26.sh
 source shellScripts/run_align_motion_preamble.sh
 #
 python -u ./calcAlignedAsigs.py --chanQuery="lfp" --outputBlockSuffix="lfp" --eventBlockSuffix='epochs' --signalBlockSuffix='analyze' $VERBOSITY --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER $SIGNALFOLDER $EVENTFOLDER

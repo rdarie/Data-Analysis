@@ -150,8 +150,10 @@ def getExpOpts():
         '202101281100-Rupert': [1, 2, 3],
         }
     ## Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.6, 1]
-    movementSizeBinLabels = ['S', 'L']
+    # movementSizeBins = [0, 0.6, 1]
+    # movementSizeBinLabels = ['S', 'L']
+    movementSizeBins = [0,  1]
+    movementSizeBinLabels = ['M']
 
     ############################################################
     ############################################################

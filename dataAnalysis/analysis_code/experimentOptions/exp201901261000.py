@@ -9,11 +9,11 @@ def getExpOpts():
         4: 'proprio-miniRC'
         }
     fullRigInputs = {
-        'A+': 'ainp1',
-        'B+': 'ainp2',
+        'B+': 'ainp1',
+        'A+': 'ainp2',
         'Z+': 'ainp3',
-        'A-': 'ainp5',
-        'B-': 'ainp4',
+        'B-': 'ainp5',
+        'A-': 'ainp4',
         'Z-': 'ainp6',
         'rightBut': 'ainp11',
         'leftBut': 'ainp12',
@@ -37,10 +37,10 @@ def getExpOpts():
     jsonSessionNames = {
         #  per trial
         1: [
-            # 'Session1548517963713', 'Session1548518261171',
-            # 'Session1548518496294', 'Session1548518727243',
+            'Session1548517963713', 'Session1548518261171',
+            'Session1548518496294', 'Session1548518727243',
             'Session1548518982240'
-        ],
+            ],
         2: ['Session1548520562275'],
         3: ['Session1548521956580'],
         4: ['Session1548524126669', ],
@@ -52,7 +52,9 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'synchChanName': ['ins_td2', 'ins_td3'],
+                'synchChanName': [
+                    'ins_accx', 'ins_accy',
+                    'ins_accz', 'ins_accinertia'],
                 'synchStimUnitName': None,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
@@ -68,8 +70,29 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g.
+    synchInfo['ins'][1][0].update({
+        'timeRanges': [(67.7, 71.7)],
+        'unixTimeAdjust': None,})
+    synchInfo['ins'][1][1].update({
+        'timeRanges': [(47.7, 51.7)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][1][2].update({
+        'timeRanges': [(44.1, 48.1)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][1][3].update({
+        'timeRanges': [(45.3, 49.3)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][1][4].update({
+        'timeRanges': [(43.3, 47.3)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][2][0].update({
+        'timeRanges': [(42.2, 46.2)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][3][0].update({
+        'timeRanges': [(37.4, 41.4)],
+        'unixTimeAdjust': None})
     synchInfo['ins'][4][0].update({
-        'timeRanges': [(66.0, 70.0)],
+        'timeRanges': [(67.0, 71.0)],
         'unixTimeAdjust': None})
     #
     #
@@ -95,6 +118,13 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
+    synchInfo['nsp'][1][0].update({'timeRanges': [(566.8, 570.8)]})
+    synchInfo['nsp'][1][1].update({'timeRanges': [(844.1, 848.1)]})
+    synchInfo['nsp'][1][2].update({'timeRanges': [(1075.7, 1079.7)]})
+    synchInfo['nsp'][1][3].update({'timeRanges': [(1307.8, 1311.8)]})
+    synchInfo['nsp'][1][4].update({'timeRanges': [(1560.8, 1564.8)]})
+    synchInfo['nsp'][2][0].update({'timeRanges': [(132.6, 136.6)]})
+    synchInfo['nsp'][3][0].update({'timeRanges': [(109.9, 113.9)]})
     synchInfo['nsp'][4][0].update({'timeRanges': [(937.6, 941.6)]})
     #
     #
@@ -148,11 +178,14 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901261000-Proprio': [4],
+        '201901251000-Murdoc': [2],
+        '201901261000-Murdoc': [1, 2, 3],
         }
 
-    movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
-    movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
+    # movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
+    # movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
+    movementSizeBins = [0, 0.25, 1.25, 1.5]
+    movementSizeBinLabels = ['S', 'M', 'L']
     alignTimeBoundsLookup = {
         }
     motorEncoderBoundsLookup = {
@@ -167,6 +200,9 @@ def getExpOpts():
             [131, 1085.8]
         ]
     }
+    dropMotionRounds = {
+        1: [0, 1, 2]
+        }
     ##############
     spikeSortingOpts = {
         'utah': {
@@ -174,7 +210,7 @@ def getExpOpts():
                 [
                     'utah{:d}'.format(i)
                     for i in range(1, 97)
-                    if i not in []
+                    if i not in [14, 17, 28, 40, 50, 60, 82]
                     ]
                 ],
             'ainpNameList': [
@@ -211,6 +247,82 @@ def getExpOpts():
                     'nameSuffix': 'mean_subtracted'}
                 for i in blockExperimentTypeLookup.keys()]
         }
+        }
+    #
+    expIteratorOpts = {
+        'ca': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cb': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ccm': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ccs': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'cd': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'ra': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rb': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rc': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'rd': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        're': {
+            'experimentsToAssemble': {
+                experimentName: [],
+                }
+            },
+        'pa': {
+            'experimentsToAssemble': {
+                '201901251000-Murdoc': [1, 2],
+                '201901261000-Murdoc': [1, 2, 3],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                '201901251000-Murdoc': [1, 2],
+                '201901261000-Murdoc': [1, 2, 3],
+                }
+            },
+        'na': {
+            'experimentsToAssemble': {
+                '201901251000-Murdoc': [1, 2],
+                '201901261000-Murdoc': [1, 2, 3],
+                }
+            }
         }
     
     return locals()

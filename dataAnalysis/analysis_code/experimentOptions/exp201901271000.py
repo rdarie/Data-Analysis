@@ -10,11 +10,11 @@ def getExpOpts():
         5: 'proprio-miniRC'
         }
     fullRigInputs = {
-        'A+': 'ainp1',
-        'B+': 'ainp2',
+        'B+': 'ainp1',
+        'A+': 'ainp2',
         'Z+': 'ainp3',
-        'A-': 'ainp5',
-        'B-': 'ainp4',
+        'B-': 'ainp5',
+        'A-': 'ainp4',
         'Z-': 'ainp6',
         'rightBut': 'ainp11',
         'leftBut': 'ainp12',
@@ -55,7 +55,7 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'synchChanName': ['ins_td0', 'ins_td2'],
+                'synchChanName': ['ins_td0'],
                 'synchStimUnitName': None,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
@@ -64,7 +64,7 @@ def getExpOpts():
                 'unixTimeAdjust': None,
                 'zeroOutsideTargetLags': False,
                 'thres': 5,
-                'iti': 10e-3,
+                'iti': 100e-3,
                 'minAnalogValue': None,
                 'keepIndex': slice(None)
                 }
@@ -72,26 +72,26 @@ def getExpOpts():
     ############################################################
     # manually add special instructions, e.g.
     synchInfo['ins'][1][0].update({
-        'timeRanges': [(39, 42)],
-        'unixTimeAdjust': 2.})
+        'timeRanges': [(37.9, 43.9)],
+        'unixTimeAdjust': None})
     synchInfo['ins'][1][1].update({
-        'timeRanges': [(46, 49)],
-        'unixTimeAdjust': 2.})
+        'timeRanges': [(44.8, 50.8)],
+        'unixTimeAdjust': None})
     synchInfo['ins'][2][0].update({
-        'timeRanges': [(49.6, 52.6)],
+        'timeRanges': [(51.4, 55.4)],
         'unixTimeAdjust': 2.})
     synchInfo['ins'][3][0].update({
-        'timeRanges': [(49.3, 52.3)],
+        'timeRanges': [(51.0, 55.0)],
         'unixTimeAdjust': 2.})
     synchInfo['ins'][4][0].update({
-        'timeRanges': [(54, 57)],
+        'timeRanges': [(54.4, 57.4)],
         'unixTimeAdjust': 2.})
     # synchInfo['ins'][5][0].update({
     #     'timeRanges': [(64.4, 68.4)],
     #     'unixTimeAdjust': 2.})
     # synchInfo['ins'][5][1].update({'timeRanges': [(, )]})
     synchInfo['ins'][5][0].update({
-        'timeRanges': [(59.9, 63.9)],
+        'timeRanges': [(60.5, 64.5)],
         'unixTimeAdjust': 2.})
     #
     #
@@ -104,7 +104,7 @@ def getExpOpts():
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
                 'usedTENSPulses': False,
-                'synchChanName': [fullRigInputs['tapSync']], 'iti': 10e-3,
+                'synchChanName': [fullRigInputs['tapSync']], 'iti': 100e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'zScoreTapDetection': True,
                 'trigFinder': 'getThresholdCrossings',
@@ -117,13 +117,15 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
-    synchInfo['nsp'][1][0].update({'timeRanges': [(211, 214)]})
-    synchInfo['nsp'][1][1].update({'timeRanges': [(646, 649)]})
-    synchInfo['nsp'][2][0].update({'timeRanges': [(202.5, 205.5)]})
-    synchInfo['nsp'][3][0].update({'timeRanges': [(104.6, 107.6)]})
-    synchInfo['nsp'][4][0].update({'timeRanges': [(140, 144)]})
-    # synchInfo['nsp'][5][0].update({'timeRanges': [(142.9, 146.9)]})
-    # synchInfo['nsp'][5][1].update({'timeRanges': [(1169, 1171)]})
+    synchInfo['nsp'][1][0].update({'timeRanges': [(208.9, 214.9)]})
+    synchInfo['nsp'][1][1].update({'timeRanges': [(643.4, 649.4)]})
+    #
+    synchInfo['nsp'][2][0].update({'timeRanges': [(202.2, 206.2)]})
+    synchInfo['nsp'][3][0].update({'timeRanges': [(104.1, 108.1)]})
+    synchInfo['nsp'][4][0].update({'timeRanges': [(140., 144.)]})
+    #
+    # synchInfo['nsp'][5][0].update({'timeRanges': []})
+    # synchInfo['nsp'][5][1].update({'timeRanges': []})
     synchInfo['nsp'][5][0].update({'timeRanges': [(1422.1, 1426.1)]})
     #
     #
@@ -169,6 +171,7 @@ def getExpOpts():
         }'''
     ####################
     detectStim = True
+    fractionForRollover = 0.2
     stimDetectThresDefault = 500
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
@@ -193,8 +196,10 @@ def getExpOpts():
         }
 
     # Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
-    movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
+    # movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
+    # movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
+    movementSizeBins = [0, 0.25, 1.25, 1.5]
+    movementSizeBinLabels = ['S', 'M', 'L']
     #
     alignTimeBoundsLookup = {
         1: [
@@ -237,7 +242,7 @@ def getExpOpts():
                 [
                     'utah{:d}'.format(i)
                     for i in range(1, 97)
-                    if i not in []
+                    if i not in [14, 17, 28, 40, 50, 60, 82]
                     ]
                 ],
             'ainpNameList': [

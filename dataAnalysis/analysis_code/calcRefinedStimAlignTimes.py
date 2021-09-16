@@ -492,7 +492,7 @@ else:
     preReader.file.close()
     # if events already exist...
     if eventExists:
-        print('motion times already calculated! Deleting block and starting over')
+        print('stim times already calculated! Deleting block and starting over')
         os.remove(outputPath + '.nix')
         writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
         writer.write_block(masterBlock, use_obj_names=True)

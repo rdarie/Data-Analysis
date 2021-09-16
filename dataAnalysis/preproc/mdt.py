@@ -1306,7 +1306,7 @@ def peekAtTapsV2(
     insTapsAx.plot(
         insDF.loc[plotMaskINS, 't'].to_numpy(),
         procFunINS(insDF.loc[plotMaskINS, 'tapDetectSignal'].to_numpy()),
-        '.-', label='tap detect signal',
+        c='b', label='tap detect signal',
         picker=line_picker
         )
     insTapsAx.set_title('INS tap detect signal')
@@ -1965,7 +1965,13 @@ def preprocINS(
         streamInitSysTicks = pd.Series(streamInitSysTicksDict)
         print('streamInitSysTicks\n{}'.format(streamInitSysTicks))
         rolloverCorrection = pd.Series(pd.Timedelta(seconds=0), index=streamInitSysTicks.index)
-        containsRollover = (streamInitSysTicks > 2 * rolloverSeconds / 3).any() & (streamInitSysTicks < rolloverSeconds / 3).any()
+        if 'fractionForRollover' in trialFilesStim:
+            fractionForRollover = trialFilesStim['fractionForRollover']
+        else:
+            fractionForRollover = 0.1
+        containsRollover = (
+                (streamInitSysTicks > rolloverSeconds * (1 - fractionForRollover)).any() &
+                (streamInitSysTicks < rolloverSeconds * fractionForRollover).any())
         if containsRollover:
             rolloverCorrection.loc[(streamInitSysTicks < rolloverSeconds / 3)] = rolloverSeconds
         print('rolloverCorrection\n{}'.format(rolloverCorrection))
@@ -2010,13 +2016,13 @@ def preprocINS(
         plt.show()
         plt.plot(np.linspace(
             0, 1, len(timeSync['t'])),
-            timeSync['t'], 'o',label='timeSync')
+            timeSync['t'], 'o', label='timeSync')
         plt.plot(np.linspace(
             0, 1, len(tdDF['t'])),
-            tdDF['t'], 'o',label='td')
+            tdDF['t'], 'o', label='td')
         plt.plot(np.linspace(
             0, 1, len(accelDF['t'])),
-            accelDF['t'], 'o',label='accel')
+            accelDF['t'], 'o', label='accel')
         plt.legend()
         figPath = os.path.join(figureOutputFolder, 'check_time_sync_01.pdf')
         plt.savefig(figPath)
@@ -2026,13 +2032,13 @@ def preprocINS(
             plt.close()
         plt.plot(np.linspace(
             0, 1, len(timeSync['time_master'])),
-            timeSync['time_master'], 'o',label='timeSync')
+            timeSync['time_master'], 'o', label='timeSync')
         plt.plot(np.linspace(
             0, 1, len(tdDF['time_master'])),
-            tdDF['time_master'], 'o',label='td')
+            tdDF['time_master'], 'o', label='td')
         plt.plot(np.linspace(
             0, 1, len(accelDF['time_master'])),
-            accelDF['time_master'], 'o',label='accel')
+            accelDF['time_master'], 'o', label='accel')
         plt.legend()
         figPath = os.path.join(figureOutputFolder, 'check_time_sync_02.pdf')
         plt.savefig(figPath)
@@ -2278,14 +2284,19 @@ def getINSStimOnset(
         spikeWindow=[-32, 64],
         plotting=[], showPlots=False, figureOutputFolder=None):
     if figureOutputFolder is not None:
-        therapyDetectionPDF = PdfPages(
-            os.path.join(
-                figureOutputFolder,
-                'therapy_detection_{:0>3}.pdf'.format(blockIdx)))
+        if redetectTherapyStatus:
+            therapyDetectionPDF = PdfPages(
+                os.path.join(
+                    figureOutputFolder,
+                    'therapy_detection_{:0>3}.pdf'.format(blockIdx)))
         pulseDetectionPDF = PdfPages(
             os.path.join(
                 figureOutputFolder,
                 'pulses_detection_{:0>3}.pdf'.format(blockIdx)))
+        pulseConfirmationPDF = PdfPages(
+            os.path.join(
+                figureOutputFolder,
+                'pulses_confirmation_{:0>3}.pdf'.format(blockIdx)))
     segIdx = 0
     seg = block.segments[segIdx]
     fs = seg.analogsignals[0].sampling_rate
@@ -3062,6 +3073,8 @@ def getINSStimOnset(
     left_sweep = left_sweep_samples / fs
     right_sweep_samples = spikeWindow[1] - 1
     right_sweep = right_sweep_samples / fs
+    if figureOutputFolder is not None:
+        stashStimTimesDict = {}
     for thisUnit in block.filter(objects=Unit):
         print('getINSStimOnset packaging unit {}'.format(thisUnit.name))
         if len(tempSpiketrainStorage[thisUnit.name]) == 0:
@@ -3153,6 +3166,8 @@ def getINSStimOnset(
             seg.spiketrains.append(newSt)
             newSt.segment = seg
             print('thisUnit.st len = {}'.format(len(thisUnit.spiketrains)))
+            if figureOutputFolder is not None:
+                stashStimTimesDict[thisUnit.name] = copy(consolidatedTimes)
     if createRelationship:
         for chanIdx in block.channel_indexes:
             chanIdx.create_relationship()
@@ -3160,6 +3175,38 @@ def getINSStimOnset(
         block.create_relationship()
     # [un.name for un in block.filter(objects=Unit)]
     # [len(un.spiketrains) for un in block.filter(objects=Unit)]
+    ############## add plots
+    if figureOutputFolder is not None:
+        confPlotWinSize = 90.  # seconds
+        plotRounds = tdDF['t'].apply(lambda x: np.floor(x / confPlotWinSize))
+        plotCols = [i for i in tdDF.columns if 'ins_td' in i]
+        for pr in plotRounds.unique():
+            plotMask = (plotRounds == pr)
+            fig, ax = plt.subplots(1, 1, figsize=(21, 3))
+            for cN in plotCols:
+                plotTrace = stats.zscore(tdDF.loc[plotMask, cN])
+                ax.plot(tdDF.loc[plotMask, 't'], plotTrace, label=cN, alpha=0.3, rasterized=True)
+            axSize = ax.get_ylim()[1] - ax.get_ylim()[0]
+            rasterLevels = np.linspace(ax.get_ylim()[0], ax.get_ylim()[1], len(stashStimTimesDict) + 2)
+            for uId, (uN, uT) in enumerate(stashStimTimesDict.items()):
+                plotTMask = (uT >= tdDF.loc[plotMask, 't'].min()) & (uT < tdDF.loc[plotMask, 't'].max())
+                ax.scatter(
+                    uT[plotTMask], uT[plotTMask] ** 0 - 1 + rasterLevels[uId + 1],
+                    label=uN, rasterized=True, marker='+')
+            leg = ax.legend()
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('time domain data (a.u.)')
+            fig.tight_layout()
+            figSaveOpts = dict(
+                bbox_extra_artists=(ax.get_legend(), ),
+                bbox_inches='tight')
+            pulseConfirmationPDF.savefig(**figSaveOpts)
+            if showPlots:
+                plt.show()
+            else:
+                plt.close()
+        pulseConfirmationPDF.close()
+    ######################
     return block
 
 

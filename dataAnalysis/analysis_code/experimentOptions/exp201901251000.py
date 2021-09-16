@@ -3,15 +3,15 @@ import numpy as np
 def getExpOpts():
     #
     blockExperimentTypeLookup = {
-        1: 'proprio',
-        2: 'proprio-miniRC',
+        1: 'proprio-miniRC',
+        2: 'proprio',
         }
     fullRigInputs = {
-        'A+': 'ainp1',
-        'B+': 'ainp2',
+        'B+': 'ainp1',
+        'A+': 'ainp2',
         'Z+': 'ainp3',
-        'A-': 'ainp5',
-        'B-': 'ainp4',
+        'B-': 'ainp5',
+        'A-': 'ainp4',
         'Z-': 'ainp6',
         'rightBut': 'ainp11',
         'leftBut': 'ainp12',
@@ -48,25 +48,51 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'synchChanName': ['ins_td2', 'ins_td3'],
+                'synchChanName': [
+                    'ins_accx', 'ins_accy',
+                    'ins_accz', 'ins_accinertia'],
                 'synchStimUnitName': None,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
-                'xCorrGaussWid': 10e-3,
+                'xCorrGaussWid': 50e-3,
                 'minStimAmp': 0,
                 'unixTimeAdjust': None,
                 'zeroOutsideTargetLags': False,
-                'thres': 5,
-                'iti': 10e-3,
+                'thres': 1,
+                'iti': 200e-3,
                 'minAnalogValue': None,
                 'keepIndex': slice(None)
                 }
     ############################################################
     ############################################################
     # manually add special instructions, e.g.
-    # synchInfo['ins'][1][0].update({
-    #     'timeRanges': [(39, 42)],
-    #     'unixTimeAdjust': 2.})
+    synchInfo['ins'][1][0].update({
+        'timeRanges': [(209.5, 213.5)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][1][1].update({
+        'timeRanges': [(52., 56.)],
+        'unixTimeAdjust': None,
+        'synchChanName': ['ins_td2', 'ins_td3']
+        })
+    ####
+    synchInfo['ins'][2][0].update({
+        'timeRanges': [(44.5, 48.5)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][2][1].update({
+        'timeRanges': [(39.5, 43.5)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][2][2].update({
+        'timeRanges': [(41.8, 45.8)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][2][3].update({
+        'timeRanges': [(40.0, 44.0)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][2][4].update({
+        'timeRanges': [(64.0, 68.0)],
+        'unixTimeAdjust': None})
+    synchInfo['ins'][2][5].update({
+        'timeRanges': [(54.5, 58.5)],
+        'unixTimeAdjust': None})
     ############################################################
     synchInfo['nsp'] = {
         # per block
@@ -75,7 +101,7 @@ def getExpOpts():
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
                 'usedTENSPulses': False,
-                'synchChanName': [fullRigInputs['tapSync']], 'iti': 300e-3,
+                'synchChanName': [fullRigInputs['tapSync']], 'iti': 200e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'zScoreTapDetection': True,
                 'trigFinder': 'getThresholdCrossings',
@@ -87,9 +113,14 @@ def getExpOpts():
         }
     ############################################################
     # manually add special instructions, e.g
-    # synchInfo['nsp'][5][0].update({'timeRanges': [(142.9, 146.9)]})
-    #
-    #
+    synchInfo['nsp'][1][0].update({'timeRanges': [(139.0, 143.0)]})
+    synchInfo['nsp'][1][1].update({'timeRanges': [(1034., 1038.)]})
+    synchInfo['nsp'][2][0].update({'timeRanges': [(43.3, 47.3)]})
+    synchInfo['nsp'][2][1].update({'timeRanges': [(231.0, 235.0)]})
+    synchInfo['nsp'][2][2].update({'timeRanges': [(733.1, 737.1)]})
+    synchInfo['nsp'][2][3].update({'timeRanges': [(1120.6, 1124.6)]})
+    synchInfo['nsp'][2][4].update({'timeRanges': [(1534.6, 1538.6)]})
+    synchInfo['nsp'][2][5].update({'timeRanges': [(1926.2, 1930.2)]})
     ############################################################
     #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
@@ -109,6 +140,7 @@ def getExpOpts():
     }
     ####################
     detectStim = True
+    fractionForRollover = 0.2
     stimDetectThresDefault = 500
     stimDetectChansDefault = ['ins_td2', 'ins_td3']
     stimDetectOptsByChannelSpecific = {
@@ -116,7 +148,7 @@ def getExpOpts():
         0: {
             # program
             0: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 125, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             3: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
@@ -128,12 +160,14 @@ def getExpOpts():
     
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901251000-Murdoc': [1, 2],
+        '201901251000-Murdoc': [1],
         }
 
     # Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
-    movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
+    # movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
+    # movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
+    movementSizeBins = [0, 0.25, 1.25, 1.5]
+    movementSizeBinLabels = ['S', 'M', 'L']
     #
     alignTimeBoundsLookup = {
         # e.g.
@@ -149,7 +183,7 @@ def getExpOpts():
                 [
                     'utah{:d}'.format(i)
                     for i in range(1, 97)
-                    if i not in []
+                    if i not in [14, 17, 28, 40, 50, 60, 82]
                     ]
                 ],
             'ainpNameList': [
@@ -246,19 +280,17 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '201901261000-Murdoc': [4],
-                experimentName: [1, 2, 3, 4],
+                '201901251000-Murdoc': [1],
                 }
             },
         'ma': {
             'experimentsToAssemble': {
-                experimentName: [1, 2, 3, 4],
+                '201901251000-Murdoc': [1],
                 }
             },
         'na': {
             'experimentsToAssemble': {
-                '201901261000-Murdoc': [4],
-                experimentName: [1, 2, 3, 4],
+                '201901251000-Murdoc': [1],
                 }
             }
         }

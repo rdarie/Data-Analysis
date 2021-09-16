@@ -10,17 +10,25 @@ Options:
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
     --lazy                               load from raw, or regular? [default: False]
 """
-import matplotlib, os
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
+import logging
+logging.captureWarnings(True)
+import os, sys
+import matplotlib
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
-#
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-import os, pdb, traceback
+import pdb, traceback
 from importlib import reload
 import neo
 from neo import (
@@ -41,11 +49,62 @@ import sys
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True)
+useDPI = 200
+dpiFactor = 72 / useDPI
+snsRCParams = {
+        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+        'lines.linewidth': 1,
+        'lines.markersize': 2.4,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.spines.right": True,
+        "axes.spines.top": True,
+        "axes.linewidth": .125,
+        "grid.linewidth": .2,
+        "font.size": 5,
+        "axes.labelsize": 7,
+        "axes.titlesize": 5,
+        "xtick.labelsize": 5,
+        "ytick.labelsize": 5,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": False,
+        "ytick.left": True,
+        "ytick.right": False,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
+    }
+mplRCParams = {
+    'figure.titlesize': 7,
+    'mathtext.default': 'regular',
+    'font.family': "Nimbus Sans",
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
+    }
+styleOpts = {
+    'legend.lw': 2,
+    'tight_layout.pad': 3e-1, # units of font size
+    'panel_heading.pad': 0.
+    }
+sns.set(
+    context='paper', style='whitegrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True, rc=snsRCParams)
+for rcK, rcV in mplRCParams.items():
+    matplotlib.rcParams[rcK] = rcV
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
@@ -162,14 +221,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         inplace=True)
     #
     if alignTimeBounds is not None:
-        taskMask = pd.Series(False, index=tdDF.index)
-        for idx, atb in enumerate(alignTimeBounds):
-            taskMask = (
-                (taskMask) | (
-                    (tdDF['t'] > atb[0]) &
-                    (tdDF['t'] < atb[1])
-                    )
-                )
+        taskMask = hf.getTimeMaskFromRanges(
+            tdDF['t'], alignTimeBounds)
     else:
         taskMask = (tdDF['t'] >= 0)
     ###################################################
@@ -184,12 +237,22 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     except Exception:
         tdDF.loc[:, 'positionEpoch'] = 0
     #
+    eventMask = (eventDF['t'].diff() > 0) & (eventDF['t'].diff() < 60)
+    eventBasedEpochs = [
+        [eventDF.loc[tid, 't'] - 0.5, eventDF.loc[tid, 't']]
+        for tid in eventDF.index[eventMask]
+        ]
+    periEventMask = hf.getTimeMaskFromRanges(
+        tdDF['t'], eventBasedEpochs)
+    tdDF.loc[:, 'isPeriEvent'] = periEventMask
+    #
     for name, group in tdDF.groupby('positionEpoch'):
         pedalRestingMask = group['pedalVelocityAbs'] < 1e-12
         thisTaskMask = group['isInTask']
-        # pdb.set_trace()
-        thisNeutralPoint = float(group.loc[thisTaskMask & pedalRestingMask, 'pedalPosition'].mode().iloc[0])
-        assert np.abs(thisNeutralPoint) < 0.1  # if the neutral point > 10 deg, there might be a problem
+        thisPeriEventMask = group['isPeriEvent']
+        thisNeutralPoint = float(group.loc[thisTaskMask & pedalRestingMask & thisPeriEventMask, 'pedalPosition'].mode().iloc[0])
+        print('positionEpoch {}, np.abs(thisNeutralPoint) = {}'.format(name, np.abs(thisNeutralPoint)))
+        # assert np.abs(thisNeutralPoint) < 0.1  # if the neutral point > 10 deg, there might be a problem
         tdDF.loc[group.index, 'pedalPosition'] = group['pedalPosition'] - thisNeutralPoint
     #
     tdDF.loc[:, 'pedalPositionAbs'] = tdDF['pedalPosition'].abs()
@@ -357,24 +420,52 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         alignEventsDF.drop(index=rejectMask.loc[rejectMask].index, inplace=True)
     except Exception:
         traceback.print_exc()
+    alignEventsDF.reset_index(drop=True, inplace=True)
+    # pdb.set_trace()
+    newRoundMap = {oldIJ: newIJ for newIJ, oldIJ in enumerate(alignEventsDF['movementRound'].unique())}
+    alignEventsDF.loc[:, 'originalMovementRound'] = alignEventsDF['movementRound'].copy()
+    alignEventsDF.loc[:, 'movementRound'] = alignEventsDF['movementRound'].map(newRoundMap)
     # print('Found events at {}'.format(alignEventsDF['t'].tolist()))
     if arguments['plotParamHistograms']:
-        fig, ax = plt.subplots()
-        # pdb.set_trace()
-        fig.set_size_inches(4 * np.ceil(tdDF['t'].max() / 500), 4)
-        pPosDeg = 100 * tdDF['pedalPosition']
-        ax.plot(tdDF['t'], pPosDeg, label='pedal position')
-        ax.set_ylabel('deg.')
-        ax.plot(
-            trialsDict['outbound'].loc[~markForDeletionMaster, 't'],
-            pPosDeg.loc[trialsDict['outbound'].loc[~markForDeletionMaster, 'tdIndex']],
-            'ro', label='trial outbound movement')
-        ax.legend()
-        plt.savefig(
-            os.path.join(
-                figureOutputFolder, '{}_pedalMovementTrials.pdf'.format(prefix)))
-        # plt.show()
-        plt.close()
+        print('plotting movement trial summary')
+        pdfPath = os.path.join(figureOutputFolder, '{}_pedalMovementTrials.pdf'.format(prefix))
+        with PdfPages(pdfPath) as pdf:
+            confPlotWinSize = 200.  # seconds
+            plotRounds = tdDF['t'].apply(lambda x: np.floor(x / confPlotWinSize))
+            plotChanNames = ['pedalPosition']
+            for pr in plotRounds.unique():
+                plotMask = (plotRounds == pr)
+                fig, ax = plt.subplots(1, 1, figsize=(10, 1))
+                for cNIdx, cN in enumerate(plotChanNames):
+                    try:
+                        plotTrace = 100 * tdDF.loc[plotMask, cN].to_numpy()
+                        ax.plot(tdDF.loc[plotMask, 't'], plotTrace, label=cN, alpha=0.5, rasterized=True)
+                    except Exception:
+                        traceback.print_exc()
+                goodTs = trialsDict['outbound'].loc[~markForDeletionMaster, 't']
+                goodTMask = (goodTs >= tdDF.loc[plotMask, 't'].min()) & (goodTs < tdDF.loc[plotMask, 't'].max())
+                axMiddle = (ax.get_ylim()[1] + ax.get_ylim()[0]) / 2
+                ax.scatter(
+                    trialsDict['outbound'].loc[~markForDeletionMaster, :].loc[goodTMask, 't'].to_numpy(),
+                    trialsDict['outbound'].loc[~markForDeletionMaster, :].loc[goodTMask, 't'].to_numpy() ** 0 - 1 + axMiddle,
+                    c='g', marker='+', label='set of movement trials')
+                badTs = trialsDict['outbound'].loc[markForDeletionMaster, 't']
+                badTMask = (badTs >= tdDF.loc[plotMask, 't'].min()) & (badTs < tdDF.loc[plotMask, 't'].max())
+                ax.scatter(
+                    trialsDict['outbound'].loc[markForDeletionMaster, :].loc[badTMask, 't'].to_numpy(),
+                    trialsDict['outbound'].loc[markForDeletionMaster, :].loc[badTMask, 't'].to_numpy() ** 0 - 1 + axMiddle,
+                    c='r', marker='o', label='rejected trials')
+                ax.set_ylabel('deg.')
+                ax.set_xlabel('time (sec)')
+                ax.legend(loc='lower left')
+                fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+                figSaveOpts = dict(
+                    # bbox_extra_artists=tuple([ta.get_legend() for ta in ax]),
+                    bbox_extra_artists=(ax.get_legend(),),
+                    bbox_inches='tight')
+                pdf.savefig(**figSaveOpts)
+                # plt.show()
+                plt.close()
     #  add metaCat
     alignEventsDF.loc[:, 'pedalMetaCat'] = 'NA'
     alignEventsDF.loc[(alignEventsDF['pedalMovementCat'] == 'outbound') | (alignEventsDF['pedalMovementCat'] == 'return'), 'pedalMetaCat'] = 'starting'

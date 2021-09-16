@@ -83,12 +83,12 @@ for rcK, rcV in mplRCParams.items():
 #  end if plotting
 ########################################################################################################################
 from pandas import IndexSlice as idxSl
-from datetime import datetime
+from datetime import datetime as dt
 try:
-    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
 except:
     pass
 for arg in sys.argv:
     print(arg)
 #############
-print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

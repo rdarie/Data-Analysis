@@ -40,8 +40,8 @@ import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
-from datetime import datetime
-print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+from datetime import datetime as dt
+print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
 arguments = {
@@ -217,3 +217,4 @@ ns5.getAsigsAlignedToEvents(
     breakdownFolderPath=diagnosticFolder,
     chunkSize=alignedAsigsChunkSize)
 print('Done calcAlignedAsigs')
+print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

@@ -10,17 +10,17 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_ins_201901_26
+#SBATCH -J preproc_ins_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/preproc_ins_201901_26-%a.out
-#SBATCH -e ../../batch_logs/preproc_ins_201901_26-%a.out
+#SBATCH -o ../../batch_logs/preproc_ins_202101_27-%a.out
+#SBATCH -e ../../batch_logs/preproc_ins_202101_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1-3
 
 
 module load anaconda/2020.02
@@ -30,8 +30,9 @@ conda activate
 source activate nda2
 python --version
 
-EXP="exp201901261000"
-# EXP="exp201901271000"
+# EXP="exp201901251000"
+# EXP="exp201901261000"
+EXP="exp201901271000"
 
 # EXP="exp202101141100"
 # EXP="exp202101061100"
@@ -47,12 +48,12 @@ EXP="exp201901261000"
 # EXP="exp202102101100"
 # EXP="exp202102151100"
 
-SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=1
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots
 # --disableStimDetection to use HUT derived stim start times
 
-python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose --disableStimDetection
+python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose
 
 # python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"

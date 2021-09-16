@@ -11,20 +11,24 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_dual_201901_26
+#SBATCH -J preproc_dual_201901_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/preproc_dual_201901_26-%a.out
-#SBATCH -e ../../batch_logs/preproc_dual_201901_26-%a.out
+#SBATCH -o ../../batch_logs/preproc_dual_201901_27-%a.out
+#SBATCH -e ../../batch_logs/preproc_dual_201901_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1-5
 
-EXP="exp201901261000"
-# EXP="exp201901271000"
+# EXP="exp201901251000"
+# has 1 minirc 2 motion
+# EXP="exp201901261000"
+# has 1-3 motion 4 minirc
+EXP="exp201901271000"
+# has 1-4 motion 5 minirc
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -51,10 +55,12 @@ python --version
 
 ########### get analog inputs separately to run synchronization, etc
 # !! --maskMotorEncoder ignores all motor events outside alignTimeBounds
-python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly --maskMotorEncoder
+python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly
 
 ######### finalize dataset
 python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullUnfiltered --chunkSize=700
+####
+# old
 # python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanUnfiltered --chunkSize=700
 # python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --fullSubtractMeanUnfiltered
 

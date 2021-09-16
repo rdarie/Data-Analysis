@@ -380,7 +380,6 @@ if __name__ == "__main__":
         prefix + '_outlier_channels.pdf')
     print('plotting signal ranges')
     with PdfPages(signalRangesFigPath) as pdf:
-        # pdb.set_trace()
         keepLevels = ['wasKept']
         dropLevels = [lN for lN in dataDF.index.names if lN not in keepLevels]
         plotDF = dataDF.T.reset_index(drop=True).T.reset_index(dropLevels, drop=True)
@@ -391,9 +390,11 @@ if __name__ == "__main__":
         h = 18
         w = 3
         aspect = w / h
+        # pdb.set_trace()
+        seekIdx = slice(None, None, plotDF.shape[0] // int(1e7))
         g = sns.catplot(
             col='bank', x='signal', y='feature',
-            data=plotDF, orient='h', kind='violin', ci='sd',
+            data=plotDF.iloc[seekIdx, :], orient='h', kind='violin', ci='sd',
             linewidth=0.5, cut=0,
             sharex=False, sharey=False, height=h, aspect=aspect)
         g.suptitle('original')
@@ -401,9 +402,10 @@ if __name__ == "__main__":
         pdf.savefig(bbox_inches='tight')
         plt.close()
         try:
+            seekIdx = slice(None, None, plotDF['wasKept'].sum() // int(1e7))
             g = sns.catplot(
                 col='bank', x='signal', y='feature',
-                data=plotDF.loc[plotDF['wasKept'], :], orient='h', kind='violin', ci='sd',
+                data=plotDF.loc[plotDF['wasKept'], :].iloc[seekIdx, :], orient='h', kind='violin', ci='sd',
                 linewidth=0.5, cut=0,
                 sharex=False, sharey=False, height=h, aspect=aspect
                 )
@@ -428,39 +430,40 @@ if __name__ == "__main__":
         with PdfPages(pdfPath) as pdf:
             ##############################################
             nRowCol = max(int(np.ceil(np.sqrt(theseOutliers.size))), 2)
-            mhFig, mhAx = plt.subplots(
-                nRowCol, nRowCol, sharex=True)
-            mhFig.set_size_inches(5 * nRowCol, 3 * nRowCol)
-            # for idx, (name, group) in enumerate(dataDF.loc[fullOutMask, :].groupby(theseOutliers.index.names)):
-            for idx, (name, row) in enumerate(theseOutliers.items()):
-                thisDeviation = row
-                deviationThreshold = outlierTrials.deviationThreshold
-                wasThisRejected = 'rejected' if outlierTrials.loc[name, 'rejectBlock'] else 'not rejected'
-                annotationColor = 'r' if outlierTrials.loc[name, 'rejectBlock'] else 'g'
-                outlierDataMasks = []
-                for lvlIdx, levelName in enumerate(theseOutliers.index.names):
-                    outlierDataMasks.append(dataDF.index.get_level_values(levelName) == name[lvlIdx])
-                fullOutMask = np.logical_and.reduce(outlierDataMasks)
-                mhp = - chi2.logpdf(mahalDist.loc[fullOutMask, 'mahalDist'], nDoF)
-                mhAx.flat[idx].plot(
-                    mahalDist.loc[fullOutMask, :].index.get_level_values('bin'),
-                    mhp,
-                    c=(0, 0, 0, .6),
-                    label='mahalDist', rasterized=True)
-                mhAx.flat[idx].text(
-                    1, 1, 'dev={:.2f}\nthresh={:.2f}\n({})'.format(
-                        thisDeviation, deviationThreshold, wasThisRejected),
-                    va='top', ha='right', color=annotationColor,
-                    transform=mhAx.flat[idx].transAxes)
-            mhAx.flat[0].set_ylabel('- log probability')
-            mhFig.suptitle('Outlier proportion {:.2f} ({} out of {})'.format(outlierProportion, outlierCount,
-                                                                             outlierTrials.shape[0]))
-            pdf.savefig(
-                bbox_inches='tight',
-                pad_inches=0,
-                # bbox_extra_artists=[mhLeg]
-            )
-            plt.close()
+            if False:
+                mhFig, mhAx = plt.subplots(
+                    nRowCol, nRowCol, sharex=True)
+                mhFig.set_size_inches(5 * nRowCol, 3 * nRowCol)
+                # for idx, (name, group) in enumerate(dataDF.loc[fullOutMask, :].groupby(theseOutliers.index.names)):
+                for idx, (name, row) in enumerate(theseOutliers.items()):
+                    thisDeviation = row
+                    deviationThreshold = outlierTrials.deviationThreshold
+                    wasThisRejected = 'rejected' if outlierTrials.loc[name, 'rejectBlock'] else 'not rejected'
+                    annotationColor = 'r' if outlierTrials.loc[name, 'rejectBlock'] else 'g'
+                    outlierDataMasks = []
+                    for lvlIdx, levelName in enumerate(theseOutliers.index.names):
+                        outlierDataMasks.append(dataDF.index.get_level_values(levelName) == name[lvlIdx])
+                    fullOutMask = np.logical_and.reduce(outlierDataMasks)
+                    mhp = - chi2.logpdf(mahalDist.loc[fullOutMask, 'mahalDist'], nDoF)
+                    mhAx.flat[idx].plot(
+                        mahalDist.loc[fullOutMask, :].index.get_level_values('bin'),
+                        mhp,
+                        c=(0, 0, 0, .6),
+                        label='mahalDist', rasterized=True)
+                    mhAx.flat[idx].text(
+                        1, 1, 'dev={:.2f}\nthresh={:.2f}\n({})'.format(
+                            thisDeviation, deviationThreshold, wasThisRejected),
+                        va='top', ha='right', color=annotationColor,
+                        transform=mhAx.flat[idx].transAxes)
+                mhAx.flat[0].set_ylabel('- log probability')
+                mhFig.suptitle('Outlier proportion {:.2f} ({} out of {})'.format(outlierProportion, outlierCount,
+                                                                                 outlierTrials.shape[0]))
+                pdf.savefig(
+                    bbox_inches='tight',
+                    pad_inches=0,
+                    # bbox_extra_artists=[mhLeg]
+                    )
+                plt.close()
             mhFig, mhAx = plt.subplots(
                 nRowCol, nRowCol, sharex=True)
             mhFig.set_size_inches(5 * nRowCol, 3 * nRowCol)
