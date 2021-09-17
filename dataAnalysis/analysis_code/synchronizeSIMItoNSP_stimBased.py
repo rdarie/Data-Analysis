@@ -252,7 +252,7 @@ else:
     nspSearchLims = nspGroup.loc[:, 't'].quantile([0, 1])
     #
     unixDeltaT = thisNspDF['t'].iloc[0] - thisSimiDF['t'].iloc[0]
-    print('    delta T is approx {}'.format(unixDeltaT))
+    print('    delta T is approx {:.3f}'.format(unixDeltaT))
     #
     nspVals = nspGroup.loc[:, nspChanNames].to_numpy()
     filterOpts = None

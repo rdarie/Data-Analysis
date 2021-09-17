@@ -10,17 +10,17 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_previews_20190126
+#SBATCH -J preproc_previews_20190130
 
-# Specify an output file
-#SBATCH -o ../../batch_logs/preproc_previews_20190126.out
-#SBATCH -e ../../batch_logs/preproc_previews_20190126.out
+# Specify an output fi
+#SBATCH -o ../../batch_logs/preproc_previews_20190130.out
+#SBATCH -e ../../batch_logs/preproc_previews_20190130.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-##############SBATCH --array=1,2
+#SBATCH --array=1-4
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -30,10 +30,20 @@ source activate nda2
 python --version
 
 # EXP="exp201901070700"
+# EXP="exp201901221000"
+# has 1 minirc 2-3 motion
+# EXP="exp201901231000"
+# only has 1 block
+# EXP="exp201901240900"
 # EXP="exp201901251000"
 # EXP="exp201901261000"
-EXP="exp201901271000"
-
+# EXP="exp201901271000"
+# EXP="exp201901281200"
+# has 4
+EXP="exp201901301000"
+# has 4
+# EXP="exp201901311000"
+# has 5
 # EXP="exp202101111100"
 # EXP="exp202101141100"
 # EXP="exp202101061100"
@@ -52,7 +62,8 @@ EXP="exp201901271000"
 # python -u ./previewINSSessionSummary.py --exp=$EXP
 # python -u ./saveImpedances.py --exp=$EXP --processAll --reprocess
 
-for BLOCKIDX in 2 1 4 3
-do
-    python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP
-done
+# for BLOCKIDX in 1 2
+# do
+#     python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP
+# done
+python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP

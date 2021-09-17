@@ -429,7 +429,7 @@ else:
         nspSearchLims = nspGroup.loc[:, 't'].quantile([0, 1])
         #
         unixDeltaT = thisNspDF['t'].iloc[0] - thisInsDF['t'].iloc[0]
-        print('    delta T is approx {}'.format(unixDeltaT))
+        print('    delta T is approx {:.3f}'.format(unixDeltaT))
         #
         nspVals = nspGroup.loc[:, theseChanNamesNSP].to_numpy()
         filterOpts = None
@@ -506,6 +506,7 @@ else:
                         procFunINS=stats.zscore,
                         # procFunNSP=stats.zscore
                         )
+                    fig.suptitle('block {} sess # {} ({})'.format(blockIdx, insSessIdx, jsonSessionNames[insSessIdx]))
                     plt.show()
                     if len(manualAlignTimes[insSessIdx]['ins']) > 0:
                         insTapTimes = pd.Series(manualAlignTimes[insSessIdx]['ins'])
@@ -520,7 +521,7 @@ else:
             ###
             if (insTapTimes.size == nspTapTimes.size):
                 unixDeltaT = (nspTapTimes - insTapTimes).mean()
-                print('    Aligning preliminary tap times: new delta T = {}'.format(unixDeltaT))
+                print('    Aligning preliminary tap times: new delta T = {:.3f}'.format(unixDeltaT))
         if sessTapOptsINS['synchStimUnitName'] is not None:
             insTapTimes = None
             insTapTimesStList = [

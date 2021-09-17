@@ -83,7 +83,7 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': 1,
+        'lines.linewidth': .5,
         'lines.markersize': 2.4,
         "axes.spines.left": True,
         "axes.spines.bottom": True,

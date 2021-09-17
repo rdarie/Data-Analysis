@@ -1996,56 +1996,6 @@ def preprocINS(
         timeSync = realignINSTimestamps(
             timeSync, trialSegment, alignmentFactor.loc['timeSync'])
     #  Check timeSync
-    checkTimeSync = False
-    if checkTimeSync and makePlots:
-        for name, group in timeSync.groupby('trialSegment'):
-            print('Segment {} head:'.format(name))
-            print(group.loc[:, ('time_master', 'microseconds', 't')].head())
-            print('Segment {} tail:'.format(name))
-            print(group.loc[:, ('time_master', 'microseconds', 't')].tail())
-        plt.plot(
-            np.linspace(0, 1, len(timeSync['t'])),
-            timeSync['t'], 'o', label='timeSync')
-        plt.plot(
-            np.linspace(0, 1, len(tdDF['t'])), tdDF['t'],
-            'o', label='td')
-        plt.plot(
-            np.linspace(0, 1, len(accelDF['t'])), accelDF['t'],
-            'o', label='accel')
-        plt.legend()
-        plt.show()
-        plt.plot(np.linspace(
-            0, 1, len(timeSync['t'])),
-            timeSync['t'], 'o', label='timeSync')
-        plt.plot(np.linspace(
-            0, 1, len(tdDF['t'])),
-            tdDF['t'], 'o', label='td')
-        plt.plot(np.linspace(
-            0, 1, len(accelDF['t'])),
-            accelDF['t'], 'o', label='accel')
-        plt.legend()
-        figPath = os.path.join(figureOutputFolder, 'check_time_sync_01.pdf')
-        plt.savefig(figPath)
-        if showPlots:
-            plt.show()
-        else:
-            plt.close()
-        plt.plot(np.linspace(
-            0, 1, len(timeSync['time_master'])),
-            timeSync['time_master'], 'o', label='timeSync')
-        plt.plot(np.linspace(
-            0, 1, len(tdDF['time_master'])),
-            tdDF['time_master'], 'o', label='td')
-        plt.plot(np.linspace(
-            0, 1, len(accelDF['time_master'])),
-            accelDF['time_master'], 'o', label='accel')
-        plt.legend()
-        figPath = os.path.join(figureOutputFolder, 'check_time_sync_02.pdf')
-        plt.savefig(figPath)
-        if showPlots:
-            plt.show()
-        else:
-            plt.close()
     progAmpNames = rcsa_helpers.progAmpNames
     expandCols = (
         ['RateInHz', 'therapyStatus', 'trialSegment'] +
@@ -2066,13 +2016,7 @@ def preprocINS(
         deriveCols=deriveCols, progAmpNames=progAmpNames,
         dummyTherapySwitches=False, elecConfiguration=elecConfiguration
         )
-    # for trialSegment in pd.unique(tdDF['trialSegment']):
-    #     stimStatus = synchronizeHUTtoINS(
-    #         stimStatus, trialSegment, interpFunHUTtoINS[trialSegment],
-    #         syncTo='HostUnixTime')
-    #     stimStatusSerial = synchronizeHUTtoINS(
-    #         stimStatusSerial, trialSegment, interpFunHUTtoINS[trialSegment],
-    #         syncTo='HostUnixTime')
+    # maybe here is a good spot to intercept the stim configs and force them to be unique
     #  sync Host PC Unix time to NSP
     HUTtoINSPlotting = False
     if HUTtoINSPlotting and makePlots:
@@ -2252,13 +2196,10 @@ def preprocINS(
         )
     block.segments[0].events.append(concatEvents)
     concatEvents.segment = block.segments[0]
-    # [un.name for un in block.filter(objects=Unit)]
-    # [len(un.spiketrains) for un in block.filter(objects=Unit)]
     createRelationship = False
     if createRelationship:
         block.create_relationship()
     #
-    # stimStatusSerial.loc[stimStatusSerial['ins_property'] == 'trialSegment', :]
     writer = neo.io.NixIO(filename=insDataFilename, mode='ow')
     writer.write_block(block, use_obj_names=True)
     writer.close()
@@ -2493,13 +2434,17 @@ def getINSStimOnset(
             (group['amplitude'] > 0) &
             (group['therapyStatus'] > 0))
         if not groupAmpMask.any():
-            print('Amplitude never turned on!')
+            print('Amplitude round {} stim never turned on!'.format(name))
             continue
         stimRate = (
             group
             .loc[groupAmpMask, 'RateInHz']
             .value_counts()
             .idxmax())
+        groupTotalDuration = group['t'].max() - group['t'].min()
+        if groupTotalDuration < min(50e-3, stimRate ** -1):
+            print('Amplitude round {} is shorter than {:.3f} sec. Ignoring...'.format(name, min(50e-3, stimRate ** -1)))
+            continue
         slotSize = int(fs/stimRate)
         stimPeriod = stimRate ** (-1)
         activeProgram = (
@@ -2949,53 +2894,6 @@ def getINSStimOnset(
             trainNPulses = (theseOnsetTimestamps ** 0).magnitude * pq.dimensionless
             theseTrialSegments = (theseOnsetTimestamps ** 0).magnitude * thisTrialSegment * pq.dimensionless
             ##############################################################################
-            repeatCycles = False
-            #############################
-            '''
-            if repeatCycles:
-                if thisElecConfig['cyclingEnabled']:
-                    thisCycleOnTime = (
-                        thisElecConfig['cycleOnTime']['time'] *
-                        mdt_constants.cycleUnits[thisElecConfig['cycleOnTime']['units']] *
-                        pq.s
-                        )
-                    thisCycleOffTime = (
-                        thisElecConfig['cycleOffTime']['time'] *
-                        mdt_constants.cycleUnits[thisElecConfig['cycleOffTime']['units']] *
-                        pq.s
-                        )
-                    tempOnTimes = []
-                    tempOffTimes = []
-                    tempOnDiffsE = []
-                    tempOnDiffsL = []
-                    for idx, onTime in enumerate(theseOnsetTimestamps):
-                        offTime = theseOffsetTimestamps[idx]
-                        # 
-                        interCycleInterval = (
-                            thisCycleOffTime +
-                            cyclePeriodCorrection * pq.s +
-                            thisCycleOnTime)
-                        pulseOnTimes = np.arange(
-                            onTime, offTime,
-                            interCycleInterval) * onTime.units
-                        pulseOffTimes = pulseOnTimes + thisCycleOnTime
-                        # if cycle shuts down early because of new command
-                        if offTime < pulseOffTimes[-1]:
-                            print('Replaced {} with {}'.format(pulseOffTimes[-1], offTime))
-                            pulseOffTimes[-1] = offTime
-                        tempOnTimes.append(pulseOnTimes)
-                        tempOffTimes.append(pulseOffTimes)
-                        onDiffE = onsetDifferenceFromExpected[idx]
-                        tempOnDiffsE.append(pulseOnTimes ** 0 * onDiffE)
-                        onDiffL = onsetDifferenceFromLogged[idx]
-                        tempOnDiffsL.append(pulseOnTimes ** 0 * onDiffL)
-                    #
-                    theseOnsetTimestamps = np.concatenate(tempOnTimes) * onTime.units
-                    theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
-                    onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
-                    onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
-            '''
-            ##############################################################################
             if treatAsSinglePulses:
                 tempOnTimes = []
                 tempRankInTrain = []
@@ -3017,7 +2915,11 @@ def getINSStimOnset(
                         pulseOnTimes ** 0 * theseTrialSegments[idx])
                     #
                     pulseOffTimes = pulseOnTimes + 100 * stimPW * pq.us
-                    pulseOffTimes[0] = offTime
+                    try:
+                        pulseOffTimes[0] = offTime
+                    except:
+                        traceback.print_exc()
+                        pdb.set_trace()
                     tempOnTimes.append(pulseOnTimes)
                     tempOffTimes.append(pulseOffTimes)
                     onDiffE = onsetDifferenceFromExpected[idx]

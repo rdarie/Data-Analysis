@@ -10,20 +10,20 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_plots_stim_26
+#SBATCH -J test_train_split_plots_stim_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_split_plots_stim_26-%a.out
-#SBATCH -e ../../batch_logs/test_train_split_plots_stim_26-%a.out
+#SBATCH -o ../../batch_logs/test_train_split_plots_stim_25-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_plots_stim_25-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=1
 
 #     SLURM_ARRAY_TASK_ID=1
-source shellScripts/run_exp_preamble_26.sh
+source shellScripts/run_exp_preamble_25.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 #
 ITERATOR="--iteratorSuffix=pa"

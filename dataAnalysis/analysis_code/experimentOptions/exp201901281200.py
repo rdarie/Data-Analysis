@@ -1,11 +1,13 @@
 import numpy as np
 
-
 def getExpOpts():
     #
     blockExperimentTypeLookup = {
         1: 'proprio',
-    }
+        2: 'proprio',
+        3: 'proprio',
+        4: 'proprio',
+        }
     fullRigInputs = {
         'B+': 'ainp1',
         'A+': 'ainp2',
@@ -19,25 +21,26 @@ def getExpOpts():
         'leftLED': 'ainp10',
         'simiTrigs': 'ainp8',
         'tapSync': 'ainp7',
-    }
+        }
     miniRCRigInputs = {
         'tapSync': 'ainp7',
         'simiTrigs': 'ainp8'
-    }
+        }
     RCRigInputs = {
         'kinectSync': 'ainp16',
-    }
+        }
 
-    experimentName = '201901231000-Murdoc'
+    experimentName = '201901281200-Murdoc'
     deviceName = 'DeviceNPC700373H'
     subjectName = 'Murdoc'
-
+    
     jsonSessionNames = {
         #  per trial
-        1: [
-            'Session1548258716429', 'Session1548259084797',
-            'Session1548260509595', 'Session1548260943898'],
-    }
+        1: ['Session1548696263394'],
+        2: ['Session1548697737024'],
+        3: ['Session1548699080781'],
+        4: ['Session1548700299955'],
+        }
 
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -46,9 +49,10 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'synchChanName': [
-                    'ins_accx', 'ins_accy',
-                    'ins_accz', 'ins_accinertia'],
+                'synchChanName': ['ins_td0', 'ins_td2'],
+                # 'synchChanName': [
+                #     'ins_accx', 'ins_accy',
+                #     'ins_accz', 'ins_accinertia'],
                 'synchStimUnitName': None,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
@@ -60,21 +64,21 @@ def getExpOpts():
                 'iti': 200e-3,
                 'minAnalogValue': None,
                 'keepIndex': slice(None)
-            }
+                }
     ############################################################
     ############################################################
     # manually add special instructions, e.g.
     synchInfo['ins'][1][0].update({
-        'timeRanges': [(72.5, 76.5)],
+        'timeRanges': [(98.3, 102.3)],
+        'unixTimeAdjust': -2.})
+    synchInfo['ins'][2][0].update({
+        'timeRanges': [(83.7, 87.7)],
         'unixTimeAdjust': None})
-    synchInfo['ins'][1][1].update({
-        'timeRanges': [(41.0, 45.0)],
+    synchInfo['ins'][3][0].update({
+        'timeRanges': [(52.8, 56.8)],
         'unixTimeAdjust': None})
-    synchInfo['ins'][1][2].update({
-        'timeRanges': [(46.8, 50.8)],
-        'unixTimeAdjust': None})
-    synchInfo['ins'][1][3].update({
-        'timeRanges': [(40.3, 44.3)],
+    synchInfo['ins'][4][0].update({
+        'timeRanges': [(40.8, 44.8)],
         'unixTimeAdjust': None})
     ############################################################
     synchInfo['nsp'] = {
@@ -91,15 +95,15 @@ def getExpOpts():
                 'unixTimeAdjust': None,
                 'minAnalogValue': None, 'thres': 7}
             for j, sessionName in enumerate(jsonSessionNames[i])
-        }
+            }
         for i in jsonSessionNames.keys()
-    }
+        }
     ############################################################
     # manually add special instructions, e.g
-    synchInfo['nsp'][1][0].update({'timeRanges': [(59.8, 63.8)]})
-    synchInfo['nsp'][1][1].update({'timeRanges': [(396.7, 400.7)]})
-    synchInfo['nsp'][1][2].update({'timeRanges': [(1827.3, 1831.3)]})
-    synchInfo['nsp'][1][3].update({'timeRanges': [(2255.1, 2259.1)]})
+    synchInfo['nsp'][1][0].update({'timeRanges': [(198.6, 202.6)]})
+    synchInfo['nsp'][2][0].update({'timeRanges': [(93.2, 97.2)]})
+    synchInfo['nsp'][3][0].update({'timeRanges': [(145.8, 149.8)]})
+    synchInfo['nsp'][4][0].update({'timeRanges': [(187.5, 191.5)]})
     ############################################################
     #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
@@ -109,7 +113,7 @@ def getExpOpts():
         #  1: {0: 'coarse'},  # e.g. for ins session 0, use the coarse alignment based on system unix time
         #  2: {2: 1},  # e.g. for ins session 2, use the alignment of ins session 1
         #
-    }
+        }
     #
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
@@ -131,16 +135,16 @@ def getExpOpts():
             2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             3: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
-
+        
     triFolderSourceBase = 1
     triDestinations = [
         'Block00{}'.format(blockIdx)
         for blockIdx in [2, 3, 4]]
-
+    
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901231000-Murdoc': [1],
-    }
+        '201901281200-Murdoc': [1],
+        }
 
     # Options relevant to the classifcation of proprio trials
     # movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
@@ -151,11 +155,11 @@ def getExpOpts():
     alignTimeBoundsLookup = {
         # e.g.
         #  per trial
-        # 2: [
+        #2: [
         #    #  per trialSegment
         #    [238, 1198],
         #    ],
-    }
+        }
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
@@ -163,8 +167,8 @@ def getExpOpts():
                     'utah{:d}'.format(i)
                     for i in range(1, 97)
                     if i not in [14, 17, 28, 40, 50, 60, 82]
-                ]
-            ],
+                    ]
+                ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
                 for i in range(1, 17)
@@ -205,72 +209,72 @@ def getExpOpts():
         'ca': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'cb': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'cc': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'ccm': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'ccs': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'cd': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'ra': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'rb': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'rc': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'rd': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         're': {
             'experimentsToAssemble': {
                 experimentName: [],
-            }
-        },
+                }
+            },
         'pa': {
             'experimentsToAssemble': {
-                '201901231000-Murdoc': [1],
-            }
-        },
+                '201901281200-Murdoc': [1],
+                }
+            },
         'ma': {
             'experimentsToAssemble': {
-                '201901231000-Murdoc': [1],
-            }
-        },
+                '201901281200-Murdoc': [1],
+                }
+            },
         'na': {
             'experimentsToAssemble': {
-                '201901231000-Murdoc': [1],
+                '201901281200-Murdoc': [1],
+                }
             }
         }
-    }
     return locals()

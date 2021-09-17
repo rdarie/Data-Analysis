@@ -44,7 +44,7 @@ do
       # python -u ./assembleExperimentAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix=$B $WINDOW $ANALYSISFOLDER --alignFolderName=$A $LAZINESS
   done
   # python -u ./calcTrialOutliersV2.py --inputBlockSuffix=lfp --unitQuery=lfp --alignFolderName=$A $UNITSELECTOR $LAZINESS --plotting --verbose --saveResults --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $BLOCKSELECTOR
-  TIMEWINDOWOPTS="--winStart=-200 --winStop=400"
+  TIMEWINDOWOPTS="--winStart=-150 --winStop=400"
   PAGELIMITS=""
   HUEOPTS="--hueName=trialAmplitude --hueControl="
   OUTLIERMASK="--maskOutlierBlocks"

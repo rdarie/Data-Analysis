@@ -34,7 +34,10 @@ def getExpOpts():
     
     jsonSessionNames = {
         #  per trial
-        1: ['Session1548429682595', 'Session1548430735314'],
+        1: [
+            'Session1548429682595',
+            'Session1548430735314'
+        ],
         2: [
             'Session1548431390236', 'Session1548431581704',
             'Session1548432081534', 'Session1548432470771',

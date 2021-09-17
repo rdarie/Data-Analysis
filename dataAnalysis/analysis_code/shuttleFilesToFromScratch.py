@@ -27,6 +27,7 @@ Options:
     --preprocFolderSubfolders                        process entire experimental day? [default: False]
     --filesIncluded                                  process entire experimental day? [default: False]
     --foldersIncluded                                process entire experimental day? [default: False]
+    --requireKeypress                                process entire experimental day? [default: False]
     
 """
 
@@ -152,7 +153,8 @@ if arguments['preprocFolderFiles']:
         ]
     print('\nAbout to move:\n')
     print('\n'.join(itemsToMove))
-    x = input('\n********\nPress any key to continue.')
+    if arguments['requireKeypress']:
+        _ = input('\n********\nPress any key to continue.')
     for itemName in os.listdir(originFolder):
         originPath = os.path.join(originFolder, itemName)
         destinPath = os.path.join(destinFolder, itemName)
@@ -171,7 +173,8 @@ if arguments['preprocFolderSubfolders']:
         ]
     print('\nAbout to move:\n')
     print('\n'.join(itemsToMove))
-    x = input('\n********\nPress any key to continue.')
+    if arguments['requireKeypress']:
+        _ = input('\n********\nPress any key to continue.')
     for itemName in os.listdir(originFolder):
         originPath = os.path.join(originFolder, itemName)
         destinPath = os.path.join(destinFolder, itemName)
@@ -202,7 +205,8 @@ if arguments['searchTerm'] is not None:
     if len(folderNamesToMove):
         print('\nAbout to move:\n')
         print('\n'.join(folderNamesToMove))
-        x = input('\n********\nPress any key to continue.')
+        if arguments['requireKeypress']:
+            _ = input('\n********\nPress any key to continue.')
         for itemName in folderNamesToMove:
             originPath = os.path.join(originFolder, itemName)
             destinPath = os.path.join(destinFolder, itemName)
@@ -216,7 +220,8 @@ if arguments['searchTerm'] is not None:
     if len(fileNamesToMove):
         print('\nAbout to move:\n')
         print('\n'.join(fileNamesToMove))
-        x = input('\n********\nPress any key to continue.')
+        if arguments['requireKeypress']:
+            _ = input('\n********\nPress any key to continue.')
         for itemName in fileNamesToMove:
             originPath = os.path.join(originFolder, itemName)
             destinPath = os.path.join(destinFolder, itemName)

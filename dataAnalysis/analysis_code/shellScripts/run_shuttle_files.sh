@@ -23,8 +23,22 @@
 #SBATCH --array=1,2,3
 
 ####
-# EXP="exp201901070700"
-EXP="exp201901271000"
+
+# EXP="exp201901221000"
+# has 1 minirc 2-3 motion
+# EXP="exp201901231000"
+# has 1 motion
+# EXP="exp201901240900"
+# has 1 minirc 2 motion
+EXP="exp201901251000"
+# EXP="exp201901261000"
+# EXP="exp201901271000"
+# EXP="exp201901281200"
+# has 1-4 motion
+# EXP="exp201901301000"
+# has 1-3 motion 4 minirc
+# EXP="exp201901311000"
+# has 1-4 motion 5 minirc
 
 # EXP="exp202010151400"
 # EXP="exp202012171300"
@@ -70,15 +84,16 @@ python --version
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.json' --fromScratchToData --moveItems --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.h5' --fromScratchToData --moveItems --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.pickle' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.joblib' --fromScratchToData --moveItems --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.csv' --fromScratchToData --moveItems --filesIncluded
 
 ###### data to scratch
 ## required by qa_proprio
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*lfp_XL.nix' --fromDataToScratch --filesIncluded
 ## required to make epoch align times
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*' --fromDataToScratch --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*analog_inputs*.*' --fromDataToScratch --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*analog_inputs*.*' --fromDataToScratch --filesIncluded
 ## required by test train splitter
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*rig_XL.nix' --fromDataToScratch --moveItems --filesIncluded
@@ -87,6 +102,6 @@ python --version
 ## required by plotting qa
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp_XL.nix' --fromDataToScratch --filesIncluded
 
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*pt*' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*pt*' --fromDataToScratch --filesIncluded
 # examine folder sizes
 python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize
