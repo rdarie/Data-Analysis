@@ -10,17 +10,17 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_ins_201901_27
+#SBATCH -J preproc_ins_201901_30
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/preproc_ins_201901_27-%a.out
-#SBATCH -e ../../batch_logs/preproc_ins_201901_27-%a.out
+#SBATCH -o ../../batch_logs/preproc_ins_201901_30-%a.out
+#SBATCH -e ../../batch_logs/preproc_ins_201901_30-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=5
+#SBATCH --array=4
 
 
 module load anaconda/2020.02
@@ -38,13 +38,13 @@ python --version
 # has 1 minirc 2 motion
 # EXP="exp201901251000"
 # EXP="exp201901261000"
-EXP="exp201901271000"
+# EXP="exp201901271000"
 # has 1-4 motion 5 minirc
 # EXP="exp201901281200"
 # has 1-4 motion
 # EXP="exp201901301000"
 # has 1-3 motion 4 minirc
-# EXP="exp201901311000"
+EXP="exp201901311000"
 # has 1-4 motion 5 minirc
 
 # EXP="exp202101141100"
@@ -61,7 +61,7 @@ EXP="exp201901271000"
 # EXP="exp202102101100"
 # EXP="exp202102151100"
 
-SLURM_ARRAY_TASK_ID=5
+# SLURM_ARRAY_TASK_ID=5
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots

@@ -28,11 +28,11 @@ export OUTDATED_IGNORE=1
 # has 1-3 motion 4 minirc
 # EXP="exp201901271000"
 # has 1-4 motion 5 minirc
-EXP="exp201901281200"
+# EXP="exp201901281200"
 # has 1-4 motion
 # EXP="exp201901301000"
 # has 1-3 motion 4 minirc
-# EXP="exp201901311000"
+EXP="exp201901311000"
 # has 1-4 motion 5 minirc
 
 # EXP="exp202101141100"

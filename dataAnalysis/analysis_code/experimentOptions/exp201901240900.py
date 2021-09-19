@@ -35,9 +35,12 @@ def getExpOpts():
     jsonSessionNames = {
         #  per trial
         1: [
-            'Session1548342088863', 'Session1548343250517'],
+            'Session1548342088863',
+            'Session1548343250517',
+            'Session1548343863024'],
         2: [
-            'Session1548345747928', 'Session1548347034243'],
+            'Session1548345747928',
+            'Session1548347034243'],
         }
 
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
@@ -66,21 +69,31 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g.
+    extraSynchOffset = 3.
     synchInfo['ins'][1][0].update({
-        'timeRanges': [(181.2, 185.2)],
-        'unixTimeAdjust': -3.})
+        'timeRanges': [(178.2 + extraSynchOffset, 182.2 + extraSynchOffset)],
+        'unixTimeAdjust': extraSynchOffset * (-1)
+    })
     synchInfo['ins'][1][1].update({
-        'timeRanges': [(56.7, 61.7)],
-        'unixTimeAdjust': -3.})
+        'timeRanges': [(53.7 + extraSynchOffset, 57.7 + extraSynchOffset)],
+        'unixTimeAdjust': extraSynchOffset * (-1)
+    })
+    synchInfo['ins'][1][2].update({
+        'timeRanges': [(59.5 + extraSynchOffset, 66.5 + extraSynchOffset)],
+        'unixTimeAdjust': extraSynchOffset * (-1)
+    })
     ###
+    extraSynchOffset = 0.
     synchInfo['ins'][2][0].update({
-        'timeRanges': [(37.7, 43.7)],
-        'unixTimeAdjust': None,
-        'synchChanName': ['ins_accz'],})
+        'timeRanges': [(36.7 + extraSynchOffset, 44.7 + extraSynchOffset)],
+        'unixTimeAdjust': extraSynchOffset * (-1),
+        'synchChanName': ['ins_accz'],
+    })
     synchInfo['ins'][2][1].update({
-        'timeRanges': [(46.1, 52.1)],
-        'unixTimeAdjust': None,
-        'synchChanName': ['ins_accz'],})
+        'timeRanges': [(45.1 + extraSynchOffset, 53.1 + extraSynchOffset)],
+        'unixTimeAdjust': extraSynchOffset * (-1),
+        'synchChanName': ['ins_accz'],
+    })
     ############################################################
     synchInfo['nsp'] = {
         # per block
@@ -103,9 +116,10 @@ def getExpOpts():
     # manually add special instructions, e.g
     synchInfo['nsp'][1][0].update({'timeRanges': [(125.9, 129.9)]})
     synchInfo['nsp'][1][1].update({'timeRanges': [(1163.1, 1167.1)]})
+    synchInfo['nsp'][1][2].update({'timeRanges': [(1781.4, 1788.4)]})
     #
-    synchInfo['nsp'][2][0].update({'timeRanges': [(1057.4, 1063.4)]})
-    synchInfo['nsp'][2][1].update({'timeRanges': [(2352.2, 2358.2)]})
+    synchInfo['nsp'][2][0].update({'timeRanges': [(1056.4, 1064.4)]})
+    synchInfo['nsp'][2][1].update({'timeRanges': [(2351.2, 2359.2)]})
     ############################################################
     #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
@@ -161,6 +175,15 @@ def getExpOpts():
         #    #  per trialSegment
         #    [238, 1198],
         #    ],
+        }
+    pedalPositionZeroEpochs = None
+    dropMotionRounds = {
+        2: [
+            16, 17, 28, 29, 32, 33,
+            94, 95, 88, 89, 84, 85, 71, 70, 64, 65, 49, 48, 41, 40, 34, 35,
+            173, 172, 151, 150, 136, 137, 126, 127, 116, 117, 112, 113,
+            178, 179, 188, 189, 196, 197, 204, 205, 211, 219, 212, 220, 221,
+            222, 227, 228, 231, 232, 235, 236, 237, 238, 239, 240, 243, 244]
         }
     spikeSortingOpts = {
         'utah': {

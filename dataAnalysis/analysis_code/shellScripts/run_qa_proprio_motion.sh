@@ -10,19 +10,19 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J qa_motion_201901_26
+#SBATCH -J qa_motion_201901_31
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/qa_motion_201901_26-%a.out
-#SBATCH -e ../../batch_logs/qa_motion_201901_26-%a.out
+#SBATCH -o ../../batch_logs/qa_motion_201901_31-%a.out
+#SBATCH -e ../../batch_logs/qa_motion_201901_31-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=1-3
+#SBATCH --array=1-4
 
 # SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_exp_preamble_26.sh
+source shellScripts/run_exp_preamble_31.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 # ANALYSISFOLDER="--analysisName=default"
 ANALYSISFOLDER="--analysisName=hiRes"

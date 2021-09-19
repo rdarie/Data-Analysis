@@ -1871,7 +1871,26 @@ def preprocINS(
             jsonBaseFolder, jsonSessionNames[0],
             deviceName=deviceName)
         )
-    #
+    #############################################################
+    #############################################################
+    # maybe here is a good spot to intercept the stim configs and force them to be unique
+    # change both stimStatusSerial and elecConfiguration
+    sessionsToRename = [
+        'Session1548343250517', 'Session1548430735314', 'Session1548611405556', 'Session1548869346906']
+    if jsonSessionNames[0] in sessionsToRename:
+        # hacky relabel group 0 as group 1 to avoind name overlap
+        hackMask = (
+            (stimStatusSerial['ins_property'] == 'activeGroup') &
+            (stimStatusSerial['ins_value'] == 0)
+            )
+        stimStatusSerial.loc[hackMask, 'ins_value'] = 1
+        # swap the config descriptions
+        tempConfig = copy(elecConfiguration[1])
+        elecConfiguration[1] = copy(elecConfiguration[0])
+        elecConfiguration[0] = tempConfig
+        #
+    #############################################################
+    #############################################################
     if 'upsampleRate' in trialFilesStim:
         upsampleRate = trialFilesStim['upsampleRate']
     else:
@@ -2016,7 +2035,7 @@ def preprocINS(
         deriveCols=deriveCols, progAmpNames=progAmpNames,
         dummyTherapySwitches=False, elecConfiguration=elecConfiguration
         )
-    # maybe here is a good spot to intercept the stim configs and force them to be unique
+    '''
     #  sync Host PC Unix time to NSP
     HUTtoINSPlotting = False
     if HUTtoINSPlotting and makePlots:
@@ -2058,6 +2077,7 @@ def preprocINS(
             plt.show(block=plotBlocking)
         else:
             plt.close()
+    '''
     block = insDataToBlock(
         tdDF, accelDF, stimStatusSerial,
         senseInfo, trialFilesStim,
@@ -2200,6 +2220,8 @@ def preprocINS(
     if createRelationship:
         block.create_relationship()
     #
+    # also can make changes to events here before they get written out. e.g. annotate with session info?
+    pdb.set_trace()
     writer = neo.io.NixIO(filename=insDataFilename, mode='ow')
     writer.write_block(block, use_obj_names=True)
     writer.close()

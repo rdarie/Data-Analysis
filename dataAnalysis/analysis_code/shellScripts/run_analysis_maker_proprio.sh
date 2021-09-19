@@ -11,23 +11,35 @@
 #SBATCH --mem=125G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_201901_27
+#SBATCH -J analysis_calc_201901_24
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/analysis_calc_201901_27-%a.out
-#SBATCH -e ../../batch_logs/analysis_calc_201901_27-%a.out
+#SBATCH -o ../../batch_logs/analysis_calc_201901_24-%a.out
+#SBATCH -e ../../batch_logs/analysis_calc_201901_24-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1-5
+#SBATCH --array=2
 
+# EXP="exp201901221000"
+# has 1 minirc 2-3 motion
+# EXP="exp201901231000"
+# has 1 motion
+# EXP="exp201901240900"
+# has 1 minirc 2 motion
 # EXP="exp201901251000"
 # has 1 minirc 2 motion
 # EXP="exp201901261000"
 # has 1-3 motion 4 minirc
-EXP="exp201901271000"
+# EXP="exp201901271000"
+# has 1-4 motion 5 minirc
+# EXP="exp201901281200"
+# has 1-4 motion
+EXP="exp201901301000"
+# has 1-3 motion 4 minirc
+# EXP="exp201901311000"
 # has 1-4 motion 5 minirc
 
 # EXP="exp202101141100"
@@ -76,7 +88,7 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=4
 echo --blockIdx=$SLURM_ARRAY_TASK_ID
 
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy

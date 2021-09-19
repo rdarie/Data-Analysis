@@ -71,7 +71,9 @@ def getExpOpts():
     # manually add special instructions, e.g.
     synchInfo['ins'][1][0].update({
         'timeRanges': [(209.5, 213.5)],
-        'unixTimeAdjust': None})
+        'unixTimeAdjust': None,
+        'synchChanName': ['ins_td2', 'ins_td3']
+        })
     synchInfo['ins'][1][1].update({
         'timeRanges': [(52., 56.)],
         'unixTimeAdjust': None,

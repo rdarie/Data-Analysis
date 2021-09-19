@@ -88,11 +88,11 @@ def getExpOpts():
         'unixTimeAdjust': 2.})
     #
     synchInfo['ins'][5][0].update({
-        'timeRanges': [(56.5, 60.5)],
-        'unixTimeAdjust': None})
+        'timeRanges': [(53.5, 59.5)],
+        'unixTimeAdjust': 2.})
     synchInfo['ins'][5][1].update({
-        'timeRanges': [(62.4, 66.4)],
-        'unixTimeAdjust': None})
+        'timeRanges': [(59.4, 65.4)],
+        'unixTimeAdjust': 2.})
     #
     #
     ############################################################
@@ -124,9 +124,8 @@ def getExpOpts():
     synchInfo['nsp'][3][0].update({'timeRanges': [(104.1, 108.1)]})
     synchInfo['nsp'][4][0].update({'timeRanges': [(140., 144.)]})
     #
-    synchInfo['nsp'][5][0].update({'timeRanges': [(134.1, 138.1)]})
-    # synchInfo['nsp'][5][1].update({'timeRanges': []})
-    synchInfo['nsp'][5][0].update({'timeRanges': [(1422.6, 1426.6)]})
+    synchInfo['nsp'][5][0].update({'timeRanges': [(133.1, 139.1)]})
+    synchInfo['nsp'][5][1].update({'timeRanges': [(1421.6, 1427.6)]})
     #
     #
     ############################################################

@@ -10,17 +10,17 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_plots_motion_28
+#SBATCH -J test_train_split_plots_motion_24
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_split_plots_motion_28-%a.out
-#SBATCH -e ../../batch_logs/test_train_split_plots_motion_28-%a.out
+#SBATCH -o ../../batch_logs/test_train_split_plots_motion_24-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_plots_motion_24-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_exp_preamble.sh

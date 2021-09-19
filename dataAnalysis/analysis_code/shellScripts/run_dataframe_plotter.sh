@@ -10,7 +10,7 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J plot_dataframes_201901_26
+#SBATCH -J plot_df_201901_26
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/plot_dataframes_201901_26.out
@@ -30,7 +30,8 @@
 
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_exp_preamble_26.sh
-source shellScripts/calc_aligned_motion_preamble.sh
+# source shellScripts/calc_aligned_motion_preamble.sh
+source shellScripts/calc_aligned_stim_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 

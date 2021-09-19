@@ -178,8 +178,9 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901251000-Murdoc': [2],
-        '201901261000-Murdoc': [1, 2, 3],
+        '201901240900-Murdoc': [2],
+        '201901251000-Murdoc': [1, 2],
+        '201901261000-Murdoc': [1, 2, 3, 4],
         }
 
     # movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
@@ -307,18 +308,21 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
+                '201901240900-Murdoc': [2],
                 '201901251000-Murdoc': [1, 2],
-                '201901261000-Murdoc': [1, 2, 3],
+                '201901261000-Murdoc': [1, 2, 3, 4],
                 }
             },
         'ma': {
             'experimentsToAssemble': {
+                '201901240900-Murdoc': [2],
                 '201901251000-Murdoc': [1, 2],
-                '201901261000-Murdoc': [1, 2, 3],
+                '201901261000-Murdoc': [1, 2, 3, 4],
                 }
             },
         'na': {
             'experimentsToAssemble': {
+                '201901240900-Murdoc': [2],
                 '201901251000-Murdoc': [1, 2],
                 '201901261000-Murdoc': [1, 2, 3],
                 }

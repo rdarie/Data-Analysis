@@ -30,9 +30,12 @@
 # has 1 motion
 # EXP="exp201901240900"
 # has 1 minirc 2 motion
-EXP="exp201901251000"
+# EXP="exp201901251000"
+# has 1 minirc 2 motion
 # EXP="exp201901261000"
-# EXP="exp201901271000"
+# has 1-3 motion 4 minirc
+EXP="exp201901271000"
+# has 1-4 motion 5 minirc
 # EXP="exp201901281200"
 # has 1-4 motion
 # EXP="exp201901301000"
@@ -76,10 +79,16 @@ python --version
 #  or option '-j' for a specific Job ID.
 
 # scratch to data
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*pt*' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*XL.nix' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*lfp_XL.nix' --fromScratchToData --moveItems --filesIncluded
 #
+# full length files
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_chunkingInfo.json' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_synchFun.json' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromScratchToData --moveItems --filesIncluded
+
+# everything ever
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.nix' --fromScratchToData --moveItems --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.json' --fromScratchToData --moveItems --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.h5' --fromScratchToData --moveItems --filesIncluded
@@ -91,9 +100,9 @@ python --version
 ## required by qa_proprio
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*lfp_XL.nix' --fromDataToScratch --filesIncluded
 ## required to make epoch align times
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*analog_inputs*.*' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*analog_inputs*.*' --fromDataToScratch --filesIncluded
 ## required by test train splitter
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*rig_XL.nix' --fromDataToScratch --moveItems --filesIncluded
@@ -102,6 +111,39 @@ python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*analog_inp
 ## required by plotting qa
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*lfp_XL.nix' --fromDataToScratch --filesIncluded
 
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*pt*' --fromDataToScratch --filesIncluded
+## bring back pre-analysis files
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah**_chunkingInfo.json --fromDataToScratch --filesIncluded
+
+## bring back pre-align files
+# first, save existing files to processed (to make sure we don't reload old versions)
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromScratchToData --moveItems --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_outliers.h5' --fromScratchToData --moveItems --filesIncluded
+# then, bring everything back
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze.nix' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromDataToScratch --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs.nix' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_outliers.h5' --fromDataToScratch --filesIncluded
+
+
+## bring back aligned .nix files
+# first, save existing files to processed (to make sure we don't reload old versions)
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_XL.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_outliers.h5' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs.nix' --fromScratchToData --moveItems --filesIncluded
+# then, bring everything back
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_XL.nix' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_outliers.h5' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs.nix' --fromDataToScratch --filesIncluded
+
+# bring back epoqued iterator dataframes
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_pa.h5' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_pa_*_meta.pickle' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_pa_cvIterators.pickle' --fromDataToScratch --filesIncluded
+
+
 # examine folder sizes
 python './shuttleFilesToFromScratchV2.py' --exp=$EXP --printFolderSize

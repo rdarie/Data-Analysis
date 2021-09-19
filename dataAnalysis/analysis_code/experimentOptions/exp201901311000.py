@@ -154,7 +154,8 @@ def getExpOpts():
     
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901311000-Murdoc': [1],
+        '201901301000-Murdoc': [4],
+        '201901311000-Murdoc': [1, 2, 3, 4],
         }
 
     # Options relevant to the classifcation of proprio trials
@@ -274,17 +275,20 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '201901311000-Murdoc': [1],
+                '201901301000-Murdoc': [4],
+                '201901311000-Murdoc': [1, 2, 3, 4],
                 }
             },
         'ma': {
             'experimentsToAssemble': {
-                '201901311000-Murdoc': [1],
+                '201901301000-Murdoc': [4],
+                '201901311000-Murdoc': [1, 2, 3, 4],
                 }
             },
         'na': {
             'experimentsToAssemble': {
-                '201901311000-Murdoc': [1],
+                '201901301000-Murdoc': [4],
+                '201901311000-Murdoc': [1, 2, 3, 4],
                 }
             }
         }

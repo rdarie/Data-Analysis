@@ -36,11 +36,12 @@ python --version
 # EXP="exp201901251000"
 # EXP="exp201901261000"
 # EXP="exp201901271000"
+# has 1-4 motion 5 minirc
 # EXP="exp201901281200"
 # has 1-4 motion
-# EXP="exp201901301000"
+EXP="exp201901301000"
 # has 1-3 motion 4 minirc
-EXP="exp201901311000"
+# EXP="exp201901311000"
 # has 1-4 motion 5 minirc
 
 # EXP="exp202101061100"
@@ -59,7 +60,7 @@ EXP="exp201901311000"
 
 BLOCKSELECTOR=""
 # BLOCKSELECTOR="--inputINSBlockSuffix="
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=4
 
 ## --showFigures --forceRecalc
 #
