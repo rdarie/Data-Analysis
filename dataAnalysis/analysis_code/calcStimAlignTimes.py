@@ -184,15 +184,15 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 cathodes = thisUnit.annotations['cathodes']
                 anodes = thisUnit.annotations['anodes']
                 elecName = ''
-                if isinstance(anodes, Iterable):
-                    elecName += '+ ' + ', '.join(['E{}'.format(i) for i in anodes])
-                else:
-                    elecName += '+ E{}'.format(anodes)
-                elecName += ' '
                 if isinstance(cathodes, Iterable):
-                    elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
+                    elecName += '-' + ''.join(['E{:02d}'.format(i) for i in cathodes])
                 else:
-                    elecName += '- E{}'.format(cathodes)
+                    elecName += '-E{:02d}'.format(cathodes)
+                elecName += ''
+                if isinstance(anodes, Iterable):
+                    elecName += '+' + ''.join(['E{:02d}'.format(i) for i in anodes])
+                else:
+                    elecName += '+E{:02d}'.format(anodes)
                 alignEventsDF.loc[group.index, 'electrode'] = elecName
     #
     # TODO: fix synch code so that all units are present, to avoid this hack:

@@ -11,6 +11,7 @@ import quantities as pq
 #  from quantities import mV, kHz, s, uV
 import math, pdb
 from scipy import stats, signal, fftpack
+from scipy.ndimage import median_filter
 from copy import copy, deepcopy
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
@@ -31,7 +32,6 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 #  import h5py
 import re, sys
-#  from scipy import signal
 #  import rcsanalysis.packet_func as rcsa_helpers
 try:
     from collections.abc import Iterable
@@ -361,8 +361,10 @@ def transposeSpikeDF(
 
 def concatenateBlocks(
         asigBlocks, spikeBlocks, eventBlocks, chunkingMetadata,
-        samplingRate, chanQuery, lazy, trackMemory, verbose, clipSignals=False,
-        clippingOpts={}
+        samplingRate, chanQuery, lazy, trackMemory, verbose,
+        clipSignals=False, clippingOpts={},
+        filterSignals=False, analysisFilterOpts={},
+        medianFilterSignals=False, analysisMedianFilterOpts={},
         ):
     # Scan ahead through all files and ensure that
     # spikeTrains and units are present across all assembled files
@@ -487,48 +489,66 @@ def concatenateBlocks(
         tdDF.loc[:, 't'] += asigBlock.annotations['chunkTStart']
         tdDF.set_index('t', inplace=True)
         if samplingRate != dummyAsig.sampling_rate:
-            lowPassOpts = {
-                # 'low': {
-                #     'Wn': float(samplingRate / 3),
-                #     'N': 4,
-                #     'btype': 'low',
-                #     'ftype': 'butter'
-                # },
-                'high': {
-                    'Wn': .1,
-                    'N': 4,
-                    'btype': 'high',
-                    'ftype': 'butter'
-                }
-            }
+            if filterSignals:
+                if not len(analysisFilterOpts):
+                    analysisFilterOpts = {
+                        # 'low': {
+                        #     'Wn': float(samplingRate / 3),
+                        #     'N': 4,
+                        #     'btype': 'low',
+                        #     'ftype': 'butter'
+                        # },
+                        'high': {
+                            'Wn': .1,
+                            'N': 4,
+                            'btype': 'high',
+                            'ftype': 'butter'
+                        }
+                    }
+            else:
+                analysisFilterOpts = {}
             newT = pd.Series(
                 np.arange(
                     dummyAsig.t_start + asigBlock.annotations['chunkTStart'] * pq.s,
                     dummyAsig.t_stop + asigBlock.annotations['chunkTStart'] * pq.s,
                     1/samplingRate))
             if samplingRate < dummyAsig.sampling_rate:
-                filterCoeffs = hf.makeFilterCoeffsSOS(
-                    lowPassOpts, float(dummyAsig.sampling_rate))
+                if len(analysisFilterOpts):
+                    filterCoeffs = hf.makeFilterCoeffsSOS(
+                        analysisFilterOpts, float(dummyAsig.sampling_rate))
                 if trackMemory:
                     print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
                         prf.memory_usage_psutil()))
                 '''
                 ### check that axis=0 is the correct option
-                dummyDF = tdDF.iloc[:, :4].copy()
+                dummyDF = tdDF.loc[:, 'seg0_utah90'].copy()
                 filteredAsigs0 = signal.sosfiltfilt( filterCoeffs, dummyDF.to_numpy(), axis=0)
                 filteredAsigs1 = signal.sosfiltfilt( filterCoeffs, dummyDF.to_numpy(), axis=1)
+                dummyDF = tdDF.loc[:, ['seg0_utah90']].iloc[6467800:6520000, :].copy(); 
+                medianFilteredAsigs = median_filter(dummyDF.to_numpy(), size=(30, 1))
+                fig, ax = plt.subplots(); ax.plot(dummyDF.to_numpy()); ax.plot(medianFilteredAsigs); plt.show()
                 ###
                 '''
-                filteredAsigs = signal.sosfiltfilt(
-                    filterCoeffs, tdDF.to_numpy(),
-                    axis=0)
-                tdDF = pd.DataFrame(
-                    filteredAsigs,
-                    index=tdDF.index,
-                    columns=tdDF.columns)
-                if trackMemory:
-                    print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
-                        prf.memory_usage_psutil()))
+                if medianFilterSignals:
+                    if not len(analysisMedianFilterOpts):
+                        analysisMedianFilterOpts = dict(size=(30, 1))
+                    print('Applying median filter, analysisMedianFilterOpts={}'.format(analysisMedianFilterOpts))
+                    medianFilteredAsigs = median_filter(tdDF.to_numpy(), **analysisMedianFilterOpts)
+                    tdDF = pd.DataFrame(
+                        medianFilteredAsigs,
+                        index=tdDF.index,
+                        columns=tdDF.columns)
+                if filterSignals:
+                    filteredAsigs = signal.sosfiltfilt(
+                        filterCoeffs, tdDF.to_numpy(),
+                        axis=0)
+                    tdDF = pd.DataFrame(
+                        filteredAsigs,
+                        index=tdDF.index,
+                        columns=tdDF.columns)
+                    if trackMemory:
+                        print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
+                            prf.memory_usage_psutil()))
             tdInterp = hf.interpolateDF(
                 tdDF, newT,
                 kind='linear', fill_value='extrapolate',
@@ -1688,7 +1708,6 @@ def alignedAsigDFtoSpikeTrain(
             else:
                 thisUnit = masterBlock.filter(
                     objects=Unit, name=cleanFeatName)[0]
-            # pdb.set_trace()
             if colsAre == 'bin':
                 spikeWaveformsDF = featGroup
             elif colsAre == 'feature':
@@ -2305,12 +2324,14 @@ def readBlockFixNames(
             dataBlock.name = dataBlock.annotations['neo_name']
     #  on first segment, rename the chan_indexes and units
     seg0 = dataBlock.segments[0]
+    # print(sorted([asi.name for asi in seg0.analogsignals]))
     asigLikeList = (
         seg0.filter(objects=AnalogSignalProxy) +
         seg0.filter(objects=AnalogSignal))
-    # pdb.set_trace()
+    # asigLikeList = seg0.analogsignals
     if mapDF is not None:
         if headerSignalChan.size > 0:
+            headerSignalChan.loc[:, 'renamedLabel'] = np.nan
             asigNameChanger = {}
             for nevID in mapDF['nevID']:
                 if int(nevID) in headerSignalChan.index:
@@ -2320,6 +2341,9 @@ def readBlockFixNames(
                         .iloc[0])
                     asigNameChanger[
                         headerSignalChan.loc[int(nevID), 'name']] = labelFromMap
+                    headerSignalChan.loc[int(nevID), 'renamedLabel'] = labelFromMap
+            headerSignalChan.loc[headerSignalChan['renamedLabel'].isna(), 'renamedLabel'] = (
+                headerSignalChan.loc[headerSignalChan['renamedLabel'].isna(), 'name'])
         else:
             asigOrigNames = np.unique(
                 [i.split('#')[0] for i in headerUnitChan['name']])
@@ -2333,20 +2357,27 @@ def readBlockFixNames(
         asigNameChanger = dict()
     for asig in asigLikeList:
         asigBaseName = childBaseName(asig.name, 'seg')
-        asig.name = (
-            asigNameChanger[asigBaseName]
-            if asigBaseName in asigNameChanger
-            else asigBaseName)
+        if 'renamedLabel' in headerSignalChan.columns:
+            asigChId = asig.channel_index.channel_ids[0]
+            print('renamed {} to {}'.format(asig.name, headerSignalChan.loc[asigChId, 'renamedLabel']))
+            asig.name = headerSignalChan.loc[asigChId, 'renamedLabel']
+        elif asigBaseName in asigNameChanger:
+            asig.name = asigNameChanger[asigBaseName]
+        else:
+            asig.name = asigBaseName
         if mapDF is not None:
             if (mapDF['label'] == asig.name).any():
                 asig.annotations['xCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'xcoords'].iloc[0])
                 asig.annotations['yCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'ycoords'].iloc[0])
                 asig.annotations['zCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'zcoords'].iloc[0])
         if 'Channel group ' in asig.channel_index.name:
-            newChanName = (
-                asigNameChanger[asigBaseName]
-                if asigBaseName in asigNameChanger
-                else asigBaseName)
+            if 'renamedLabel' in headerSignalChan.columns:
+                asigChId = asig.channel_index.channel_ids[0]
+                newChanName = headerSignalChan.loc[asigChId, 'renamedLabel']
+            elif asigBaseName in asigNameChanger:
+                newChanName = asigNameChanger[asigBaseName]
+            else:
+                newChanName = asigBaseName
             asig.channel_index.name = newChanName
             if 'neo_name' in asig.channel_index.annotations:
                 asig.channel_index.annotations['neo_name'] = newChanName
@@ -2363,6 +2394,7 @@ def readBlockFixNames(
         seg0.filter(objects=SpikeTrainProxy) +
         seg0.filter(objects=SpikeTrain))
     # add channels for channelIndex that has no asigs but has spikes
+    # print(sorted([ci.name for ci in dataBlock.filter(objects=ChannelIndex)]))
     nExtraChans = 0
     for stp in spikeTrainLikeList:
         stpBaseName = childBaseName(stp.name, 'seg')
@@ -2427,15 +2459,20 @@ def readBlockFixNames(
             stp.unit.channel_index.name = newChanName
             # units and analogsignals have different channel_indexes when loaded by nix
             # add them to each other's parent list
-            allMatchingChIdx = dataBlock.filter(
-                objects=ChannelIndex, name=newChanName)
+            allMatchingChIdx = dataBlock.filter(objects=ChannelIndex, name=newChanName)
             if (len(allMatchingChIdx) > 1) and reduceChannelIndexes:
-                assert len(allMatchingChIdx) == 2
+                try:
+                    assert len(allMatchingChIdx) == 2
+                except:
+                    # [ci.name for ci in allMatchingChIdx]
+                    # [ci.name for ci in dataBlock.filter(objects=ChannelIndex)]
+                    pass
                 targetChIdx = [
                     ch
                     for ch in allMatchingChIdx
                     if ch is not stp.unit.channel_index][0]
                 oldChIdx = stp.unit.channel_index
+                oldChIdx.name = '{}_duplicate'.format(newChanName)
                 targetChIdx.units.append(stp.unit)
                 stp.unit.channel_index = targetChIdx
                 oldChIdx.units.remove(stp.unit)
@@ -3137,6 +3174,7 @@ def preprocBlockToNix(
             if (('ainp' in a.name) or ('analog' in a.name))]
         ainpNameListSeg = [a.name for a in aSigList]
     nAsigs = len(aSigList)
+    # [asi.name for asi in aSigList]
     if LFPFilterOpts is not None:
         def filterFun(sig, filterCoeffs=None):
             # sig[:] = signal.sosfiltfilt(

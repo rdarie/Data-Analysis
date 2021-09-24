@@ -42,8 +42,8 @@ def getExpOpts():
     jsonSessionNames = {
         #  per block
         1: [
-            'Session1611592926754',
-            'Session1611593104315',
+            # 'Session1611592926754',
+            # 'Session1611593104315',
             'Session1611593338204', 'Session1611593481943'
             ],
         2: [
@@ -65,6 +65,9 @@ def getExpOpts():
                 'timeRanges': None,
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
+                'searchRadius': [-1., 1.],
+                'zeroOutsideTargetLags': True,
+                'stimTrainEdgeProportion': .2,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': 1000,
                 'xCorrGaussWid': 10e-3,
@@ -89,10 +92,12 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
+                'usedTENSPulses': True,
+                'zScoreTapDetection': False, 'trigFinder': 'getThresholdCrossings',
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
-                'minAnalogValue': None, 'thres': 5}
+                'minAnalogValue': None, 'thres': 3}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -121,6 +126,7 @@ def getExpOpts():
         # 2: [96.43, 191.689],
     }
     detectStim = True
+    fractionForRollover = 0.2
     stimDetectThresDefault = 1e6
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
@@ -134,12 +140,13 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101251100-Rupert': [2, 3],
-        '202101271100-Rupert': [2, 3],
+        '202101251100-Rupert': [1, 2],
         }
     # Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.6, 1]
-    movementSizeBinLabels = ['S', 'L']
+    # movementSizeBins = [0, 0.6, 1]
+    # movementSizeBinLabels = ['S', 'L']
+    movementSizeBins = [0, 1]
+    movementSizeBinLabels = ['M']
 
     ############################################################
     ############################################################
@@ -162,18 +169,12 @@ def getExpOpts():
         }
 
     ############################################################
-    ############################################################
-    #
-    minNConditionRepetitions = {
-        'n': 1,
-        'categories': ['trialAmplitude', 'electrode', 'trialRateInHz']
-        }
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97) if i not in [39]]
+                    for i in range(1, 97) if i not in [25, 39, 69, 89]]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
@@ -213,43 +214,58 @@ def getExpOpts():
     expIteratorOpts = {
         'ca': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [2, 3],
-            }
-        },
+                '202101251100-Rupert': [2, 3, 4],
+                }
+            },
         'cb': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [2, 3],
-            }
-        },
+                '202101251100-Rupert': [2, 3, 4],
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                '202101251100-Rupert': [1, 2, 3],
+                }
+            },
         'ccm': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [2],
-            }
-        },
+                '202101251100-Rupert': [2, 3],
+                }
+            },
         'ccs': {
             'experimentsToAssemble': {
                 '202101251100-Rupert': [1],
-            }
-        },
+                }
+            },
+        'cd': {
+            'experimentsToAssemble': {
+                '202101251100-Rupert': [1, 2, 3, 4],
+                }
+            },
         'ra': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3],
-            }
-        },
-        'na': {
+                '202101251100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'rb': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3],
-            }
-        },
-        'ma': {
-            'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3],
-            }
-        },
+                '202101251100-Rupert': [1, 2, 3, 4],
+                }
+            },
         'pa': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3],
+                '202101251100-Rupert': [1, 2],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                '202101251100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'na': {
+            'experimentsToAssemble': {
+                '202101251100-Rupert': [1, 2, 3, 4],
+                }
             }
-        },
-    }
+        }
     return locals()

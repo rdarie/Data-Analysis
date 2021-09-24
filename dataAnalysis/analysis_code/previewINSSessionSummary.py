@@ -20,6 +20,7 @@ import seaborn as sns
 import pandas as pd
 import quantities as pq
 import pdb, json, glob
+from copy import copy, deepcopy
 from datetime import datetime, date
 sns.set(
     context='talk', style='darkgrid',
@@ -27,6 +28,8 @@ sns.set(
     font_scale=0.75, color_codes=True)
 import dataAnalysis.preproc.mdt as mdt
 import dataAnalysis.preproc.mdt_constants as mdt_constants
+import dataAnalysis.helperFunctions.helper_functions_new as hf
+import rcsanalysis.packet_func as rcsa_helpers
 import os
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -59,7 +62,8 @@ def summarizeINSSession(
         'tEnd': None,
         'duration': None,
         'maxAmp': None,
-        'minAmp': None
+        'minAmp': None,
+        'stimBreakdown': None
         }
     summaryText += '<h2>Started: ' + sessionTime.strftime('%Y-%m-%d %H:%M:%S') + '</h2>\n'
     #
@@ -112,8 +116,8 @@ def summarizeINSSession(
         summaryText += '<h3>Unable to read Stim Log</h3>\n'
     if len(HUTimestamps):
         hutDF = pd.concat(HUTimestamps, ignore_index=True)
-        firstPacketT = pd.Timestamp(hutDF.min(), unit='ms')
-        lastPacketT = pd.Timestamp(hutDF.max(), unit='ms')
+        firstPacketT = pd.Timestamp(hutDF.min(), unit='ms', tz='EST')
+        lastPacketT = pd.Timestamp(hutDF.max(), unit='ms', tz='EST')
         sessionDuration = lastPacketT - firstPacketT
         #
         logEntry['tEnd'] = lastPacketT.isoformat()
@@ -130,6 +134,7 @@ def summarizeINSSession(
                 orcaFolderPath, subjectName),
             'Session{}'.format(sessionUnixTime),
             deviceName=deviceName)
+        electrodeConfigurationCopy = deepcopy(electrodeConfiguration)
         summaryText += '<h2>Sense Configuration</h2>\n'
         summaryText += senseInfoDF.to_html()
         if logEntry['hasStim']:
@@ -150,21 +155,56 @@ def summarizeINSSession(
                     progConfig['program'] = progIdx
                     elecConfigList.append(pd.Series(progConfig))
             elecConfigDF = pd.concat(elecConfigList, axis='columns').transpose()
-            elecConfigDF = elecConfigDF.loc[elecConfigDF['cathodes'].apply(lambda x: len(x) > 0), :]
             elecConfigDF.loc[:, 'cathodeStr'] = elecConfigDF.apply(
-                lambda x: ''.join(['-E{}'.format(ct) for ct in x['cathodes']]),
+                lambda x: ''.join(['-E{:02d}'.format(ct) for ct in x['cathodes']]),
                 axis='columns')
             elecConfigDF.loc[:, 'anodeStr'] = elecConfigDF.apply(
-                lambda x: ''.join(['+E{}'.format(ct) for ct in x['anodes']]),
+                lambda x: ''.join(['+E{:02d}'.format(ct) for ct in x['anodes']]),
                 axis='columns')
             summaryText += '<h2>Stim Configuration</h2>\n'
-            summaryText += elecConfigDF.to_html()
+            summaryText += elecConfigDF.loc[elecConfigDF['cathodes'].apply(lambda x: len(x) > 0), :].to_html()
         else:
             elecConfigDF = None
     except Exception:
         traceback.print_exc()
         elecConfigDF, senseInfoDF = None, None
         summaryText += '<h2>Device settings not read</h2>\n'
+    if elecConfigDF is not None:
+        try:
+            progAmpNames = rcsa_helpers.progAmpNames
+            expandCols = (
+                    ['RateInHz', 'therapyStatus', 'trialSegment'] +
+                    progAmpNames)
+            deriveCols = ['amplitudeRound']
+            stimStatusSerial = mdt.getINSStimLogFromJson(
+                os.path.join(
+                    orcaFolderPath, subjectName),
+                ['Session{}'.format(sessionUnixTime)],
+                deviceName=deviceName)
+            stimStatusSerial.loc[:, 'HostUnixTime'] = stimStatusSerial['HostUnixTime'] / 1e3
+            stimStatus = mdt.stimStatusSerialtoLong(
+                stimStatusSerial, idxT='HostUnixTime', expandCols=expandCols,
+                deriveCols=deriveCols, progAmpNames=progAmpNames,
+                dummyTherapySwitches=False, elecConfiguration=electrodeConfigurationCopy
+                )
+            stimStatus = stimStatus.loc[stimStatus['amplitude'] != 0, :]
+            stimStatus.rename(columns={'activeGroup': 'group'}, inplace=True)
+            groupProgToElec = elecConfigDF.set_index(['group', 'program']).loc[stimStatus.set_index(['group', 'program']).index, :]
+            elecCombo = groupProgToElec.apply(lambda x: '{}{}'.format(x['cathodeStr'], x['anodeStr']), axis='columns')
+            stimStatus.loc[:, 'elecCombo'] = elecCombo.to_numpy()
+            stimStatus.loc[:, 'cyclingEnabled'] = groupProgToElec['cyclingEnabled'].to_numpy()
+            breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
+                    stimStatus,
+                    breakDownBy=['elecCombo', 'cyclingEnabled', 'RateInHz', 'amplitude'])
+            logEntry['stimBreakdown'] = breakDownData.reset_index().to_dict(orient='records')
+            summaryText += '<h2>Stimulation pattern summary: </h2>\n'
+            summaryText += breakDownHtml
+        except Exception:
+            traceback.print_exc()
+            print('Did not print stim update summary')
+            logEntry['stimBreakdown'] = None
+            pdb.set_trace()
+            summaryText += '<h2>Updates to stimulation not read</h2>\n'
     commentsJsonPath = os.path.join(
         orcaFolderPath, subjectName,
         'Session{}'.format(sessionUnixTime),
@@ -208,8 +248,6 @@ def summarizeINSSessionWrapper():
     if not os.path.exists(listOfSummarizedPath):
         listOfSummarized = []
         summaryDF = pd.DataFrame([], columns=['unixStartTime'])
-        # with open(listOfSummarizedPath, 'w') as f:
-        #     json.dump(listOfSummarized, f)
     else:
         with open(listOfSummarizedPath, 'r') as f:
             listOfSummarized = json.load(f)
@@ -228,6 +266,93 @@ def summarizeINSSessionWrapper():
             listOfSummarized.append(logEntry)
     with open(listOfSummarizedPath, 'w') as f:
         json.dump(listOfSummarized, f)
+    ####################################################################################################################
+    cssTableStyles = [
+        {
+            'selector': 'th',
+            'props': [
+                ('border-style', 'solid'),
+                ('border-color', 'black')]},
+        {
+            'selector': 'td',
+            'props': [
+                ('border-style', 'solid'),
+                ('border-color', 'black')]},
+        {
+            'selector': 'table',
+            'props': [
+                ('border-collapse', 'collapse')
+            ]}
+        ]
+    cm = sns.dark_palette("green", as_cmap=True)
+    #
+    summaryDF = pd.read_json(
+        listOfSummarizedPath,
+        orient='records',
+        convert_dates=['tStart', 'tEnd'],
+        dtype={
+            'unixStartTime': int,
+            'tStart': pd.DatetimeIndex,
+            'tEnd': pd.DatetimeIndex,
+            'hasTD': bool,
+            'hasStim': bool,
+            'duration': float,
+            'maxAmp': int,
+            'minAmp': int,
+        })
+    summaryDF.loc[:, 'tStart'] = pd.DatetimeIndex(summaryDF['tStart']).tz_convert("America/New_York")
+    summaryDF.loc[:, 'tEnd'] = pd.DatetimeIndex(summaryDF['tEnd']).tz_convert("America/New_York")
+    summaryDF.loc[:, 'experimentDate'] = summaryDF['tStart'].apply(lambda x: x.strftime('%Y-%m-%d'))
+    summaryText = ''
+    stimBoundsDict = {}
+    for name, group in summaryDF.groupby('experimentDate'):
+        summaryText += '<h2>{}</h2>\n'.format(name)
+        if name in ['2018-12-13', '2018-12-14', '2018-12-17', '2018-12-18', '2018-12-19']:
+            summaryText += '<h2>Skipped</h2>\n'
+            continue
+        stimSummaryDict = {}
+        for rowIdx, row in group.iterrows():
+            if row['stimBreakdown'] is not None:
+                stimSummaryDict[row['unixStartTime']] = pd.DataFrame(row['stimBreakdown'])
+        if (len(stimSummaryDict)):
+            stimSummaryAll = pd.concat(stimSummaryDict, names=['unixStartTime', 'tempIdx']).reset_index().drop(columns=['tempIdx'])
+            stimSummaryDF = stimSummaryAll.groupby(['elecCombo', 'cyclingEnabled', 'RateInHz', 'amplitude']).sum().loc[:, ['count']]
+            stimMinDF = stimSummaryAll.groupby(['elecCombo', 'cyclingEnabled']).min().loc[:, ['amplitude']].rename(columns={'amplitude': 'min. amp.'})
+            stimMaxDF = stimSummaryAll.groupby(['elecCombo', 'cyclingEnabled']).max().loc[:, ['amplitude']].rename(columns={'amplitude': 'max. amp.'})
+            stimCountDF = stimSummaryAll.groupby(['elecCombo', 'cyclingEnabled']).sum().loc[:, ['count']]
+            stimBoundsDict[name] = pd.concat([stimMinDF, stimMaxDF, stimCountDF], axis='columns')
+            dfStyler = (
+                stimSummaryDF
+                .style
+                .background_gradient(cmap=cm)
+                .set_precision(1)
+                )
+            dfStyler.set_table_styles(cssTableStyles)
+            summaryText += dfStyler.render()
+            summaryText += '\n'
+        else:
+            summaryText += '<h3>No stim updates found.</h3>\n'
+    stimSummaryPath = os.path.join(
+        orcaFolderPath,
+        subjectName + '_daily_stimulation_patterns.html')
+    with open(stimSummaryPath, 'w') as _file:
+        _file.write(summaryText)
+    ####
+    stimBoundsDF = pd.concat(stimBoundsDict, names=['date', 'elecCombo', 'cyclingEnabled']).reset_index()
+    stimBoundsDF = stimBoundsDF.sort_values('elecCombo', kind='mergesort').set_index(['elecCombo', 'date', 'cyclingEnabled'])
+    dfStyler = (
+        stimBoundsDF
+        .style
+        .background_gradient(cmap=cm)
+        .set_precision(1)
+        .set_table_styles(cssTableStyles)
+        )
+    stimSummaryPath = os.path.join(
+        orcaFolderPath,
+        subjectName + '_electrode_stimulation_patterns.html')
+    with open(stimSummaryPath, 'w') as _file:
+        _file.write(dfStyler.render())
+    ####################################################################################################################
     return
 
 

@@ -10,17 +10,18 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_ins_201901_30
+#SBATCH -J preproc_ins_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/preproc_ins_201901_30-%a.out
-#SBATCH -e ../../batch_logs/preproc_ins_201901_30-%a.out
+#SBATCH -o ../../batch_logs/preproc_ins_202101_21-%a.out
+#SBATCH -e ../../batch_logs/preproc_ins_202101_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
+#SBATCH --export=CCV_HEADLESS=1
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=3
 
 
 module load anaconda/2020.02
@@ -37,31 +38,48 @@ python --version
 # EXP="exp201901240900"
 # has 1 minirc 2 motion
 # EXP="exp201901251000"
+# has 1 minirc 2 motion
 # EXP="exp201901261000"
+# has 1-3 motion 4 minirc
 # EXP="exp201901271000"
 # has 1-4 motion 5 minirc
 # EXP="exp201901281200"
 # has 1-4 motion
+# EXP="exp201901291000"
+# has 1-3 motion
 # EXP="exp201901301000"
 # has 1-3 motion 4 minirc
-EXP="exp201901311000"
+# EXP="exp201901311000"
 # has 1-4 motion 5 minirc
-
-# EXP="exp202101141100"
+# EXP="exp201902010900"
+#  has 1-4 motion 5 minirc
+# EXP="exp201902021100"
+# has 3-5 motion 6 minirc; blocks 1 and 2 were bad;
+# EXP="exp201902031100"
+# has 1-4 motion 5 minirc;
+# EXP="exp201902041100"
+# has 1-4 motion 5 minirc;
+# EXP="exp201902051100"
+# has 1-4 motion
+########
 # EXP="exp202101061100"
+# EXP="exp202101141100"
+# has 1-2
 # EXP="exp202101191100"
-# EXP="exp202101201100"
-# EXP="exp202101211100"
+EXP="exp202101201100"
+EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
 # EXP="exp202101271100"
 # EXP="exp202101281100"
+# EXP="exp202102021100"
+# EXP="exp202102031100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"
 # EXP="exp202102101100"
 # EXP="exp202102151100"
 
-# SLURM_ARRAY_TASK_ID=5
+#   SLURM_ARRAY_TASK_ID=3
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots

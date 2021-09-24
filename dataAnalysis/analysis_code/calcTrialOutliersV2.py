@@ -379,6 +379,7 @@ if __name__ == "__main__":
         figureOutputFolder,
         prefix + '_outlier_channels.pdf')
     print('plotting signal ranges')
+    print('dataDF.columns = {}'.format(dataDF.columns.to_frame().reset_index(drop=True)))
     with PdfPages(signalRangesFigPath) as pdf:
         keepLevels = ['wasKept']
         dropLevels = [lN for lN in dataDF.index.names if lN not in keepLevels]
@@ -387,10 +388,10 @@ if __name__ == "__main__":
         plotDF = plotDF.stack().reset_index(name='signal')
         plotDF.loc[:, 'bank'] = plotDF['flatFeature'].map(featureInfo['bank'])
         plotDF.loc[:, 'feature'] = plotDF['flatFeature'].map(featureInfo['feature'])
+        plotDF.sort_values(by=['bank', 'feature'], inplace=True)
         h = 18
         w = 3
         aspect = w / h
-        # pdb.set_trace()
         seekIdx = slice(None, None, plotDF.shape[0] // int(1e7))
         g = sns.catplot(
             col='bank', x='signal', y='feature',

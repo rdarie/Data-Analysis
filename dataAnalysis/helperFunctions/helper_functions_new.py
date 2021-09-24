@@ -3706,7 +3706,7 @@ def calcBreakDown(
     try:
         unitName = asigWide.reset_index()['feature'].unique()[0]
     except Exception:
-        traceback.print_exc()
+        # traceback.print_exc()
         unitName = 'feature'
     breakDownText = (
         '{}\n'.format(unitName) +

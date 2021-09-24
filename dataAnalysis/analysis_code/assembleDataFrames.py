@@ -25,6 +25,7 @@ Options:
     --iteratorSuffix=iteratorSuffix        filename for cross_val iterator
     --selector=selector                    filename if using a unit selector
     --loadFromFrames                       load data from pre-saved dataframes?
+    --resetHDF                             load data from pre-saved dataframes?
 """
 import logging, sys
 logging.captureWarnings(True)
@@ -268,6 +269,14 @@ if __name__ == '__main__':
             # maskTrialInfo = loadingMeta['minBinMask'].index.to_frame().reset_index(drop=True)
             dataDF = dataDF.loc[loadingMeta['minBinMask'].to_numpy(), :]
     #
+    if arguments['resetHDF']:
+        datasetPath = os.path.join(
+            dataFramesFolder,
+            datasetName + '.h5'
+            )
+        if os.path.exists(datasetPath):
+            print('Assembled hdf already exists at\n{}\nDeleting...'.format(datasetPath))
+            os.remove(datasetPath)
     hf.exportNormalizedDataFrame(
         dataDF=dataDF, loadingMeta=loadingMeta, featureInfoMask=thisMask,
         # arguments=loadingMeta['arguments'], selectionName=arguments['selectionName'],

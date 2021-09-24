@@ -10,20 +10,21 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J tts_assembler_plots_201901_26
+#SBATCH -J tts_assembler_plots_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_split_assembler_plots_201901_26.out
-#SBATCH -e ../../batch_logs/test_train_split_assembler_plots_201901_26.out
+#SBATCH -o ../../batch_logs/test_train_split_assembler_plots_202101_21.out
+#SBATCH -e ../../batch_logs/test_train_split_assembler_plots_202101_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
+#SBATCH --export=CCV_HEADLESS=1
 
 # Request custom resources
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_exp_preamble_26.sh
+source ./shellScripts/run_exp_preamble_202101_21.sh
 source ./shellScripts/calc_aligned_stim_preamble.sh
 # source ./shellScripts/calc_aligned_motion_preamble.sh
 

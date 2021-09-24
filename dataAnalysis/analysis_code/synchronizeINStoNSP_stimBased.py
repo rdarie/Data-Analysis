@@ -71,10 +71,11 @@ from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 import neo
+import pdb
 # import elephant as elph
 # import elephant.pandas_bridge as elphpdb
 from elephant.conversion import binarize
-# from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.covariance import EmpiricalCovariance, MinCovDet
 useDPI = 200
 dpiFactor = 72 / useDPI
@@ -172,12 +173,6 @@ if arguments['outputINSBlockSuffix'] is None:
 else:
     outputINSBlockSuffix = "_{}".format(arguments['outputINSBlockSuffix'])
 
-# searchRadius = [-1.5, 1.5]
-searchRadius = [-.5, .5]
-searchRadiusUnix = [
-    pd.Timedelta(searchRadius[0], unit='s'),
-    pd.Timedelta(searchRadius[1], unit='s')]
-#
 jsonSessionNames = jsonSessionNames[blockIdx]
 #  Load NSP Data
 ############################################################
@@ -276,14 +271,6 @@ for insSessIdx, jsonSessName in enumerate(jsonSessionNames):
     insDFList[insSessIdx] = ns5.analogSignalsToDataFrame(asigList)
     insBlockList[insSessIdx] = insBlock
     ####
-    '''
-    for un in insBlock.filter(objects=Unit):
-        print(un.annotations['cathodes'])
-        print(un.annotations['anodes'])
-        print('  ')
-    pdb.set_trace()
-    '''
-    ####
 insSamplingRate = float(asigList[0].sampling_rate)
 insDF = (
     pd.concat(insDFList, names=['trialSegment', 'index'])
@@ -368,6 +355,11 @@ else:
             'seg0_' + scn
             for scn in sessTapOptsNSP['synchChanName']
             ]
+        # searchRadius = [-1.5, 1.5]
+        searchRadius = sessTapOptsINS.pop('searchRadius', [-1.5, 1.5])
+        searchRadiusUnix = [
+            pd.Timedelta(searchRadius[0], unit='s'),
+            pd.Timedelta(searchRadius[1], unit='s')]
         #
         searchLimsUnixStartList = []
         searchLimsUnixStopList = []
@@ -470,7 +462,7 @@ else:
             'nspTapTimes were detected between t = {:.3f} and {:.3f}'.format(
                 nspTapTimes.min(), nspTapTimes.max()))
         insTapTimesStList = None
-        if getINSTrigTimes and sessTapOptsINS['synchChanName'] is not None:
+        if getINSTrigTimes and len(sessTapOptsINS['synchChanName']) > 0:
             theseChanNamesINS = [
                 'seg0_' + scn
                 for scn in sessTapOptsINS['synchChanName']
@@ -580,11 +572,17 @@ else:
                             spikesToBinarize,
                             sampling_rate=trigRasterSamplingRate * pq.Hz,
                             t_start=trigRaster['t'].min() * pq.s,
-                            t_stop=(trigRaster['t'].max()) * pq.s)
+                            t_stop=trigRaster['t'].max() * pq.s)
                         idxOfSpikes = np.flatnonzero(thisSpikeMat)
                         thisSpikeMat = thisSpikeMat.astype(float)
                         if 'amplitude' in coarseSt.array_annotations:
-                            thisSpikeMat[idxOfSpikes] = theseAmps[selectionMask] 
+                            if len(idxOfSpikes) > selectionMask.sum():
+                                excess = int(len(idxOfSpikes) - selectionMask.sum())
+                                idxOfSpikes = idxOfSpikes[:(1-excess)]
+                            elif len(idxOfSpikes) < selectionMask.sum():
+                                excess = int(selectionMask.sum() - len(idxOfSpikes))
+                                selectionMask[np.flatnonzero(selectionMask)[-excess:]] = False
+                            thisSpikeMat[idxOfSpikes] = theseAmps[selectionMask]
                         coarseSpikeMats.append(thisSpikeMat[:, np.newaxis])
                         print(
                             '{}: coarseSt.times from {:.3f} to {:.3f}'.format(
@@ -602,7 +600,6 @@ else:
                         support=trigRaster.set_index('t')['insDiracDelta'],
                         gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
                     # plt.plot(trigRaster['t'], trigRaster['insTrigs'])
-                    #
             if sessTapOptsINS['synchByXCorrTapDetectSignal']:
                 xcorrINS = thisInsDF.copy()
                 xcorrINS.loc[:, 'coarseNspTime'] = xcorrINS['t'] + unixDeltaT
@@ -610,7 +607,7 @@ else:
                     xcorrINS, trigRaster['t'], x='coarseNspTime',
                     columns=['tapDetectSignal'],
                     kind='linear', fill_value=(0, 0))
-            else:
+            elif insTapTimes is not None:
                 approxInsTapTimes = insTapTimes + unixDeltaT
                 closestTimes, closestIdx = hf.closestSeries(
                     takeFrom=pd.Series(approxInsTapTimes), compareTo=trigRaster['t']
@@ -865,14 +862,16 @@ if plotSynchReport and alignByXCorr:
         fig, ax = plt.subplots(2, 1, figsize=(21, 3))
         for cNIdx, cN in enumerate(nspChanNames):
             try:
-                plotTrace = stats.zscore(nspDF.loc[plotMask, cN]) + cNIdx
-                ax[0].plot(nspDF.loc[plotMask, 't'], plotTrace, label=cN, alpha=0.5, rasterized=True)
+                # plotTrace = stats.zscore(nspDF.loc[plotMask, cN]) + cNIdx
+                plotTrace = MinMaxScaler(feature_range=(1e-2, 1)).fit_transform(nspDF.loc[plotMask, [cN]].to_numpy()) + cNIdx
+                ax[0].plot(nspDF.loc[plotMask, 't'], plotTrace.flatten(), label=cN, alpha=0.5, rasterized=True)
             except Exception:
                 traceback.print_exc()
         for cNIdx, cN in enumerate(insSignalsToPlot):
             try:
-                plotTrace = stats.zscore(insDF.loc[plotMaskINS, cN]) + cNIdx
-                ax[1].plot(insDF.loc[plotMaskINS, 't'], plotTrace, label=cN, alpha=0.5, rasterized=True)
+                # plotTrace = stats.zscore(insDF.loc[plotMaskINS, cN]) + cNIdx
+                plotTrace = MinMaxScaler(feature_range=(1e-2, 1)).fit_transform(insDF.loc[plotMaskINS, [cN]].to_numpy()) + cNIdx
+                ax[1].plot(insDF.loc[plotMaskINS, 't'], plotTrace.flatten(), label=cN, alpha=0.5, rasterized=True)
             except Exception:
                 traceback.print_exc()
         fig.tight_layout(pad=styleOpts['tight_layout.pad'])

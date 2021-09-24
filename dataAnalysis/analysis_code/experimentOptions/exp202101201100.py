@@ -62,6 +62,9 @@ def getExpOpts():
                 'timeRanges': None,
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
+                'searchRadius': [-1., 1.],
+                'zeroOutsideTargetLags': True,
+                'stimTrainEdgeProportion': .2,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
                 'xCorrGaussWid': 10e-3,
@@ -75,8 +78,7 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g.
-    # synchInfo['ins'][3][0].update({'minStimAmp': 0})
-    #
+    synchInfo['ins'][2][0].update({'unixTimeAdjust': 6.5})
     #
     ############################################################
     ############################################################
@@ -86,6 +88,8 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
+                'usedTENSPulses': True,
+                'zScoreTapDetection': False, 'trigFinder': 'getThresholdCrossings',
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
@@ -97,7 +101,7 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
-    # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
+    synchInfo['nsp'][3][0].update({'timeRanges': [(30, 40)]})
     #
     #
     ############################################################
@@ -149,6 +153,7 @@ def getExpOpts():
         # 2: [96.43, 191.689],
     }
     detectStim = True
+    fractionForRollover = 0.2
     stimDetectThresDefault = 1e6
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
@@ -162,11 +167,13 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101201100-Rupert': [2, 3],
+        '202101201100-Rupert': [1, 2],
         }
     # Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.6, 1]
-    movementSizeBinLabels = ['S', 'L']
+    # movementSizeBins = [0, 0.6, 1]
+    # movementSizeBinLabels = ['S', 'L']
+    movementSizeBins = [0, 1]
+    movementSizeBinLabels = ['M']
 
     ############################################################
     ############################################################
@@ -182,25 +189,18 @@ def getExpOpts():
             [100, 772], [1173, 1896]
         ]
     }
+    pedalPositionZeroEpochs = None
+    dropMotionRounds = {
+        2: [37, 191]
+    }
     ############################################################
-    ############################################################
-    outlierDetectOptions = dict(
-        targetEpochSize=100e-3,
-        windowSize=(-.2, .8),
-        twoTailed=True,
-        )
-    #
-    minNConditionRepetitions = {
-        'n': 1,
-        'categories': ['amplitude', 'electrode', 'RateInHz']
-        }
     #
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97) if i not in [39, 89]]
+                    for i in range(1, 97) if i not in [25, 39, 69, 89]]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
@@ -237,15 +237,6 @@ def getExpOpts():
                 for i in [1, 2, 3]]
         }
     }
-    #
-    '''analysisClippingOpts = {
-        'utah': {
-            'absoluteLimit': 600,
-            # 'IQR': True,
-            # 'quantileVal': 0.25,
-            # 'quantileMultiple': 5
-            }
-        }'''
     #
     csdOpts = {
         'NSamplesForCV': 1000,
@@ -304,7 +295,7 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '202101201100-Rupert': [1, 2, 3],
+                '202101201100-Rupert': [1, 2],
                 }
             },
         'ma': {

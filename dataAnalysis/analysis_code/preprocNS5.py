@@ -24,28 +24,46 @@ Options:
     --ISIRaw                           special options for parsing Ripple files from ISI [default: False]
     
 """
-
 import logging
 logging.captureWarnings(True)
-import matplotlib, os, sys
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('PS')   # generate postscript output
-matplotlib.use('Qt5Agg')   # generate interactive output
-#
+import os, sys
+
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+
+########################################################################################################################
+## if plotting
+########################################################################################################################
+import matplotlib
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
+########################################################################################################################
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
-import pdb, traceback, shutil, os
-
+import pdb, traceback, shutil
 #  load options
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 #
-from datetime import datetime
-print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
 for arg in sys.argv:
     print(arg)
-
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -66,7 +84,7 @@ def preprocNS5():
         if 'rawBlockName' in spikeSortingOpts[arrayName]:
             ns5FileName = ns5FileName.replace(
                 'Block', spikeSortingOpts[arrayName]['rawBlockName'])
-        mapDF = mapDF.loc[mapDF['elecName'] == arrayName, :].reset_index(drop=True)
+        # mapDF = mapDF.loc[mapDF['elecName'] == arrayName, :].reset_index(drop=True)
     idealDataPath = os.path.join(nspFolder, ns5FileName + '.ns5')
     if not os.path.exists(idealDataPath):
         fallBackPathList = [
@@ -267,7 +285,7 @@ def preprocNS5():
     if arguments['analogOnly']:
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
-        theseAsigNames = [mapDF['label'].iloc[::5].to_list()]
+        theseAsigNames = [mapDF.loc[mapDF['elecName'] == arguments['arrayName'], 'label'].iloc[::5].to_list()]
         print('\n\nPreprocNs5, generating rig inputs and other analog data...\n\n')
         ns5.preproc(
             fileName=ns5FileName,
@@ -422,4 +440,4 @@ if __name__ == "__main__":
             nameSuffix=nameSuffix, outputUnits=1e-3)
     else:
         preprocNS5()
-    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

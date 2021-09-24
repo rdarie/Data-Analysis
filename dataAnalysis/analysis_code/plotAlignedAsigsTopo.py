@@ -226,7 +226,7 @@ if groupPagesBy is not None:
 alignedAsigsKWargs.update(dict(
     getMetaData=requiredAnns,
     transposeToColumns='bin', concatOn='index'))
-# alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-300e-3, -100e-3))
+alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-600e-3, -300e-3))
 
 #############################
 # for stim spike report
@@ -266,7 +266,7 @@ relplotKWArgs.update({
     'height': 1,
     'aspect': 1,
     'facet_kws': {
-        'sharey': True,
+        'sharey': False,
         'legend_out': False,
         'gridspec_kws': {
             'wspace': 0.01,
@@ -516,8 +516,17 @@ with PdfPages(pdfName) as pdf:
                     else:
                         updateFigSize = None
             relplotKWArgs['rasterized'] = False
+            ############################################################################################################
+            zoomMask = (
+                    (
+                            (thisAsigStack['bin'] >= (-75e-3)) &
+                            (thisAsigStack['bin'] < (175e-3))
+                    ) |
+                    (thisAsigStack['bin'].isna())
+            )
+            ############################################################################################################
             g = sns.relplot(
-                data=thisAsigStack,
+                data=thisAsigStack.loc[zoomMask, :],
                 x='bin', y='signal', hue=arguments['hueName'],
                 size=arguments['sizeName'], style=arguments['styleName'],
                 row='xCoords', col='yCoords', **relplotKWArgs)

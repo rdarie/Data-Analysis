@@ -13,6 +13,9 @@ Options:
 import logging
 logging.captureWarnings(True)
 import os, sys
+
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
 import matplotlib
 if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('Agg')   # generate postscript output
@@ -45,10 +48,7 @@ import dataAnalysis.preproc.ns5 as ns5
 import numpy as np
 import pandas as pd
 from collections import Iterable
-import sys
 #  load options
-from currentExperiment import parseAnalysisOptions
-from docopt import docopt
 sns.set(
     context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
@@ -105,14 +105,21 @@ sns.set(
     font_scale=.8, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
-
+from pandas import IndexSlice as idxSl
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
+from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 ###
 #!! applyDelay: Move align time by this factor, to account for build-up to the threshold crossing
 #               applyDelay should be positive, we'll resolve the sign later
@@ -310,7 +317,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 markForDeletionMaster.loc[mvRound] = True
                 traceback.print_exc()
                 continue
-                # pdb.set_trace()
             trialsDict['reachedBase'].loc[mvRound, 'tdIndex'] = crossIdxFall
             trialsDict['reachedBase'].loc[mvRound, 't'] = group.loc[crossIdxFall, 't']
             pedalSizeAbs = group['pedalPositionAbs'].quantile(1)
@@ -330,7 +336,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 markForDeletionMaster.loc[mvRound] = True
                 traceback.print_exc()
                 continue
-                # pdb.set_trace()
             trialsDict['reachedPeak'].loc[mvRound, 'tdIndex'] = crossIdxReachPeak
             trialsDict['reachedPeak'].loc[mvRound, 't'] = group.loc[crossIdxReachPeak, 't']
             #  return
@@ -349,7 +354,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 markForDeletionMaster.loc[mvRound] = True
                 traceback.print_exc()
                 continue
-                # pdb.set_trace()
             trialsDict['return'].loc[mvRound, 'tdIndex'] = crossIdxReturn
             trialsDict['return'].loc[mvRound, 't'] = (
                 group.loc[crossIdxReturn, 't'])
@@ -421,7 +425,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     except Exception:
         traceback.print_exc()
     alignEventsDF.reset_index(drop=True, inplace=True)
-    # pdb.set_trace()
     newRoundMap = {oldIJ: newIJ for newIJ, oldIJ in enumerate(alignEventsDF['movementRound'].unique())}
     alignEventsDF.loc[:, 'originalMovementRound'] = alignEventsDF['movementRound'].copy()
     alignEventsDF.loc[:, 'movementRound'] = alignEventsDF['movementRound'].map(newRoundMap)
@@ -477,7 +480,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         alignEventsDF.loc[alignEventsDF['pedalMetaCat'] == 'starting', 't'] -= applyDelay
         # falling thresholds probably resolve later
         alignEventsDF.loc[alignEventsDF['pedalMetaCat'] == 'stopping', 't'] += applyDelay
-    # pdb.set_trace()
     alignEventsDF.loc[:, 'expName'] = arguments['exp']
     htmlOutPath = os.path.join(figureOutputFolder, '{}_motionAlignTimes.html'.format(prefix))
     alignEventsDF.to_html(htmlOutPath)
@@ -543,3 +545,5 @@ else:
             purgeNixNames=False,
             nixBlockIdx=0, nixSegIdx=allSegs,
             )
+#############
+print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

@@ -77,15 +77,15 @@ argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
         'winStart': '-250', 'winStop': '500', 'limitPages': None,
-        'unitQuery': "chanName.isin(['position#0', 'amplitude#0'])", 'alignQuery': "conditionUID == 0",
+        'unitQuery': "chanName.isin(['position#0', 'amplitude#0'])", 'alignQuery': "conditionUID == 2",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        'rowName': 'stimConditionWithDate', 'rowControl': '', # 'rowOrder':
         'colName': 'kinematicConditionNoSize', 'colControl': '',
-        'colOrder': [
-            'NA_NA', 'CW_outbound', 'CW_return',
-            'CCW_outbound', 'CCW_return'
-            ],
+        # 'colOrder': [
+        #     'NA_NA', 'CW_outbound', 'CW_return',
+        #     'CCW_outbound', 'CCW_return'
+        #     ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'lfp_illustration': {
@@ -95,7 +95,7 @@ argumentsLookup = {
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        'rowName': 'stimConditionWithDate', 'rowControl': '', # 'rowOrder':
         'colName': 'kinematicConditionNoSize', 'colControl': '',
         #  'colOrder': [
         #      'NA_NA', 'CW_outbound', 'CW_return',
@@ -219,13 +219,14 @@ plotProcFunsLookup = {
     asp.xLabelsTime,
     asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
     asp.genLegendRounder(decimals=2),
-    asp.genTitleChanger({
-        'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-        'stimCondition = NA_0.0': 'No stimulation',
-        'kinematicConditionNoSize = NA_NA': 'No movement',
-        'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)'
-        })],
+        # asp.genTitleChanger({
+        #     'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
+        #     'stimCondition = NA_0.0': 'No stimulation',
+        #     'kinematicConditionNoSize = NA_NA': 'No movement',
+        #     'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
+        #     'kinematicConditionNoSize = CW_return': 'Return to start (flexion)'
+        #     })
+        ],
     'lfp_illustration': [
     shadeAUCEpochsPerFacet,
     asp.xLabelsTime,
@@ -234,15 +235,16 @@ plotProcFunsLookup = {
     asp.genStimVLineAdder(
         'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
         tOnset=-.05, tOffset=.7, includeLeft=False, includeRight=False),
-    asp.genTitleChanger({
-        'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-        'stimCondition = NA_0.0': 'No stimulation',
-        'kinematicConditionNoSize = NA_NA': 'No movement',
-        'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-        'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-        'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-        })],
+        # asp.genTitleChanger({
+        #     'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
+        #     'stimCondition = NA_0.0': 'No stimulation',
+        #     'kinematicConditionNoSize = NA_NA': 'No movement',
+        #     'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
+        #     'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
+        #     'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
+        #     'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
+        #     })
+        ],
     'factor_illustration': [
     shadeAUCEpochsPerFacet,
     asp.xLabelsTime,
@@ -329,11 +331,11 @@ unusedPlotProcFuns = [
 ]
 relPlotKWArgsLookup = {
     'rig_illustration': {
-        'linewidth': 1, 'height': 1.5, 'aspect': 3,
+        'linewidth': 1, 'height': 4, 'aspect': 2,
         'palette': "ch:0.8,-.3,dark=.1,light=0.7,reverse=1"
     },
     'lfp_illustration': {
-        'linewidth': .5, 'height': 1.5, 'aspect': 3,
+        'linewidth': .5, 'height': 4, 'aspect': 2,
         'palette': "ch:1.6,-.3,dark=.1,light=0.7,reverse=1"
     },
     'factor_illustration': {
@@ -426,6 +428,8 @@ yAxisLabelLookup = {
     }
 }
 titlesOptsLookup = {
+    'rig_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'lfp_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     }
 titleTextLookup = {}
 customCodeLookup = {

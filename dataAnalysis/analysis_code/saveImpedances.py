@@ -106,11 +106,11 @@ if impedanceFileType == 'blackrock':
             filename, sep='\t',
             header=None, names=['elec', 'impedance'])
         newImpedances = newImpedances.loc[newImpedances['elec'].apply(lambda x: x[0] != '*'), :]
-        pdb.set_trace()
-        newImpedances['impedance'] = newImpedances['impedance'].apply(stripImpedance)
-        newImpedances['elec'] = newImpedances['elec'].apply(str.strip)
-        # newImpedances['elec'] = newImpedances['elec'].apply(stripName)
-        newImpedances['elecType'] = np.nan
+        # pdb.set_trace()
+        newImpedances.loc[:, 'elec'] = newImpedances['elec'].apply(lambda x: x.replace('elec', 'utah'))
+        newImpedances.loc[:, 'impedance'] = newImpedances['impedance'].apply(stripImpedance)
+        newImpedances.loc[:, 'elec'] = newImpedances['elec'].apply(str.strip)
+        newImpedances.loc[:, 'elecType'] = np.nan
         # pdb.set_trace()
         newImpedances.loc[newImpedances['elec'].isin(utahLabels.values), 'elecType'] = 'utah'
         recDateStr = [i for i in (re.findall('(\d*)', filename)) if len(i)]

@@ -56,28 +56,28 @@ for font_file in font_files:
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-from dask.distributed import Client, LocalCluster
 import os, traceback
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
-import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from sklearn.preprocessing import MinMaxScaler
-import pdb
 from tqdm import tqdm
-from copy import deepcopy
 import numpy as np
 import pandas as pd
+import pdb
+from copy import deepcopy
+import dataAnalysis.custom_transformers.tdr as tdr
+from dask.distributed import Client, LocalCluster
 import dataAnalysis.preproc.ns5 as ns5
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA, FactorAnalysis
 from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
-import dill as pickle
 import gc
+import dill as pickle
 from docopt import docopt
 for arg in sys.argv:
     print(arg)
@@ -205,7 +205,11 @@ if __name__ == '__main__':
             normalizationParams = loadingMeta['normalizationParams']
         else:
             normalizeDataset = None
-    dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    rigDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    lfpDF = pd.read_hdf(datasetPath, '/{}/data'.format('lfp_CAR'))
+    dataDF = pd.concat([rigDF, lfpDF], axis='columns')
+    del rigDF, lfpDF
+    # pdb.set_trace()
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
     #
@@ -219,7 +223,6 @@ if __name__ == '__main__':
         else:
             dataDF = dataDF.loc[keepMask, :]
             trialInfo = dataDF.index.to_frame().reset_index(drop=True)
-    #
     tMask = pd.Series(True, index=trialInfo.index)
     if arguments['winStop'] is not None:
         tMask = tMask & (trialInfo['bin'] < (float(arguments['winStop']) * 1e-3))
@@ -229,7 +232,6 @@ if __name__ == '__main__':
         dataDF = dataDF.iloc[tMask.to_numpy(), :]
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         del tMask
-    #
     compoundAnnDescr = {
         'stimCondition': ['electrode', 'trialRateInHz', ],
         'kinematicCondition': ['pedalDirection', 'pedalSizeCat', 'pedalMovementCat'],
@@ -252,13 +254,21 @@ if __name__ == '__main__':
     ######
     confPlotWinSize = 15.  # seconds
     plotRounds = trialInfo['t'].apply(lambda x: np.floor(x / confPlotWinSize))
-    rigChans = [cN for cN in ['amplitude', 'position'] if cN in featureInfo['feature'].to_list()]
-    insChans = [cN for cN in featureInfo['feature'].to_list() if 'ins_' in cN]
+    rigChans = [
+        cN
+        for cN in [
+            'amplitude', 'position', 'utah_rawAverage_0', 'utah_artifact_0',
+            'utah10', 'utah17', 'utah80', 'utah87', 'utah53']
+        if cN in featureInfo['feature'].to_list()]
+    insChans = [
+        cN
+        for cN in featureInfo['feature'].to_list()
+        if ('ins_td' in cN) or ('ins_accinertia' in cN)]
     rigChans += insChans
     with PdfPages(pdfPath) as pdf:
-        for pr in plotRounds.unique():
+        for pr in tqdm(plotRounds.unique()):
             plotMask = (plotRounds == pr).to_numpy()
-            fig, ax = plt.subplots(1, 1, figsize=(25, 3))
+            fig, ax = plt.subplots(1, 1, figsize=(50, 3))
             extraArtists = []
             for cIdx, cN in enumerate(rigChans):
                 plotTrace = dataDF.xs(cN, level='feature', axis='columns').iloc[plotMask, :].to_numpy()
@@ -267,20 +277,29 @@ if __name__ == '__main__':
                 ax.plot(thisT, plotTrace, label=cN, alpha=0.5)
                 traceLabel = ax.text(np.min(thisT), cIdx * .75 + 0.5, '{}'.format(cN), va='center', ha='right')
                 extraArtists.append(traceLabel)
+                ax.set_xlim([thisT.min(), thisT.max()])
             if 'amplitude_raster' in featureInfo['feature'].to_list():
                 cN = 'amplitude_raster'
                 plotTrace = dataDF.xs(cN, level='feature', axis='columns').iloc[plotMask, :].to_numpy()
                 thisMask = (plotTrace.flatten() > 0)
                 thisT = trialInfo.loc[plotMask, 't'].to_numpy()
                 plotTrace = MinMaxScaler().fit_transform(plotTrace).flatten()
-                ax.scatter(thisT[thisMask], plotTrace[thisMask], marker='o', label='stim pulses')
+                ax.scatter(
+                    thisT[thisMask], plotTrace[thisMask],
+                    marker='+', c='k', s=3,
+                    label='stim pulses')
             for name, group in trialInfo.loc[plotMask, :].groupby('trialUID'):
                 ax.axvline(group['t'].min(), c='k')
                 if group['bin'].min() < 0:
-                    # ax.axvline(group['t'].min() - group['bin'].min(), c='k', alpha=0.25)
-                    ax.axvspan(group['t'].min() - group['bin'].min(), group['t'].max(), alpha=0.1, color='red', zorder=-10)
+                    ax.axvspan(
+                        group['t'].min() - group['bin'].min(),
+                        group['t'].max(), alpha=0.1,
+                        color='red', zorder=-10)
                 metaInfo = group.iloc[0, :]
-                ps = '{:.0f}  deg.'.format(100 * metaInfo['pedalSize']) if (not isinstance(metaInfo['pedalSize'], str)) else '{}'.format(metaInfo['pedalSize'])
+                ps = (
+                    '{:.0f}  deg.'.format(100 * metaInfo['pedalSize'])
+                    if (not isinstance(metaInfo['pedalSize'], str))
+                    else '{}'.format(metaInfo['pedalSize']))
                 captionText = (
                     't(start) = {:.2f} sec\n'.format(metaInfo['trialStartT']) +
                     'segment = {}\n'.format(metaInfo['segment']) +

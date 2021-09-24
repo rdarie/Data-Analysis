@@ -10,20 +10,28 @@ Options:
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
     --lazy                               load from raw, or regular? [default: False]
 """
-import matplotlib, os
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
+import logging
+logging.captureWarnings(True)
+import os, sys
+
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+import matplotlib
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
-#
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("talk")
-sns.set_style("whitegrid")
+
 import os, pdb, traceback
 from importlib import reload
 import neo
@@ -43,21 +51,79 @@ import pandas as pd
 from collections import Iterable
 import sys
 #  load options
-from currentExperiment import parseAnalysisOptions
-from docopt import docopt
-sns.set(
-    context='talk', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True)
+from pandas import IndexSlice as idxSl
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
 
+from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+sns.set(
+    context='talk', style='darkgrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
+useDPI = 200
+dpiFactor = 72 / useDPI
+snsRCParams = {
+        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+        'lines.linewidth': 1,
+        'lines.markersize': 2.4,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.spines.right": True,
+        "axes.spines.top": True,
+        "axes.linewidth": .125,
+        "grid.linewidth": .2,
+        "font.size": 5,
+        "axes.labelsize": 7,
+        "axes.titlesize": 5,
+        "xtick.labelsize": 5,
+        "ytick.labelsize": 5,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": False,
+        "ytick.left": True,
+        "ytick.right": False,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
+    }
+mplRCParams = {
+    'figure.titlesize': 7,
+    'mathtext.default': 'regular',
+    'font.family': "Nimbus Sans",
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
+    }
+styleOpts = {
+    'legend.lw': 2,
+    'tight_layout.pad': 3e-1, # units of font size
+    'panel_heading.pad': 0.
+    }
+sns.set(
+    context='paper', style='whitegrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True, rc=snsRCParams)
+for rcK, rcV in mplRCParams.items():
+    matplotlib.rcParams[rcK] = rcV
 
-print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
@@ -148,7 +214,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     stimEvDF = pd.DataFrame(stimEvDict)
     noStimFiller = preproc.metaFillerLookup.copy()
     noStimFiller['expName'] = arguments['exp']
-    # pdb.set_trace()
     for annName in stimAnnNames + extraAnnNames:
         motionEvDF.loc[:, annName] = np.nan
     for annName in motionAnnNamesForStim + extraAnnNames:
@@ -185,9 +250,15 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 stimEvDF['t'].min() - 1e-3
                 )
         #
-        tSearchStop = min(
-            (float(reachBaseT) + searchRadius),
-            stimEvDF['t'].max() + 1e-3
+        if mvRound == motionEvDF['movementRound'].max():
+            tSearchStop = min(
+                (float(reachBaseT) + searchRadius),
+                motionEvDF['t'].max() + 1e-3
+            )
+        else:
+            tSearchStop = min(
+                (float(reachBaseT) + searchRadius),
+                motionEvDF.loc[motionEvDF['movementRound'] == mvRound + 1, 't'].max() +  1e-3
             )
         #
         stimInSearchRadius = (
@@ -207,13 +278,17 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             :]
         try:
             # what goes up, must come down?
-            assert (roundStimOnEvents.shape[0] == roundStimOffEvents.shape[0])
+            errMsg = 'WARNING: Move round {} has different number of stim ons and stim offs (t = {:.3f})!'.format(originalMoveRound, float(outboundT))
+            errMsg += '\n\n{}'.format(roundStimOnEvents)
+            errMsg += '\n\n{}'.format(roundStimOffEvents)
+            assert (roundStimOnEvents.shape[0] == roundStimOffEvents.shape[0]), errMsg
         except Exception:
             traceback.print_exc()
-            errMsg = 'Move round {} has different number of stim ons and stim offs (t = {:.3f})!'.format(originalMoveRound, float(outboundT))
-            # print(errMsg)
-            raise(Exception(errMsg))
-        singleOnOffAllRound = (roundStimOnEvents.shape[0] == 1)
+            print(errMsg)
+            # raise(Exception(errMsg))
+        singleOnOffAllRound = (
+            (roundStimOnEvents.shape[0] == 1)
+        )
         specialCaseSingleStim = False
         if singleOnOffAllRound:
             singleStimOnT = roundStimOnEvents['t'].iloc[0]
@@ -408,7 +483,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 print('No off time corresponding to stim on for move round {} (t = {:.3f})!'.format(originalMoveRound, float(reachBaseT)))
                 # raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(float(reachBaseT))))
         oldReachBaseT = reachBaseT
-    # pdb.set_trace()
     for cN in stimAnnNames:
         motionEvDF.loc[motionEvDF[cN].isna(), cN] = noStimFiller[cN]
     '''motionEvDF.loc[motionEvDF[cN].isna(), stimAnnNames] = (
@@ -446,7 +520,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         # plt.show()
         plt.close()
     ###
-    # pdb.set_trace()
     htmlOutPath = os.path.join(figureOutputFolder, '{}_motionPeriStim.html'.format(prefix))
     motionEvDF.to_html(htmlOutPath)
     alignEventsMotion = preproc.eventDataFrameToEvents(
@@ -513,7 +586,7 @@ preReader, preBlock = preproc.blockFromPath(
     outputPath + '.nix', lazy=arguments['lazy'])
 existingEvNames = [ev.name for ev in preBlock.filter(objects=[EventProxy, Event])]
 eventExists = (alignEventsStim.name in existingEvNames) or (alignEventsMotion.name in existingEvNames)
-# pdb.set_trace()
+
 preReader.file.close()
 if eventExists:
     raise(Exception('CalcMotionStimAlignTimes: calculated events, but they already exist in the events block'))
@@ -525,3 +598,5 @@ preproc.addBlockToNIX(
     purgeNixNames=False,
     nixBlockIdx=0, nixSegIdx=allSegs,
     )
+#############
+print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

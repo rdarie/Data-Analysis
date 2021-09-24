@@ -65,7 +65,6 @@ def getExpOpts():
     jsonSessionNames = {
         #  per block
         1: [
-            'Session1610641839881',
             'Session1610642040064',
             'Session1610642516780',
             'Session1610642924085'],
@@ -80,8 +79,9 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'synchChanName': ['ins_td0', 'ins_td2'],
+                'synchChanName': [],
                 'synchStimUnitName': ['g0p0#0'],
+                'zeroOutsideTargetLags': True,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
                 'xCorrGaussWid': 10e-3,
@@ -106,10 +106,12 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
+                'usedTENSPulses': True,
+                'zScoreTapDetection': False, 'trigFinder': 'getThresholdCrossings',
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
-                'minAnalogValue': None, 'thres': 7}
+                'minAnalogValue': None, 'thres': 5}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -152,11 +154,13 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101141100-Rupert': [1],
+        '202101141100-Rupert': [1, 2],
         }
     # Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.6, 1]
-    movementSizeBinLabels = ['S', 'L']
+    # movementSizeBins = [0, 0.6, 1]
+    # movementSizeBinLabels = ['S', 'L']
+    movementSizeBins = [0, 1]
+    movementSizeBinLabels = ['M']
     alignTimeBoundsLookup = None
     # alignTimeBoundsLookup = {
     #     3: [
@@ -216,7 +220,79 @@ def getExpOpts():
                 {
                     'exp': experimentName, 'block': i,
                     'nameSuffix': 'mean_subtracted'}
-                for i in [1,  2]]
+                for i in [1, 2]]
         }
     }
+    expIteratorOpts = {
+        'ca': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2],
+                }
+            },
+        'cb': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2],
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2],
+                }
+            },
+        'ccm': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [2],
+                }
+            },
+        'ccs': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1],
+                }
+            },
+        'cd': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2, 3],
+                }
+            },
+        'ra': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2, 3],
+                }
+            },
+        'rb': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2, 3],
+                }
+            },
+        'rc': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2, 3],
+                }
+            },
+        'rd': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2, 3],
+                }
+            },
+        're': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2, 3],
+                }
+            },
+        'pa': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2, 3],
+                }
+            },
+        'na': {
+            'experimentsToAssemble': {
+                '202101141100-Rupert': [1, 2, 3],
+                }
+            }
+        }
     return locals()

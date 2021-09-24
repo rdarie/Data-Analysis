@@ -11,13 +11,20 @@ Options:
     --usedTENSPulses                                whether the sync was done using TENS pulses (as opposed to mechanical taps) [default: False]
 """
 import matplotlib, os
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-if 'DISPLAY' in os.environ:
-    matplotlib.use('QT5Agg')   # generate postscript output
-else:
+if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('Agg')   # generate postscript output
-from matplotlib import pyplot as plt
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
 import numpy as np
 import pandas as pd
 import pdb, traceback
@@ -191,42 +198,42 @@ if 'tapSync' in eventInfo['inputIDs']:
             absVal=False, plotting=arguments['plotting'], keep_max=False)
 
     allNSPTapTimes = nspDF.loc[nspPeakIdx, 't'].to_numpy()
-
-    approxTapTimes = pd.DataFrame([allNSPTapTimes]).T
-    approxTapTimes.columns = ['NSP']
-    tapIntervals = approxTapTimes['NSP'].diff()
-    # trains separated by more than 5 seconds count as new trains
-    approxTapTimes.loc[:, 'tapGroup'] = (tapIntervals > 5).cumsum()
-    approxTapTimes.loc[:, 'tapMeanTime'] = np.nan
-    for trialSegment, group in approxTapTimes.groupby('tapGroup'):
-        firstNSPTap = (
-            recDateTime +
-            pd.Timedelta(int(group['NSP'].min() * 1e3), unit='milli'))
-        tapMeanTime = np.round(group['NSP'].mean(), decimals=1)
-        approxTapTimes.loc[group.index, 'tapMeanTime'] = tapMeanTime
-        summaryText += (
-            '<h3>Segment {} started: '.format(trialSegment) +
-            firstNSPTap.tz_convert(tz="America/New_York").strftime('%Y-%m-%d %H:%M:%S') +
-            ' (t = {:.3f} sec)</h3>\n'.format(group['NSP'].min()))
-        summaryText += (
-            '<h3>time ranges: ({:.1f}, {:.1f})</h3>\n'.format(tapMeanTime + tapTimeBuffer[0], tapMeanTime + tapTimeBuffer[1]))
-        if trialSegment == approxTapTimes['tapGroup'].max():
-            lastNSPTime = (
+    if allNSPTapTimes.size > 0:
+        approxTapTimes = pd.DataFrame([allNSPTapTimes]).T
+        approxTapTimes.columns = ['NSP']
+        tapIntervals = approxTapTimes['NSP'].diff()
+        # trains separated by more than 5 seconds count as new trains
+        approxTapTimes.loc[:, 'tapGroup'] = (tapIntervals > 5).cumsum()
+        approxTapTimes.loc[:, 'tapMeanTime'] = np.nan
+        for trialSegment, group in approxTapTimes.groupby('tapGroup'):
+            firstNSPTap = (
                 recDateTime +
-                pd.Timedelta(int(nspDF['t'].max() * 1e3), unit='milli'))
-        else:
-            nextGroup = approxTapTimes.loc[(approxTapTimes['tapGroup'] == trialSegment + 1), :]
-            lastNSPTime = recDateTime + pd.Timedelta(int(nextGroup['NSP'].min() * 1e3), unit='milli')
-        segDur = lastNSPTime - firstNSPTap
-        formattedSegDur = '{:d}:{:d}:{:d}'.format(
-            int(segDur.total_seconds() // 3600), int(segDur.total_seconds() % 3600 // 60), int(segDur.total_seconds() % 60))
-        summaryText += (
-            '<h3>             ended: '.format(trialSegment) +
-            lastNSPTime.tz_convert(tz="America/New_York").strftime('%Y-%m-%d %H:%M:%S') +
-            ' (lasted up to {} ({} sec))</h3>\n'.format(formattedSegDur, segDur.total_seconds()))
-    #
-    approxStartTimes = approxTapTimes.drop_duplicates(subset='tapGroup').copy()
-    approxStartTimes.loc[:, 'unixTime'] = recDateTime + pd.TimedeltaIndex(approxStartTimes['tapMeanTime'], unit='s')
+                pd.Timedelta(int(group['NSP'].min() * 1e3), unit='milli'))
+            tapMeanTime = np.round(group['NSP'].mean(), decimals=1)
+            approxTapTimes.loc[group.index, 'tapMeanTime'] = tapMeanTime
+            summaryText += (
+                '<h3>Segment {} started: '.format(trialSegment) +
+                firstNSPTap.tz_convert(tz="America/New_York").strftime('%Y-%m-%d %H:%M:%S') +
+                ' (t = {:.3f} sec)</h3>\n'.format(group['NSP'].min()))
+            summaryText += (
+                '<h3>time ranges: ({:.1f}, {:.1f})</h3>\n'.format(tapMeanTime + tapTimeBuffer[0], tapMeanTime + tapTimeBuffer[1]))
+            if trialSegment == approxTapTimes['tapGroup'].max():
+                lastNSPTime = (
+                    recDateTime +
+                    pd.Timedelta(int(nspDF['t'].max() * 1e3), unit='milli'))
+            else:
+                nextGroup = approxTapTimes.loc[(approxTapTimes['tapGroup'] == trialSegment + 1), :]
+                lastNSPTime = recDateTime + pd.Timedelta(int(nextGroup['NSP'].min() * 1e3), unit='milli')
+            segDur = lastNSPTime - firstNSPTap
+            formattedSegDur = '{:d}:{:d}:{:d}'.format(
+                int(segDur.total_seconds() // 3600), int(segDur.total_seconds() % 3600 // 60), int(segDur.total_seconds() % 60))
+            summaryText += (
+                '<h3>             ended: '.format(trialSegment) +
+                lastNSPTime.tz_convert(tz="America/New_York").strftime('%Y-%m-%d %H:%M:%S') +
+                ' (lasted up to {} ({} sec))</h3>\n'.format(formattedSegDur, segDur.total_seconds()))
+        #
+        approxStartTimes = approxTapTimes.drop_duplicates(subset='tapGroup').copy()
+        approxStartTimes.loc[:, 'unixTime'] = recDateTime + pd.TimedeltaIndex(approxStartTimes['tapMeanTime'], unit='s')
 orcaFolderPath = os.path.join(remoteBasePath, 'ORCA Logs')
 listOfSummarizedPath = os.path.join(
     orcaFolderPath,
@@ -243,59 +250,61 @@ if os.path.exists(listOfSummarizedPath):
             'tStart': pd.DatetimeIndex,
             'tEnd': pd.DatetimeIndex,
             'hasTD': bool,
+            'hasStim': bool,
             'duration': float,
             'maxAmp': int,
             'minAmp': int,
         })
     summaryDF.loc[:, 'tStart'] = pd.DatetimeIndex(summaryDF['tStart']).tz_convert(tz="utc")
-    summaryDF.loc[:, 'tEnd'] = pd.DatetimeIndex(summaryDF['tEnd']).tz_localize(tz="utc")
+    summaryDF.loc[:, 'tEnd'] = pd.DatetimeIndex(summaryDF['tEnd']).tz_convert(tz="utc")
     compatibleSessionsMask = (
         (summaryDF['tStart'] > (recDateTime - pd.Timedelta(5, unit='min'))) &
         (summaryDF['tEnd'] < recEndTime) &
         (summaryDF['hasTD']) &
         (summaryDF['maxAmp'].notna()))
     insSessions = summaryDF.loc[compatibleSessionsMask, :].copy()
-    if approxStartTimes is not None:
-        closestTimes, closestIdx = hf.closestSeries(
-            takeFrom=insSessions['tStart'].apply(lambda x: x.timestamp()), compareTo=approxStartTimes['unixTime'].apply(lambda x: x.timestamp())
-            )
-        insSessions.loc[:, 'approxSynchPulseTime'] = (
-            approxStartTimes.loc[closestIdx, 'unixTime'].reset_index(drop=True) -
-            insSessions['tStart'].reset_index(drop=True)
-            ).to_numpy()
-        insSessions.loc[:, 'approxSynchPulseNSPTime'] = approxStartTimes.loc[closestIdx, 'tapMeanTime'].to_numpy()
-        insSessions.loc[:, 'approxSynchTimeRanges'] = (
-            insSessions['approxSynchPulseTime']
-                .apply(
-                lambda x: '({}, {})'.format(
-                    np.round(x.total_seconds() + tapTimeBuffer[0], decimals=1),
-                    np.round(x.total_seconds() + tapTimeBuffer[1], decimals=1))))
-    else:
-        insSessions.loc[:, 'approxSynchPulseNSPTime'] = np.nan
-        insSessions.loc[:, 'approxSynchTimeRanges'] = np.nan
-    insSessions.loc[:, 'delayFromNSP'] = pd.TimedeltaIndex(
-        summaryDF.loc[compatibleSessionsMask, 'tStart'] - recDateTime).total_seconds()
-    ###
-    summaryText += '<h3>Companion INS sessions: </h3>'
-    columnsToPrint = [
-        'unixStartTime', 'tStart', 'tEnd', 'duration',
-        'approxSynchTimeRanges', 'approxSynchPulseNSPTime'
-        ]
-    summaryText += insSessions.loc[:, columnsToPrint].rename(
-        columns={
-            'tStart': 'Start Time', 'tEnd': 'End Time',
-            'duration': 'Duration (sec)', 'delayFromNSP': 'delay after NSP start (sec)',
-            'approxSynchTimeRanges': 'synch pulse time ranges (sec, INS time)',
-            'approxSynchPulseNSPTime': 'synch pulse time (sec, NSP time)'
-            }).to_html()
-    summaryText += '<br> insSessions = [{}]'.format(
-        ', '.join(
-            [
-                "'Session{}'".format(unT)
-                for unT in insSessions['unixStartTime']
+    if insSessions.size > 0:
+        if (approxStartTimes is not None):
+            closestTimes, closestIdx = hf.closestSeries(
+                takeFrom=insSessions['tStart'].apply(lambda x: x.timestamp()), compareTo=approxStartTimes['unixTime'].apply(lambda x: x.timestamp())
+                )
+            insSessions.loc[:, 'approxSynchPulseTime'] = (
+                approxStartTimes.loc[closestIdx, 'unixTime'].reset_index(drop=True) -
+                insSessions['tStart'].reset_index(drop=True)
+                ).to_numpy()
+            insSessions.loc[:, 'approxSynchPulseNSPTime'] = approxStartTimes.loc[closestIdx, 'tapMeanTime'].to_numpy()
+            insSessions.loc[:, 'approxSynchTimeRanges'] = (
+                insSessions['approxSynchPulseTime']
+                    .apply(
+                    lambda x: '({}, {})'.format(
+                        np.round(x.total_seconds() + tapTimeBuffer[0], decimals=1),
+                        np.round(x.total_seconds() + tapTimeBuffer[1], decimals=1))))
+        else:
+            insSessions.loc[:, 'approxSynchPulseNSPTime'] = np.nan
+            insSessions.loc[:, 'approxSynchTimeRanges'] = np.nan
+        insSessions.loc[:, 'delayFromNSP'] = pd.TimedeltaIndex(
+            summaryDF.loc[compatibleSessionsMask, 'tStart'] - recDateTime).total_seconds()
+        ###
+        summaryText += '<h3>Companion INS sessions: </h3>'
+        columnsToPrint = [
+            'unixStartTime', 'tStart', 'tEnd', 'duration',
+            'approxSynchTimeRanges', 'approxSynchPulseNSPTime'
             ]
+        summaryText += insSessions.loc[:, columnsToPrint].rename(
+            columns={
+                'tStart': 'Start Time', 'tEnd': 'End Time',
+                'duration': 'Duration (sec)', 'delayFromNSP': 'delay after NSP start (sec)',
+                'approxSynchTimeRanges': 'synch pulse time ranges (sec, INS time)',
+                'approxSynchPulseNSPTime': 'synch pulse time (sec, NSP time)'
+                }).to_html()
+        summaryText += '<br> insSessions = [{}]'.format(
+            ', '.join(
+                [
+                    "'Session{}'".format(unT)
+                    for unT in insSessions['unixStartTime']
+                ]
+            )
         )
-    )
 #### impedances
 impedanceFilePath = os.path.join(
     remoteBasePath,

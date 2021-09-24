@@ -16,16 +16,27 @@ Options:
     --removeLabels=removeLabels                           remove certain labels, e.g. stimOff (comma separated)
     --disableRefinement                                   by default, use xcorr to refine stim times [default: False]
 """
+import logging
+logging.captureWarnings(True)
+import os, sys
 
-import matplotlib, os
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+import matplotlib
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
-#
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
 import pdb, traceback, sys
 from importlib import reload
 from matplotlib.lines import Line2D
@@ -48,13 +59,19 @@ import matplotlib.pyplot as plt
 from collections import Iterable
 from elephant.conversion import binarize
 #  load options
-from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True)
-
+from pandas import IndexSlice as idxSl
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
@@ -119,10 +136,11 @@ nspPath = os.path.join(
 insDiagnosticsFolder = os.path.join(figureFolder, 'insDiagnostics')
 if not os.path.exists(insDiagnosticsFolder):
     os.mkdirs(insDiagnosticsFolder)
-synchReportPDF = PdfPages(
-    os.path.join(
-        insDiagnosticsFolder,
-        'ins_stim_refinement_Block{:0>3}{}.pdf'.format(blockIdx, inputINSBlockSuffix)))
+if arguments['plotting']:
+    synchReportPDF = PdfPages(
+        os.path.join(
+            insDiagnosticsFolder,
+            'ins_stim_refinement_Block{:0>3}{}.pdf'.format(blockIdx, inputINSBlockSuffix)))
 sessTapOptsNSP = expOpts['synchInfo']['nsp'][blockIdx][0]
 sessTapOptsINS = expOpts['synchInfo']['ins'][blockIdx][0]
 print('Loading NSP Block from: {}'.format(nspPath))
@@ -209,14 +227,14 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     if nspTrigFinder == 'getTriggers':
         nspPeakIdx = hf.getTriggers(
             thisNspDF['tapDetectSignal'], iti=sessTapOptsNSP['iti'], itiWiggle=.2,
-            fs=nspSamplingRate, plotting=arguments['plotting'], absVal=False,
+            fs=nspSamplingRate, plotting=False, absVal=False,
             thres=sessTapOptsNSP['thres'], edgeType='rising', keep_max=True)
     elif nspTrigFinder == 'getThresholdCrossings':
         nspPeakIdx, _ = hf.getThresholdCrossings(
             thisNspDF['tapDetectSignal'], thresh=sessTapOptsNSP['thres'],
             iti=sessTapOptsNSP['iti'], fs=nspSamplingRate,
             edgeType='rising', itiWiggle=.2,
-            absVal=False, plotting=arguments['plotting'])
+            absVal=False, plotting=False)
     nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
     nspDiracSt = SpikeTrain(
         times=nspTapTimes, units='s',
@@ -420,15 +438,15 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
                 cathodes = thisUnit.annotations['cathodes']
                 anodes = thisUnit.annotations['anodes']
                 elecName = ''
-                if isinstance(anodes, Iterable):
-                    elecName += '+ ' + ', '.join(['E{}'.format(i) for i in anodes])
-                else:
-                    elecName += '+ E{}'.format(anodes)
-                elecName += ' '
                 if isinstance(cathodes, Iterable):
-                    elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
+                    elecName += '-' + ''.join(['E{:02d}'.format(i) for i in cathodes])
                 else:
-                    elecName += '- E{}'.format(cathodes)
+                    elecName += '-E{:02d}'.format(cathodes)
+                elecName += ''
+                if isinstance(anodes, Iterable):
+                    elecName += '+' + ''.join(['E{:02d}'.format(i) for i in anodes])
+                else:
+                    elecName += '+E{:02d}'.format(anodes)
                 alignEventsDF.loc[group.index, 'electrode'] = elecName
     #
     # TODO: fix synch code so that all units are present, to avoid this hack:
@@ -472,7 +490,8 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     print('Saving events {}'.format(alignEvents.name))
 
 nspReader.file.close()
-synchReportPDF.close()
+if arguments['plotting']:
+    synchReportPDF.close()
 
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
@@ -506,3 +525,5 @@ else:
             purgeNixNames=False,
             nixBlockIdx=0, nixSegIdx=allSegs,
             )
+#############
+print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

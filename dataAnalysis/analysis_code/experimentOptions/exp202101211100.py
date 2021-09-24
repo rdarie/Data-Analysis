@@ -61,6 +61,9 @@ def getExpOpts():
                 'timeRanges': None,
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
+                'searchRadius': [-1.5, 1.5],
+                'zeroOutsideTargetLags': True,
+                'stimTrainEdgeProportion': .2,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
                 'xCorrGaussWid': 10e-3,
@@ -75,7 +78,8 @@ def getExpOpts():
     ############################################################
     # manually add special instructions, e.g.
     # synchInfo['ins'][3][0].update({'minStimAmp': 0})
-    synchInfo['ins'][2][0].update({'unixTimeAdjust': 6.4})
+    synchInfo['ins'][2][0].update({'unixTimeAdjust': 6.5})
+    synchInfo['ins'][3][3].update({'unixTimeAdjust': 6.5})
     # #synchInfo['ins'][1][1] = {
     # #    'timeRanges': None,
     # #    'chan': ['ins_td2'],
@@ -96,6 +100,8 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
+                'usedTENSPulses': True,
+                'zScoreTapDetection': False, 'trigFinder': 'getThresholdCrossings',
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
@@ -147,6 +153,7 @@ def getExpOpts():
         # 2: [96.43, 191.689],
     }
     detectStim = True
+    fractionForRollover = 0.2
     stimDetectThresDefault = 1e6
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
@@ -160,11 +167,13 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101211100-Rupert': [2, 3],
+        '202101211100-Rupert':  [1, 2, 3],
         }
     # Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.6, 1]
-    movementSizeBinLabels = ['S', 'L']
+    # movementSizeBins = [0, 0.6, 1]
+    # movementSizeBinLabels = ['S', 'L']
+    movementSizeBins = [0, 1]
+    movementSizeBinLabels = ['M']
 
     ############################################################
     ############################################################
@@ -183,32 +192,16 @@ def getExpOpts():
     # }
     pedalPositionZeroEpochs = None
     dropMotionRounds = {
-        3: [83]
+        3: [48]
         }
 
     ############################################################
-    ############################################################
-    outlierDetectOptions = dict(
-        targetEpochSize=100e-3,
-        windowSize=(-.2, .8),
-        conditionNames=[
-            'electrode', 'amplitude', 'RateInHz',
-            'pedalSizeCat', 'pedalDirection'],
-        # conditionNames=[
-        #     'electrode', 'amplitude', 'RateInHz'],
-        twoTailed=True,
-        )
-    #
-    minNConditionRepetitions = {
-        'n': 1,
-        'categories': ['amplitude', 'electrode', 'RateInHz']
-        }
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97) if i not in [39, 89]]
+                    for i in range(1, 97) if i not in [25, 39, 69, 89]]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
@@ -288,7 +281,7 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [1, 2, 3, 4],
+                '202101211100-Rupert': [1, 2, 3],
                 }
             },
         'ma': {

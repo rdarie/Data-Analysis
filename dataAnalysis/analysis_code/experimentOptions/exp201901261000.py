@@ -185,8 +185,8 @@ def getExpOpts():
 
     # movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     # movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
-    movementSizeBins = [0, 0.25, 1.25, 1.5]
-    movementSizeBinLabels = ['S', 'M', 'L']
+    movementSizeBins = [0, 1.5]
+    movementSizeBinLabels = ['M']
     alignTimeBoundsLookup = {
         }
     motorEncoderBoundsLookup = {

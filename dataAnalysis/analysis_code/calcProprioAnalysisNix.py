@@ -217,10 +217,15 @@ def calcBlockAnalysisWrapper():
     # clip magnitude of signal (y axis)?
     ####
     try:
+        # replace with if 'analysisClippingOpts' in locals()?
         clippingKWArgs = dict(clipSignals=True, clippingOpts=analysisClippingOpts)
     except Exception:
         print('Using default clipping opts')
         clippingKWArgs = dict(clipSignals=False, clippingOpts={})
+    if arguments['analysisName'] in rasterOpts['analysisFilterKWArgs']:
+        filterKWArgs = rasterOpts['analysisFilterKWArgs'][arguments['analysisName']]
+    else:
+        filterKWArgs = dict(filterSignals=False, medianFilterSignals=False)
     outputBlock = ns5.concatenateBlocks(
         asigBlocks, spikeBlocks, eventBlocks,
         chunkingMetadata, samplingRate, chanQuery,

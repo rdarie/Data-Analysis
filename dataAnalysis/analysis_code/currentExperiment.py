@@ -421,6 +421,10 @@ def parseAnalysisOptions(
                 'binInterval': (3e3) ** (-1),
                 'binWidth': 1e-3,
                 'smoothKernelWidth': 1e-3},  # 3 kHz
+            'hiResHiFreq': {
+                'binInterval': (3e3) ** (-1),
+                'binWidth': 1e-3,
+                'smoothKernelWidth': 1e-3},  # 3 kHz
             },
         'windowSizes': {
             'XS': (-0.2, 0.4),
@@ -433,6 +437,9 @@ def parseAnalysisOptions(
             'XL': (-1.5, 2.),
             'RC': (-0.33, 0.33),
             'miniRC': (-1, 1)},
+        'analysisFilterKWArgs': {
+            'hiRes': dict(filterSignals=False, medianFilterSignals=True, analysisMedianFilterOpts=dict(size=(30, 1)))
+        },
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
         'separateByFunArgs': None,
         'alignTo': None,
@@ -770,6 +777,8 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 1e-3,
+            'procFun': {
+                'lfp_CAR': 'ash.genDetrender(timeWindow=[-0.6, -0.3], useMean=True)'},
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,

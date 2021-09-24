@@ -10,19 +10,20 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J qa_stim_201901_25
+#SBATCH -J qa_stim_202101_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/qa_stim_201901_25-%a.out
-#SBATCH -e ../../batch_logs/qa_stim_201901_25-%a.out
+#SBATCH -o ../../batch_logs/qa_stim_202101_28-%a.out
+#SBATCH -e ../../batch_logs/qa_stim_202101_28-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=2
+#SBATCH --array=1-2
+#SBATCH --export=CCV_HEADLESS=1
 
 # SLURM_ARRAY_TASK_ID=1
-source shellScripts/run_exp_preamble_25.sh
+source shellScripts/run_exp_preamble_202101_28.sh
 source shellScripts/run_align_stim_preamble.sh
 #
 ALIGNQUERY="--alignQuery=stimOn"

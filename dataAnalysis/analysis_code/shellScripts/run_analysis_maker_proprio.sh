@@ -8,58 +8,27 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=125G
+#SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_201901_24
+#SBATCH -J analysis_calc_hr_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/analysis_calc_201901_24-%a.out
-#SBATCH -e ../../batch_logs/analysis_calc_201901_24-%a.out
+#SBATCH -o ../../batch_logs/analysis_calc_hf_202101_21-%a.out
+#SBATCH -e ../../batch_logs/analysis_calc_hf_202101_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2
-
-# EXP="exp201901221000"
-# has 1 minirc 2-3 motion
-# EXP="exp201901231000"
-# has 1 motion
-# EXP="exp201901240900"
-# has 1 minirc 2 motion
-# EXP="exp201901251000"
-# has 1 minirc 2 motion
-# EXP="exp201901261000"
-# has 1-3 motion 4 minirc
-# EXP="exp201901271000"
-# has 1-4 motion 5 minirc
-# EXP="exp201901281200"
-# has 1-4 motion
-EXP="exp201901301000"
-# has 1-3 motion 4 minirc
-# EXP="exp201901311000"
-# has 1-4 motion 5 minirc
-
-# EXP="exp202101141100"
-# EXP="exp202101191100"
-# EXP="exp202101061100"
-# EXP="exp202101201100"
-# EXP="exp202101211100"
-# EXP="exp202101221100"
-# EXP="exp202101251100"
-# EXP="exp202101271100"
-# EXP="exp202101281100"
-# EXP="exp202102041100"
-# EXP="exp202102081100"
-# EXP="exp202102101100"
-# EXP="exp202102151100"
-
+#SBATCH --array=1-3
+#SBATCH --export=CCV_HEADLESS=1
+#
 LAZINESS="--lazy"
 #
 # ANALYSISFOLDER="--analysisName=loRes"
-ANALYSISFOLDER="--analysisName=hiRes"
+# ANALYSISFOLDER="--analysisName=hiRes"
+ANALYSISFOLDER="--analysisName=hiResHiFreq"
 # ANALYSISFOLDER="--analysisName=normalizedByImpedance"
 # ANALYSISFOLDER="--analysisName=default"
 #
@@ -73,22 +42,10 @@ RIGSUFFIX="--rigFileSuffix=analog_inputs"
 #
 BLOCKPREFIX="--sourceFilePrefix=utah"
 #
-module load git/2.10.2
-module load gcc/8.3
-module load leveldb lapack openblas llvm hdf5 protobuf ffmpeg fftw scons
-module load anaconda/2020.02
-module load mpi
-# module load opengl
-module load qt/5.10.1
-module load zlib/1.2.11
-module unload python
 
-. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
+# SLURM_ARRAY_TASK_ID=1
 
-SLURM_ARRAY_TASK_ID=4
+source ./shellScripts/run_exp_preamble_202101_21.sh
 echo --blockIdx=$SLURM_ARRAY_TASK_ID
 
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
@@ -96,13 +53,13 @@ python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
 # python -u ./synchronizeSIMItoNSP_stimBased.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --showFigures --inputBlockSuffix=analog_inputs  --inputBlockPrefix=utah --plotting --forceRecalc
 # python -u ./calcProprioAnalysisNix.py --hasKinematics --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 
-python -u ./calcMotionAlignTimesV3.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
+# python -u ./calcMotionAlignTimesV3.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
 
-python -u ./calcRefinedStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --inputNSPBlockSuffix=analog_inputs --plotParamHistograms $LAZINESS
+# python -u ./calcRefinedStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --inputNSPBlockSuffix=analog_inputs --plotParamHistograms $LAZINESS --plotting
 # or, if wanting to trim down the dataset (e.g. for time consuming uperations such as CSD calculation, can remove the stimOff labels
 # python -u ./calcRefinedStimAlignTimes.py --removeLabels='stimOff' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --inputNSPBlockSuffix=analog_inputs --plotParamHistograms $LAZINESS
 
-python -u ./calcMotionStimAlignTimesV2.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS --plotParamHistograms
+# python -u ./calcMotionStimAlignTimesV2.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS --plotParamHistograms
 
 # python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER
 # python -u ./calcFRsqrt.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

@@ -112,12 +112,16 @@ triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(
         inputBlockSuffix, arguments['window']))
+
 alignedAsigsKWargs = loadingMeta['alignedAsigsKWargs'].copy()
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['verbose'] = arguments['verbose']
-if arguments['verbose']:
-    prf.print_memory_usage('loading {}'.format(triggeredPath))
+if 'procFun' in iteratorOpts:
+    if arguments['selectionName'] in iteratorOpts['procFun']:
+        if iteratorOpts['procFun'][arguments['selectionName']] is not None:
+            alignedAsigsKWargs['procFun'] = eval(iteratorOpts['procFun'][arguments['selectionName']])
+
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 nSeg = len(dataBlock.segments)

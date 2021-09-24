@@ -197,8 +197,8 @@ def getExpOpts():
     # Options relevant to the classifcation of proprio trials
     # movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     # movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
-    movementSizeBins = [0, 0.25, 1.25, 1.5]
-    movementSizeBinLabels = ['S', 'M', 'L']
+    movementSizeBins = [0, 1.5]
+    movementSizeBinLabels = ['M']
     #
     alignTimeBoundsLookup = {
         1: [
@@ -338,8 +338,9 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '201901261000-Murdoc': [4],
-                experimentName: [1, 2, 3, 4],
+                '201901251000-Murdoc': [1, 2],
+                '201901261000-Murdoc': [1, 2, 3, 4],
+                experimentName: [1, 2, 3, 4, 5],
                 }
             },
         'ma': {

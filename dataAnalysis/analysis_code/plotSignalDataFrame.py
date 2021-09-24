@@ -95,8 +95,8 @@ snsRCParams = {
         "axes.spines.top": True,
         "axes.linewidth": .125,
         "grid.linewidth": .2,
-        "font.size": 7,
-        "axes.labelsize": 7,
+        "font.size": 5,
+        "axes.labelsize": 9,
         "axes.titlesize": 9,
         "xtick.labelsize": 5,
         "ytick.labelsize": 5,
@@ -184,7 +184,10 @@ if __name__ == '__main__':
         plotSuffix = '_{}'.format(arguments['plotSuffix'])
     else:
         plotSuffix = ''
-    pdfPath = os.path.join(figureOutputFolder, '{}{}.pdf'.format(pdfName, plotSuffix))
+    # pdb.set_trace()
+    expDateTime = pd.to_datetime(experimentName.split('-')[0], format='%Y%m%d%H%M')
+    expDateTimePathStr = expDateTime.strftime('%Y-%m-%d')
+    pdfPath = os.path.join(figureOutputFolder, '{}-{}{}.pdf'.format(expDateTimePathStr, pdfName, plotSuffix))
     #
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(
@@ -262,7 +265,8 @@ if __name__ == '__main__':
         del tMask2
     #
     compoundAnnDescr = {
-        'stimCondition': ['electrode', 'trialRateInHz', ],
+        'stimCondition': ['electrode', 'trialRateInHz'],
+        'stimConditionWithDate': ['electrode', 'expName'],
         'kinematicCondition': ['pedalDirection', 'pedalSizeCat', 'pedalMovementCat'],
         'kinematicConditionNoSize': ['pedalDirection', 'pedalMovementCat']
         }

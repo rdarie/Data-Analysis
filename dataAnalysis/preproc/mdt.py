@@ -2030,54 +2030,6 @@ def preprocINS(
         stimStatusSerial, timeSync, interpFunHUTtoINS,
         syncTo='HostUnixTime')
     # # # #
-    stimStatus = stimStatusSerialtoLong(
-        stimStatusSerial, idxT='INSTime', expandCols=expandCols,
-        deriveCols=deriveCols, progAmpNames=progAmpNames,
-        dummyTherapySwitches=False, elecConfiguration=elecConfiguration
-        )
-    '''
-    #  sync Host PC Unix time to NSP
-    HUTtoINSPlotting = False
-    if HUTtoINSPlotting and makePlots:
-        plottingColumns = deriveCols + expandCols + progAmpNames
-        plotStimStatusList = []
-        for trialSegment in pd.unique(tdDF['trialSegment']):
-            stimGroupMask = stimStatus['trialSegment'] == trialSegment
-            stimGroup = stimStatus.loc[stimGroupMask, :]
-            thisHUTtoINS = interpFunHUTtoINS[trialSegment]
-            #
-            plottingRange = np.arange(
-                stimGroup['HostUnixTime'].min(),
-                stimGroup['HostUnixTime'].max(), 10)  # every 2msec
-            temp = hf.interpolateDF(
-                stimGroup, plottingRange,
-                x='HostUnixTime', columns=plottingColumns, kind='previous')
-            temp['amplitudeIncrease'] = temp['amplitudeRound'].diff().fillna(0)
-            temp['INSTime'] = pd.Series(
-                thisHUTtoINS(temp['HostUnixTime']),
-                index=temp['HostUnixTime'].index)
-            plotStimStatusList.append(temp)
-        plotStimStatus = pd.concat(
-            plotStimStatusList,
-            ignore_index=True)
-    if HUTtoINSPlotting and makePlots:
-        tStartTD = 200
-        tStopTD = 300
-        fig, ax = plotHUTtoINS(
-            tdDF, accelDF, plotStimStatus,
-            tStartTD, tStopTD,
-            sharex=True, dataCols=tdDataCols,
-            plotBlocking=plotBlocking
-            )
-        figPath = os.path.join(
-            figureOutputFolder,
-            'check_hut_sync_01_{:0<3}.pdf'.format(blockIdx))
-        plt.savefig(figPath)
-        if showPlots:
-            plt.show(block=plotBlocking)
-        else:
-            plt.close()
-    '''
     block = insDataToBlock(
         tdDF, accelDF, stimStatusSerial,
         senseInfo, trialFilesStim,
@@ -2219,9 +2171,14 @@ def preprocINS(
     createRelationship = False
     if createRelationship:
         block.create_relationship()
-    #
+    '''
+    stimStatus = stimStatusSerialtoLong(
+        stimStatusSerial, idxT='INSTime', expandCols=expandCols,
+        deriveCols=deriveCols, progAmpNames=progAmpNames,
+        dummyTherapySwitches=False, elecConfiguration=elecConfiguration
+        )
+    '''
     # also can make changes to events here before they get written out. e.g. annotate with session info?
-    pdb.set_trace()
     writer = neo.io.NixIO(filename=insDataFilename, mode='ow')
     writer.write_block(block, use_obj_names=True)
     writer.close()
@@ -2463,9 +2420,9 @@ def getINSStimOnset(
             .loc[groupAmpMask, 'RateInHz']
             .value_counts()
             .idxmax())
-        groupTotalDuration = group['t'].max() - group['t'].min()
-        if groupTotalDuration < min(50e-3, stimRate ** -1):
-            print('Amplitude round {} is shorter than {:.3f} sec. Ignoring...'.format(name, min(50e-3, stimRate ** -1)))
+        groupTotalDuration = group.loc[groupAmpMask, 't'].max() - group.loc[groupAmpMask, 't'].min()
+        if groupTotalDuration < 360e-3:
+            print('Amplitude round {} is shorter than {:.3f} sec. Ignoring...'.format(name, 360e-3))
             continue
         slotSize = int(fs/stimRate)
         stimPeriod = stimRate ** (-1)
@@ -2786,40 +2743,6 @@ def getINSStimOnset(
             tdSeg.loc[:, 'slot'] = tdDF.loc[tdSeg.index, 'slot']
             slotDiff = tdSeg['slot'].diff()
             resolvedSlots = True
-            if plottingEnabled and plottingSlots:
-                pass
-                # plot all the slots for this therapy round
-                # cPal = sns.color_palette('pastel', n_colors=len(allDataCol))
-                # cLookup = {n: cPal[i] for i, n in enumerate(allDataCol)}
-                # fig, slotAx = plt.subplots()
-                # for colName in allDataCol:
-                #     tdCol = therSegDF[colName]
-                #     slotAx.plot(
-                #         therSegDF['t'],
-                #         tdCol.values,
-                #         '-', c=cLookup[colName],
-                #         label='original signal {}'.format(colName))
-                # slotAx.set_xlabel('Time (sec)')
-                # slotAx.set_title('Slots for therapy round {}'.format(thisTherapyRound))
-                # therSegSlotDiff = therSegDF['slot'].diff()
-                # slotEdges = (
-                #     therSegDF
-                #     .loc[therSegSlotDiff.fillna(1) != 0, 't']
-                #     .reset_index(drop=True))
-                # theseSlots = (
-                #     therSegDF
-                #     .loc[therSegSlotDiff.fillna(1) != 0, 'slot']
-                #     .reset_index(drop=True))
-                # for idx, slEdge in slotEdges.iloc[1:].iteritems():
-                #     try:
-                #         slotAx.axvspan(
-                #             slotEdges[idx-1], slEdge,
-                #             alpha=0.4, facecolor=cPal[int(theseSlots[idx-1])])
-                #     except Exception:
-                #         continue
-                # for t in rateChangeTimes:
-                #     slotAx.axvline(t)
-                # slotAx.legend()
         # done resolving slots
         if plottingEnabled:
             # tdSegSlotDiff = tdDF.loc[plotMaskTD, 'slot'].diff()
@@ -2939,7 +2862,7 @@ def getINSStimOnset(
                     pulseOffTimes = pulseOnTimes + 100 * stimPW * pq.us
                     try:
                         pulseOffTimes[0] = offTime
-                    except:
+                    except Exception:
                         traceback.print_exc()
                         pdb.set_trace()
                     tempOnTimes.append(pulseOnTimes)

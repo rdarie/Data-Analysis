@@ -20,23 +20,31 @@ Options:
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
     --substituteOneChannel                 correct for rank defficiency by using one unsubtracted chan [default: False]
 """
-#
-import dataAnalysis.helperFunctions.profiling as prf
+import logging
+logging.captureWarnings(True)
+import os, sys
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+# import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
-from namedQueries import namedQueries
-import os
 import pandas as pd
 import numpy as np
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
-import joblib as jb
-import pickle
-import math as m
-import quantities as pq
-from dask.distributed import Client, LocalCluster
-
-from currentExperiment import parseAnalysisOptions
+# import joblib as jb
+# import pickle
+# import math as m
+# import quantities as pq
+# from dask.distributed import Client, LocalCluster
+# from pandas import IndexSlice as idxSl
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
@@ -163,3 +171,5 @@ if __name__ == "__main__":
     writer.close()
     if arguments['lazy']:
         dataReader.file.close()
+    #############
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

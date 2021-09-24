@@ -61,8 +61,9 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'synchChanName': ['ins_td0', 'ins_td2'],
+                'synchChanName': [],
                 'synchStimUnitName': ['g0p0#0'],
+                'zeroOutsideTargetLags': True,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
                 'xCorrGaussWid': 10e-3,
@@ -95,6 +96,8 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
+                'usedTENSPulses': True,
+                'zScoreTapDetection': False, 'trigFinder': 'getThresholdCrossings',
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
@@ -129,6 +132,7 @@ def getExpOpts():
         # 2: [96.43, 191.689],
     }
     detectStim = True
+    fractionForRollover = 0.3
     stimDetectThresDefault = 1e6
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
@@ -142,11 +146,13 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101221100-Rupert': [2],
+        '202101221100-Rupert': [1, 2],
         }
     # Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.6, 1]
-    movementSizeBinLabels = ['S', 'L']
+    # movementSizeBins = [0, 0.6, 1]
+    # movementSizeBinLabels = ['S', 'L']
+    movementSizeBins = [0, 1]
+    movementSizeBinLabels = ['M']
 
     ############################################################
     ############################################################
@@ -172,23 +178,12 @@ def getExpOpts():
         2: [42, 43, 44]
     }
     ############################################################
-    ############################################################
-    outlierDetectOptions = dict(
-        targetEpochSize=100e-3,
-        windowSize=(-.2, .8),
-        twoTailed=True,
-        )
-    #
-    minNConditionRepetitions = {
-        'n': 1,
-        'categories': ['amplitude', 'electrode', 'RateInHz']
-        }
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97)]
+                    for i in range(1, 97) if i not in [25, 39, 69, 89]]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
@@ -225,4 +220,61 @@ def getExpOpts():
                 for i in [1, 2, 3]]
         }
     }
+    expIteratorOpts = {
+        'ca': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [2, 3, 4],
+                }
+            },
+        'cb': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [2, 3, 4],
+                }
+            },
+        'cc': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3],
+                }
+            },
+        'ccm': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [2, 3],
+                }
+            },
+        'ccs': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1],
+                }
+            },
+        'cd': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'ra': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'rb': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'pa': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2],
+                }
+            },
+        'ma': {
+            'experimentsToAssemble': {
+                '202101211100-Rupert': [1, 2, 3, 4],
+                }
+            },
+        'na': {
+            'experimentsToAssemble': {
+                '202101221100-Rupert': [1, 2, 3, 4],
+                }
+            }
+        }
     return locals()

@@ -22,52 +22,40 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         }
     miniRCRigInputs = {
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         'simiTrigs': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         }
     RCRigInputs = {
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         'kinectSync': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         }
-    csdOpts = {
-        'NSamplesForCV': 1000,
-        'chunkSize': 20000,
-        'skipChannels': ['utah25', 'utah39'],
-        'optimalHyperparameters': {'h': 1.0, 'R_init': 0.2, 'lambd': 0.0016},
-        'filterOpts': {
-            'low': {
-                'Wn': 400,
-                'N': 4,
-                'btype': 'low',
-                'ftype': 'butter'
-            }
-        }
-    }
-    experimentName = '202101281100-Rupert'
+    experimentName = '202102031100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
     #
     jsonSessionNames = {
         #  per block
-        1: [
-            'Session1611851045712', 'Session1611851119278',
-            'Session1611851334376'
-            ],
-        2: [
-            'Session1611851887132', 'Session1611852925167',
-            'Session1611853488545'
-            ],
-        3: [
-            'Session1611854079418', 'Session1611854145204'
-            ]
+        1: ['Session1'],
+        2: ['Session1'],
+        3: ['Session1'],
         }
-    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}, 'nspForDelsys': {}, 'delsysToNsp': {}}
+    for blockIdx in jsonSessionNames.keys():
+        synchInfo['nspForDelsys'][blockIdx] = {
+            'synchChanName': 'ainp2'
+            }
+        synchInfo['delsysToNsp'][blockIdx] = {
+            'synchChanName': 'AnalogInputAdapterAnalog'
+        }
     # populate with defaults
     for blockIdx in jsonSessionNames.keys():
         synchInfo['ins'][blockIdx] = {}
@@ -76,12 +64,10 @@ def getExpOpts():
                 'timeRanges': None,
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
-                'searchRadius': [-1., 1.],
-                'zeroOutsideTargetLags': True,
                 'stimTrainEdgeProportion': .2,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
-                'xCorrGaussWid': 10e-3,
+                'xCorrGaussWid': 20e-3,
                 'minStimAmp': 0,
                 'unixTimeAdjust': None,
                 'thres': 5,
@@ -104,11 +90,10 @@ def getExpOpts():
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
                 'usedTENSPulses': True,
-                'zScoreTapDetection': False, 'trigFinder': 'getThresholdCrossings',
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
-                'minAnalogValue': None, 'thres': 7}
+                'minAnalogValue': None, 'thres': 4}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -116,7 +101,7 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
-    # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
+    # synchInfo['nsp'][1][0].update({'thres': 3})
     #
     #
     ############################################################
@@ -150,13 +135,11 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101281100-Rupert': [1, 2],
+        '202102031100-Rupert': [2],
         }
-    ## Options relevant to the classifcation of proprio trials
-    # movementSizeBins = [0, 0.6, 1]
-    # movementSizeBinLabels = ['S', 'L']
-    movementSizeBins = [0,  1]
-    movementSizeBinLabels = ['M']
+    # Options relevant to the classifcation of proprio trials
+    movementSizeBins = [0, 0.6, 1]
+    movementSizeBinLabels = ['S', 'L']
 
     ############################################################
     ############################################################
@@ -174,20 +157,31 @@ def getExpOpts():
     #     ]
     # }
     pedalPositionZeroEpochs = None
-    pedalPositionZeroEpochs = {
-        2: [
-            [1603]
-        ]
-    }
+    # pedalPositionZeroEpochs = {
+    #     2: [
+    #         [1603]
+    #     ]
+    # }
     dropMotionRounds = None
 
     ############################################################
+    ############################################################
+    # outlierDetectOptions = dict(
+    #     targetEpochSize=100e-3,
+    #     windowSize=(-.2, .8),
+    #     twoTailed=True,
+    #     )
+    #
+    minNConditionRepetitions = {
+        'n': 1,
+        'categories': ['amplitude', 'electrode', 'RateInHz']
+        }
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97) if i not in [25, 39, 69, 89]]
+                    for i in range(1, 97)]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
@@ -224,52 +218,7 @@ def getExpOpts():
                 for i in [1, 2, 3]]
         }
     }
-    #########
-    expIteratorOpts = {
-        'ca': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [1, 2, 3],
-                }
-        },
-        'cb': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [2, 3],
-                }
-        },
-        'ccs': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [1],
-                }
-        },
-        'ccm': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [2],
-                }
-        },
-        'cd': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [1, 2, 3],
-                }
-        },
-        'ra': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [1, 2, 3],
-                }
-        },
-        'pa': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [1, 2],
-            }
-        },
-        'ma': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [1, 2, 3],
-            }
-        },
-        'na': {
-            'experimentsToAssemble': {
-                '202101281100-Rupert': [1, 2, 3],
-            }
+    csdOpts = {
+        'skipChannels': ['utah25', 'utah39']
         }
-    }
     return locals()
