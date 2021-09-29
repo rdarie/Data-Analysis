@@ -1,4 +1,4 @@
-import os, pdb, re, platform, traceback
+import os, pdb, re, platform, traceback, sys
 #  import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 # from imblearn.over_sampling import RandomOverSampler
@@ -50,7 +50,11 @@ def parseAnalysisOptions(
     # miniRCBlockLookup = expOpts['miniRCBlockLookup']
     # RCBlockLookup = expOpts['RCBlockLookup']
     # RippleBlockLookup = expOpts['RippleBlockLookup']
-    blockExperimentType = expOpts['blockExperimentTypeLookup'][blockIdx]
+    if blockIdx in expOpts['blockExperimentTypeLookup']:
+        blockExperimentType = expOpts['blockExperimentTypeLookup'][blockIdx]
+    else:
+        print('{} has no defined block {}. Exiting.'.format(experimentName, blockIdx))
+        sys.exit()
     try:
         openEphysChanNames = expOpts['openEphysChanNames']
     except Exception:

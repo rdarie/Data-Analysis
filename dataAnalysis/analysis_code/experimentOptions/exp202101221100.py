@@ -223,57 +223,57 @@ def getExpOpts():
     expIteratorOpts = {
         'ca': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [2, 3, 4],
+                '202101221100-Rupert': [2, 3, 4],
                 }
             },
         'cb': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [2, 3, 4],
+                '202101221100-Rupert': [2, 3, 4],
                 }
             },
         'cc': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [1, 2, 3],
+                '202101221100-Rupert': [1, 2, 3],
                 }
             },
         'ccm': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [2, 3],
+                '202101221100-Rupert': [2, 3],
                 }
             },
         'ccs': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [1],
+                '202101221100-Rupert': [1],
                 }
             },
         'cd': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [1, 2, 3, 4],
+                '202101221100-Rupert': [1, 2, 3],
                 }
             },
         'ra': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [1, 2, 3, 4],
+                '202101221100-Rupert': [1, 2, 3],
                 }
             },
         'rb': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [1, 2, 3, 4],
+                '202101221100-Rupert': [1, 2, 3],
                 }
             },
         'pa': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [1, 2],
+                '202101221100-Rupert': [1, 2],
                 }
             },
         'ma': {
             'experimentsToAssemble': {
-                '202101211100-Rupert': [1, 2, 3, 4],
+                '202101221100-Rupert': [1, 2, 3],
                 }
             },
         'na': {
             'experimentsToAssemble': {
-                '202101221100-Rupert': [1, 2, 3, 4],
+                '202101221100-Rupert': [1, 2, 3],
                 }
             }
         }

@@ -1,5 +1,0 @@
-#!/bin/bash
-
-sbatch shellScripts/run_test_train_split_normalization_stim.sh
-sbatch shellScripts/run_test_train_split_normalization_motion.sh
-sbatch shellScripts/run_test_train_split_plots_01_stim.sh

@@ -64,6 +64,14 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+if arguments['alignFolderName'] == 'stim':
+    if blockExperimentType == 'proprio-motionOnly':
+        print('skipping block {} (no stim)'.format(arguments['blockIdx']))
+        sys.exit()
+if arguments['alignFolderName'] == 'motion':
+    if blockExperimentType == 'proprio-miniRC':
+        print('skipping block {} (no movement)'.format(arguments['blockIdx']))
+        sys.exit()
 #
 blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
 analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
