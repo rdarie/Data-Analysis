@@ -37,7 +37,7 @@
 #  has 1-4 motion 5 minirc
 # EXP="exp201902021100"
 # has 3-5 motion 6 minirc; blocks 1 and 2 were bad;
-EXP="exp201902031100"
+# EXP="exp201902031100"
 # has 1-4 motion 5 minirc;
 # EXP="exp201902041100"
 # has 1-4 motion 5 minirc;
@@ -48,7 +48,7 @@ EXP="exp201902031100"
 # has 1 minirc 2 motion+stim 3 motionOnly
 # EXP="exp202101211100"
 # has 1 minirc 2,3 motion+stim 4 motionOnly
-# EXP="exp202101221100"
+EXP="exp202101221100"
 # has 1 minirc 2 motion+stim 3 motionOnly
 # EXP="exp202101251100"
 # has 1 minirc 2 motion+stim 3 motionOnly
@@ -81,21 +81,21 @@ python --version
 # scratch to data
 #
 # full length files
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_chunkingInfo.json' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_synchFun.json' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*.nix' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze.nix' --fromScratchToData --moveItems --filesIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromScratchToData --moveItems --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromScratchToData --moveItems --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_chunkingInfo.json' --fromScratchToData --moveItems --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_synchFun.json' --fromScratchToData --moveItems --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*.nix' --fromScratchToData --moveItems --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze.nix' --fromScratchToData --moveItems --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromScratchToData --moveItems --filesIncluded
 
 # data to scratch
 # full length files
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromDataToScratch --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_chunkingInfo.json' --fromDataToScratch --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_synchFun.json' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_chunkingInfo.json' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_synchFun.json' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*.nix' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze.nix' --fromDataToScratch --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromDataToScratch --filesIncluded
 
 # everything ever
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.nix' --fromScratchToData --moveItems --filesIncluded
