@@ -11,6 +11,7 @@ Options:
     --searchTerm=searchTerm                          shuttle all files and folders that include this term
     --excludeSearchTerm=excludeSearchTerm            shuttle all files and folders that include this term
     --moveItems                                      move items, as opposed to copy them
+    --deleteItems                                    remove items entirely from origin path
     --fromScratchToData                              process entire experimental day? [default: False]
     --fromDataToScratch                              process entire experimental day? [default: False]
     --preprocFolderFiles                             process entire experimental day? [default: False]
@@ -161,6 +162,8 @@ if arguments['preprocFolderFiles']:
         if os.path.isfile(originPath):
             if arguments['moveItems']:
                 shutil.move(originPath, destinPath)
+            elif arguments['deleteItems']:
+                os.remove(originPath)
             else:
                 shutil.copyfile(originPath, destinPath)
             print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
@@ -183,6 +186,8 @@ if arguments['preprocFolderSubfolders']:
                 shutil.rmtree(destinPath)
             if arguments['moveItems']:
                 shutil.move(originPath, destinPath)
+            elif arguments['deleteItems']:
+                shutil.rmtree(originPath)
             else:
                 shutil.copytree(originPath, destinPath)
             print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
@@ -214,6 +219,8 @@ if arguments['searchTerm'] is not None:
                 shutil.rmtree(destinPath)
             if arguments['moveItems']:
                 shutil.move(originPath, destinPath)
+            elif arguments['deleteItems']:
+                shutil.rmtree(originPath)
             else:
                 shutil.copytree(originPath, destinPath)
             print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
@@ -229,6 +236,8 @@ if arguments['searchTerm'] is not None:
                 os.makedirs(os.path.dirname(destinPath))
             if arguments['moveItems']:
                 shutil.move(originPath, destinPath)
+            elif arguments['deleteItems']:
+                os.remove(originPath)
             else:
                 shutil.copyfile(originPath, destinPath)
             print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))

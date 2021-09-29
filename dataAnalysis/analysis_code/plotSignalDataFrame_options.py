@@ -91,7 +91,7 @@ argumentsLookup = {
     'lfp_illustration': {
         'recalcStats': True,
         'winStart': '-250', 'winStop': '500', 'limitPages': None,
-        'unitQuery': "chanName.isin(['utah18#0', 'utah7#0'])", 'alignQuery': None,
+        'unitQuery': "chanName.isin(['utah_csd_81#0', 'utah_csd_18#0'])", 'alignQuery': None,
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -121,7 +121,7 @@ argumentsLookup = {
     'spectral_illustration': {
         'recalcStats': True,
         'winStart': '-250', 'winStop': '500', 'limitPages': None,
-        'unitQuery': "chanName.isin(['utah18_alpha#0', 'utah18_beta#0', 'utah18_gamma#0', 'utah18_higamma#0', 'utah18_spb#0'])",
+        'unitQuery': "chanName.isin(['utah_csd_81_alpha#0', 'utah_csd_81_beta#0', 'utah_csd_81_gamma#0', 'utah_csd_81_higamma#0', 'utah_csd_81_spb#0'])",
         # 'unitQuery': None,
         'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,

@@ -11,7 +11,7 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_hr_202101_21
+#SBATCH -J analysis_calc_hf_202101_21
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/analysis_calc_hf_202101_21-%a.out
@@ -21,14 +21,14 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1-3
+#SBATCH --array=1-4
 #SBATCH --export=CCV_HEADLESS=1
 #
 LAZINESS="--lazy"
 #
 # ANALYSISFOLDER="--analysisName=loRes"
-# ANALYSISFOLDER="--analysisName=hiRes"
-ANALYSISFOLDER="--analysisName=hiResHiFreq"
+ANALYSISFOLDER="--analysisName=hiRes"
+# ANALYSISFOLDER="--analysisName=hiResHiFreq"
 # ANALYSISFOLDER="--analysisName=normalizedByImpedance"
 # ANALYSISFOLDER="--analysisName=default"
 #

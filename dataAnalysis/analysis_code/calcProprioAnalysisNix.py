@@ -230,7 +230,7 @@ def calcBlockAnalysisWrapper():
         asigBlocks, spikeBlocks, eventBlocks,
         chunkingMetadata, samplingRate, chanQuery,
         arguments['lazy'], trackMemory, arguments['verbose'],
-        **clippingKWArgs)
+        **clippingKWArgs, **filterKWArgs)
     ##############################################################################
     # close open readers, etc
     for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):

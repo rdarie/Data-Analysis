@@ -10,21 +10,21 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_normalization_stim_26
+#SBATCH -J tts_norm_stim_202101_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/test_train_split_normalization_stim_26-%a.out
-#SBATCH -e ../../batch_logs/test_train_split_normalization_stim_26-%a.out
+#SBATCH -o ../../batch_logs/test_train_split_normalization_stim_202101_20-%a.out
+#SBATCH -e ../../batch_logs/test_train_split_normalization_stim_202101_20-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=1
 #SBATCH --export=CCV_HEADLESS=1
 
 # SLURM_ARRAY_TASK_ID=2
-source shellScripts/run_exp_preamble_26.sh
+source shellScripts/run_exp_preamble_202101_20.sh
 source shellScripts/calc_aligned_stim_preamble.sh
 ###
 
@@ -36,8 +36,8 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 python -u './calcTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ALIGNQUERY $ROIOPTS $ITERATOR --eventName='stim' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS
 ##
-python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --selectionName='lfp_CAR' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" --selectionName='lfp_CAR_spectral' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="laplace" --unitQuery="laplace" --selectionName='laplace' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="laplace_spectral" --unitQuery="laplace" --selectionName='laplace_spectral' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 python -u './applyTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 
 # next, go to run_test_train_split_assembler_xxx.sh

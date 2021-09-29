@@ -14,6 +14,7 @@ from scipy import stats, signal, fftpack
 from scipy.ndimage import median_filter
 from copy import copy, deepcopy
 import dataAnalysis.helperFunctions.helper_functions_new as hf
+from dataAnalysis.helperFunctions.hampel import hampel
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.motor_encoder_new as mea
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
@@ -365,6 +366,7 @@ def concatenateBlocks(
         clipSignals=False, clippingOpts={},
         filterSignals=False, analysisFilterOpts={},
         medianFilterSignals=False, analysisMedianFilterOpts={},
+        hampelFilterSignals=False, analysisHampelFilterOpts={},
         ):
     # Scan ahead through all files and ensure that
     # spikeTrains and units are present across all assembled files
@@ -492,18 +494,18 @@ def concatenateBlocks(
             if filterSignals:
                 if not len(analysisFilterOpts):
                     analysisFilterOpts = {
-                        # 'low': {
-                        #     'Wn': float(samplingRate / 3),
-                        #     'N': 4,
-                        #     'btype': 'low',
-                        #     'ftype': 'butter'
-                        # },
-                        'high': {
-                            'Wn': .1,
+                        'low': {
+                            'Wn': float(samplingRate / 3),
                             'N': 4,
-                            'btype': 'high',
+                            'btype': 'low',
                             'ftype': 'butter'
-                        }
+                        },
+                        # 'high': {
+                        #     'Wn': .1,
+                        #     'N': 4,
+                        #     'btype': 'high',
+                        #     'ftype': 'butter'
+                        # }
                     }
             else:
                 analysisFilterOpts = {}
@@ -513,12 +515,9 @@ def concatenateBlocks(
                     dummyAsig.t_stop + asigBlock.annotations['chunkTStart'] * pq.s,
                     1/samplingRate))
             if samplingRate < dummyAsig.sampling_rate:
-                if len(analysisFilterOpts):
+                if filterSignals:
                     filterCoeffs = hf.makeFilterCoeffsSOS(
                         analysisFilterOpts, float(dummyAsig.sampling_rate))
-                if trackMemory:
-                    print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
-                        prf.memory_usage_psutil()))
                 '''
                 ### check that axis=0 is the correct option
                 dummyDF = tdDF.loc[:, 'seg0_utah90'].copy()
@@ -538,7 +537,16 @@ def concatenateBlocks(
                         medianFilteredAsigs,
                         index=tdDF.index,
                         columns=tdDF.columns)
+                elif hampelFilterSignals:
+                    if not len(analysisHampelFilterOpts):
+                        analysisHampelFilterOpts = dict()
+                    print('Applying hampel filter, analysisHampelFilterOpts={}'.format(analysisHampelFilterOpts))
+                    tdDF = hampel(tdDF, **analysisHampelFilterOpts)
+                #
                 if filterSignals:
+                    if trackMemory:
+                        print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
+                            prf.memory_usage_psutil()))
                     filteredAsigs = signal.sosfiltfilt(
                         filterCoeffs, tdDF.to_numpy(),
                         axis=0)

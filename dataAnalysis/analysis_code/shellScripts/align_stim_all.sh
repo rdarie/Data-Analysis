@@ -10,21 +10,21 @@
 #SBATCH --mem=125G
 
 # Specify a job name:
-#SBATCH -J align_stim_202102_02_lfp_rig
+#SBATCH -J align_stim_202101_21_lfp_rig_hr
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/align_stim_202102_02_lfp_rig-%a.out
-#SBATCH -e ../../batch_logs/align_stim_202102_02_lfp_rig-%a.out
+#SBATCH -o ../../batch_logs/align_stim_202101_21_lfp_rig_hr-%a.out
+#SBATCH -e ../../batch_logs/align_stim_202101_21_lfp_rig_hr-%a.out
 
 # Request custom resources
-#SBATCH --array=1-2
+#SBATCH --array=1-3
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 #SBATCH --export=CCV_HEADLESS=1
 
 # SLURM_ARRAY_TASK_ID=1
-source shellScripts/run_exp_preamble_202102_02.sh
+source shellScripts/run_exp_preamble_202101_21.sh
 source shellScripts/run_align_stim_preamble.sh
 ###
 

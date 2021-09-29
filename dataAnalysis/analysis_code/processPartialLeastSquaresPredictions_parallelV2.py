@@ -31,7 +31,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from dask.distributed import Client, LocalCluster
 import os, traceback
-
+from tqdm import tqdm
 # if debugging in a console:
 '''
 
@@ -345,7 +345,8 @@ if __name__ == '__main__':
                 _y_mean = estimator.regressor_.named_steps['regressor']._y_mean
                 _x_std = estimator.regressor_.named_steps['regressor']._x_std
                 _y_std = estimator.regressor_.named_steps['regressor']._y_std
-                for subTargetIdx, subTarget in enumerate(rhGroup.columns):
+                tIterator = enumerate(tqdm(rhGroup.columns, mininterval=30., maxinterval=120.))
+                for subTargetIdx, subTarget in tIterator:
                     coefs = pd.Series(
                         all_coefs[:, subTargetIdx], index=fullDesignDF.columns)
                     #pdb.set_trace()
@@ -407,8 +408,8 @@ if __name__ == '__main__':
                         predDF = predictionPerSource
                     else:
                         predDF = predDF.append(predictionPerSource)
-                    prf.print_memory_usage('Calculated predictions for {}'.format(indexValues))
-                    print('predDF.shape = {}'.format(predDF.shape))
+                    prf.print_memory_usage('\nCalculated predictions for {}'.format(indexValues))
+                    # print('predDF.shape = {}'.format(predDF.shape))
                     #### residual autocorrelation
                     nLags = int(thisModelHistoryLen / binInterval)
                     nLagsSec = np.arange(0, nLags) * binInterval

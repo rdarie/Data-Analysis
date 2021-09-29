@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=200G
 
 # Specify a job name:
-#SBATCH -J pls_motion_lfp_post_impulses_ste_27
+#SBATCH -J pls_post_impulses_sta_202101_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/pls_motion_lfp_post_impulses_ste_27.out
-#SBATCH -e ../../batch_logs/regression/pls_motion_lfp_post_impulses_ste_27.out
+#SBATCH -o ../../batch_logs/regression/pls_post_impulses_sta_202101_20.out
+#SBATCH -e ../../batch_logs/regression/pls_post_impulses_sta_202101_20.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,13 +25,13 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source shellScripts/run_exp_preamble.sh
+source shellScripts/run_exp_preamble_202101_20.sh
 source shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ###
-ITERATOR="re"
+ITERATOR="ra"
 ###
 WINDOWTERM="XL"
 #

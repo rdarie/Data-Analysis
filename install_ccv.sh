@@ -51,6 +51,8 @@ pip install vg==1.6.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-p
 # conda install mayavi --freeze-installed
 # conda install -c conda-forge slycot --freeze-installed --dry-run
 # conda install -c conda-forge control --freeze-installed --dry-run
+conda install -c conda-forge pyerfa --freeze-installed --dry-run
+conda install -c conda-forge astropy --freeze-installed --dry-run
 # pip install importlib-resources --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 
 pip install git+git://github.com/G-Node/nixpy@v1.5.0b3 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps

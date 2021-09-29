@@ -17,7 +17,7 @@ Options:
     --lazy                                       load from raw, or regular? [default: False]
     --unitQuery=unitQuery                        how to restrict channels?
     --alignQuery=alignQuery                      choose a subset of the data?
-    --verbose                                    print diagnostics? [default: False]
+    --verbose=verbose                            print diagnostics? [default: 0]
     --plotting                                   plot results?
     --recalcKCSDCV                               recalculate optimal kCSD hyperparameters [default: False]
 """
@@ -34,10 +34,8 @@ from dataAnalysis.analysis_code.namedQueries import namedQueries
 import matplotlib
 if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('Agg')   # generate postscript output
-    enableTQDM = False
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
-    enableTQDM = True
 import matplotlib.font_manager as fm
 font_files = fm.findSystemFonts()
 for font_file in font_files:
@@ -51,34 +49,37 @@ import seaborn as sns
 ##########
 from docopt import docopt
 from neo.io import NixIO
-from neo.io.proxyobjects import (
-    AnalogSignalProxy, SpikeTrainProxy, EventProxy)
+# from neo.io.proxyobjects import (
+#     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from neo.core import (Block, Segment, ChannelIndex,
     AnalogSignal, Unit, SpikeTrain, Event)
 import os, gc
 import pdb, traceback
-import dataAnalysis.helperFunctions.probe_metadata as prb_meta
+# import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.plotting.spike_sorting_plots as ssplt
 import dataAnalysis.preproc.ns5 as ns5
 from dataAnalysis.lfpAnalysis import csd
-from scipy.stats import zscore, chi2
+# from scipy.stats import zscore, chi2
 from scipy import interpolate, ndimage, signal
 # import pingouin as pg
 import pandas as pd
 import numpy as np
-from elephant import current_source_density as elph_csd
-from kcsd import KCSD2D
-from dask import dataframe as dd
-from dask.diagnostics import ProgressBar
-from dask.distributed import Client
-from copy import deepcopy
+from astropy.convolution import convolve, interpolate_replace_nans
+# from elephant import current_source_density as elph_csd
+# from kcsd import KCSD2D
+# from dask import dataframe as dd
+# from dask.diagnostics import ProgressBar
+# from dask.distributed import Client
+# from copy import deepcopy
 from tqdm import tqdm
 from random import sample
-from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
-from sklearn.utils.random import sample_without_replacement as swr
+import contextlib
+from joblib import Parallel, parallel_backend, delayed
+# from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
+# from sklearn.utils.random import sample_without_replacement as swr
 import quantities as pq
 sns.set(
     context='talk', style='darkgrid',
@@ -138,62 +139,75 @@ for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 from pandas import IndexSlice as idxSl
 from datetime import datetime as dt
-try:
-    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
-except:
-    pass
-for arg in sys.argv:
-    print(arg)
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['blockIdx']), arguments['exp'])
-globals().update(expOpts)
-globals().update(allOpts)
-
-if arguments['outputBlockSuffix'] is not None:
-    outputBlockSuffix = '_{}'.format(arguments['outputBlockSuffix'])
-else:
-    outputBlockSuffix = ''
-#
-blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
-analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
-    arguments, scratchFolder)
-
-if arguments['plotting']:
-    figureFolderSuffix = 'kcsd' if arguments['useKCSD'] else 'laplacian'
-    figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'], arguments['alignFolderName'], figureFolderSuffix)
-    if not os.path.exists(figureOutputFolder):
-        os.makedirs(figureOutputFolder, exist_ok=True)
-
-calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
-if not os.path.exists(calcSubFolder):
-    os.makedirs(calcSubFolder, exist_ok=True)
-#
-triggeredPath = os.path.join(
-    alignSubFolder,
-    blockBaseName + '{}_{}.nix'.format(
-        inputBlockSuffix, arguments['window']))
-outputPath = os.path.join(
-    alignSubFolder,
-    blockBaseName + '{}_{}.nix'.format(
-        outputBlockSuffix, arguments['window']))
-#
-annotationsPath = os.path.join(
-    alignSubFolder, blockBaseName + '{}_{}_meta.h5'.format(
-        outputBlockSuffix, arguments['window']))
-#
-reqUnitNames, unitQuery = ash.processUnitQueryArgs(
-    namedQueries, scratchFolder, **arguments)
-outlierTrials = ash.processOutlierTrials(
-    scratchPath, blockBaseName, **arguments)
-
-#####
-# DEBUG_ARRAY_RESHAPING = False
-#####
-
 
 if __name__ == "__main__":
+    try:
+        print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+    except:
+        pass
+    for arg in sys.argv:
+        print(arg)
+    arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+    expOpts, allOpts = parseAnalysisOptions(
+        int(arguments['blockIdx']), arguments['exp'])
+    globals().update(expOpts)
+    globals().update(allOpts)
+    if arguments['alignFolderName'] == 'stim':
+        if blockExperimentType == 'proprio-motionOnly':
+            print('skipping block {} (no stim)'.format(arguments['blockIdx']))
+            sys.exit()
+    if arguments['alignFolderName'] == 'motion':
+        if blockExperimentType == 'proprio-miniRC':
+            print('skipping block {} (no movement)'.format(arguments['blockIdx']))
+            sys.exit()
+    arguments['verbose'] = int(arguments['verbose'])
+
+    if arguments['outputBlockSuffix'] is not None:
+        outputBlockSuffix = '_{}'.format(arguments['outputBlockSuffix'])
+    else:
+        outputBlockSuffix = ''
+    #
+    blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
+    analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
+        arguments, scratchFolder)
+
+    if arguments['plotting']:
+        figureFolderSuffix = 'kcsd' if arguments['useKCSD'] else 'laplacian'
+        figureOutputFolder = os.path.join(
+            figureFolder, arguments['analysisName'], arguments['alignFolderName'], figureFolderSuffix)
+        if not os.path.exists(figureOutputFolder):
+            os.makedirs(figureOutputFolder, exist_ok=True)
+
+    calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+    if not os.path.exists(calcSubFolder):
+        os.makedirs(calcSubFolder, exist_ok=True)
+    #
+    triggeredPath = os.path.join(
+        alignSubFolder,
+        blockBaseName + '{}_{}.nix'.format(
+            inputBlockSuffix, arguments['window']))
+    outputPath = os.path.join(
+        alignSubFolder,
+        blockBaseName + '{}_{}.nix'.format(
+            outputBlockSuffix, arguments['window']))
+    #
+    annotationsPath = os.path.join(
+        alignSubFolder, blockBaseName + '{}_{}_meta.h5'.format(
+            outputBlockSuffix, arguments['window']))
+    #
+    reqUnitNames, unitQuery = ash.processUnitQueryArgs(
+        namedQueries, scratchFolder, **arguments)
+    outlierTrials = ash.processOutlierTrials(
+        scratchPath, blockBaseName, **arguments)
+
+    #####
+    # DEBUG_ARRAY_RESHAPING = False
+    #####
+
+    joblibBackendArgs = dict(
+        backend='loky',
+    )
+
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
@@ -305,13 +319,14 @@ if __name__ == "__main__":
         sigma = 1
         #
         estimateAsigs = asigs
-        ###########################################
-        # for debugging, reduce nTrials
-        # nTrials = 3
-        # dummySt = dummySt[:nTrials]
-        # estimateAsigs = asigs[:nBins*nTrials, :]
-        # NSamplesForCV = 10
-        #
+        ######################################################################################
+        # ## # for debugging, reduce nTrials
+        # ## if True:
+        # ##     nTrials = 3
+        # ##     dummySt = dummySt[:nTrials]
+        # ##     estimateAsigs = asigs[:nBins*nTrials, :]
+        # ##     NSamplesForCV = 10
+        #######################################################################################
         if arguments['plotting'] and (segIdx == 0):
             sns.set(font_scale=.8)
             if arguments['useKCSD']:
@@ -329,8 +344,14 @@ if __name__ == "__main__":
             fig.set_size_inches(5 * len(ax), 5)
             _, _, lfpDF = csd.plotLfp2D(
                 asig=estimateAsigs[0, :], chanIndex=chanIndex,
-                fillerFun=csd.interpLfp, fig=fig, ax=origAx)
+                fig=fig, ax=origAx)
             origAx.set_title('Original')
+        #
+        if arguments['lazy']:
+            dataReader.file.close()
+        nSegsOriginal = len(dataBlock.segments)
+        del dataReader, dataBlock
+        gc.collect()
         if arguments['useKCSD']:
             print('estimating csd with kcsd...')
             nElecX = chanIndex.annotations['coordinateIndices'][:, 0].max()
@@ -530,65 +551,46 @@ if __name__ == "__main__":
             csdChanIndex.analogsignals.append(csdAsigsLong)
         else:
             # 2d laplacian
-            prf.print_memory_usage(prefix='reshaping data for laplacian')
-            laplKernel = 1/8 * np.asarray([
-                [-1, -1, -1],
-                [-1, 8, -1],
-                [-1, -1, -1],
-                ])
-            '''lfpTimes, lfpList = csd.compose2D(
+            prf.print_memory_usage(
+                prefix='calculating laplacian ({} samples)'.format(estimateAsigs.times.shape[0]))
+            lfpTimes, laplList = csd.compose2DParallel(
                 estimateAsigs, chanIndex,
-                fillerFun=csd.interpLfp,
-                fillerFunKWArgs=dict(
-                    coordCols=['x', 'y'], groupCols=['t'],
-                    method='bypass', tqdmProgBar=enableTQDM),
-                tqdmProgBar=enableTQDM)'''
-            lfpTimes, lfpList = csd.compose2D(
-                estimateAsigs, chanIndex,
-                tqdmProgBar=enableTQDM)
+                tqdmProgBar=True,
+                procFun=csd.convolveLfpWithKernel,
+                joblibBackendArgs=joblibBackendArgs)
             del asigs, estimateAsigs
             gc.collect()
-            laplList = []
-            prf.print_memory_usage(prefix='done reshaping, estimating csd with laplacian')
-            if enableTQDM:
-                tIterator = tqdm(total=len(lfpList), miniters=100)
-            for tIdx, lfpDF in enumerate(lfpList):
-                laplNP = signal.convolve2d(lfpDF.fillna(lfpDF.mean().mean()).to_numpy(), laplKernel, mode='same')
-                # laplNP =ndimage.laplace(ndimage.gaussian_filter(lfpDF.fillna(lfpDF.mean().mean()).to_numpy(), sigma))
-                laplDF = pd.DataFrame(
-                    laplNP,
-                    index=lfpDF.index,
-                    columns=lfpDF.columns)
-                if tIdx == 0:
-                    nanMask = lfpDF.isna()
-                else:
-                    nanMask = nanMask | lfpDF.isna()
-                laplDF = laplDF.unstack()
-                laplList.append(laplDF.to_numpy()[np.newaxis, :])
-                if enableTQDM:
-                    tIterator.update(1)
-                if 'csdChanIndex' not in locals():
-                    csdCoordinates = laplDF.index.to_frame().to_numpy() * pq.um
-                    csdX = csdCoordinates[:, 0]
-                    csdY = csdCoordinates[:, 1]
-                    csdXIdx, csdYIdx = ssplt.coordsToIndices(
-                        csdX, csdY)
-                    csdCoordinateIndices = np.concatenate(
-                        [csdXIdx[:, np.newaxis], csdYIdx[:, np.newaxis]],
-                        axis=1)
-                    csdChanNames = [
-                        arguments['arrayName'] + '_csd_{}'.format(idx)
-                        for idx, xy in enumerate(csdCoordinateIndices)
-                        ]
-                    csdChanIndex = ChannelIndex(
-                        name=arguments['arrayName'] + '_csd',
-                        index=np.arange(len(csdChanNames)),
-                        channel_ids=np.arange(len(csdChanNames)),
-                        channel_names=csdChanNames,
-                        coordinates=csdCoordinates,
-                        coordinateIndices=csdCoordinateIndices
-                        )
-            print('    done estimating csd with laplacian')
+            dummyLfpDF = laplList[0].copy()
+            nanMask = pd.DataFrame(
+                np.logical_or.reduce([lfp.isna() for lfp in laplList]),
+                index=dummyLfpDF.index, columns=dummyLfpDF.columns
+                ).unstack()
+            if 'csdChanIndex' not in locals():
+                csdCoordinates = dummyLfpDF.unstack().index.to_frame().to_numpy() * pq.um
+                csdX = csdCoordinates[:, 0]
+                csdY = csdCoordinates[:, 1]
+                csdXIdx, csdYIdx = ssplt.coordsToIndices(
+                    csdX, csdY)
+                csdCoordinateIndices = np.concatenate(
+                    [csdXIdx[:, np.newaxis], csdYIdx[:, np.newaxis]],
+                    axis=1)
+                csdChanNames = [
+                    arguments['arrayName'] + '_csd_{}'.format(idx)
+                    for idx, xy in enumerate(csdCoordinateIndices)
+                    ]
+                csdChanIndex = ChannelIndex(
+                    name=arguments['arrayName'] + '_csd',
+                    index=np.arange(len(csdChanNames)),
+                    channel_ids=np.arange(len(csdChanNames)),
+                    channel_names=csdChanNames,
+                    coordinates=csdCoordinates,
+                    coordinateIndices=csdCoordinateIndices
+                    )
+            laplList = [
+                laplDF.unstack().to_numpy()[np.newaxis, :]
+                for laplDF in laplList]
+            gc.collect()
+            prf.print_memory_usage(prefix='done calculating laplacian')
             csdUnits = dummySt.waveforms.units / (csdX.units * csdY.units)
             csdAsigsLong = AnalogSignal(
                 np.concatenate(laplList, axis=0),
@@ -598,6 +600,9 @@ if __name__ == "__main__":
                 )
             csdAsigsLong.channel_index = csdChanIndex
             csdChanIndex.analogsignals.append(csdAsigsLong)
+            del laplList
+            gc.collect()
+            prf.print_memory_usage(prefix='done reshaping laplacian')
             # end laplacian option
     if csdTimeFilterOpts is not None:
         if 'low' in csdTimeFilterOpts:
@@ -615,7 +620,7 @@ if __name__ == "__main__":
     if arguments['plotting']:
         _, _, csdDF = csd.plotLfp2D(
             asig=csdAsigsLong[0, :], chanIndex=csdChanIndex,
-            fillerFun=csd.interpLfp, fig=fig, ax=csdAx,
+            fig=fig, ax=csdAx,
             heatmapKWs={'cmap': 'mako'})
         csdAx.set_title('CSD estimate ({})'.format(methodName))
         #
@@ -632,18 +637,16 @@ if __name__ == "__main__":
                 '{}_{}_example.pdf'.format(blockBaseName, methodName)),
             bbox_inches='tight', pad_inches=0
             )
-        # plt.show()
         plt.close()
-    if nanMask is not None:
-        nanMaskLong = nanMask.unstack()
     outputBlock = Block(name='csd')
-    for segIdx, seg in enumerate(dataBlock.segments):
+    # for segIdx, seg in enumerate(dataBlock.segments):
+    for segIdx in range(nSegsOriginal):
         newSeg = Segment(name='seg{}_csd'.format(segIdx))
         newSeg.block = outputBlock
         outputBlock.segments.append(newSeg)
         for cidx, csdName in enumerate(csdChanIndex.channel_names):
             if nanMask is not None:
-                if nanMaskLong.iloc[cidx]:
+                if nanMask.iloc[cidx]:
                     continue
             if segIdx == 0:
                 newChIdx = ChannelIndex(
@@ -679,9 +682,6 @@ if __name__ == "__main__":
             newUnit.spiketrains.append(thisSt)
             newSeg.spiketrains.append(thisSt)
             thisSt.unit = newUnit
-    #
-    if arguments['lazy']:
-        dataReader.file.close()
     outputBlock.create_relationship()
     outputBlock = ns5.purgeNixAnn(outputBlock)
     if os.path.exists(outputPath):

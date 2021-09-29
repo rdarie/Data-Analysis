@@ -45,7 +45,9 @@ from scipy.stats import zscore, mode
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
-from dataAnalysis.analysis_code.regression_parameters import *
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
@@ -56,7 +58,6 @@ import dill as pickle
 pickle.settings['recurse'] = True
 import gc
 from itertools import product
-from docopt import docopt
 import colorsys, sys
 
 idxSl = pd.IndexSlice
@@ -64,7 +65,6 @@ idxSl = pd.IndexSlice
 print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
 for arg in sys.argv:
     print(arg)
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 # if debugging in a console:
 '''

@@ -36,7 +36,10 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from dask.distributed import Client, LocalCluster
 import os, traceback
-from dataAnalysis.analysis_code.regression_parameters import *
+
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -64,7 +67,6 @@ from sklego.preprocessing import PatsyTransformer
 import dill as pickle
 pickle.settings['recurse'] = True
 import gc, sys
-from docopt import docopt
 from copy import deepcopy
 import colorsys
 sns.set(
@@ -128,7 +130,6 @@ for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
 if __name__ == '__main__':
-    arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
     # if debugging in a console:
     '''
     consoleDebugging = True

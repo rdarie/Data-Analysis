@@ -51,8 +51,11 @@ import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
 from sklego.preprocessing import PatsyTransformer
-from dataAnalysis.analysis_code.regression_parameters import *
-# from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
+
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
+
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
@@ -62,7 +65,7 @@ import gc
 import patsy
 from itertools import product
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
-from docopt import docopt
+
 import control as ctrl
 idxSl = pd.IndexSlice
 useDPI = 200
@@ -120,7 +123,7 @@ for rcK, rcV in mplRCParams.items():
 
 
 print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+
 
 # if debugging in a console:
 '''

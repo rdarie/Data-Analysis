@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J apply_mahal_dist_motion_lfp_25
+#SBATCH -J apply_mahal_dist_motion_202101_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/apply_mahal_dist_motion_lfp_25-%a.out
-#SBATCH -e ../../batch_logs/apply_mahal_dist_motion_lfp_25-%a.out
+#SBATCH -o ../../batch_logs/apply_mahal_dist_motion_202101_20-%a.out
+#SBATCH -e ../../batch_logs/apply_mahal_dist_motion_202101_20-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,7 +24,7 @@
 
 #    SLURM_ARRAY_TASK_ID=2
 
-source ./shellScripts/run_exp_preamble_temp.sh
+source ./shellScripts/run_exp_preamble_202101_20.sh
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 ###################
@@ -34,13 +34,13 @@ ITERATOR="ca"
 ALIGNQUERYTERM="starting"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
-targets=(lfp_CAR lfp_CAR_spectral_scaled)
+targets=(laplace_scaled laplace_spectral_scaled)
 estimators=(mahal_ledoit)
 for TARGET in "${targets[@]}"
 do
   for ESTIMATOR in "${estimators[@]}"
   do
-    python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
+    python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
     python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
   done
 done

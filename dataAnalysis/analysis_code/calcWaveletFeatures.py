@@ -19,7 +19,7 @@ Options:
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
 """
-import matplotlib, os
+import matplotlib, os, sys
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 if 'CCV_HEADLESS' in os.environ:
@@ -35,17 +35,16 @@ import dataAnalysis.helperFunctions.helper_functions_new as hf
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import dataAnalysis.helperFunctions.pywt_helpers as pywthf
-import os
 import pandas as pd
 import numpy as np
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
-import joblib as jb
-import pickle
-import math as m
+# import joblib as jb
+# import pickle
+# import math as m
 import quantities as pq
-from dask.distributed import Client, LocalCluster
-from tqdm import tqdm
+# from dask.distributed import Client, LocalCluster
+# from tqdm import tqdm
 import pywt
 from docopt import docopt
 from numpy.random import default_rng
@@ -150,6 +149,14 @@ if __name__ == "__main__":
         int(arguments['blockIdx']), arguments['exp'])
     globals().update(expOpts)
     globals().update(allOpts)
+    if arguments['alignFolderName'] == 'stim':
+        if blockExperimentType == 'proprio-motionOnly':
+            print('skipping block {} (no stim)'.format(arguments['blockIdx']))
+            sys.exit()
+    if arguments['alignFolderName'] == 'motion':
+        if blockExperimentType == 'proprio-miniRC':
+            print('skipping block {} (no movement)'.format(arguments['blockIdx']))
+            sys.exit()
     #
     blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
     analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(

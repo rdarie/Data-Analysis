@@ -38,7 +38,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from dask.distributed import Client, LocalCluster
 import os, traceback
-from dataAnalysis.analysis_code.regression_parameters_rd import *
+#
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetNameRhs'].split('_')[-1]))
+#
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -65,7 +69,6 @@ from sklego.preprocessing import PatsyTransformer
 import dill as pickle
 pickle.settings['recurse'] = True
 import gc, sys
-from docopt import docopt
 from copy import deepcopy
 sns.set(
     context='talk', style='darkgrid',
@@ -75,7 +78,6 @@ for arg in sys.argv:
     print(arg)
 ##
 if __name__ == '__main__':
-    arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
     ##
     '''
     consoleDebugging = True
@@ -188,6 +190,7 @@ if __name__ == '__main__':
         # 'forceMagnitude': MinMaxScaler(feature_range=(0., 1)),
         # 'forceMagnitude_prime': MinMaxScaler(feature_range=(-1., 1)),
         'amplitude': MinMaxScaler(feature_range=(0., 1)),
+        'amplitude_raster': MinMaxScaler(feature_range=(0., 1)),
         'RateInHz': MinMaxScaler(feature_range=(0., .5)),
         'velocity': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
@@ -261,9 +264,10 @@ if __name__ == '__main__':
                     plt.show()
                 else:
                     plt.close()
-    thisEnv = patsy.EvalEnvironment.capture()
+    ##
     # prep rhs dataframes
     # histDesignDict = {}
+    thisEnv = patsy.EvalEnvironment.capture()
     targetsList = []
     for rhsMaskIdx in range(rhsMasks.shape[0]):
         prf.print_memory_usage('Prepping RHS on rhsRow {}'.format(rhsMaskIdx))
@@ -307,6 +311,7 @@ if __name__ == '__main__':
                 thisHistDesign.columns.name = 'factor'
                 thisHistDesign.to_hdf(designMatrixPath, 'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
     del rhsDF
+    ###
     allTargetsList = []
     for lhsMaskIdx in range(lhsMasks.shape[0]):
         allTargetsList.append(pd.concat(targetsList))

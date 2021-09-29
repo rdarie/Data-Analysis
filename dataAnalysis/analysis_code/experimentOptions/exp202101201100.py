@@ -238,6 +238,7 @@ def getExpOpts():
         }
     }
     #
+    '''
     csdOpts = {
         'NSamplesForCV': 1000,
         'chunkSize': 20000,
@@ -251,7 +252,8 @@ def getExpOpts():
                 'ftype': 'butter'
             }
         }
-    }
+        }
+        '''
     expIteratorOpts = {
         'ca': {
             'experimentsToAssemble': {
@@ -289,6 +291,21 @@ def getExpOpts():
                 }
             },
         'rb': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            },
+        'rc': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            },
+        'rd': {
+            'experimentsToAssemble': {
+                '202101201100-Rupert': [1, 2, 3],
+                }
+            },
+        're': {
             'experimentsToAssemble': {
                 '202101201100-Rupert': [1, 2, 3],
                 }

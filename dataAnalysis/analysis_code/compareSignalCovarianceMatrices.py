@@ -63,6 +63,7 @@ from sklearn.metrics import explained_variance_score
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 from sklearn.decomposition import PCA, FactorAnalysis
+from sklearn.manifold import MDS
 import joblib as jb
 import dill as pickle
 import gc
@@ -74,8 +75,8 @@ from itertools import product
 from scipy import stats
 import scipy
 import umap
-from tqdm import tqdm
 import umap.plot
+from tqdm import tqdm
 #
 idxSl = pd.IndexSlice
 useDPI = 200
@@ -320,7 +321,7 @@ listOfIteratorSuffixes =[x.strip() for x in arguments['iteratorSuffixList'].spli
 covMatDict = {}
 eVSDict = {}
 estimatorsDict = {}
-for iteratorSuffix in listOfIteratorSuffixes:
+for iterIdx, iteratorSuffix in enumerate(listOfIteratorSuffixes):
     datasetName = arguments['datasetPrefix'] + '_{}'.format(iteratorSuffix)
     thisEstimatorName = '{}_{}_{}'.format(
         estimatorName, datasetName, selectionName)
@@ -347,6 +348,15 @@ for iteratorSuffix in listOfIteratorSuffixes:
             estimatorsDict[iteratorSuffix] = pd.read_hdf(store, 'full_estimators')
         elif 'cv_estimators' in store:
             estimatorsDict[iteratorSuffix] = pd.read_hdf(store, 'cv_estimators')
+    #
+    if iterIdx == 0:
+        datasetPath = os.path.join(
+            dataFramesFolder,
+            datasetName + '.h5'
+            )
+        dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+        mapDF = dataDF.columns.to_frame().reset_index(drop=True).set_index('feature')
+        del dataDF
 covMatDF = pd.concat(covMatDict, names=['iterator'])
 if any(eVSDict):
     eVSDF = pd.concat(eVSDict, names=['iterator'])
@@ -370,8 +380,9 @@ for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
     for distanceType in lOfDistanceTypes:
         theseDistances[distanceType] = pd.DataFrame(
             np.nan, index=estimatorGroup.index, columns=estimatorGroup.index)
-    print('On {}'.format(freqBandName))
-    for refIdx in tqdm(estimatorGroup.index):
+    print('Calculating covariance distances per frequency band; On freq. band {}'.format(freqBandName))
+    tIterator = tqdm(estimatorGroup.index, mininterval=30., maxinterval=120.)
+    for refIdx in tIterator:
         for testIdx in estimatorGroup.index:
             if refIdx == testIdx:
                 for distanceType in ['KL', 'frobenius', 'spectral']:
@@ -392,10 +403,11 @@ for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
         distancesDict[distanceType][freqBandName].name = distanceType
         distancesDict[distanceType][freqBandName].to_hdf(resultPath, '/distanceMatrices/{}/{}'.format(freqBandName, distanceType))
         #
-        uMapper = umap.UMAP(metric='precomputed', n_neighbors=3*lastFoldIdx, min_dist=0.5)
-        uMapper.fit(theseDistances[distanceType])
+        # uMapper = umap.UMAP(metric='precomputed', n_neighbors=3*lastFoldIdx, min_dist=0.5)
+        uMapper = MDS(metric='dissimilarity', n_components=2)
         projectedDict[distanceType][freqBandName] = pd.DataFrame(
-            uMapper.transform(theseDistances[distanceType]), index=theseDistances[distanceType].index,
+            uMapper.fit_transform(theseDistances[distanceType]),
+            index=theseDistances[distanceType].index,
             columns=['umap_{}'.format(fid) for fid in range(2)])
         projectedDict[distanceType][freqBandName].columns.name = 'feature'
         projectedDict[distanceType][freqBandName].name = '{}_umap'.format(distanceType)
@@ -546,21 +558,13 @@ def annotateLine(
 
 def distanceBetweenSites(
         inputSrs=None, mapDF=None,
-        spacing=400, xSpacing=400, ySpacing=400):
+        spacing=1., xSpacing=1., ySpacing=1.):
     # fromFeat = 'utah1'
     # toFeat = 'utah10'
-    dX = xSpacing * (mapDF.loc[inputSrs['fromFeat'], 'xcoords'] - mapDF.loc[inputSrs['toFeat'], 'xcoords'])
-    dY = ySpacing * (mapDF.loc[inputSrs['fromFeat'], 'ycoords'] - mapDF.loc[inputSrs['toFeat'], 'ycoords'])
+    dX = xSpacing * (mapDF.loc[inputSrs['fromFeat'], 'xCoords'] - mapDF.loc[inputSrs['toFeat'], 'xCoords'])
+    dY = ySpacing * (mapDF.loc[inputSrs['fromFeat'], 'yCoords'] - mapDF.loc[inputSrs['toFeat'], 'yCoords'])
     distance = np.sqrt(dX**2 + dY**2)
     return distance
-
-electrodeMapPath = spikeSortingOpts['utah']['electrodeMapPath']
-mapExt = electrodeMapPath.split('.')[-1]
-if mapExt == 'cmp':
-    mapDF = prb_meta.cmpToDF(electrodeMapPath)
-elif mapExt == 'map':
-    mapDF = prb_meta.mapToDF(electrodeMapPath)
-mapDF = mapDF.loc[:, ['label', 'xcoords', 'ycoords']].drop_duplicates().set_index('label')
 
 pdfPath = os.path.join(
     figureOutputFolder, '{}_covMatSimilarity_comparison.pdf'.format(
@@ -895,7 +899,7 @@ with PdfPages(pdfPath) as pdf:
                         x_var=x_var, y_var=y_var,
                         plotKWArgs=plotKWArgs,
                         textLocation=textLocation, text=text, textKWArgs=textKWArgs)
-            g.suptitle('umap projection of {} distance (frequency band: {})'.format(distanceType, freqBandName))
+            g.suptitle('MDS projection of {} distance (frequency band: {})'.format(distanceType, freqBandName))
             for ax in g.axes.flat:
                 ax.set_xticks([])
                 ax.set_yticks([])

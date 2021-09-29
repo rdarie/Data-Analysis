@@ -20,6 +20,7 @@ from patsy.state import stateful_transform
 from statsmodels.stats.multitest import multipletests as mt
 import pdb, traceback
 import os
+from tqdm import tqdm
 import scipy.optimize
 from itertools import product
 import joblib as jb
@@ -643,18 +644,21 @@ class raisedCosTransformer(object):
             b = 0
         self.verbose = verbose
         self.convolveMethod = convolveMethod
-        self.joblibBackendArgs = joblibBackendArgs.copy()
-        if joblibBackendArgs['backend'] == 'dask':
-            daskComputeOpts = self.joblibBackendArgs.pop('daskComputeOpts')
-            if daskComputeOpts['scheduler'] == 'single-threaded':
-                daskClient = Client(LocalCluster(n_workers=1))
-            elif daskComputeOpts['scheduler'] == 'processes':
-                daskClient = Client(LocalCluster(processes=True))
-            elif daskComputeOpts['scheduler'] == 'threads':
-                daskClient = Client(LocalCluster(processes=False))
-            else:
-                print('Scheduler name is not correct!')
-                daskClient = Client()
+        if joblibBackendArgs is not None:
+            self.joblibBackendArgs = joblibBackendArgs.copy()
+            if joblibBackendArgs['backend'] == 'dask':
+                daskComputeOpts = self.joblibBackendArgs.pop('daskComputeOpts')
+                if daskComputeOpts['scheduler'] == 'single-threaded':
+                    daskClient = Client(LocalCluster(n_workers=1))
+                elif daskComputeOpts['scheduler'] == 'processes':
+                    daskClient = Client(LocalCluster(processes=True))
+                elif daskComputeOpts['scheduler'] == 'threads':
+                    daskClient = Client(LocalCluster(processes=False))
+                else:
+                    print('Scheduler name is not correct!')
+                    daskClient = Client()
+        else:
+            self.joblibBackendArgs = None
         self.nb = nb
         self.dt = dt
         self.historyLen = historyLen
@@ -738,14 +742,19 @@ class raisedCosTransformer(object):
             contextManager = contextlib.nullcontext()
         else:
             contextManager = parallel_backend(**self.joblibBackendArgs)
-        if self.verbose > 1:
-            print('Analyzing signal {}'.format(vecSrs.name))
-            print('joblibBackendArgs = {}'.format(self.joblibBackendArgs))
-            print('joblib context manager = {}'.format(contextManager))
+        if self.verbose >= 1:
+            if self.verbose >= 2:
+                print('Analyzing signal {}'.format(vecSrs.name))
+                print('joblibBackendArgs = {}'.format(self.joblibBackendArgs))
+                print('joblib context manager = {}'.format(contextManager))
+            #  tIterator = tqdm(vecSrs.groupby(self.groupBy), mininterval=30., maxinterval=120.)
+            tIterator = vecSrs.groupby(self.groupBy)
+        else:
+            tIterator = vecSrs.groupby(self.groupBy)
         with contextManager:
             lOfPieces = Parallel(verbose=self.verbose)(
                 delayed(self.transformPiece)(name, group)
-                for name, group in vecSrs.groupby(self.groupBy))
+                for name, group in tIterator)
             resDF = pd.concat(lOfPieces)
             resDF = resDF.loc[vecSrs.index, :]
             resDF.columns = columnNames

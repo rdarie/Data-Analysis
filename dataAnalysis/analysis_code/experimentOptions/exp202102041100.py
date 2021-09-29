@@ -217,7 +217,4 @@ def getExpOpts():
                 for i in [1, 2, 3]]
         }
     }
-    csdOpts = {
-        'skipChannels': ['utah25', 'utah39']
-        }
     return locals()

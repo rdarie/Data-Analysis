@@ -185,8 +185,6 @@ if __name__ == '__main__':
     else:
         plotSuffix = ''
     # pdb.set_trace()
-    expDateTime = pd.to_datetime(experimentName.split('-')[0], format='%Y%m%d%H%M')
-    expDateTimePathStr = expDateTime.strftime('%Y-%m-%d')
     pdfPath = os.path.join(figureOutputFolder, '{}-{}{}.pdf'.format(expDateTimePathStr, pdfName, plotSuffix))
     #
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')

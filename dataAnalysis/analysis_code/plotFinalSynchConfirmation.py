@@ -14,7 +14,8 @@ Options:
     --debugging                            load from raw, or regular? [default: False]
     --verbose=verbose                      print diagnostics? [default: 0]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
-    --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
+    --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps) [default: rig]
+    --selectionName2=selectionName2        filename for resulting estimator (cross-validated n_comps) [default: laplace]
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
     --plotSuffix=plotSuffix                filename for resulting estimator (cross-validated n_comps)
     --enableOverrides                      modify default plot opts? [default: False]
@@ -205,11 +206,17 @@ if __name__ == '__main__':
             normalizationParams = loadingMeta['normalizationParams']
         else:
             normalizeDataset = None
+    #
     rigDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
-    lfpDF = pd.read_hdf(datasetPath, '/{}/data'.format('lfp_CAR'))
+    lfpDF = pd.read_hdf(datasetPath, '/{}/data'.format(arguments['selectionName2']))
+    #
+    lfpDF.index = rigDF.index
+    #
+    # rigTrialInfo = rigDF.index.to_frame().reset_index(drop=True)
+    # lfpTrialInfo = lfpDF.index.to_frame().reset_index(drop=True)
+    #
     dataDF = pd.concat([rigDF, lfpDF], axis='columns')
     del rigDF, lfpDF
-    # pdb.set_trace()
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
     #
@@ -257,8 +264,8 @@ if __name__ == '__main__':
     rigChans = [
         cN
         for cN in [
-            'amplitude', 'position', 'utah_rawAverage_0', 'utah_artifact_0',
-            'utah10', 'utah17', 'utah80', 'utah87', 'utah53']
+            'amplitude_raster', 'amplitude', 'position', 'utah_rawAverage_0', 'utah_artifact_0',
+            'utah_csd_11', 'utah_csd_18', 'utah_csd_81', 'utah_csd_88']
         if cN in featureInfo['feature'].to_list()]
     insChans = [
         cN

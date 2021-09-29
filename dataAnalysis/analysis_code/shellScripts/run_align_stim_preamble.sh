@@ -9,11 +9,12 @@ WINDOWTERM="XL"
 #
 WINDOW="--window=${WINDOWTERM}"
 
-
 ANALYSISFOLDER="--analysisName=hiRes"
+# ANALYSISFOLDER="--analysisName=hiResHiFreq"
 # ANALYSISFOLDER="--analysisName=default"
 # 
 SIGNALFOLDER="--signalSubfolder=hiRes"
+# SIGNALFOLDER="--signalSubfolder=hiResHiFreq"
 # SIGNALFOLDER="--signalSubfolder=default"
 
 EVENTFOLDER="--eventSubfolder=None"

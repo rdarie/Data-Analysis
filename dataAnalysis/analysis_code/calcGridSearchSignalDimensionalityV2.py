@@ -43,7 +43,11 @@ import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.custom_transformers.tdr import reconstructionR2
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
-from dataAnalysis.analysis_code.regression_parameters import *
+
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
+
 import pdb
 import numpy as np
 import pandas as pd
@@ -60,7 +64,6 @@ import joblib as jb
 import dill as pickle
 pickle.settings['recurse'] = True
 import gc, sys
-from docopt import docopt
 from copy import deepcopy
 sns.set(
     context='talk', style='darkgrid',
@@ -104,7 +107,6 @@ def calc_lw_score(
 
 
 if __name__ == '__main__':
-    arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
     ##
     '''
     

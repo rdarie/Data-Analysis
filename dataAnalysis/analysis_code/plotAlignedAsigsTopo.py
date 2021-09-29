@@ -75,10 +75,6 @@ import pdb
 from tqdm import tqdm
 import dill as pickle
 #
-sns.set(
-    context='talk', style='darkgrid',
-    palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True)
 useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
@@ -122,11 +118,11 @@ mplRCParams = {
     }
 styleOpts = {
     'legend.lw': 2,
-    'tight_layout.pad': 3e-1, # units of font size
+    'tight_layout.pad': 3e-1,  # units of font size
     'panel_heading.pad': 0.
     }
 sns.set(
-    context='paper', style='whitegrid',
+    context='paper', style='white',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
@@ -199,7 +195,16 @@ figureOutputFolder = os.path.join(
     arguments['alignFolderName'], 'alignedFeatures')
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder, exist_ok=True)
-pdfName = os.path.join(figureOutputFolder, reportName + '.pdf')
+# for cleanup
+if False:
+    for oldFileName in os.listdir(figureOutputFolder):
+        oldFilePath = os.path.join(figureOutputFolder, oldFileName)
+        print('deleting {}'.format(oldFilePath))
+        os.remove(os.path.join(figureOutputFolder, oldFileName))
+#
+pdfName = os.path.join(
+    figureOutputFolder,
+    expDateTimePathStr + '-' + arguments['analysisName'] + '-' + reportName + '.pdf')
 #
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
     namedQueries, **arguments)
@@ -218,7 +223,7 @@ else:
         makeControlProgram=True,
         metaDataToCategories=False))
 #
-requiredAnns = essentialMetadataFields + ['xCoords', 'yCoords']  
+requiredAnns = essentialMetadataFields + ['xCoords', 'yCoords', 'freqBandName']
 if groupPagesBy is not None:
     for annNm in groupPagesBy:
         if annNm not in requiredAnns:
@@ -226,7 +231,7 @@ if groupPagesBy is not None:
 alignedAsigsKWargs.update(dict(
     getMetaData=requiredAnns,
     transposeToColumns='bin', concatOn='index'))
-alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-600e-3, -300e-3))
+alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-600e-3, -100e-3))
 
 #############################
 # for stim spike report
@@ -263,8 +268,8 @@ mapSpecificRelplotKWArgs = {
 relplotKWArgs.update({
     'legend': 'brief',
     # 'legend': False,
-    'height': 1,
-    'aspect': 1,
+    'height': 1.5,
+    'aspect': 2,
     'facet_kws': {
         'sharey': False,
         'legend_out': False,
@@ -272,9 +277,13 @@ relplotKWArgs.update({
             'wspace': 0.01,
             'hspace': 0.01
         }}})
-if 'csd' in arguments['inputBlockSuffix']:
+if 'laplace' in arguments['inputBlockSuffix']:
     relplotKWArgs.update({
-        'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1"
+        'palette': "ch:0.6,.3,dark=.25,light=0.75,reverse=1"
+        })
+elif 'CAR' in arguments['inputBlockSuffix']:
+    relplotKWArgs.update({
+        'palette': "ch:2.9,.3,dark=.25,light=0.75,reverse=1"
         })
 sharedYAxes = relplotKWArgs['facet_kws']['sharey']
 plotProcFuns = [
@@ -300,12 +309,11 @@ plotProcFuns = [
             max(0e-3, alignedAsigsKWargs['windowSize'][0]),
             min(1000e-3, alignedAsigsKWargs['windowSize'][1])],
         asigPlotShadingOpts),
-    # asp.genTicksToScale(
-    #     lineOpts={'lw': 1}, shared=sharedYAxes,
-    #     xUnitFactor=1e3, xUnits='msec',
-    #     yUnitFactor=1e3, yUnits='uA/mm^3',
-    #     # yUnitFactor=1, yUnits='uV',
-    #     )
+    asp.genTicksToScale(
+        lineOpts={'lw': .5}, shared=sharedYAxes,
+        xUnitFactor=1e3, xUnits='msec',
+        yUnitFactor=1, yUnits='uV',
+        )
     # asp.genStimVLineAdder(
     #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False)
         ]
@@ -350,8 +358,8 @@ with open(loadFigMetaPath, 'rb') as _f:
 #         filePath=saveAxLimsToPath, keyColName='feature')
 #     )
 
-if arguments['analysisName'] == 'hiRes':
-    alignedAsigsKWargs['decimate'] = 5
+# if arguments['analysisName'] == 'fullRes':
+#     alignedAsigsKWargs['decimate'] = 3
 ################
 # from here on, we can start defining a function
 # TODO delete this and rework, right now it is very hacky
@@ -463,7 +471,6 @@ if groupPagesBy is None:
     pageGrouper = [('all', asigWide)]
 else:
     pageGrouper = asigWide.groupby(groupPagesBy)
-#
 # import warnings
 # warnings.filterwarnings("error")
 pageCount = 0
@@ -519,11 +526,11 @@ with PdfPages(pdfName) as pdf:
             ############################################################################################################
             zoomMask = (
                     (
-                            (thisAsigStack['bin'] >= (-75e-3)) &
-                            (thisAsigStack['bin'] < (175e-3))
+                            (thisAsigStack['bin'] >= (-25e-3)) &
+                            (thisAsigStack['bin'] < (150e-3))
                     ) |
                     (thisAsigStack['bin'].isna())
-            )
+                )
             ############################################################################################################
             g = sns.relplot(
                 data=thisAsigStack.loc[zoomMask, :],

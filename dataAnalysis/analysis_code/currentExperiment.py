@@ -1,10 +1,10 @@
 import os, pdb, re, platform, traceback
 #  import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
-from imblearn.over_sampling import RandomOverSampler
-from imblearn.under_sampling import RandomUnderSampler
+# from imblearn.over_sampling import RandomOverSampler
+# from imblearn.under_sampling import RandomUnderSampler
 import importlib
-
+import pandas as pd
 
 def parseAnalysisOptions(
         blockIdx=1, experimentShorthand=None):
@@ -39,6 +39,8 @@ def parseAnalysisOptions(
     except Exception:
         insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
+    expDateTime = pd.to_datetime(experimentName.split('-')[0], format='%Y%m%d%H%M')
+    expDateTimePathStr = expDateTime.strftime('%Y-%m-%d')
     assembledName = 'Block'
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
     simiFolder = os.path.join(remoteBasePath, 'processed', experimentName, 'simi')
@@ -438,7 +440,11 @@ def parseAnalysisOptions(
             'RC': (-0.33, 0.33),
             'miniRC': (-1, 1)},
         'analysisFilterKWArgs': {
-            'hiRes': dict(filterSignals=False, medianFilterSignals=True, analysisMedianFilterOpts=dict(size=(30, 1)))
+            'hiRes': dict(
+                filterSignals=True, medianFilterSignals=False,
+                hampelFilterSignals=True, analysisHampelFilterOpts=dict(
+                    window_size=10, n=6, imputation=True  # total window size will be computed as 2*window_size + 1
+            ))
         },
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
         'separateByFunArgs': None,
@@ -549,8 +555,8 @@ def parseAnalysisOptions(
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
-                'winStart': -900e-3,
-                'winStop': -600e-3
+                'winStart': -600e-3,
+                'winStop': -200e-3
                 }
             },
         # perimovement, no stim
@@ -630,8 +636,8 @@ def parseAnalysisOptions(
             },
             'timeROIOpts_control': {
                 'alignQuery': 'startingOrStimOn',
-                'winStart': -600e-3,
-                'winStop': -200e-3
+                'winStart': -900e-3,
+                'winStop': -600e-3
                 }
             },
         # perimovement, any stim, for regression
@@ -645,14 +651,14 @@ def parseAnalysisOptions(
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
-                n_splits=10,
+                n_splits=5,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
-                'winStart': -0.45,  # start 0.2 before whatever the query was
+                'winStart': -0.3,  # start 0.2 before whatever the query was
                 'winStop': .5  # stop .5 sec after startingOrStimOn
             },
             'timeROIOpts_control': {

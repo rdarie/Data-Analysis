@@ -50,7 +50,7 @@ from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
-# from dataAnalysis.analysis_code.regression_parameters_history_len_determine import *
+
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf

@@ -6,10 +6,47 @@ import seaborn as sns
 from tqdm import tqdm
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
-from neo.core import (Block, Segment, ChannelIndex,
+from neo.core import (
+    Block, Segment, ChannelIndex,
     AnalogSignal, Unit, SpikeTrain, Event)
 from kcsd import KCSD2D
 from scipy import interpolate, ndimage
+import contextlib
+from joblib import Parallel, parallel_backend, delayed
+from astropy.convolution import convolve, interpolate_replace_nans
+import pdb
+
+
+def convolveLfpWithKernel(
+        lfpDF, laplKernel=None):
+    if laplKernel is None:
+        laplKernel = 1/8 * np.asarray([
+            [-1, -1, -1],
+            [-1, 8, -1],
+            [-1, -1, -1],
+            ])
+    #
+    if lfpDF.isna().any(axis=None):
+        nanMask = lfpDF.isna()
+        inputNP = interpolate_replace_nans(
+            lfpDF.to_numpy(),
+            np.ones((3, 3))
+        )
+    else:
+        nanMask = None
+        inputNP = lfpDF.to_numpy()
+    #
+    laplNP = convolve(
+        inputNP, laplKernel,
+        normalize_kernel=False,
+        boundary='extend')
+    laplDF = pd.DataFrame(
+        laplNP,
+        index=lfpDF.index,
+        columns=lfpDF.columns)
+    if nanMask is not None:
+        laplDF = laplDF.mask(nanMask)
+    return laplDF
 
 
 def compose2D(
@@ -79,6 +116,92 @@ def compose2D(
             lfpList.append(lfpDF)
         if tqdmProgBar:
             tIterator.update(1)
+    return asigTimes, lfpList
+
+
+def compose2DParallel(
+        asig, chanIndex, procFun=None,
+        fillerFun=None, fillerFunKWArgs={}, unstacked=False,
+        tqdmProgBar=False, joblibBackendArgs=None, verbose=0):
+    coordinateIndices = chanIndex.annotations['coordinateIndices']
+    # coordsToIndices is guaranteed to return indices between 0 and max
+    xMin = chanIndex.coordinates[:, 0].min()
+    xMax = chanIndex.coordinates[:, 0].max()
+    yMin = chanIndex.coordinates[:, 1].min()
+    yMax = chanIndex.coordinates[:, 1].max()
+    #
+    yIdxMax = coordinateIndices[:, 1].max()
+    yStepSize = (yMax - yMin) / yIdxMax
+    yIndex = yMin + (np.arange(yIdxMax + 1) * yStepSize)
+    xIdxMax = coordinateIndices[:, 0].max()
+    xStepSize = (xMax - xMin) / xIdxMax
+    xIndex = xMin + (np.arange(xIdxMax + 1) * xStepSize)
+    fullLongIndex = pd.MultiIndex.from_product(
+        [xIndex, yIndex], names=['x', 'y'])
+    fullLongCoords = fullLongIndex.to_frame().reset_index(drop=True)
+    fullLongCoords.loc[:, 'isPresent'] = False
+    presentCoords = pd.DataFrame(
+        chanIndex.coordinates[:, :2], columns=['x', 'y'])
+    for coordIdx, coord in fullLongCoords.iterrows():
+        deltaX = (presentCoords['x'] - coord['x']).abs()
+        deltaY = (presentCoords['y'] - coord['y']).abs()
+        fullLongCoords.loc[coordIdx, 'isPresent'] = (
+            (deltaX < 1e-3) &
+            (deltaY < 1e-3)
+            ).any()
+    if asig.ndim == 1:
+        allAsig = asig.magnitude[np.newaxis, :].copy()
+        asigTimes = np.asarray([0]) * pq.s
+    else:
+        allAsig = asig.magnitude.copy()
+        asigTimes = asig.times
+    if (~fullLongCoords['isPresent']).any():
+        missingCoords = fullLongCoords[~fullLongCoords['isPresent']]
+        allCoords = pd.concat(
+            [presentCoords, missingCoords.loc[:, ['x', 'y']]],
+            ignore_index=True, axis=0)
+        filler = np.empty((allAsig.shape[0], missingCoords.shape[0]))
+        filler[:] = np.nan
+        allAsig = np.concatenate([allAsig, filler], axis=1)
+    else:
+        allCoords = presentCoords
+    allAsigDF = pd.DataFrame(
+        allAsig, index=asigTimes,
+        columns=allCoords.set_index(['x', 'y']).index)
+    allAsigDF.index.name = 't'
+    if fillerFun is not None:
+        fillerFun(allAsigDF, **fillerFunKWArgs)
+    # asig is a 2D AnalogSignal
+    if joblibBackendArgs is None:
+        contextManager = contextlib.nullcontext()
+    else:
+        contextManager = parallel_backend(**joblibBackendArgs)
+    if verbose > 1:
+        print('compose2DParallel()\njoblibBackendArgs = {}'.format(joblibBackendArgs))
+        print('joblib context manager = {}'.format(contextManager))
+
+    def transformPiece(asigSrs):
+        asigCopy = asigSrs.copy()
+        asigCopy.name = 'signal'
+        retDF = asigCopy.reset_index().pivot(index='y', columns='x', values='signal')
+        if procFun is not None:
+            retDF = procFun(retDF)
+        if unstacked:
+            retDF = retDF.unstack()
+        return retDF
+
+    if tqdmProgBar:
+        tIterator = tqdm(
+            allAsigDF.iterrows(),
+            total=allAsigDF.shape[0],
+            mininterval=30., maxinterval=120.)
+    else:
+        tIterator = allAsigDF.iterrows()
+
+    with contextManager:
+        lfpList = Parallel(verbose=verbose)(
+            delayed(transformPiece)(asigSrs)
+            for tIdx, asigSrs in tIterator)
     return asigTimes, lfpList
 
 

@@ -43,7 +43,11 @@ import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.custom_transformers.tdr import reconstructionR2
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
-from dataAnalysis.analysis_code.regression_parameters_rd import *
+
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
+
 import pdb
 import numpy as np
 import pandas as pd
@@ -60,7 +64,7 @@ import joblib as jb
 import dill as pickle
 pickle.settings['recurse'] = True
 import gc, sys
-from docopt import docopt
+
 from copy import deepcopy
 sns.set(
     context='talk', style='darkgrid',
@@ -73,7 +77,6 @@ for arg in sys.argv:
 
 
 if __name__ == '__main__':
-    arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
     ##
     '''
     
@@ -148,25 +151,36 @@ if __name__ == '__main__':
     featureMasks = featureMasks.loc[:, lagMask]
     #
     estimatorClass = ColumnTransformer
-    listOfColumns = [
-        ('utah18', 0, 8.0, 9.0, 'NA', 'NA'),
-        ('utah29', 0, 6.0, 0.0, 'NA', 'NA'),
-        ('utah32', 0, 6.0, 3.0, 'NA', 'NA'),
-        ('utah35', 0, 6.0, 6.0, 'NA', 'NA'),
-        ('utah38', 0, 6.0, 9.0, 'NA', 'NA'),
-        ( 'utah4', 0, 9.0, 4.0, 'NA', 'NA'),
-        ('utah59', 0, 3.0, 0.0, 'NA', 'NA'),
-        ('utah62', 0, 3.0, 3.0, 'NA', 'NA'),
-        ('utah65', 0, 3.0, 6.0, 'NA', 'NA'),
-        ('utah68', 0, 3.0, 9.0, 'NA', 'NA'),
-        ( 'utah7', 0, 9.0, 7.0, 'NA', 'NA'),
-        ('utah79', 0, 1.0, 0.0, 'NA', 'NA'),
-        ( 'utah9', 0, 8.0, 0.0, 'NA', 'NA'),
-        ('utah90', 0, 0.0, 2.0, 'NA', 'NA'),
-        ('utah93', 0, 0.0, 5.0, 'NA', 'NA'),
-        ('utah96', 0, 0.0, 8.0, 'NA', 'NA')
-        ]
-    listOfColumns = dataDF.columns.to_list()
+    # listOfColumns = [
+    #     ('utah18', 0, 8.0, 9.0, 'NA', 'NA'),
+    #     ('utah29', 0, 6.0, 0.0, 'NA', 'NA'),
+    #     ('utah32', 0, 6.0, 3.0, 'NA', 'NA'),
+    #     ('utah35', 0, 6.0, 6.0, 'NA', 'NA'),
+    #     ('utah38', 0, 6.0, 9.0, 'NA', 'NA'),
+    #     ( 'utah4', 0, 9.0, 4.0, 'NA', 'NA'),
+    #     ('utah59', 0, 3.0, 0.0, 'NA', 'NA'),
+    #     ('utah62', 0, 3.0, 3.0, 'NA', 'NA'),
+    #     ('utah65', 0, 3.0, 6.0, 'NA', 'NA'),
+    #     ('utah68', 0, 3.0, 9.0, 'NA', 'NA'),
+    #     ( 'utah7', 0, 9.0, 7.0, 'NA', 'NA'),
+    #     ('utah79', 0, 1.0, 0.0, 'NA', 'NA'),
+    #     ( 'utah9', 0, 8.0, 0.0, 'NA', 'NA'),
+    #     ('utah90', 0, 0.0, 2.0, 'NA', 'NA'),
+    #     ('utah93', 0, 0.0, 5.0, 'NA', 'NA'),
+    #     ('utah96', 0, 0.0, 8.0, 'NA', 'NA')
+    #     ]
+    selectMethod = 'decimateSpace'
+    if selectMethod == 'decimateSpace':
+        featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
+        keepX = np.unique(featureInfo['xCoords'])[::3]
+        keepY = np.unique(featureInfo['yCoords'])[::3]
+        xyMask = (
+            featureInfo['xCoords'].isin(keepX) &
+            featureInfo['yCoords'].isin(keepY)
+            )
+        listOfColumns = dataDF.columns[xyMask.to_numpy()].to_list()
+    elif selectMethod == 'keepAll':
+        listOfColumns = dataDF.columns.to_list()
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     workIdx = cvIterator.work
     workingDataDF = dataDF.iloc[workIdx, :]

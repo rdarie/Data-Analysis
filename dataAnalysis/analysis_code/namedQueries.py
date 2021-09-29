@@ -24,6 +24,8 @@ namedQueries = {
     },
     'unit': {
         'fr': "(chanName.str.endswith('fr#0'))",
+        'csd': "(chanName.str.contains('_csd_'))",
+        'laplace': "(chanName.str.contains('_csd_'))",
         'utahlfp': "(chanName.str.contains('elec')and(not(chanName.str.endswith('fr#0'))))",
         'lfp': "((chanName.str.contains('elec') or chanName.str.contains('utah') or chanName.str.contains('nform')) and not(chanName.str.endswith('fr#0') or chanName.str.contains('rawAverage') or chanName.str.contains('deviation') or chanName.str.contains('_artifact') or chanName.str.contains('outlierMask')))",
         'lfp_CAR': "((chanName.str.contains('elec') or chanName.str.contains('utah') or chanName.str.contains('nform')) and not(chanName.str.endswith('fr#0') or chanName.str.contains('rawAverage') or chanName.str.contains('deviation') or chanName.str.contains('_artifact') or chanName.str.contains('outlierMask')))",
@@ -64,6 +66,8 @@ namedQueries = {
     },
     'chan': {
         'all': "(chanName.notna())",
+        'csd': "(chanName.str.contains('_csd_'))",
+        'laplace': "(chanName.str.contains('_csd_'))",
         'lfp': "((chanName.str.contains('elec') or chanName.str.contains('utah') or chanName.str.contains('nform')) and not(chanName.str.contains('rawAverage') or chanName.str.contains('deviation') or chanName.str.contains('_artifact') or chanName.str.contains('outlierMask')))",
         'derivedFromLfp': "((chanName.str.contains('elec') or chanName.str.contains('utah') or chanName.str.contains('nform')) and (chanName.str.contains('rawAverage') or chanName.str.contains('deviation') or chanName.str.contains('_artifact') or chanName.str.contains('outlierMask')))",
         'fr': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and((chanName.str.endswith('fr'))))",
@@ -177,9 +181,10 @@ namedQueries['align'].update({
         namedQueries['align']['trialRateInHz==100or0']
         ])
     })
-for eName in ['E2', 'E5', 'E9']:
+for eNameIdx in range(16):
+    eName = 'E{:02d}'.format(eNameIdx)
     namedQueries['align'].update({
-        '{}'.format(eName): "(electrode=='+ E16 - {}')".format(eName)})
+        '{}'.format(eName): "(electrode=='-{}+E16')".format(eName)})
     namedQueries['align'].update({
         'starting{}'.format(eName): '(' + '&'.join([
             namedQueries['align']['starting'],
