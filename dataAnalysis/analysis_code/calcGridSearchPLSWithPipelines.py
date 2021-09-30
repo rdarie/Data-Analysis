@@ -98,6 +98,7 @@ import patsy
 import sys
 import gc
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from datetime import datetime as dt
 
 from itertools import product
 idxSl = pd.IndexSlice
@@ -105,13 +106,13 @@ sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True)
+
 try:
-    print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
-except Exception:
-    traceback.print_exc()
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
 for arg in sys.argv:
     print(arg)
-
 
 if __name__ == '__main__':
     expOpts, allOpts = parseAnalysisOptions(
@@ -403,11 +404,12 @@ if __name__ == '__main__':
             maxNC = min(rhGroup.shape[0], fullDesignDF.shape[1], globalMaxNC)
             fastTrack = True
             if fastTrack:
-                gsKWA['param_grid']['regressor__regressor__n_components'] = [2, maxNC]
+                gsKWA['param_grid']['regressor__regressor__n_components'] = [2, int(maxNC / 2), maxNC]
             else:
                 gsKWA['param_grid']['regressor__regressor__n_components'] = [
                     nc
                     for nc in range(maxNC, minNC, -10)]
+            print('grid search candidates are\n{}'.format(gsKWA['param_grid']))
             cvScores, gridSearcherDict, gsScoresDF = tdr.gridSearchHyperparameters(
                 fullDesignDF, rhGroup,
                 estimatorInstance=estimatorInstance,
@@ -465,94 +467,5 @@ if __name__ == '__main__':
                 'gs_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
                     lhsMaskIdx, rhsMaskIdx, freqBandName
                 ))
-            '''
-            cvScoresDict1 = {}
-            gridSearcherDict1 = {}
-            gsScoresDict1 = {}
-            #
-            for targetName in rhGroup.columns:
-                targetIdx = allTargetsPLS.loc[(lhsMaskIdx, rhsMaskIdx, targetName), 'targetIdx']
-                if (targetIdx // slurmGroupSize) != slurmTaskID:
-                    continue
-                print('\nslurmTaskID == {} targetIdx == {}\n'.format(slurmTaskID, targetIdx))
-                prf.print_memory_usage('Fitting {} to {}...'.format(lhsMask.name[-1], targetName))
-                ##
-                targetDF = rhGroup.loc[:, [targetName]]
-                # add targetDF to designDF?
-                if ensTemplate != 'NULL':
-                    templateIdx = lOfHistTemplates.index(ensTemplate)
-                    thisEnsDesign = pd.read_hdf(
-                        designMatrixPath, 'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
-                    ensHistList = [
-                        thisEnsDesign.iloc[:, sl].copy()
-                        for key, sl in ensDesignInfo.term_name_slices.items()
-                        if key != ensTemplate.format(targetName)]
-                    del thisEnsDesign
-                else:
-                    ensHistList = []
-                #
-                if selfTemplate != 'NULL':
-                    templateIdx = lOfHistTemplates.index(selfTemplate)
-                    thisSelfDesign = pd.read_hdf(
-                        designMatrixPath, 'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
-                    selfHistList = [
-                        thisSelfDesign.iloc[:, sl].copy()
-                        for key, sl in selfDesignInfo.term_name_slices.items()
-                        if key == selfTemplate.format(targetName)]
-                    del thisSelfDesign
-                else:
-                    selfHistList = []
-                #
-                fullDesignList = exogList + ensHistList + selfHistList
-                fullDesignDF = pd.concat(fullDesignList, axis='columns')
-                del fullDesignList
-                gsKWA = deepcopy(gridSearchKWArgs)
-                if 'param_grid' in gridSearchKWArgs:
-                    if l1_ratio_name in gsKWA['param_grid']:
-                        dummyDesign = clone(pipelineLhs.named_steps['averager']).fit_transform(fullDesignDF)
-                        dummyRhs = pd.DataFrame(
-                            clone(pipelineRhs.named_steps['averager']).fit_transform(rhGroup),
-                            columns=rhGroup.columns).loc[:, [targetName]]
-                        paramGrid = gsKWA.pop('param_grid')
-                        lOfL1Ratios = paramGrid.pop(l1_ratio_name)
-                        gsParams = []
-                        for l1Ratio in lOfL1Ratios:
-                            alphas = _alpha_grid(
-                                dummyDesign, dummyRhs,
-                                l1_ratio=l1Ratio, n_alphas=nAlphas)
-                            alphasStr = ['{:.3g}'.format(a) for a in alphas]
-                            print('Evaluating alphas: {}'.format(alphasStr))
-                            gsParams.append(
-                                {
-                                    l1_ratio_name: [l1Ratio],
-                                    alpha_name: np.atleast_1d(alphas).tolist()
-                                }
-                            )
-                        gsKWA['param_grid'] = gsParams
-                #############
-                #  estimatorInstance.fit(fullDesignDF, targetDF)
-                ##############
-                cvScores, gridSearcherDict1[targetName], gsScoresDict1[targetName] = tdr.gridSearchHyperparameters(
-                    fullDesignDF, targetDF,
-                    estimatorInstance=estimatorInstance,
-                    verbose=int(arguments['verbose']),
-                    gridSearchKWArgs=gsKWA,
-                    crossvalKWArgs=crossvalKWArgs,
-                    joblibBackendArgs=joblibBackendArgs
-                    )
-                cvScoresDF = pd.DataFrame(cvScores)
-                cvScoresDF.index.name = 'fold'
-                cvScoresDF.dropna(axis='columns', inplace=True)
-                #
-                cvScoresDF.loc[:, ['test_score', 'train_score']].to_hdf(
-                    estimatorPath,
-                    'cv_scores/lhsMask_{}/rhsMask_{}/{}'.format(
-                        lhsMaskIdx, rhsMaskIdx, targetName
-                        ))
-                cvScoresDF['estimator'].to_hdf(
-                    estimatorPath,
-                    'cv_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
-                        lhsMaskIdx, rhsMaskIdx, targetName
-                        ))
-                prf.print_memory_usage('\n\nCompleted fit {} to {}...\n\n'.format(lhsMask.name[-1], targetName))'''
-prf.print_memory_usage('All fits complete.')
+    prf.print_memory_usage('All fits complete.')
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

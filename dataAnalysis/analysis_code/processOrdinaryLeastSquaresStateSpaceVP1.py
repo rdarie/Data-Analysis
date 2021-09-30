@@ -199,8 +199,7 @@ lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
 rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
 #
-
-if processSlurmTaskCount is not None:
+if processSlurmTaskCountPLS is not None:
     ################ collect estimators and scores
     AList = []
     BList = []
@@ -208,7 +207,7 @@ if processSlurmTaskCount is not None:
     DList = []
     HList = []
     eigList = []
-    for workerIdx in range(processSlurmTaskCount):
+    for workerIdx in range(processSlurmTaskCountPLS):
         thisEstimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(workerIdx))
         try:
             AList.append(pd.read_hdf(thisEstimatorPath, 'A'))

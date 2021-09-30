@@ -255,7 +255,7 @@ if (not arguments['loadFromFrames']):
                 timeDifference = (targetTrialAnnDF['t'] - t)
                 deltaT = timeDifference[timeDifference >= 0].min()
                 groupBins = group.index.get_level_values('bin')
-                print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
+                # print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
             listOfROIMasks.append(targetMask)
             print('targetMask has dimension {}'.format(targetMask.shape))

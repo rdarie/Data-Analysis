@@ -339,6 +339,10 @@ if __name__ == '__main__':
                     trainStr, testStr = 'train', 'test'
                     foldType = 'train'
                 estimator = estimatorsDF.loc[estimatorIdx]
+                regressor = estimator.regressor_.steps[-1][1]
+                estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
+                estPreprocessorRhs = estimator.transformer_
+                termNames = designTermNames + ensTermNames
                 # pdb.set_trace()
                 all_coefs = estimator.regressor_.named_steps['regressor'].coef_
                 _x_mean = estimator.regressor_.named_steps['regressor']._x_mean
@@ -349,11 +353,7 @@ if __name__ == '__main__':
                 for subTargetIdx, subTarget in tIterator:
                     coefs = pd.Series(
                         all_coefs[:, subTargetIdx], index=fullDesignDF.columns)
-                    #pdb.set_trace()
-                    regressor = estimator.regressor_.steps[-1][1]
-                    K = (coefs.abs() > 0).sum()
-                    estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
-                    estPreprocessorRhs = estimator.transformer_
+                    K = (coefs.abs() > 0).sum() # dof
                     predictionPerComponent = pd.concat({
                         trainStr: estPreprocessorLhs.transform((fullDesignDF.iloc[trainIdx, :] - _x_mean) / _x_std) * coefs,
                         testStr: estPreprocessorLhs.transform((fullDesignDF.iloc[testIdx, :] - _x_mean) / _x_std) * coefs
@@ -361,27 +361,28 @@ if __name__ == '__main__':
                     predictionSrs = predictionPerComponent.sum(axis='columns')
                     # sanity check
                     #############################
-                    indicesThisFold = np.concatenate([trainIdx, testIdx])
-                    predictionsNormalWay = np.concatenate([
-                        (estimator.predict(fullDesignDF.iloc[trainIdx, :]) * _y_std - _y_mean)[:, subTargetIdx],
-                        (estimator.predict(fullDesignDF.iloc[testIdx, :]) * _y_std - _y_mean)[:, subTargetIdx]
-                        ])
-                    mismatch = predictionSrs - predictionsNormalWay.reshape(-1)
-                    if int(arguments['verbose']) > 3:
-                        print('max mismatch is {}'.format(mismatch.abs().max()))
-                    try:
-                        assert (mismatch.abs().max() < 1e-3)
-                    except:
-                        '''
-                        fig, ax = plt.subplots()
-                        ax.plot(predictionSrs.to_numpy(), label='from summation')
-                        ax.plot(predictionsNormalWay, '--', label='from prediction')
-                        # ax.plot(predictionSrs.to_numpy() / predictionsNormalWay , label='ratio')
-                        # ax.plot(predictionPerSource.loc[:, 'ground_truth'].to_numpy(), label='gt')
-                        ax.legend()
-                        '''
-                        print('Attention! max mismatch is {}'.format(mismatch.abs().max()))
-                    termNames = designTermNames + ensTermNames
+                    doSanityCheck = False
+                    if doSanityCheck:
+                        indicesThisFold = np.concatenate([trainIdx, testIdx])
+                        predictionsNormalWay = np.concatenate([
+                            (estimator.predict(fullDesignDF.iloc[trainIdx, :]) * _y_std - _y_mean)[:, subTargetIdx],
+                            (estimator.predict(fullDesignDF.iloc[testIdx, :]) * _y_std - _y_mean)[:, subTargetIdx]
+                            ])
+                        mismatch = predictionSrs - predictionsNormalWay.reshape(-1)
+                        if int(arguments['verbose']) > 3:
+                            print('max mismatch is {}'.format(mismatch.abs().max()))
+                        try:
+                            assert (mismatch.abs().max() < 1e-3)
+                        except:
+                            '''
+                            fig, ax = plt.subplots()
+                            ax.plot(predictionSrs.to_numpy(), label='from summation')
+                            ax.plot(predictionsNormalWay, '--', label='from prediction')
+                            # ax.plot(predictionSrs.to_numpy() / predictionsNormalWay , label='ratio')
+                            # ax.plot(predictionPerSource.loc[:, 'ground_truth'].to_numpy(), label='gt')
+                            ax.legend()
+                            '''
+                            print('Attention! max mismatch is {}'.format(mismatch.abs().max()))
                     predictionPerSource = pd.DataFrame(
                         np.nan, index=predictionPerComponent.index,
                         columns=termNames)
@@ -404,42 +405,47 @@ if __name__ == '__main__':
                     for indexName, indexValue in zip(indexNames[::-1], indexValues[::-1]):
                         predIndexDF.insert(0, indexName, indexValue)
                     predictionPerSource.index = pd.MultiIndex.from_frame(predIndexDF)
+                    #######################################################################################################################
                     if predDF is None:
                         predDF = predictionPerSource
                     else:
                         predDF = predDF.append(predictionPerSource)
                     prf.print_memory_usage('\nCalculated predictions for {}'.format(indexValues))
                     # print('predDF.shape = {}'.format(predDF.shape))
+                    #######################################################################################################################
                     #### residual autocorrelation
                     nLags = int(thisModelHistoryLen / binInterval)
                     nLagsSec = np.arange(0, nLags) * binInterval
                     residualsAutoCorrDict = {}
                     for lagIdx, lagSec in enumerate(nLagsSec):
-                        residualsAutoCorrDict[lagSec] = predDF['residuals'].groupby('trialUID').apply(lambda x: x.autocorr(lag=lagIdx))
+                        residualsAutoCorrDict[lagSec] = predictionPerSource['residuals'].groupby('trialUID').apply(lambda x: x.autocorr(lag=lagIdx))
                     theseResAutoCorrDF = pd.concat(residualsAutoCorrDict, names=['lag', 'trialUID'])
                     del residualsAutoCorrDict
                     resAutoCorrIndexDF = theseResAutoCorrDF.index.to_frame().reset_index(drop=True)
                     for indexName, indexValue in zip(indexNames[::-1], indexValues[::-1]):
                         resAutoCorrIndexDF.insert(0, indexName, indexValue)
                     theseResAutoCorrDF.index = pd.MultiIndex.from_frame(resAutoCorrIndexDF)
+                    #######################################################################################################################
                     if residualsAutoCorrDF is None:
                         residualsAutoCorrDF = theseResAutoCorrDF
                     else:
                         residualsAutoCorrDF = residualsAutoCorrDF.append(theseResAutoCorrDF)
+                    #######################################################################################################################
                     ##### residuals goodness of fit tests
                     minBin = predIndexDF['bin'].min()
-                    shiftedRes = predDF['residuals'].shift(1).drop(minBin, level='bin')
-                    residT = predDF['residuals'].drop(minBin, level='bin')
+                    shiftedRes = predictionPerSource['residuals'].shift(1).drop(minBin, level='bin')
+                    residT = predictionPerSource['residuals'].drop(minBin, level='bin')
                     residTDiff = residT - shiftedRes
-                    kDW = (residTDiff ** 2).sum() / (predDF['residuals'] ** 2).sum()
+                    kDW = (residTDiff ** 2).sum() / (predictionPerSource['residuals'] ** 2).sum()
                     #
                     resNormAlpha = 0.05
                     resNormality = pg.normality(
-                        predDF['residuals'], method='normaltest', alpha=resNormAlpha).iloc[0, :]
+                        predictionPerSource['residuals'], method='normaltest', alpha=resNormAlpha).iloc[0, :]
                     resNormality.loc['kDW'] = kDW
                     resNormality.loc['alpha'] = resNormAlpha
+                    #######################################################################################################################
                     resNormTestDict[tuple(indexValues)] = resNormality
-                    #
+                    #######################################################################################################################
     resNormTestDF = pd.concat(resNormTestDict, names=indexNames, axis='columns').T
     predDF.columns.name = 'term'
     prf.print_memory_usage('Saving prediction DF')

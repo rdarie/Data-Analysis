@@ -172,8 +172,8 @@ if __name__ == '__main__':
     selectMethod = 'decimateSpace'
     if selectMethod == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
-        keepX = np.unique(featureInfo['xCoords'])[::3]
-        keepY = np.unique(featureInfo['yCoords'])[::3]
+        keepX = np.unique(featureInfo['xCoords'])[::2]
+        keepY = np.unique(featureInfo['yCoords'])[::2]
         xyMask = (
             featureInfo['xCoords'].isin(keepX) &
             featureInfo['yCoords'].isin(keepY)

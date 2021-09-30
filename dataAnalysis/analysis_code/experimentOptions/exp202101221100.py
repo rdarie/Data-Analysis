@@ -223,22 +223,22 @@ def getExpOpts():
     expIteratorOpts = {
         'ca': {
             'experimentsToAssemble': {
-                '202101221100-Rupert': [2, 3, 4],
+                '202101221100-Rupert': [2, 3],
                 }
             },
         'cb': {
             'experimentsToAssemble': {
-                '202101221100-Rupert': [2, 3, 4],
+                '202101221100-Rupert': [2, 3],
                 }
             },
         'cc': {
             'experimentsToAssemble': {
-                '202101221100-Rupert': [1, 2, 3],
+                '202101221100-Rupert': [1, 2],
                 }
             },
         'ccm': {
             'experimentsToAssemble': {
-                '202101221100-Rupert': [2, 3],
+                '202101221100-Rupert': [2],
                 }
             },
         'ccs': {

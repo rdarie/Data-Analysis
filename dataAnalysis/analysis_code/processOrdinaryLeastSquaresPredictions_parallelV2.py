@@ -86,10 +86,15 @@ sns.set(
 for arg in sys.argv:
     print(arg)
 idxSl = pd.IndexSlice
+from datetime import datetime as dt
 
 if __name__ == '__main__':
-    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
-
+    try:
+        print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+    except:
+        pass
+    for arg in sys.argv:
+        print(arg)
     expOpts, allOpts = parseAnalysisOptions(
         int(arguments['blockIdx']), arguments['exp'])
     globals().update(expOpts)
@@ -543,3 +548,4 @@ if __name__ == '__main__':
     if savingResults:
         R2Per.to_hdf(estimatorPath, 'processedR2')
     print('Loaded and saved scores and partial scores')
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
