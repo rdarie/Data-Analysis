@@ -34,7 +34,7 @@ mock==3.0.5               # via tables
 mpi4py==2.0.0
 numexpr==2.7.0            # via tables
 numpy==1.17.2
-opencv-python==4.1.1.26
+opencv-python==4.2.0.32
 pandas==0.24.2
 parso==0.5.1              # via jedi
 patsy==0.5.1              # via statsmodels
