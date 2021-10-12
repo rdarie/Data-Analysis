@@ -48,11 +48,11 @@
 # has 1 minirc 2 motion+stim 3 motionOnly
 # EXP="exp202101211100"
 # has 1 minirc 2,3 motion+stim 4 motionOnly
-EXP="exp202101221100"
+# EXP="exp202101221100"
 # has 1 minirc 2 motion+stim 3 motionOnly
 # EXP="exp202101251100"
 # has 1 minirc 2 motion+stim 3 motionOnly
-# EXP="exp202101271100"
+EXP="exp202101271100"
 # has 1 minirc 2 motion+stim 3 motionOnly
 # EXP="exp202101281100"
 # has 1 minirc 2 motion+stim 3 motionOnly

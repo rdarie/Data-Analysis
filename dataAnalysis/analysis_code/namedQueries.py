@@ -193,12 +193,107 @@ for eNameIdx in range(16):
             ]) + ')'
         })
     namedQueries['align'].update({
+        'starting{}OrNone'.format(eName): '(' + '|'.join([
+            namedQueries['align']['starting{}'.format(eName)],
+            namedQueries['align']['startingNoStim'],
+            ]) + ')'
+        })
+    namedQueries['align'].update({
         'stimOn{}'.format(eName): '(' + '&'.join([
             namedQueries['align']['stimOn'],
             namedQueries['align']['{}'.format(eName)],
             "(trialRateInHz > 20)"
             ]) + ')'
         })
+####
+namedQueries['align'].update({
+    'startingE00E09E11': '(' + '|'.join([
+        namedQueries['align']['startingE00'],
+        namedQueries['align']['startingE09'],
+        namedQueries['align']['startingE11'],
+        ]) + ')'
+    })
+namedQueries['align'].update({
+    'startingE00E09E11OrNone': '(' + '|'.join([
+        namedQueries['align']['startingE00OrNone'],
+        namedQueries['align']['startingE09OrNone'],
+        namedQueries['align']['startingE11OrNone'],
+        ]) + ')'
+    })
+namedQueries['align'].update({
+    'stimOnE00E09E11': '(' + '|'.join([
+        namedQueries['align']['stimOnE00'],
+        namedQueries['align']['stimOnE09'],
+        namedQueries['align']['stimOnE11'],
+        ]) + ')'
+    })
+####
+namedQueries['align'].update({
+    'startingE00E09E14': '(' + '|'.join([
+        namedQueries['align']['startingE00'],
+        namedQueries['align']['startingE09'],
+        namedQueries['align']['startingE14'],
+        ]) + ')'
+    })
+namedQueries['align'].update({
+    'startingE00E09E14OrNone': '(' + '|'.join([
+        namedQueries['align']['startingE00OrNone'],
+        namedQueries['align']['startingE09OrNone'],
+        namedQueries['align']['startingE14OrNone'],
+        ]) + ')'
+    })
+namedQueries['align'].update({
+    'stimOnE00E09E14': '(' + '|'.join([
+        namedQueries['align']['stimOnE00'],
+        namedQueries['align']['stimOnE09'],
+        namedQueries['align']['stimOnE14'],
+        ]) + ')'
+    })
+###
+namedQueries['align'].update({'stimOnExp201901_25': namedQueries['align']['stimOnE00E09E14']})
+namedQueries['align'].update({'startingExp201901_25': namedQueries['align']['startingE00E09E14']})
+namedQueries['align'].update({'startingOrNoneExp201901_25': namedQueries['align']['startingE00E09E14OrNone']})
+###
+namedQueries['align'].update({'stimOnExp201901_26': namedQueries['align']['stimOnE00E09E14']})
+namedQueries['align'].update({'startingExp201901_26': namedQueries['align']['startingE00E09E14']})
+namedQueries['align'].update({'startingOrNoneExp201901_26': namedQueries['align']['startingE00E09E14OrNone']})
+###
+namedQueries['align'].update({'stimOnExp201901_27': namedQueries['align']['stimOnE00E09E14']})
+namedQueries['align'].update({'startingExp201901_27': namedQueries['align']['startingE00E09E14']})
+namedQueries['align'].update({'startingOrNoneExp201901_27': namedQueries['align']['startingE00E09E14OrNone']})
+###
+namedQueries['align'].update({'stimOnExp201902_03': namedQueries['align']['stimOnE00E09E11']})
+namedQueries['align'].update({'startingExp201902_03': namedQueries['align']['startingE00E09E11']})
+namedQueries['align'].update({'startingOrNoneExp201902_03': namedQueries['align']['startingE00E09E11OrNone']})
+namedQueries['align'].update({'stimOnExp201902_04': namedQueries['align']['stimOnE00E09E11']})
+namedQueries['align'].update({'startingExp201902_04': namedQueries['align']['startingE00E09E11']})
+namedQueries['align'].update({'startingOrNoneExp201902_04': namedQueries['align']['startingE00E09E11OrNone']})
+###
+namedQueries['align'].update({'stimOnExp201902_05': namedQueries['align']['stimOnE00E09E11']})
+namedQueries['align'].update({'startingExp201902_05': namedQueries['align']['startingE00E09E11']})
+namedQueries['align'].update({'startingOrNoneExp201902_05': namedQueries['align']['startingE00E09E11OrNone']})
+namedQueries['align'].update({'stimOnExp202101_20': namedQueries['align']['stimOnE13']})
+namedQueries['align'].update({'startingExp202101_20': namedQueries['align']['startingE13']})
+namedQueries['align'].update({'startingOrNoneExp202101_20': namedQueries['align']['startingE13OrNone']})
+namedQueries['align'].update({'stimOnExp202101_21': namedQueries['align']['stimOnE04']})
+namedQueries['align'].update({'startingExp202101_21': namedQueries['align']['startingE04']})
+namedQueries['align'].update({'startingOrNoneExp202101_21': namedQueries['align']['startingE04OrNone']})
+namedQueries['align'].update({'stimOnExp202101_22': namedQueries['align']['stimOnE12']})
+namedQueries['align'].update({'startingExp202101_22': namedQueries['align']['startingE12']})
+namedQueries['align'].update({'startingOrNoneExp202101_22': namedQueries['align']['startingE12OrNone']})
+namedQueries['align'].update({'stimOnExp202101_25': namedQueries['align']['stimOnE02']})
+namedQueries['align'].update({'startingExp202101_25': namedQueries['align']['startingE02']})
+namedQueries['align'].update({'startingOrNoneExp202101_25': namedQueries['align']['startingE02OrNone']})
+namedQueries['align'].update({'stimOnExp202101_27': namedQueries['align']['stimOnE05']})
+namedQueries['align'].update({'startingExp202101_27': namedQueries['align']['startingE05']})
+namedQueries['align'].update({'startingOrNoneExp202101_27': namedQueries['align']['startingE05OrNone']})
+namedQueries['align'].update({'stimOnExp202101_28': namedQueries['align']['stimOnE09']})
+namedQueries['align'].update({'startingExp202101_28': namedQueries['align']['startingE09']})
+namedQueries['align'].update({'startingOrNoneExp202101_28': namedQueries['align']['startingE09OrNone']})
+namedQueries['align'].update({'stimOnExp202102_02': namedQueries['align']['stimOnE11']})
+namedQueries['align'].update({'startingExp202102_02': namedQueries['align']['startingE11']})
+namedQueries['align'].update({'startingOrNoneExp202102_02': namedQueries['align']['startingE11OrNone']})
+####
 namedQueries['align'].update({
     'stopping': '|'.join([
         namedQueries['align']['reachedPeak'],

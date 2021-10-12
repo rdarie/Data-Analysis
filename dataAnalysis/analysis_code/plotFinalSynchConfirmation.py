@@ -182,7 +182,7 @@ if __name__ == '__main__':
         plotSuffix = '_{}'.format(arguments['plotSuffix'])
     else:
         plotSuffix = ''
-    pdfPath = os.path.join(figureOutputFolder, '{}{}.pdf'.format(pdfName, plotSuffix))
+    pdfPath = os.path.join(figureOutputFolder, '{}-{}{}.pdf'.format(expDateTimePathStr, pdfName, plotSuffix))
     #
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(

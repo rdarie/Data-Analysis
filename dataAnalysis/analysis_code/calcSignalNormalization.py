@@ -58,7 +58,11 @@ import joblib as jb
 import dill as pickle
 import gc
 from docopt import docopt
-print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -154,7 +158,8 @@ if __name__ == '__main__':
         dataGroup = dataDF.loc[:, featureMask]
         print('dataGroup.shape = {}'.format(dataGroup.shape))
         trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
-        estimator = tdr.flatStandardScaler(with_mean=False)
+        # estimator = tdr.flatStandardScaler(with_mean=False)
+        estimator = tdr.DataFrameStandardScaler()
         lOfColumnTransformers.append((
             # transformer name
             trfName,
@@ -174,7 +179,7 @@ if __name__ == '__main__':
     jb.dump(chosenEstimator, estimatorPath)
     #
     outputFeatureNames = pd.concat(outputFeatureNameList)
-    outputFeatureNames.loc[:, 'feature'] = outputFeatureNames['feature'].apply(lambda x: '{}#0'.format(x))
+    # outputFeatureNames.loc[:, 'feature'] = outputFeatureNames['feature'].apply(lambda x: '{}#0'.format(x))
     outputFeatureIndex = pd.MultiIndex.from_frame(outputFeatureNames)
     features = chosenEstimator.transform(dataDF)
     featuresDF = pd.DataFrame(
@@ -205,7 +210,7 @@ if __name__ == '__main__':
     allMask = pd.Series(True, index=featuresDF.columns).to_frame()
     allMask.columns = allGroupIdx
     maskList.append(allMask.T)
-    if 'lfp_CAR_spectral' in selectionName:
+    if '_spectral' in selectionName:
         # each freq band
         for name, group in featuresDF.groupby('freqBandName', axis='columns'):
             attrValues = ['all' for fgn in featuresDF.columns.names]
@@ -261,6 +266,7 @@ if __name__ == '__main__':
             return df
         #
         outputLoadingMeta[k] = passthr
+    print('saving featuresDF to {} ...\n{}'.format(datasetPath, featuresDF.head()))
     featuresDF.to_hdf(
         datasetPath,
         '/{}/data'.format(outputSelectionName),
@@ -271,3 +277,4 @@ if __name__ == '__main__':
         )
     with open(outputLoadingMetaPath, 'wb') as f:
         pickle.dump(outputLoadingMeta, f)
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

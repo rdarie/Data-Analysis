@@ -128,6 +128,7 @@ alignedAsigsKWargs['verbose'] = arguments['verbose']
 if 'procFun' in iteratorOpts:
     if arguments['selectionName'] in iteratorOpts['procFun']:
         if iteratorOpts['procFun'][arguments['selectionName']] is not None:
+            print('Applying processing to signal: {}'.format(iteratorOpts['procFun'][arguments['selectionName']]))
             alignedAsigsKWargs['procFun'] = eval(iteratorOpts['procFun'][arguments['selectionName']])
 
 dataReader, dataBlock = ns5.blockFromPath(
@@ -228,7 +229,6 @@ allMask = pd.Series(True, index=exportDF.columns).to_frame()
 allMask.columns = allGroupIdx
 maskList.append(allMask.T)
 nFreqBands = exportDF.columns.get_level_values('freqBandName').unique().size
-# if 'lfp_CAR_spectral' in arguments['selectionName']:
 if nFreqBands > 1:
     # each freq band
     for name, group in exportDF.groupby('freqBandName', axis='columns'):

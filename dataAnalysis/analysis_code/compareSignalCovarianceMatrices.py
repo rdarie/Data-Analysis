@@ -403,8 +403,8 @@ for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
         distancesDict[distanceType][freqBandName].name = distanceType
         distancesDict[distanceType][freqBandName].to_hdf(resultPath, '/distanceMatrices/{}/{}'.format(freqBandName, distanceType))
         #
-        # uMapper = umap.UMAP(metric='precomputed', n_neighbors=3*lastFoldIdx, min_dist=0.5)
-        uMapper = MDS(metric='dissimilarity', n_components=2)
+        uMapper = umap.UMAP(metric='precomputed', n_components=2, n_neighbors=5*lastFoldIdx, min_dist=0.1)
+        # uMapper = MDS(metric='dissimilarity', n_components=2)
         projectedDict[distanceType][freqBandName] = pd.DataFrame(
             uMapper.fit_transform(theseDistances[distanceType]),
             index=theseDistances[distanceType].index,

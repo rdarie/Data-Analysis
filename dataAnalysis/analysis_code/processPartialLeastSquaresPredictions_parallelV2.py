@@ -410,7 +410,7 @@ if __name__ == '__main__':
                         predDF = predictionPerSource
                     else:
                         predDF = predDF.append(predictionPerSource)
-                    prf.print_memory_usage('\nCalculated predictions for {}'.format(indexValues))
+                    prf.print_memory_usage('\nCalculated predictions for\n[lhsMaskIdx, designFormula, rhsMaskIdx, subTarget, foldIdx, foldType]\n{}'.format(indexValues))
                     # print('predDF.shape = {}'.format(predDF.shape))
                     #######################################################################################################################
                     #### residual autocorrelation

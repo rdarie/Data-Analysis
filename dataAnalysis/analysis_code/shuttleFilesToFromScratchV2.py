@@ -61,7 +61,7 @@ if arguments['printFolderSize']:
         def print_indented(folder, level):
             print('\t' * level + folder)
         print_indented(target_path.name, level)
-        ###
+        ### du -a -d 1 --time -h ./ | sort -h
         commandList = [
             'du -a -d 1 --time -h "{}" | sort -h'.format(target_path),
         ]

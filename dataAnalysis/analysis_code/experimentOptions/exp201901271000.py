@@ -283,27 +283,34 @@ def getExpOpts():
     expIteratorOpts = {
         'ca': {
             'experimentsToAssemble': {
-                experimentName: [],
+                '201901251000-Murdoc': [2],
+                '201901261000-Murdoc': [1, 2, 3],
+                experimentName: [1, 2, 3, 4],
                 }
             },
         'cb': {
             'experimentsToAssemble': {
-                experimentName: [],
+                '201901251000-Murdoc': [2],
+                '201901261000-Murdoc': [1, 2, 3],
+                experimentName: [1, 2, 3, 4],
                 }
             },
         'cc': {
             'experimentsToAssemble': {
-                experimentName: [],
                 }
             },
         'ccm': {
             'experimentsToAssemble': {
-                experimentName: [],
+                '201901251000-Murdoc': [2],
+                '201901261000-Murdoc': [1, 2, 3],
+                experimentName: [1, 2, 3, 4],
                 }
             },
         'ccs': {
             'experimentsToAssemble': {
-                experimentName: [],
+                '201901251000-Murdoc': [1],
+                '201901261000-Murdoc': [4],
+                experimentName: [5],
                 }
             },
         'cd': {
@@ -338,20 +345,22 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '201901251000-Murdoc': [1, 2],
-                '201901261000-Murdoc': [1, 2, 3, 4],
+                # '201901251000-Murdoc': [1, 2],
+                # '201901261000-Murdoc': [1, 2, 3, 4],
                 experimentName: [1, 2, 3, 4, 5],
                 }
             },
         'ma': {
             'experimentsToAssemble': {
+                '201901251000-Murdoc': [1, 2],
+                '201901261000-Murdoc': [1, 2, 3, 4],
                 experimentName: [1, 2, 3, 4],
                 }
             },
         'na': {
             'experimentsToAssemble': {
-                '201901261000-Murdoc': [4],
-                experimentName: [1, 2, 3, 4],
+                # '201901261000-Murdoc': [4],
+                experimentName: [1, 2, 3, 4, 5],
                 }
             }
         }

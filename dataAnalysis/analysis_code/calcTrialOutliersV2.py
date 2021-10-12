@@ -111,6 +111,10 @@ resultPath = os.path.join(
     calcSubFolder,
     prefix + '_{}_outliers.h5'.format(
         arguments['window']))
+resultPathCSV = os.path.join(
+    calcSubFolder,
+    prefix + '_{}_outliers.csv'.format(
+        arguments['window']))
 
 outlierLogPath = os.path.join(
     figureFolder,
@@ -133,12 +137,15 @@ print(
 #
 if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
     # has stim but no motion
-    stimulusConditionNames = stimConditionNames
+    # stimulusConditionNames = stimConditionNames
+    stimulusConditionNames = ['electrode']
 elif blockExperimentType == 'proprio-motionOnly':
     # has motion but no stim
-    stimulusConditionNames = motionConditionNames
+    # stimulusConditionNames = motionConditionNames
+    stimulusConditionNames = ['pedalDirection']
 else:
-    stimulusConditionNames = stimConditionNames + motionConditionNames
+    # stimulusConditionNames = stimConditionNames + motionConditionNames
+    stimulusConditionNames = ['pedalDirection', 'electrode']
 print('Block type {}; using the following stimulus condition breakdown:'.format(blockExperimentType))
 print('\n'.join(['    {}'.format(scn) for scn in stimulusConditionNames]))
 if 'outlierDetectOptions' in locals():
@@ -300,6 +307,8 @@ if __name__ == "__main__":
                 os.remove(resultPath)
             mahalDist.to_hdf(
                 resultPath, 'mahalDist')
+            if os.path.exists(resultPathCSV):
+                os.remove(resultPathCSV)
     print('#######################################################')
     nDoF = 1  #  len(dataDF.columns)
     refValue = chi2.isf(qThresh, nDoF)
@@ -328,6 +337,8 @@ if __name__ == "__main__":
             resultPath, 'deviation')
         outlierTrials['rejectBlock'].to_hdf(
             resultPath, 'rejectBlock')
+        # pdb.set_trace()
+        outlierTrials.to_csv(resultPathCSV)
         print('#######################################################')
         print('Done saving data')
         print('#######################################################')
@@ -380,7 +391,7 @@ if __name__ == "__main__":
     featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
     dataChanNames = featureInfo['feature'].apply(lambda x: x.replace('#0', ''))
     banksLookup = mapDF.loc[:, ['label', 'bank']].set_index(['label'])['bank']
-    featureInfo.loc[:, 'bank'] = dataChanNames.map(banksLookup)
+    featureInfo.loc[:, 'bank'] = dataChanNames.map(banksLookup).fillna(mapDF['bank'].unique()[0])
     trialInfo.loc[:, 'wasKept'] = ~outlierTrials.loc[pd.MultiIndex.from_frame(trialInfo[['segment', 't']]), 'rejectBlock'].to_numpy()
     dataDF.set_index(pd.MultiIndex.from_frame(trialInfo), inplace=True)
     #
@@ -401,7 +412,7 @@ if __name__ == "__main__":
         h = 18
         w = 3
         aspect = w / h
-        seekIdx = slice(None, None, plotDF.shape[0] // int(1e7))
+        seekIdx = slice(None, None, max(1, int(np.ceil(plotDF.shape[0] // int(1e7)))))
         g = sns.catplot(
             col='bank', x='signal', y='feature',
             data=plotDF.iloc[seekIdx, :], orient='h', kind='violin', ci='sd',
@@ -412,7 +423,7 @@ if __name__ == "__main__":
         pdf.savefig(bbox_inches='tight')
         plt.close()
         try:
-            seekIdx = slice(None, None, plotDF['wasKept'].sum() // int(1e7))
+            seekIdx = slice(None, None, max(1, plotDF['wasKept'].sum() // int(1e7)))
             g = sns.catplot(
                 col='bank', x='signal', y='feature',
                 data=plotDF.loc[plotDF['wasKept'], :].iloc[seekIdx, :], orient='h', kind='violin', ci='sd',

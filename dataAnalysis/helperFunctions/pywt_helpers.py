@@ -157,7 +157,7 @@ def plotKernels(
         axes[n, 0].text(
             max_len_sec/8, 0.1,
             'scale = {:.1f}\nextent = {:.3f} sec'.format(
-                scale, t_extent))
+                scale, rb_t_theoretical * 2))
         # f = np.linspace(-np.pi, np.pi, max_len)
         f = np.linspace(-fs/2, fs/2, max_len)
         df = f[1] - f[0]

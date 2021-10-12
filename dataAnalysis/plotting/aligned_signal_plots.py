@@ -720,9 +720,14 @@ def genTraceAnnotator(
                     xpos = group[g._x_var].loc[locIdx]
                     ypos = group[g._y_var].loc[locIdx]
                     content = group[labelsList].loc[locIdx].to_dict()
-                    annText = ' '.join([
-                        '{}: {:.2f}'.format(key, value)
-                        for key, value in content.items()])
+                    try:
+                        annText = ' '.join([
+                            '{}: {:.2f}\n'.format(key, value)
+                            for key, value in content.items()])
+                    except Exception:
+                        annText = ' '.join([
+                            '{}: {}\n'.format(key, value)
+                            for key, value in content.items()])
                     g.axes[ro, co].text(
                         xpos, ypos,
                         annText, **textOpts)
@@ -1121,7 +1126,10 @@ def genStimVLineAdder(
         if not emptySubset:
             pulseRates = dataSubset[rateFieldName]
             pulseRate = pulseRates[pulseRates.notna()].unique()
-            assert pulseRate.size == 1
+            # try:
+            assert pulseRate.size == 1, 'facet has more than one stim rate: {}'.format(pulseRate)
+            # except:
+            #     traceback.print_exc()
             axLims = g.axes[ro, co].get_xlim()
             pulsePeriod = pulseRate[0] ** (-1)
             pulseLims = [

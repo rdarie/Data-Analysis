@@ -95,7 +95,7 @@ snsRCParams = {
         "axes.spines.top": True,
         "axes.linewidth": .125,
         "grid.linewidth": .2,
-        "font.size": 5,
+        "font.size": 7,
         "axes.labelsize": 9,
         "axes.titlesize": 9,
         "xtick.labelsize": 5,
@@ -184,7 +184,6 @@ if __name__ == '__main__':
         plotSuffix = '_{}'.format(arguments['plotSuffix'])
     else:
         plotSuffix = ''
-    # pdb.set_trace()
     pdfPath = os.path.join(figureOutputFolder, '{}-{}{}.pdf'.format(expDateTimePathStr, pdfName, plotSuffix))
     #
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
@@ -321,6 +320,7 @@ if __name__ == '__main__':
         sigTestResults = None
     if arguments['plotSuffix'] in relPlotKWArgsLookup:
         relplotKWArgs.update(relPlotKWArgsLookup[arguments['plotSuffix']])
+    # pdb.set_trace()
     with PdfPages(pdfPath) as pdf:
         pageCount = 0
         for uIdx, unitName in enumerate(tqdm(dataDF.columns)):
@@ -330,9 +330,9 @@ if __name__ == '__main__':
                 if rowColOpts['{}Name'.format(axn)] is not None:
                     rowColArgs[axn] = rowColOpts['{}Name'.format(axn)]
                     if '{}Order'.format(axn) in rowColOpts:
-                        rowColArgs['{}_order'.format(axn)] = rowColOpts['{}Order'.format(axn)]
+                        rowColArgs['{}_order'.format(axn)] = [n for n in rowColOpts['{}Order'.format(axn)] if n in plotDF[rowColArgs[axn]].to_list()]
                     else:
-                        rowColArgs['{}_order'.format(axn)] = np.unique(plotDF[rowColArgs[axn]])
+                        rowColArgs['{}_order'.format(axn)] = [n for n in np.unique(plotDF[rowColArgs[axn]])]
             g = sns.relplot(
                 x='bin', y='signal',
                 **rowColArgs, **relplotKWArgs, data=plotDF,

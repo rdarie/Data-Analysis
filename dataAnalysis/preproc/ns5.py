@@ -367,6 +367,7 @@ def concatenateBlocks(
         filterSignals=False, analysisFilterOpts={},
         medianFilterSignals=False, analysisMedianFilterOpts={},
         hampelFilterSignals=False, analysisHampelFilterOpts={},
+        diagnosticPlots=False
         ):
     # Scan ahead through all files and ensure that
     # spikeTrains and units are present across all assembled files
@@ -500,12 +501,12 @@ def concatenateBlocks(
                             'btype': 'low',
                             'ftype': 'butter'
                         },
-                        # 'high': {
-                        #     'Wn': .1,
-                        #     'N': 4,
-                        #     'btype': 'high',
-                        #     'ftype': 'butter'
-                        # }
+                        'high': {
+                            'Wn': .1,
+                            'N': 4,
+                            'btype': 'high',
+                            'ftype': 'butter'
+                        }
                     }
             else:
                 analysisFilterOpts = {}
@@ -541,7 +542,8 @@ def concatenateBlocks(
                     if not len(analysisHampelFilterOpts):
                         analysisHampelFilterOpts = dict()
                     print('Applying hampel filter, analysisHampelFilterOpts={}'.format(analysisHampelFilterOpts))
-                    tdDF = hampel(tdDF, **analysisHampelFilterOpts)
+                    analysisHampelFilterOpts.update({'debug_plots': diagnosticPlots})
+                    tdDF, (fig, ax) = hampel(tdDF, **analysisHampelFilterOpts)
                 #
                 if filterSignals:
                     if trackMemory:
@@ -552,8 +554,16 @@ def concatenateBlocks(
                         axis=0)
                     tdDF = pd.DataFrame(
                         filteredAsigs,
-                        index=tdDF.index,
-                        columns=tdDF.columns)
+                        index=tdDF.index, columns=tdDF.columns)
+                    if diagnosticPlots and hampelFilterSignals:
+                        t = tdDF.index.to_numpy()
+                        palette1=['b', 'g', 'r']
+                        palette2=['c', 'y', 'm']
+                        for cIdx, cN in enumerate(['seg0_utah78', 'seg0_utah1']):
+                            filtered = tdDF.loc[:, cN].to_numpy()
+                            ax[0].plot(t, filtered, lw=1., c=palette1[cIdx], label='{} (filtered)'.format(cN))
+                        ax[0].legend(loc='upper left')
+                        plt.show()
                     if trackMemory:
                         print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
                             prf.memory_usage_psutil()))
@@ -570,6 +580,7 @@ def concatenateBlocks(
         #
         print('Finished chunk {}'.format(chunkIdxStr))
     allTdDF = pd.concat(asigCache)
+    del asigCache
     #
     if clipSignals:
         for clpN, clpOpt in clippingOpts.items():
@@ -590,7 +601,6 @@ def concatenateBlocks(
                 allTdDF.loc[:, colMask] = allTdDF.loc[:, colMask].clip(
                     lower=absoluteLimit * (-1),
                     upper=absoluteLimit)
-
     # TODO: check for nans, if, for example a signal is partially missing
     allTdDF.fillna(method='bfill', inplace=True)
     allTdDF.fillna(method='ffill', inplace=True)

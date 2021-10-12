@@ -104,8 +104,8 @@ def calcRauc(
         tMask = tMask & (partition['bin'] < tStop)
     if not tMask.any():
         tMask = pd.Series(True, index=partition.index)
-    else:
-        print('calcRauc; tMask.sum() = {}'.format(tMask.sum()))
+    #  #else:
+    #  #    print('calcRauc; tMask.sum() = {}'.format(tMask.sum()))
     if maskBaseline:
         baselineTMask = pd.Series(True, index=partition.index)
         if baselineTStart is not None:
@@ -122,6 +122,9 @@ def calcRauc(
     if 'foo' in partition.iloc[0, :].to_numpy():
         tMask.loc[:] = True
     detrended = partitionData.loc[tMask, :].subtract(baseline, axis='columns')
+    # plt.plot(partitionData.loc[tMask, :].abs().to_numpy()); plt.show()
+    # plt.plot(detrended.abs().to_numpy(), c='b', alpha=0.3); plt.show()
+    #
     result = detrended.abs().mean()
     resultDF = pd.concat([partitionMeta.iloc[0, :], result]).to_frame(name=partition.index[0]).T
     resultDF.name = 'rauc'
@@ -147,9 +150,9 @@ if __name__ == "__main__":
     #  Overrides
     limitPages = None
     funKWArgs = dict(
-        tStart=-100e-3, tStop=100e-3,
-        maskBaseline=True,
-        baselineTStart=-300e-3, baselineTStop=-150e-3)
+        tStart=-100e-3, tStop=200e-3,
+        maskBaseline=False,
+        baselineTStart=-300e-3, baselineTStop=-100e-3)
     #  End Overrides
     if not arguments['loadFromFrames']:
         resultPath = os.path.join(
@@ -169,8 +172,7 @@ if __name__ == "__main__":
         alignedAsigsKWargs.update(dict(
             transposeToColumns='feature', concatOn='bin'))
         #
-        '''alignedAsigsKWargs['procFun'] = ash.genDetrender(
-            timeWindow=(-200e-3, -100e-3))'''
+        '''alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))'''
 
         if 'windowSize' not in alignedAsigsKWargs:
             alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
@@ -222,12 +224,12 @@ if __name__ == "__main__":
         arguments.update(loadingMeta['arguments'])
         cvIterator = iteratorsBySegment[0]
         dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
-        # tweak control time base to look like main time base
+        # hack control time base to look like main time base
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         deltaB = trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'].min() - trialInfo.loc[trialInfo['controlFlag'] == 'main', 'bin'].min()
         trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'] -= deltaB
         dataDF.index = pd.MultiIndex.from_frame(trialInfo)
-        # detrend as a group
+        ### detrend as a group?
         tMask = ((trialInfo['bin'] >= funKWArgs['baselineTStart']) & (trialInfo['bin'] < funKWArgs['baselineTStop']))
         baseline = dataDF.loc[tMask.to_numpy(), :].median()
         dataDF = dataDF.subtract(baseline, axis='columns')
@@ -246,6 +248,7 @@ if __name__ == "__main__":
         daskComputeOpts=daskComputeOpts)
     for cN in rawRaucDF.columns:
         rawRaucDF.loc[:, cN] = rawRaucDF[cN].astype(float)
+    # pdb.set_trace()
     rawRaucDF.columns = colFeatureInfo
     rawRaucDF.index = rawRaucDF.index.droplevel('bin')
     trialInfo = rawRaucDF.index.to_frame().reset_index(drop=True)
@@ -273,6 +276,10 @@ if __name__ == "__main__":
         qScaler.inverse_transform(clippedScaledRaucDF),
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
+    infIndices = clippedRaucDF.index[np.isinf(clippedRaucDF).any(axis='columns')]
+    clippedRaucDF.drop(infIndices, inplace=True)
+    clippedScaledRaucDF.drop(infIndices, inplace=True)
+    rawRaucDF.drop(infIndices, inplace=True)
     #
     mmScaler = MinMaxScaler()
     mmScaler.fit(clippedRaucDF)
@@ -293,8 +300,16 @@ if __name__ == "__main__":
         clippedRaucDF
             .xs('NA', level='electrode', drop_level=False)
             .xs('NA_NA', level='kinematicCondition', drop_level=False)
-            .median())
-    relativeRaucDF = clippedRaucDF / referenceRaucDF
+            # .median()
+            )
+    referenceScaler = StandardScaler()
+    referenceScaler.fit(referenceRaucDF)
+    #
+    #relativeRaucDF = clippedRaucDF / referenceRaucDF
+    relativeRaucDF = pd.DataFrame(
+        referenceScaler.transform(clippedRaucDF.to_numpy()),
+        index=clippedRaucDF.index, columns=clippedRaucDF.columns
+        )
     clippedRaucDF.to_hdf(resultPath, 'raw')
     clippedScaledRaucDF.to_hdf(resultPath, 'scaled')
     normalizedRaucDF.to_hdf(resultPath, 'normalized')
@@ -330,6 +345,35 @@ if __name__ == "__main__":
     ampStatsDF.to_hdf(resultPath, 'amplitudeStats')
     relativeStatsDF = pd.concat(relativeStatsDict, names=['electrode', 'kinematicCondition'] + relativeRaucDF.columns.names)
     relativeStatsDF.to_hdf(resultPath, 'relativeStatsDF')
+    #####
+    amplitudeStatsPerFBDict = {}
+    relativeStatsPerFBDict = {}
+    for name, group in recCurve.groupby(['electrode', 'kinematicCondition']):
+        elecName, kinName = name
+        if elecName != 'NA':
+            refMask = (recCurve['electrode'] == 'NA') & (recCurve['kinematicCondition'] == kinName)
+            if refMask.any():
+                refGroup = recCurve.loc[refMask, :]
+            else:
+                refMask = (recCurve['electrode'] == 'NA')
+                refGroup = recCurve.loc[refMask, :]
+            for freqBandName, freqGroup in relativeRaucDF.groupby('freqBandName', axis='columns'):
+                thisEntry = tuple([elecName, kinName, freqBandName])
+                freqRefGroup = refGroup.loc[:, refGroup.columns.isin(freqGroup.columns)]
+                freqGroup.columns = freqGroup.columns.get_level_values('feature')
+                freqRefGroup.columns = freqRefGroup.columns.get_level_values('feature')
+                freqGroupStack = freqGroup.stack().to_frame(name='rauc').reset_index()
+                freqRefGroupStack = freqRefGroup.stack().to_frame(name='rauc').reset_index()
+                lm = pg.linear_regression(freqGroupStack['trialAmplitude'], freqGroupStack['rauc'])
+                amplitudeStatsPerFBDict[thisEntry] = lm
+                maxAmpMask = (freqGroupStack['trialAmplitude'] == freqGroupStack['trialAmplitude'].max())
+                tt = pg.ttest(freqGroupStack.loc[maxAmpMask, 'rauc'], freqRefGroupStack['rauc'])
+                relativeStatsPerFBDict[thisEntry] = tt
+    ampStatsPerFBDF = pd.concat(amplitudeStatsPerFBDict, names=['electrode', 'kinematicCondition', 'freqBandName'])
+    ampStatsPerFBDF.set_index('names', append=True, inplace=True)
+    ampStatsPerFBDF.to_hdf(resultPath, 'amplitudeStatsPerFreqBand')
+    relativeStatsPerFBDF = pd.concat(relativeStatsPerFBDict, names=['electrode', 'kinematicCondition', 'freqBandName'])
+    relativeStatsPerFBDF.to_hdf(resultPath, 'relativeStatsDFPerFreqBand')
     #
     defaultSamplerKWArgs = dict(random_state=42, test_size=0.5)
     defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.1)

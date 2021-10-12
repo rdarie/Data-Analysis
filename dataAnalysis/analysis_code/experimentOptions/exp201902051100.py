@@ -276,11 +276,6 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '201901311000-Murdoc': [5],
-                '201902010900-Murdoc': [1, 2, 3, 4, 5],
-                '201902021100-Murdoc': [3, 4, 5, 6],
-                '201902031100-Murdoc': [1, 2, 3, 4, 5],
-                '201902041100-Murdoc': [1, 2, 3, 4, 5],
                 experimentName: [1, 2, 3, 4],
                 }
             },

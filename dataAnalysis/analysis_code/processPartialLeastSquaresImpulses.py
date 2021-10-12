@@ -29,7 +29,7 @@ else:
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-from datetime import datetime
+from datetime import datetime as dt
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 # if debugging in a console:
@@ -72,6 +72,7 @@ pickle.settings['recurse'] = True
 import gc
 from itertools import product
 import colorsys
+import sys
 idxSl = pd.IndexSlice
 useDPI = 200
 dpiFactor = 72 / useDPI
@@ -121,7 +122,12 @@ sns.set(
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 #
-print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
 
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -736,3 +742,4 @@ with PdfPages(pdfPath) as pdf:
             plt.show()
         else:
             plt.close()
+print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

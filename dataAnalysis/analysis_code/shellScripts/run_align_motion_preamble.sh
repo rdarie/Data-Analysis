@@ -3,8 +3,8 @@
 LAZINESS="--lazy"
 # LAZINESS=""
 
-VERBOSITY="--verbose"
-
+# VERBOSITY="--verbose"
+VERBOSITY=""
 WINDOWTERM="XL"
 #
 WINDOW="--window=${WINDOWTERM}"

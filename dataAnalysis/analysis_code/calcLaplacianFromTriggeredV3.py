@@ -67,7 +67,7 @@ from scipy import interpolate, ndimage, signal
 # import pingouin as pg
 import pandas as pd
 import numpy as np
-from astropy.convolution import convolve, interpolate_replace_nans
+# from astropy.convolution import convolve, interpolate_replace_nans
 # from elephant import current_source_density as elph_csd
 # from kcsd import KCSD2D
 # from dask import dataframe as dd
@@ -320,12 +320,12 @@ if __name__ == "__main__":
         #
         estimateAsigs = asigs
         ######################################################################################
-        # ## # for debugging, reduce nTrials
-        # ## if True:
-        # ##     nTrials = 3
-        # ##     dummySt = dummySt[:nTrials]
-        # ##     estimateAsigs = asigs[:nBins*nTrials, :]
-        # ##     NSamplesForCV = 10
+        # # # for debugging, reduce nTrials
+        # # if True:
+        # #     nTrials = 3
+        # #     dummySt = dummySt[:nTrials]
+        # #     estimateAsigs = asigs[:nBins*nTrials, :]
+        # #     NSamplesForCV = 10
         #######################################################################################
         if arguments['plotting'] and (segIdx == 0):
             sns.set(font_scale=.8)
@@ -344,7 +344,7 @@ if __name__ == "__main__":
             fig.set_size_inches(5 * len(ax), 5)
             _, _, lfpDF = csd.plotLfp2D(
                 asig=estimateAsigs[0, :], chanIndex=chanIndex,
-                fig=fig, ax=origAx)
+                fig=fig, ax=origAx, heatmapKWs={'cmap': 'flare'})
             origAx.set_title('Original')
         #
         if arguments['lazy']:
@@ -621,7 +621,7 @@ if __name__ == "__main__":
         _, _, csdDF = csd.plotLfp2D(
             asig=csdAsigsLong[0, :], chanIndex=csdChanIndex,
             fig=fig, ax=csdAx,
-            heatmapKWs={'cmap': 'mako'})
+            heatmapKWs={'cmap': 'crest'})
         csdAx.set_title('CSD estimate ({})'.format(methodName))
         #
         if not arguments['useKCSD']:

@@ -41,6 +41,7 @@ from dask.distributed import Client, LocalCluster
 from sklearn.metrics import r2_score
 from ttictoc import tic, toc
 import contextlib
+import gc
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
@@ -140,7 +141,7 @@ def ERAMittnik(
 
 def ERA(
         Phi, maxNDim=None, endogNames=None, exogNames=None,
-        plotting=False, nLags=None, method='ERA'):
+        plotting=False, nLags=None, method='ERA', verbose=0):
     tBins = np.unique(Phi.columns.get_level_values('bin'))
     bins2Index = {bN: bIdx for bIdx, bN in enumerate(tBins)}
     Phi.rename(columns=bins2Index, inplace=True)
@@ -150,6 +151,8 @@ def ERA(
     q = len(endogNames)
     m = len(exogNames)
     N = nLags
+    if verbose > 1:
+        print('ERA(): extracting phi matrix from coefficients')
     Phi1 = {}
     Phi2 = {}
     Phi1[0] = Phi.xs(0, level='bin', axis='columns').loc[:, exogNames] # D
@@ -164,15 +167,46 @@ def ERA(
     # matrix form from Juang 1992 (p. 324)
     # lPhiMat * Psi_sDF = rPhiMat_s
     # lPhiMat * Psi_gDF = rPhiMat_g
-    lPhiMatLastRowList = [
-        Phi2[k].reset_index(drop=True) * (-1) for k in range(N-1, 0, -1)
-    ] + [pd.DataFrame(np.eye(q))]
-    lPhiMatLastRow = pd.concat(lPhiMatLastRowList, axis='columns', ignore_index=True)
-    lPhiMat = pd.concat([
-        lPhiMatLastRow.shift(k * q * (-1), axis='columns').fillna(0)
-        for k in range(N-1, -1, -1)
-        ])
+    # # # # N = 5
+    # # # # ###############
+    # # # # lPhiMatLastRowList = [
+    # # # #     Phi2[k].reset_index(drop=True) * (-1) for k in range(N-1, 0, -1)
+    # # # # ] + [pd.DataFrame(np.eye(q))]
+    # # # # lPhiMatLastRow = pd.concat(lPhiMatLastRowList, axis='columns', ignore_index=True)
+    # # # # # sns.heatmap(lPhiMatLastRow.to_numpy()); plt.show()
+    # # # # if verbose > 1:
+    # # # #     print('ERA(): concatenating lPhiMat')
+    # # # # lPhiMat = pd.concat([
+    # # # #     lPhiMatLastRow.shift(k * q * (-1), axis='columns').fillna(0)
+    # # # #     for k in range(N-1, -1, -1)
+    # # # #     ])
+    # # # # sns.heatmap(lPhiMat.to_numpy()); plt.show()
+    # # # # sns.heatmap(lPhiMatLastRow.shift(250 * q * (-1), axis='columns').to_numpy()); plt.show()
+    if verbose > 1:
+        print('ERA(): concatenating lPhiMat')
+        tIterator = tqdm(range(N-1, -1, -1), mininterval=30., maxinterval=120.)
+    else:
+        tIterator = range(N-1, -1, -1)
+    lPhiMatRowList = []
+    for kr in tIterator:
+        thisRowList = (
+            [Phi2[kc].reset_index(drop=True) * (-1) for kc in range(N-1-kr, 0, -1)] +
+            [pd.DataFrame(np.eye(q))] +
+            [pd.DataFrame(np.zeros((q, q)))] * kr
+            )
+        thisRow = pd.concat(thisRowList, axis='columns', ignore_index=True)
+        lPhiMatRowList.append(thisRow)
+        # sns.heatmap(thisRow.to_numpy()); plt.show()
+    lPhiMat = pd.concat(lPhiMatRowList)
+    del lPhiMatRowList
+    gc.collect()
+    # fig, ax = plt.subplots(1, 2); sns.heatmap(lPhiMat.to_numpy(), ax=ax[0]); sns.heatmap(lPhiMat2.to_numpy(), ax=ax[1]); plt.show()
+    ###################
+    if verbose > 1:
+        print('ERA(): inverting lPhiMat')
     lPhiMatInv = np.linalg.inv(lPhiMat)
+    del lPhiMat
+    gc.collect()
     #
     if D.any().any():
         rPhiMat_s = pd.concat({
@@ -187,50 +221,36 @@ def ERA(
     Psi_sDF = lPhiMatInv @ rPhiMat_s
     Psi_sDF.index = rPhiMat_s.index
     Psi_sDF = Psi_sDF.unstack(level='bin')
+    if verbose > 1:
+        print('ERA(): sorting Psi_sDF index')
     Psi_sDF.sort_index(
         axis='columns', level='bin', sort_remaining=False,
         kind='mergesort', inplace=True)
     #
+    if verbose > 1:
+        print('ERA(): concatenating rPhiMat_g')
     rPhiMat_g = pd.concat({
         k: Phi2[k]
         for k in range(1, N+1)
         }, names=['bin'])
     Psi_gDF = lPhiMatInv @ rPhiMat_g
+    #
+    del lPhiMatInv
+    gc.collect()
+    #
     Psi_gDF.index = rPhiMat_g.index
     Psi_gDF = Psi_gDF.unstack(level='bin')
+    if verbose > 1:
+        print('ERA(): Psi_gDF.sort_index(')
     Psi_gDF.sort_index(
         axis='columns', level='bin',
         sort_remaining=False, kind='mergesort',
         inplace=True)
-    '''
-    # recursive substitution way
-    Psi_s = {}
-    Psi_g = {}
-    Psi_s[0] = Phi1[0]  # also D
-    for j in range(1, nLags):
-        print('j = {}'.format(j))
-        if j <= p:
-            Phi1[j] = Phi.xs(j, level='bin', axis='columns').loc[:, exogNames]
-            Phi2[j] = Phi.xs(j, level='bin', axis='columns').loc[:, endogNames]
-        else:
-            Phi1[j] = Phi.xs(p, level='bin', axis='columns').loc[:, exogNames] * 0
-            Phi2[j] = Phi.xs(p, level='bin', axis='columns').loc[:, endogNames] * 0
-        Psi_s[j] = Phi1[j]
-        Psi_g[j] = Phi2[j]
-        #
-        print('\tnorm(Phi1) = {}'.format(np.linalg.norm(Phi1[j])))
-        print('\tnorm(Phi2) = {}'.format(np.linalg.norm(Phi2[j])))
-        for h in range(1, j+1):
-            # print('\th = {}'.format(h))
-            Psi_s[j] += Phi2[h].to_numpy() @ Psi_s[j-h].to_numpy()
-            if h < j:
-                Psi_g[j] += Phi2[h].to_numpy() @ Psi_g[j-h].to_numpy()
-    #
-    Psi_sDF = pd.concat(Psi_s, axis='columns', names=['bin'])
-    Psi_gDF = pd.concat(Psi_g, axis='columns', names=['bin'])'''
     if plotting:
         dt = scipy.stats.mode(np.diff(tBins))[0][0]
-        fig, ax = plt.subplots(3, 1)
+        fig, ax = plt.subplots(
+            3, 1,
+            figsize=(16,24))
         plotS = Psi_sDF.stack('feature')
         plotG = Psi_gDF.stack('feature')
         for rowName, row in plotS.iterrows():
@@ -239,14 +259,18 @@ def ERA(
             ax[1].plot(row.index * dt, row, label=rowName)
         ax[0].set_title('System Markov parameters (Psi_s)')
         ax[0].axvline(p * dt)
-        ax[0].legend()
+        # ax[0].legend()
         ax[1].set_title('Gain Markov parameters (Psi_g)')
         ax[1].axvline(p * dt)
-        ax[1].legend()
+        # ax[1].legend()
         ax[1].set_xlabel('Time (sec)')
     else:
         fig, ax = None, None
+    if verbose > 1:
+        print('ERA(): PsiDF = pd.concat([')
     PsiDF = pd.concat([Psi_gDF, Psi_sDF], axis='columns')
+    del Psi_gDF, Psi_sDF
+    gc.collect()
     PsiDF.sort_index(
         axis='columns', level=['bin'],
         kind='mergesort', sort_remaining=False, inplace=True)
@@ -265,16 +289,20 @@ def ERA(
         HH0 = H0 @ H0.T
         HH1 = H1 @ H0.T
         svdTargetH = HH0
+    if verbose > 1:
+        print('ERA(): svd of H')
     u, s, vh = np.linalg.svd(svdTargetH, full_matrices=False)
     if maxNDim is None:
         optThresh = optimalSVDThreshold(svdTargetH) * np.median(s[:int(N)])
         maxNDim = (s > optThresh).sum()
     stateSpaceNDim = min(maxNDim, u.shape[0])
     if plotting:
-        ax[2].plot(s)
+        ax[2].plot(s, label='singular values of H')
         ax[2].set_title('singular values of Hankel matrix (ERA)')
         ax[2].set_ylabel('s')
-        ax[2].axvline(stateSpaceNDim)
+        ax[2].axvline(stateSpaceNDim, color='r', label='optimal state space n. dim.')
+        ax[2].axvline(p, color='g', label='AR(p) order')
+        ax[2].legend()
         ax[2].set_xlabel('Count')
     #
     u = u[:, :stateSpaceNDim]
@@ -1315,9 +1343,28 @@ class flatStandardScaler(StandardScaler):
         else:
             res = super().transform((X - self.means_per_column_).reshape(-1, 1))
         if isinstance(X, pd.DataFrame):
-            output = pd.DataFrame(np.reshape(res, originalShape), index=X.index, columns=X.columns)
+            output = pd.DataFrame(
+                np.reshape(res, originalShape),
+                index=X.index, columns=X.columns)
         else:
             output = np.reshape(res, originalShape)
+        '''if True:
+            fig, ax = plt.subplots(2, 1)
+            ax[0].plot(X.xs(1, level='conditionUID').iloc[:, 0].to_numpy())
+            ax[1].plot(output.xs(1, level='conditionUID').iloc[:, 0].to_numpy())
+            plt.show()'''
+        return output
+
+class DataFrameStandardScaler(StandardScaler):
+
+    def transform(self, X):
+        res = super().transform(X)
+        if isinstance(X, pd.DataFrame):
+            output = pd.DataFrame(
+                res,
+                index=X.index, columns=X.columns)
+        else:
+            output = res
         '''if True:
             fig, ax = plt.subplots(2, 1)
             ax[0].plot(X.xs(1, level='conditionUID').iloc[:, 0].to_numpy())

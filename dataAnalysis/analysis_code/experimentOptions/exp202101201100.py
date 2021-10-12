@@ -194,6 +194,12 @@ def getExpOpts():
         2: [37, 191]
     }
     ############################################################
+    manualOutlierOverrideDict = {
+        1: [22],
+        2: [186],
+        3: [41]
+        }
+    ############################################################
     #
     spikeSortingOpts = {
         'utah': {
@@ -237,23 +243,6 @@ def getExpOpts():
                 for i in [1, 2, 3]]
         }
     }
-    #
-    '''
-    csdOpts = {
-        'NSamplesForCV': 1000,
-        'chunkSize': 20000,
-        'skipChannels': ['utah25', 'utah39'],
-        'optimalHyperparameters': {'h': 1.0, 'R_init': 0.2, 'lambd': 0.0016},
-        'filterOpts': {
-            'low': {
-                'Wn': 400,
-                'N': 4,
-                'btype': 'low',
-                'ftype': 'butter'
-            }
-        }
-        }
-        '''
     expIteratorOpts = {
         'ca': {
             'experimentsToAssemble': {

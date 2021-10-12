@@ -20,7 +20,7 @@ Options:
     --showFigures                          show plots interactively? [default: False]
     --plotThePieces                        show plots interactively? [default: False]
 """
-import logging
+import logging, sys
 logging.captureWarnings(True)
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -54,7 +54,13 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import RobustScaler, MinMaxScaler
-
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
 sns.set(
     context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
@@ -170,7 +176,7 @@ relativeRaucDF.columns = relativeRaucDF.columns.get_level_values('feature')
 recCurve.loc[:, 'normalizedRAUC'] = relativeRaucDF.stack().to_numpy()
 
 whichRAUC = 'normalizedRAUC'
-averageRaucDF = relativeRaucDF.mean(axis='columns').to_frame(name=whichRAUC).reset_index()
+# whichRAUC = 'rauc'
 
 ampStatsDF = pd.read_hdf(resultPath, 'amplitudeStats')
 relativeStatsDF = pd.read_hdf(resultPath, 'relativeStatsDF')
@@ -188,9 +194,30 @@ dropCols = [
     for idxName in recCurve.index.names
     if idxName not in keepCols]
 plotRC.drop(columns=dropCols, inplace=True)
+######
+relativeStatsDF.loc[:, 'T_abs'] = relativeStatsDF['T'].abs()
+nFeats = plotRC['feature'].unique().shape[0]
+nFeatsToPlot = min(4, int(np.ceil(nFeats/2)))
+keepTopIdx = (
+    [i for i in range(nFeatsToPlot)] +
+    [i for i in range(-1 * nFeatsToPlot, -1)]
+    )
+statsRankingDF = relativeStatsDF.groupby('feature').mean().sort_values('T_abs')
+keepCols = (
+    pd.Series(
+        statsRankingDF
+        .iloc[keepTopIdx, :]
+        .index.get_level_values('feature'))
+    .drop_duplicates()
+    )
+# pdb.set_trace() # relativeStatsDF.groupby('kinematicCondition').mean()
+print('Plotting select features:\n{}'.format(statsRankingDF.loc[keepCols, :]))
+plotRC = plotRC.loc[plotRC['feature'].isin(keepCols), :]
+######
 refGroup = plotRC.loc[plotRC['electrode'] == 'NA', :]
 testGroup = plotRC.loc[plotRC['electrode'] != 'NA', :]
-
+#
+averageRaucDF = relativeRaucDF.mean(axis='columns').to_frame(name=whichRAUC).reset_index()
 averageRaucDF.loc[:, 'feature'] = 'averageFeature'
 averageRaucDF.loc[:, 'freqBandName'] = 'averageFeature'
 refGroupAverage = averageRaucDF.loc[averageRaucDF['electrode'] == 'NA', :]
@@ -204,7 +231,8 @@ hueName = 'kinematicCondition'
 hueOrder = sorted(np.unique(plotRC[hueName]))
 pal = sns.color_palette("Set2")
 huePalette = {hN: pal[hIdx] for hIdx, hN in enumerate(hueOrder)}
-rowName = 'freqBandName'
+#
+rowName = 'feature'
 rowOrder = sorted(np.unique(plotRC[rowName]))
 colWrap = min(3, len(colOrder))
 height, width = 3, 3
@@ -233,9 +261,7 @@ def statsAnnotator(g, ro, co, hu, dataSubset):
                     g.axes[ro, co].text(x + dx, y + dy, '+', color=huePalette[hn], va='bottom', ha='right')
             g.axes[ro, co].starsAnnotated = True
     return
-
-
-# pdb.set_trace()
+#
 titleLabelLookup = {
     'electrode = + E16 - E5': 'Stimulation (+ E16 - E5)',
     'electrode = NA': 'No stimulation',
@@ -247,8 +273,12 @@ titleLabelLookup = {
     'feature = mahal_ledoit_spb': 'Mahalanobis distance (spike power band)',
     }
 with PdfPages(pdfPath) as pdf:
-    plotLims = [0, plotRC[whichRAUC].quantile(1-1e-2)]
+    # plotLims = [0, plotRC[whichRAUC].quantile(1-1e-2)]
+    plotLims = [
+        plotRC[whichRAUC].quantile(1e-2),
+        plotRC[whichRAUC].quantile(1-1e-2)]
     if arguments['plotThePieces']:
+        widthRatios = [4] * np.unique(testGroup[colName]).shape[0] + [1]
         g = sns.relplot(
             col=colName,
             col_order=colOrder,
@@ -260,8 +290,7 @@ with PdfPages(pdfPath) as pdf:
             height=height, aspect=aspect, errorbar='sd', estimator='mean',
             facet_kws=dict(
                 sharey=True, sharex=False, margin_titles=True,
-                gridspec_kws=dict(width_ratios=[4, 1])), lw=1,
-
+                gridspec_kws=dict(width_ratios=widthRatios)), lw=1,
             )
         plotProcFuns = [statsAnnotator, asp.genTitleChanger(titleLabelLookup)]
         for (ro, co, hu), dataSubset in g.facet_data():
@@ -306,58 +335,87 @@ with PdfPages(pdfPath) as pdf:
         else:
             plt.close()
         ################################
-    g = sns.relplot(
-        col=colName,
-        col_order=colOrder,
-        row=rowName,
-        x=amplitudeFieldName,
-        y=whichRAUC,
-        hue=hueName, hue_order=hueOrder, palette=huePalette,
-        kind='line', data=testGroupAverage,
-        height=height, aspect=aspect, errorbar='sd', estimator='mean',
-        facet_kws=dict(
-            sharey=True, sharex=False, margin_titles=True,
-            gridspec_kws=dict(width_ratios=[4, 1])), lw=1,
+        plotRelativeStatsDF = relativeStatsDF.reset_index()
+        g = sns.displot(
+            x='T', hue='freqBandName',
+            data=plotRelativeStatsDF,
+            col=colName,
+            col_order=[
+                cn
+                for cn in colOrder
+                if cn in plotRelativeStatsDF[colName].to_list()],
+            row=hueName,
+            row_order=[
+                cn
+                for cn in hueOrder
+                if cn in plotRelativeStatsDF[hueName].to_list()],
+            kind='hist', element='step',
+            height=2 * height, aspect=aspect
+            )
+        g.suptitle('T-statistic distribution')
+        pdf.savefig(
+            bbox_inches='tight',
+            )
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+    plotTheAverage = False
+    if plotTheAverage:
+        widthRatios = [4] * np.unique(testGroupAverage[colName]).shape[0] + [1]
+        g = sns.relplot(
+            col=colName,
+            col_order=colOrder,
+            row=rowName,
+            x=amplitudeFieldName,
+            y=whichRAUC,
+            hue=hueName, hue_order=hueOrder, palette=huePalette,
+            kind='line', data=testGroupAverage,
+            height=height, aspect=aspect, errorbar='sd', estimator='mean',
+            facet_kws=dict(
+                sharey=True, sharex=False, margin_titles=True,
+                gridspec_kws=dict(width_ratios=widthRatios)), lw=1,
 
-        )
-    plotProcFuns = []
-    for (ro, co, hu), dataSubset in g.facet_data():
-        if len(plotProcFuns):
-            for procFun in plotProcFuns:
-                procFun(g, ro, co, hu, dataSubset)
-    for (row_val, col_val), ax in g.axes_dict.items():
-        if col_val == 'NA':
-            refMask = (refGroupAverage[rowName] == row_val)
-            if refMask.any():
-                refData = refGroupAverage.loc[refMask, :]
-            else:
-                refData = refGroupAverage
-            sns.violinplot(
-                x=amplitudeFieldName,
-                y=whichRAUC, palette=huePalette,
-                hue=hueName, hue_order=hueOrder, data=refData,
-                cut=0, inner='box',
-                ax=ax)
-            if ax.get_legend() is not None:
-                ax.get_legend().remove()
-    g.set_axis_labels('Stimulation amplitude (uA)', 'Normalized AUC')
-    asp.reformatFacetGridLegend(
-        g, titleOverrides={
-            'kinematicCondition': 'Movement type'
-        },
-        contentOverrides={
-            'NA_NA': 'No movement',
-            'CW_outbound': 'Start of movement (extension)',
-            'CW_return': 'Return to start (flexion)'
-        },
-        styleOpts=styleOpts)
-    g.resize_legend(adjust_subtitles=True)
-    g.axes[0, 0].set_ylim(plotLims)
-    g.suptitle('Averaged across all signals')
-    pdf.savefig(
-        bbox_inches='tight',
-        )
-    if arguments['showFigures']:
-        plt.show()
-    else:
-        plt.close()
+            )
+        plotProcFuns = []
+        for (ro, co, hu), dataSubset in g.facet_data():
+            if len(plotProcFuns):
+                for procFun in plotProcFuns:
+                    procFun(g, ro, co, hu, dataSubset)
+        for (row_val, col_val), ax in g.axes_dict.items():
+            if col_val == 'NA':
+                refMask = (refGroupAverage[rowName] == row_val)
+                if refMask.any():
+                    refData = refGroupAverage.loc[refMask, :]
+                else:
+                    refData = refGroupAverage
+                sns.violinplot(
+                    x=amplitudeFieldName,
+                    y=whichRAUC, palette=huePalette,
+                    hue=hueName, hue_order=hueOrder, data=refData,
+                    cut=0, inner='box',
+                    ax=ax)
+                if ax.get_legend() is not None:
+                    ax.get_legend().remove()
+        g.set_axis_labels('Stimulation amplitude (uA)', 'Normalized AUC')
+        asp.reformatFacetGridLegend(
+            g, titleOverrides={
+                'kinematicCondition': 'Movement type'
+            },
+            contentOverrides={
+                'NA_NA': 'No movement',
+                'CW_outbound': 'Start of movement (extension)',
+                'CW_return': 'Return to start (flexion)'
+            },
+            styleOpts=styleOpts)
+        g.resize_legend(adjust_subtitles=True)
+        g.axes[0, 0].set_ylim(plotLims)
+        g.suptitle('Averaged across all signals')
+        pdf.savefig(
+            bbox_inches='tight',
+            )
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

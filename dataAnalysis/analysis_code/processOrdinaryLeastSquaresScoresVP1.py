@@ -697,7 +697,7 @@ if __name__ == '__main__':
                 plotDF = hyperParams.to_frame(name='parameter').reset_index()
                 g = sns.catplot(
                     x='rhsMaskIdx', y='parameter',
-                    col='rhsMaskIdx', data=plotDF, kind='violin'
+                    col='rhsMaskIdx', data=plotDF, kind='count'
                     )
                 g.suptitle(titleText)
                 plotProcFuns = [annotateWithQuantile]

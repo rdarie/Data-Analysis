@@ -285,7 +285,7 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '201901251000-Murdoc': [1],
+                '201901251000-Murdoc': [1, 2],
                 }
             },
         'ma': {
@@ -295,7 +295,7 @@ def getExpOpts():
             },
         'na': {
             'experimentsToAssemble': {
-                '201901251000-Murdoc': [1],
+                '201901251000-Murdoc': [1, 2],
                 }
             }
         }

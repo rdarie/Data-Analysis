@@ -446,8 +446,10 @@ def parseAnalysisOptions(
         'analysisFilterKWArgs': {
             'hiRes': dict(
                 filterSignals=True, medianFilterSignals=False,
-                hampelFilterSignals=True, analysisHampelFilterOpts=dict(
-                    window_size=10, n=6, imputation=True  # total window size will be computed as 2*window_size + 1
+                hampelFilterSignals=True, diagnosticPlots=False,
+                analysisHampelFilterOpts=dict(
+                    average_across_channels=True,
+                    window_size=31, thresh=3, imputation=True  # window must be odd
             ))
         },
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
@@ -542,12 +544,12 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 5e-3,
+            'forceBinInterval': 1e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
-                n_splits=20,
+                n_splits=25,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
@@ -569,12 +571,12 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 5e-3,
+            'forceBinInterval': 1e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
-                n_splits=20,
+                n_splits=25,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
@@ -596,12 +598,12 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 5e-3,
+            'forceBinInterval': 1e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
-                n_splits=20,
+                n_splits=25,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
@@ -617,33 +619,6 @@ def parseAnalysisOptions(
                 'winStop': None
                 }
             },
-        # rest period from before movement onset
-        'cd': {
-            'ensembleHistoryLen': .30,
-            'covariateHistoryLen': .50,
-            'nHistoryBasisTerms': 1,
-            'nCovariateBasisTerms': 1,
-            'forceBinInterval': 5e-3,
-            'minBinCount': 5,
-            'calcTimeROI': True,
-            'controlProportion': None,
-            'cvKWArgs': dict(
-                n_splits=20,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
-                resamplerClass=None, resamplerKWArgs={},
-                ),
-            'timeROIOpts': {
-                'alignQuery': None,
-                'winStart': None,
-                'winStop': None
-            },
-            'timeROIOpts_control': {
-                'alignQuery': 'startingOrStimOn',
-                'winStart': -900e-3,
-                'winStop': -600e-3
-                }
-            },
         # perimovement, any stim, for regression
         'ra': {
             'ensembleHistoryLen': .30,
@@ -651,6 +626,10 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 1e-3,
+            # # #'procFun': {
+            # # #    'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.5], useMean=True)',
+            # # #    'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.5], useMean=True)',
+            # # #    },
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -662,116 +641,7 @@ def parseAnalysisOptions(
                 ),
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
-                'winStart': -0.3,  # start 0.2 before whatever the query was
-                'winStop': .5  # stop .5 sec after startingOrStimOn
-            },
-            'timeROIOpts_control': {
-                'alignQuery': None,
-                'winStart': None,
-                'winStop':  None,
-                }
-            },
-        # perimovement, any stim, for regression
-        'rb': {
-            'ensembleHistoryLen': .30,
-            'covariateHistoryLen': .50,
-            'nHistoryBasisTerms': 1,
-            'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
-            'minBinCount': 5,
-            'calcTimeROI': True,
-            'controlProportion': None,
-            'cvKWArgs': dict(
-                n_splits=10,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
-                resamplerClass=None, resamplerKWArgs={},
-                ),
-            'timeROIOpts': {
-                'alignQuery': 'startingOrStimOn',
-                'winStart': -0.4,  # start 0.2 before whatever the query was
-                'winStop': .5  # stop .5 sec after startingOrStimOn
-            },
-            'timeROIOpts_control': {
-                'alignQuery': None,
-                'winStart': None,
-                'winStop':  None,
-                }
-            },
-        # perimovement, any stim, for regression
-        'rc': {
-            'ensembleHistoryLen': .30,
-            'covariateHistoryLen': .50,
-            'nHistoryBasisTerms': 1,
-            'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
-            'minBinCount': 5,
-            'calcTimeROI': True,
-            'controlProportion': None,
-            'cvKWArgs': dict(
-                n_splits=10,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
-                resamplerClass=None, resamplerKWArgs={},
-                ),
-            'timeROIOpts': {
-                'alignQuery': 'startingOrStimOn',
-                'winStart': -0.7,  # start 0.2 before whatever the query was
-                'winStop': .5  # stop .5 sec after startingOrStimOn
-            },
-            'timeROIOpts_control': {
-                'alignQuery': None,
-                'winStart': None,
-                'winStop':  None,
-                }
-            },
-        # perimovement, any stim, for regression
-        'rd': {
-            'ensembleHistoryLen': .30,
-            'covariateHistoryLen': .50,
-            'nHistoryBasisTerms': 1,
-            'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
-            'minBinCount': 5,
-            'calcTimeROI': True,
-            'controlProportion': None,
-            'cvKWArgs': dict(
-                n_splits=5,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
-                resamplerClass=None, resamplerKWArgs={},
-                ),
-            'timeROIOpts': {
-                'alignQuery': 'startingOrStimOn',
-                'winStart': -0.3,  # start 0.2 before whatever the query was
-                'winStop': .5  # stop .5 sec after startingOrStimOn
-            },
-            'timeROIOpts_control': {
-                'alignQuery': None,
-                'winStart': None,
-                'winStop':  None,
-                }
-            },
-        # perimovement, any stim, for regression
-        're': {
-            'ensembleHistoryLen': .30,
-            'covariateHistoryLen': .50,
-            'nHistoryBasisTerms': 1,
-            'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
-            'forceRollingWindow': None,
-            'minBinCount': 5,
-            'calcTimeROI': True,
-            'controlProportion': None,
-            'cvKWArgs': dict(
-                n_splits=5,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
-                resamplerClass=None, resamplerKWArgs={},
-                ),
-            'timeROIOpts': {
-                'alignQuery': 'startingOrStimOn',
-                'winStart': -0.3,  # start 0.2 before whatever the query was
+                'winStart': -0.2,  # start 0.2 before whatever the query was
                 'winStop': .5  # stop .5 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
@@ -787,13 +657,15 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 1e-3,
-            'procFun': {
-                'lfp_CAR': 'ash.genDetrender(timeWindow=[-0.6, -0.3], useMean=True)'},
+            # # #'procFun': {
+            # # #    'laplace': 'ash.genDetrender(timeWindow=[-0.6, -0.3], useMean=True)',
+            # # #    'laplace_spectral': 'ash.genDetrender(timeWindow=[-0.6, -0.3], useMean=True)',
+            # # #    },
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
-                n_splits=3,
+                n_splits=2,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
@@ -815,7 +687,7 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 5e-3,
+            'forceBinInterval': 1e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -842,7 +714,7 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 5e-3,
+            'forceBinInterval': 1e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -854,13 +726,13 @@ def parseAnalysisOptions(
                 ),
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
-                'winStart': -0.2,  # start 0.6 before whatever the query was
-                'winStop': 0.6  # stop .6 sec after startingOrStimOn
+                'winStart': -0.3,  # start 0.3 before whatever the query was
+                'winStop': 0.4  # stop .6 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
-                'alignQuery': 'startingOrStimOn',
+                'alignQuery': 'startingNoStim',
                 'winStart': -0.6,
-                'winStop': 0.2,
+                'winStop': -0.1,
                 }
             },
         }
@@ -874,49 +746,7 @@ def parseAnalysisOptions(
         for key in iteratorOpts.keys():
             if key in expOpts['expIteratorOpts']:
                 iteratorOpts[key].update(expOpts['expIteratorOpts'][key])
-
-    '''glmOptsLookup = {
-        'ensembleHistoryLen': .30,
-        'covariateHistoryLen': .50,
-        'nHistoryBasisTerms': 5,
-        'nCovariateBasisTerms': 1,
-        'regressionBinInterval': 20e-3,
-        'glm_50msec': dict(
-            subsampleOpts=dict(
-                rollingWindow=50, decimate=50,
-                windowSize=(-1750e-3, 1750e-3)),
-            covariateSpacing=25e-3),
-        'glm_30msec': dict(
-            subsampleOpts=dict(
-                rollingWindow=30, decimate=30,
-                windowSize=(-1750e-3, 1750e-3)),
-            covariateSpacing=15e-3),
-        'glm_20msec': dict(
-            subsampleOpts=dict(
-                rollingWindow=20, decimate=20,
-                windowSize=(-1750e-3, 1750e-3)),
-            covariateSpacing=10e-3),
-        'glm_10msec': dict(
-            subsampleOpts=dict(
-                rollingWindow=10, decimate=10,
-                windowSize=(-1750e-3, 1750e-3)),
-            covariateSpacing=10e-3),
-        'glm_5msec': dict(
-            subsampleOpts=dict(
-                rollingWindow=5, decimate=5,
-                windowSize=(-1750e-3, 1750e-3)),
-            covariateSpacing=10e-3),
-        'glm_3msec': dict(
-            subsampleOpts=dict(
-                rollingWindow=3, decimate=3,
-                windowSize=(-1750e-3, 1750e-3)),
-            covariateSpacing=10e-3),
-        'glm_1msec': dict(
-            subsampleOpts=dict(
-                rollingWindow=None, decimate=1,
-                windowSize=(-1750e-3, 1750e-3)),
-            covariateSpacing=10e-3),
-    }'''
+    #
     spectralFeatureOpts = dict(
         winLen=100e-3, stepLen=20e-3, R=20,
         fStart=None, fStop=None)
@@ -927,9 +757,25 @@ def parseAnalysisOptions(
         })
     outlierDetectOptions = dict(
         targetEpochSize=200e-3,
-        windowSize=(-.7, .6),
+        windowSize=(-.7, .8),
         twoTailed=True,
         qThresh=1e-3,
         devQuantile=None,
         )
+    csdOpts = {
+        'filterOpts': {
+            'low': {
+                # 'Wn': 400,
+                'N': 4,
+                'btype': 'low',
+                'ftype': 'butter'
+            },
+            'high': {
+                'Wn': .1,
+                'N': 4,
+                'btype': 'high',
+                'ftype': 'butter'
+            },
+        }
+        }
     return expOpts, locals()

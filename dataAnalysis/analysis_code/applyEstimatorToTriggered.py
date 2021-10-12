@@ -208,7 +208,9 @@ trialTimes = alignedAsigsDF.index.get_level_values('t').unique()
 # assert np.allclose(trialTimes - dummySt.times.magnitude)
 tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 if normalizeDataset is not None:
+    print('Normalizing dataset...')
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
+# take away neo's #0 suffix
 alignedAsigsDF.rename(columns=lambda x: x.replace('#0', ''), level='feature', inplace=True)
 
 if hasattr(estimator, 'transform'):
@@ -257,7 +259,10 @@ if True:
     plt.legend()
     plt.show()'''
 del alignedAsigsDF
-#
+# put back neo's #0 suffix, but only if not already there
+alignedFeaturesDF.rename(
+    columns=lambda x: '{}#0'.format(x.replace('#0', '')),
+    level='feature', inplace=True)
 spikeTrainMeta.update({
     'left_sweep': (-1) * tBins[0] * pq.s,
     't_start': trialTimes[0] * pq.s,

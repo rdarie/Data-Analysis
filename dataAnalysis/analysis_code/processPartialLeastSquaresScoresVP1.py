@@ -340,7 +340,8 @@ if __name__ == '__main__':
     prf.print_memory_usage('done concatenating scoresStack from .h5 array')
     #
     estimatorsDict = {}
-    # scoresDict = {}
+    gsScoresDict = {}
+    # load estimators from joblib files
     for rowIdx, row in allTargetsPLS.iterrows():
         lhsMaskIdx, rhsMaskIdx = row.name
         rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
@@ -351,11 +352,13 @@ if __name__ == '__main__':
             print('Loading data from {}'.format(thisEstimatorPath))
         else:
             thisEstimatorPath = estimatorPath
-        '''estimatorsDict[(lhsMaskIdx, rhsMaskIdx, freqBandName)] = pd.read_hdf(
+        '''
+        estimatorsDict[(lhsMaskIdx, rhsMaskIdx, freqBandName)] = pd.read_hdf(
             thisEstimatorPath,
             'cv_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
                 lhsMaskIdx, rhsMaskIdx, freqBandName
-                ))'''
+                ))
+                '''
         thisEstimatorJBPath = os.path.join(
             thisEstimatorPath.replace('.h5', ''),
             'cv_estimators__lhsMask_{}__rhsMask_{}__{}.joblib'.format(
@@ -365,10 +368,20 @@ if __name__ == '__main__':
         thisEstimatorJB = pd.Series(thisEstimatorJBDict)
         thisEstimatorJB.index.name = 'fold'
         estimatorsDict[(lhsMaskIdx, rhsMaskIdx, freqBandName)] = thisEstimatorJB
-    prf.print_memory_usage('concatenating estimators from .h5 array')
+        #####
+        gsScoresDict[(lhsMaskIdx, rhsMaskIdx, freqBandName)] = pd.read_hdf(
+            thisEstimatorPath, 'gs_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
+                lhsMaskIdx, rhsMaskIdx, freqBandName
+            ))
+    prf.print_memory_usage('concatenating estimators from joblib files')
     estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     del estimatorsDict
-    prf.print_memory_usage('done concatenating estimators from .h5 array')
+    prf.print_memory_usage('done concatenating gs scores from h5 file')
+    #
+    prf.print_memory_usage('concatenating estimators from joblib files')
+    gsScoresDF = pd.concat(gsScoresDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
+    del gsScoresDict
+    prf.print_memory_usage('done concatenating gs scores from h5 file')
     # prf.print_memory_usage('concatenating scores from .h5 array')
     # scoresDF = pd.concat(scoresDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     # del scoresDict
@@ -696,6 +709,64 @@ if __name__ == '__main__':
         lambda x: print(x.regressor_.named_steps['regressor']))
     '''
     pdfPath = os.path.join(
+        figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'hyperparameters_gridSearch'))
+    with PdfPages(pdfPath) as pdf:
+        height, width = 3, 4
+        aspect = width / height
+        hpNames = [cN for cN in gsScoresDF.columns if 'regressor__regressor__' in cN]
+        gsScoresDF.reset_index(drop=True, inplace=True)
+        gsScoresDF.rename(columns={cN: cN.replace('regressor__regressor__', '') for cN in hpNames}, inplace=True)
+        hpNames = [cN.replace('regressor__regressor__', '') for cN in hpNames]
+        issueMask = gsScoresDF['score'].abs() > 1e3
+        if issueMask.any():
+            gsScoresDF.loc[issueMask, :].drop_duplicates(subset=['lhsMaskIdx', 'rhsMaskIdx', 'fold'])
+        for hpN in hpNames:
+            for rhsMaskIdx, plotScores in gsScoresDF.loc[~issueMask, :].groupby('rhsMaskIdx', sort=False):
+                rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
+                #
+                for annotationName in ['historyLen', 'designFormula', 'ensembleTemplate']:
+                    plotScores.loc[:, annotationName] = plotScores['lhsMaskIdx'].map(lhsMasksInfo[annotationName])
+                #
+                plotScores.loc[:, 'designType'] = ''
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] == 'NULL') &
+                        (plotScores['ensembleTemplate'] == 'NULL')
+                    )
+                assert (not thisDesignTypeMask.any())
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] == 'NULL') &
+                        (plotScores['ensembleTemplate'] != 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleOnly'
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] != 'NULL') &
+                        (plotScores['ensembleTemplate'] == 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'exogenousOnly'
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] != 'NULL') &
+                        (plotScores['ensembleTemplate'] != 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndExogenous'
+                thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
+                g = sns.relplot(
+                    y='score', x=hpN,
+                    row='designType',
+                    hue='trialType',
+                    data=plotScores, kind='line', errorbar='se',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    height=height, aspect=aspect,
+                    facet_kws=dict(sharex=False, sharey=False)
+                    )
+                g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+    pdfPath = os.path.join(
         figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'hyperparameters'))
     with PdfPages(pdfPath) as pdf:
         for pName in ['L1_wt', 'alpha', 'n_components']:
@@ -705,8 +776,9 @@ if __name__ == '__main__':
                 titleText = pName
                 plotDF = hyperParams.to_frame(name='parameter').reset_index()
                 g = sns.catplot(
-                    x='rhsMaskIdx', y='parameter',
-                    col='rhsMaskIdx', data=plotDF, kind='violin'
+                    row='rhsMaskIdx', x='parameter',
+                    col='rhsMaskIdx', data=plotDF,
+                    kind='count'
                     )
                 g.suptitle(titleText)
                 plotProcFuns = [annotateWithQuantile]
@@ -714,7 +786,7 @@ if __name__ == '__main__':
                     if len(plotProcFuns):
                         for procFun in plotProcFuns:
                             procFun(g, ro, co, hu, dataSubset)
-                print('Saving {}\n to {}'.format(titleText, pdfPath))
+                print('Saving {} hyperparam counts to \n to {}'.format(titleText, pdfPath))
                 g.tight_layout(pad=styleOpts['tight_layout.pad'])
                 pdf.savefig(
                     bbox_inches='tight',
@@ -724,5 +796,6 @@ if __name__ == '__main__':
                 else:
                     plt.close()
             except Exception:
-                traceback.print_exc()
+                print('An error was triggered when retrieving hyperparameter {}'.format(pName))
+                # traceback.print_exc()
     print('\n' + '#' * 50 + '\n{}\nCompleted.\n'.format(__file__) + '#' * 50 + '\n')

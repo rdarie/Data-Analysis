@@ -50,6 +50,7 @@ from docopt import docopt
 from numpy.random import default_rng
 
 import seaborn as sns
+from datetime import datetime as dt
 '''
 consoleDebug = True
 if consoleDebug:
@@ -136,9 +137,14 @@ def calcCWT(
     result.columns.name = partition.columns.name
     # print('Process {} finished wavelet chunk'.format(os.getpid()))
     return result
-
 #
 if __name__ == "__main__":
+    try:
+        print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+    except:
+        pass
+    for arg in sys.argv:
+        print(arg)
     rng = default_rng()
     arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
     sns.set()
@@ -166,7 +172,7 @@ if __name__ == "__main__":
         alignSubFolder,
         blockBaseName + '{}_{}.nix'.format(
             inputBlockSuffix, arguments['window']))
-
+    #
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
         namedQueries, scratchFolder, **arguments)
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
@@ -262,7 +268,6 @@ if __name__ == "__main__":
             plt.close()
         waveletReportPDF.close()
     ##
-    #
     groupBy = ['feature', 'pedalMovementCat', 'stimCat']
     spectralDF = ash.splitApplyCombine(
         dataDF, fun=calcCWT,
@@ -319,3 +324,4 @@ if __name__ == "__main__":
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()
     print('Finished {}.nix...'.format(outputPath))
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

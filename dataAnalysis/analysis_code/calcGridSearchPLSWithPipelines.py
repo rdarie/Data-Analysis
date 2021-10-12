@@ -97,6 +97,7 @@ import joblib as jb
 import patsy
 import sys
 import gc
+import time
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from datetime import datetime as dt
 
@@ -218,7 +219,7 @@ if __name__ == '__main__':
     globalMaxNC = int(1e3)
     #n_components': Number of components to keep. Should be in [1, min(n_samples, n_features, n_targets)]
     regressorClass = PLSRegression
-    regressorKWArgs = dict(scale=False)
+    regressorKWArgs = dict(scale=False, max_iter=1000)
     regressorInstance = regressorClass(**regressorKWArgs)
     #
     for hIdx, histOpts in enumerate(addHistoryTerms):
@@ -274,6 +275,53 @@ if __name__ == '__main__':
     estimatorMetadata['lhsDatasetPath'] = lhsDatasetPath
     estimatorMetadata['rhsDatasetPath'] = rhsDatasetPath
     #
+    ###################################################################################################################
+    if os.getenv('SLURM_ARRAY_TASK_ID') is not None:
+        slurmTaskID = int(os.getenv('SLURM_ARRAY_TASK_ID'))
+        estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
+    else:
+        slurmTaskID = 0
+        #### debugging!
+        #  slurmTaskID = 2
+        #  estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
+    #####
+    #### remove existing results
+    if os.path.exists(estimatorPath):
+        os.remove(estimatorPath)
+    ####
+    estimatorPathJoblib = estimatorPath.replace('.h5', '')
+    if os.path.exists(estimatorPathJoblib):
+        shutil.rmtree(estimatorPathJoblib)
+    os.makedirs(estimatorPathJoblib)
+    ########
+    if os.getenv('SLURM_ARRAY_TASK_COUNT') is not None:
+        slurmTaskCount = int(os.getenv('SLURM_ARRAY_TASK_COUNT'))
+    else:
+        slurmTaskCount = 1
+    ####
+    # if rerunning a subset of tasks, get the original task count from the file
+    slurmTaskCount = processSlurmTaskCountPLS
+    print('slurmTaskCount = {}'.format(slurmTaskCount))
+    ############
+    slurmGroupSize = int(np.ceil(allTargetsPLS.shape[0] / slurmTaskCount))
+    if os.getenv('SLURM_ARRAY_TASK_MIN') is not None:
+        slurmTaskMin = int(os.getenv('SLURM_ARRAY_TASK_MIN'))
+    else:
+        slurmTaskMin = 0
+    if arguments['transformerNameRhs'] is not None:
+        del transformedRhsDF, transformedRhsMasks
+    #########
+    if slurmTaskID == slurmTaskMin:
+        print('Saving estimator metadata to \n{}'.format(estimatorMetaDataPath))
+        if os.path.exists(estimatorMetaDataPath):
+            print('Pre-existing file found, deleting')
+            os.remove(estimatorMetaDataPath)
+        with open(estimatorMetaDataPath, 'wb') as f:
+            pickle.dump(estimatorMetadata, f)
+    else:
+        print('Pausing execution to make sure the root process saves the metadata to pickle')
+        time.sleep(60)
+    ###################################################################################################################
     allScores = []
     lhGroupNames = lhsMasks.index.names
     if 'backend' in joblibBackendArgs:
@@ -307,48 +355,7 @@ if __name__ == '__main__':
                 ensDesignMatrix = ensPt.transform(exampleRhGroup)
                 ensDesignInfo = ensDesignMatrix.design_info
                 histDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
-    #
-    if os.getenv('SLURM_ARRAY_TASK_ID') is not None:
-        slurmTaskID = int(os.getenv('SLURM_ARRAY_TASK_ID'))
-        estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
-    else:
-        slurmTaskID = 0
-        #### debugging!
-        #  slurmTaskID = 2
-        #  estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
-    ##############################################################################################################
-    #### remove existing results
-    if os.path.exists(estimatorPath):
-        os.remove(estimatorPath)
-    ####
-    estimatorPathJoblib = estimatorPath.replace('.h5', '')
-    if os.path.exists(estimatorPathJoblib):
-        shutil.rmtree(estimatorPathJoblib)
-    os.makedirs(estimatorPathJoblib)
-    ##################################################################################################################
-    if os.getenv('SLURM_ARRAY_TASK_COUNT') is not None:
-        slurmTaskCount = int(os.getenv('SLURM_ARRAY_TASK_COUNT'))
-    else:
-        slurmTaskCount = 1
-    ####
-    # if rerunning a subset of tasks, get the original task count from the file
-    slurmTaskCount = processSlurmTaskCountPLS
-    print('slurmTaskCount = {}'.format(slurmTaskCount))
-    ############
-    slurmGroupSize = int(np.ceil(allTargetsPLS.shape[0] / slurmTaskCount))
-    if os.getenv('SLURM_ARRAY_TASK_MIN') is not None:
-        slurmTaskMin = int(os.getenv('SLURM_ARRAY_TASK_MIN'))
-    else:
-        slurmTaskMin = 0
-    if arguments['transformerNameRhs'] is not None:
-        del transformedRhsDF, transformedRhsMasks
-    ###################################################################################################################
-    if slurmTaskID == slurmTaskMin:
-        if os.path.exists(estimatorMetaDataPath):
-            os.remove(estimatorMetaDataPath)
-        with open(estimatorMetaDataPath, 'wb') as f:
-            pickle.dump(estimatorMetadata, f)
-    ###################################################################################################################
+    ###
     for lhsMaskIdx in range(lhsMasks.shape[0]):
         lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
         lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
@@ -402,13 +409,13 @@ if __name__ == '__main__':
             gsKWA = gridSearchKWArgs.copy()
             # pdb.set_trace()
             maxNC = min(rhGroup.shape[0], fullDesignDF.shape[1], globalMaxNC)
-            fastTrack = True
+            fastTrack = False
             if fastTrack:
                 gsKWA['param_grid']['regressor__regressor__n_components'] = [2, int(maxNC / 2), maxNC]
             else:
                 gsKWA['param_grid']['regressor__regressor__n_components'] = [
                     nc
-                    for nc in range(maxNC, minNC, -10)]
+                    for nc in range(maxNC, minNC, -1 * int(np.ceil(maxNC / 10)))]
             print('grid search candidates are\n{}'.format(gsKWA['param_grid']))
             cvScores, gridSearcherDict, gsScoresDF = tdr.gridSearchHyperparameters(
                 fullDesignDF, rhGroup,
@@ -435,9 +442,16 @@ if __name__ == '__main__':
             estimatorSaveName = 'cv_estimators__lhsMask_{}__rhsMask_{}__{}.joblib'.format(
                     lhsMaskIdx, rhsMaskIdx, freqBandName
                 )
+            ####
             estimatorSavePath = os.path.join(estimatorPathJoblib, estimatorSaveName)
+            # 2021-10-01 this shouldn't be necessary if we deleted the folder
+            # if os.path.exists(estimatorSavePath):
+            #     print('Deleting existing file at\n{}'.format(estimatorSavePath))
+            #     os.remove(estimatorSavePath)
+            ####
             jb.dump(cvScoresDF['estimator'].to_dict(), estimatorSavePath)
             prf.print_memory_usage('\n\nCompleted fit {} to {}...\n\n'.format(lhsMask.name[-1], freqBandName))
+            #
             gsScoresStack = pd.concat({
                 'test': gsScoresDF['test_score'],
                 'train': gsScoresDF['train_score']},

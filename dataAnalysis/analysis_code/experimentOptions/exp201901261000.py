@@ -204,6 +204,9 @@ def getExpOpts():
     dropMotionRounds = {
         1: [0, 1, 2]
         }
+    manualOutlierOverrideDict = {
+        4: [187]
+        }
     ##############
     spikeSortingOpts = {
         'utah': {
@@ -308,8 +311,8 @@ def getExpOpts():
             },
         'pa': {
             'experimentsToAssemble': {
-                '201901240900-Murdoc': [2],
-                '201901251000-Murdoc': [1, 2],
+                # '201901240900-Murdoc': [2],
+                # '201901251000-Murdoc': [1, 2],
                 '201901261000-Murdoc': [1, 2, 3, 4],
                 }
             },
@@ -322,8 +325,8 @@ def getExpOpts():
             },
         'na': {
             'experimentsToAssemble': {
-                '201901240900-Murdoc': [2],
-                '201901251000-Murdoc': [1, 2],
+                # '201901240900-Murdoc': [2],
+                # '201901251000-Murdoc': [1, 2],
                 '201901261000-Murdoc': [1, 2, 3],
                 }
             }

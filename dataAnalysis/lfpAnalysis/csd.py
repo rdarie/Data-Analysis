@@ -18,30 +18,37 @@ import pdb
 
 
 def convolveLfpWithKernel(
-        lfpDF, laplKernel=None):
+        lfpDF, laplKernel=None,
+        interpolateInput=False):
     if laplKernel is None:
-        laplKernel = 1/8 * np.asarray([
-            [-1, -1, -1],
-            [-1, 8, -1],
-            [-1, -1, -1],
+        laplKernel = np.asarray([
+            [1, 1, 1],
+            [1, 0, 1],
+            [1, 1, 1],
             ])
     #
     if lfpDF.isna().any(axis=None):
         nanMask = lfpDF.isna()
-        inputNP = interpolate_replace_nans(
-            lfpDF.to_numpy(),
-            np.ones((3, 3))
-        )
+        if interpolateInput:
+            inputNP = interpolate_replace_nans(
+                lfpDF.to_numpy(),
+                np.ones((3, 3))
+                )
+        else:
+            inputNP = lfpDF.to_numpy()
     else:
         nanMask = None
         inputNP = lfpDF.to_numpy()
     #
     laplNP = convolve(
         inputNP, laplKernel,
-        normalize_kernel=False,
-        boundary='extend')
+        normalize_kernel=True,
+        boundary='fill',
+        fill_value=np.nan,
+        nan_treatment='interpolate',
+        )
     laplDF = pd.DataFrame(
-        laplNP,
+        inputNP - laplNP,
         index=lfpDF.index,
         columns=lfpDF.columns)
     if nanMask is not None:
@@ -207,7 +214,8 @@ def compose2DParallel(
 
 def plotLfp2D(
         asig=None, chanIndex=None,
-        lfpDF=None, procFun=None, fillerFun=None, fillerFunKWArgs={},
+        lfpDF=None, procFun=None,
+        fillerFun=None, fillerFunKWArgs={},
         fig=None, ax=None,
         heatmapKWs={}):
     if (fig is None) and (ax is None):
@@ -220,7 +228,7 @@ def plotLfp2D(
             fillerFunKWArgs=fillerFunKWArgs)
         lfpDF = lfpList[0]
         returnList.append(lfpDF)
-    sns.heatmap(lfpDF, ax=ax, **heatmapKWs)
+    g = sns.heatmap(lfpDF, ax=ax, **heatmapKWs)
     return returnList
 
 

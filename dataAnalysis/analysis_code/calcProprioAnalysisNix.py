@@ -25,15 +25,24 @@ Options:
     --samplingRate=samplingRate                resample the result??
     --rigOnly                                  is there no INS block? [default: False]
 """
-import matplotlib, os
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
+#
+import os, sys
+import matplotlib
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
-#
+import matplotlib.font_manager as fm
+font_files = fm.findSystemFonts()
+for font_file in font_files:
+    try:
+        fm.fontManager.addfont(font_file)
+    except Exception:
+        pass
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
+#
 from neo.io import NixIO
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
@@ -63,21 +72,79 @@ import json
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-import seaborn as sns
+############################################################################################################
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True)
-
-
+useDPI = 200
+dpiFactor = 72 / useDPI
+snsRCParams = {
+        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+        'lines.linewidth': 1,
+        'lines.markersize': 2.4,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.spines.right": True,
+        "axes.spines.top": True,
+        "axes.linewidth": .125,
+        "grid.linewidth": .2,
+        "font.size": 5,
+        "axes.labelsize": 7,
+        "axes.titlesize": 5,
+        "xtick.labelsize": 5,
+        "ytick.labelsize": 5,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": False,
+        "ytick.left": True,
+        "ytick.right": False,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
+    }
+mplRCParams = {
+    'figure.titlesize': 7,
+    'mathtext.default': 'regular',
+    'font.family': "Nimbus Sans",
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
+    }
+styleOpts = {
+    'legend.lw': 2,
+    'tight_layout.pad': 3e-1, # units of font size
+    'panel_heading.pad': 0.
+    }
+sns.set(
+    context='paper', style='whitegrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True, rc=snsRCParams)
+for rcK, rcV in mplRCParams.items():
+    matplotlib.rcParams[rcK] = rcV
+############################################################################################################
+from pandas import IndexSlice as idxSl
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
+for arg in sys.argv:
+    print(arg)
+############################################################################################################
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
-print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 trackMemory = True
 
@@ -780,6 +847,7 @@ def calcBlockAnalysisWrapper():
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
     return
 
 

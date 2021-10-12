@@ -167,6 +167,12 @@ def getExpOpts():
     dropMotionRounds = {
         2: [106, 107, 108]
         }
+    ############################################################
+    manualOutlierOverrideDict = {
+        1: [274],
+        3: [83]
+        }
+    ############################################################
 
     ############################################################
     spikeSortingOpts = {
@@ -214,22 +220,22 @@ def getExpOpts():
     expIteratorOpts = {
         'ca': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [2, 3, 4],
+                '202101251100-Rupert': [2, 3],
                 }
             },
         'cb': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [2, 3, 4],
+                '202101251100-Rupert': [2, 3],
                 }
             },
         'cc': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3],
+                '202101251100-Rupert': [1, 2],
                 }
             },
         'ccm': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [2, 3],
+                '202101251100-Rupert': [2],
                 }
             },
         'ccs': {
@@ -239,17 +245,17 @@ def getExpOpts():
             },
         'cd': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3, 4],
+                '202101251100-Rupert': [1, 2, 3],
                 }
             },
         'ra': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3, 4],
+                '202101251100-Rupert': [1, 2, 3],
                 }
             },
         'rb': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3, 4],
+                '202101251100-Rupert': [1, 2, 3],
                 }
             },
         'pa': {
@@ -259,12 +265,12 @@ def getExpOpts():
             },
         'ma': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3, 4],
+                '202101251100-Rupert': [1, 2, 3],
                 }
             },
         'na': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3, 4],
+                '202101251100-Rupert': [1, 2, 3],
                 }
             }
         }

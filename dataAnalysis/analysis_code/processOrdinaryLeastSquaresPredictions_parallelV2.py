@@ -435,7 +435,7 @@ if __name__ == '__main__':
                     nLagsSec = np.arange(0, nLags) * binInterval
                     residualsAutoCorrDict = {}
                     for lagIdx, lagSec in enumerate(nLagsSec):
-                        residualsAutoCorrDict[lagSec] = predDF['residuals'].groupby('trialUID').apply(lambda x: x.autocorr(lag=lagIdx))
+                        residualsAutoCorrDict[lagSec] = predictionPerSource['residuals'].groupby('trialUID').apply(lambda x: x.autocorr(lag=lagIdx))
                     theseResAutoCorrDF = pd.concat(residualsAutoCorrDict, names=['lag', 'trialUID'])
                     del residualsAutoCorrDict
                     resAutoCorrIndexDF = theseResAutoCorrDF.index.to_frame().reset_index(drop=True)
@@ -448,14 +448,14 @@ if __name__ == '__main__':
                         residualsAutoCorrDF = residualsAutoCorrDF.append(theseResAutoCorrDF)
                     ##### residuals goodness of fit tests
                     minBin = predIndexDF['bin'].min()
-                    shiftedRes = predDF['residuals'].shift(1).drop(minBin, level='bin')
-                    residT = predDF['residuals'].drop(minBin, level='bin')
+                    shiftedRes = predictionPerSource['residuals'].shift(1).drop(minBin, level='bin')
+                    residT = predictionPerSource['residuals'].drop(minBin, level='bin')
                     residTDiff = residT - shiftedRes
-                    kDW = (residTDiff ** 2).sum() / (predDF['residuals'] ** 2).sum()
+                    kDW = (residTDiff ** 2).sum() / (predictionPerSource['residuals'] ** 2).sum()
                     #
                     resNormAlpha = 0.05
                     resNormality = pg.normality(
-                        predDF['residuals'], method='normaltest', alpha=resNormAlpha).iloc[0, :]
+                        predictionPerSource['residuals'], method='normaltest', alpha=resNormAlpha).iloc[0, :]
                     resNormality.loc['kDW'] = kDW
                     resNormality.loc['alpha'] = resNormAlpha
                     resNormTestDict[tuple(indexValues)] = resNormality

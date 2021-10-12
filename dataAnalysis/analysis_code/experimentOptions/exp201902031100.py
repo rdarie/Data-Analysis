@@ -246,27 +246,35 @@ def getExpOpts():
     expIteratorOpts = {
         'ca': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3, 4],
+                '201902041100-Murdoc': [1, 2, 3, 4],
+                '201902051100-Murdoc': [1, 2, 3, 4],
                 }
             },
         'cb': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3, 4],
+                '201902041100-Murdoc': [1, 2, 3, 4],
+                '201902051100-Murdoc': [1, 2, 3, 4],
                 }
             },
         'cc': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [5],
+                '201902041100-Murdoc': [5],
                 }
             },
         'ccm': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3, 4],
+                '201902041100-Murdoc': [1, 2, 3, 4],
+                '201902051100-Murdoc': [1, 2, 3, 4],
                 }
             },
         'ccs': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [5],
+                '201902041100-Murdoc': [5],
                 }
             },
         'cd': {
@@ -277,6 +285,8 @@ def getExpOpts():
         'ra': {
             'experimentsToAssemble': {
                 experimentName: [],
+                '201902041100-Murdoc': [1, 2, 3, 4, 5],
+                '201902051100-Murdoc': [1, 2, 3, 4],
                 }
             },
         'rb': {
@@ -307,6 +317,8 @@ def getExpOpts():
         'ma': {
             'experimentsToAssemble': {
                 experimentName: [1, 2, 3, 4, 5],
+                '201902041100-Murdoc': [1, 2, 3, 4, 5],
+                '201902051100-Murdoc': [1, 2, 3, 4],
                 }
             },
         'na': {
