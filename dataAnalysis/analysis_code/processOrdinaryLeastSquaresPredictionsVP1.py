@@ -530,28 +530,4 @@ if __name__ == '__main__':
                         theseColors, theseLegendUpdates, hueName='term',
                         axLims=predAxLims)
                 ####
-                '''
-                designFormula = lhsMasksInfo.loc[nmLk0['lhsMaskIdx'], 'designFormula']
-                if designFormula != 'NULL':
-                    designInfo = designInfoDict[designFormula]
-                    formulaIdx = lOfDesignFormulas.index(designFormula)
-                    designDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'designs/formula_{}'.format(formulaIdx))
-                    for key, value in nmLk1.items():
-                        if key in designDF.index.names:
-                            designDF = designDF.xs(value, level=key, drop_level=False)
-                    designTermNames = designInfo.term_names
-                    plotDesign = designDF.stack().to_frame(name='signal').reset_index()
-                    plotDesign = plotDesign.loc[plotDesign['bin'] > (plotDesign['bin'].min() + burnInPeriod), :]
-                    plotDesign.loc[:, 'predType'] = 'factor'
-                    plotDesign.loc[:, 'kinCondition'] = plotDesign.loc[:, ['pedalMovementCat', 'pedalDirection']].apply(lambda x: tuple(x), axis='columns').map(kinConditionLookup)
-                    thisFactorPalette = factorPalette.loc[factorPalette['factor'].isin(plotDesign['factor']), :]
-                    plotDesign.loc[:, 'term'] = plotDesign['factor'].map(thisFactorPalette[['factor', 'term']].set_index('factor')['term'])
-                    theseColorsFactor = thisFactorPalette.loc[:, ['factor', 'color']].set_index('factor')['color'].to_dict()
-                    theseLegendUpdatesFactor = thisFactorPalette.loc[:, ['factor', 'source']].set_index('factor')['source'].to_dict()
-                    coefValues = coefDF.loc[idxSl[nmLk0['lhsMaskIdx'], nmLk0['design'], nmLk0['rhsMaskIdx'], nmLk0['target'], :]].reset_index(name='coef')
-                    coefValues.loc[:, 'term'] = coefValues['factor'].map(factorPalette[['factor', 'term']].set_index('factor')['term'])
-                    meanCoefs = coefValues.groupby('term').mean()['coef']
-                    for termName, plotDesignTerm in plotDesign.groupby('term'):
-                        if meanCoefs[termName] != 0:
-                            plotRoutine(plotDesignTerm, theseColorsFactor, theseLegendUpdatesFactor, hueName='factor')'''
     print('\n' + '#' * 50 + '\n{}\nCompleted.\n'.format(__file__) + '#' * 50 + '\n')

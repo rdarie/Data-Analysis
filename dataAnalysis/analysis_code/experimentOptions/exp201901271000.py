@@ -315,12 +315,13 @@ def getExpOpts():
             },
         'cd': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3, 4],
                 }
             },
         'ra': {
             'experimentsToAssemble': {
-                experimentName: [],
+                '201901261000-Murdoc': [1, 2, 3, 4],
+                experimentName: [1, 2, 3, 4],
                 }
             },
         'rb': {

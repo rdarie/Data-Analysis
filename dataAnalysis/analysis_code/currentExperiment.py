@@ -619,6 +619,33 @@ def parseAnalysisOptions(
                 'winStop': None
                 }
             },
+        # rest period from before movement onset
+        'cd': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 1e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=25,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop': None
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': -600e-3,
+                'winStop': -200e-3
+                }
+            },
         # perimovement, any stim, for regression
         'ra': {
             'ensembleHistoryLen': .30,
@@ -641,8 +668,39 @@ def parseAnalysisOptions(
                 ),
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
-                'winStart': -0.2,  # start 0.2 before whatever the query was
+                'winStart': -0.2,  # start 0.05 ( + .15 burn in period) before whatever the query was
                 'winStop': .5  # stop .5 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
+        # perimovement, any stim, for regression
+        'rb': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 1e-3,
+            # # #'procFun': {
+            # # #    'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.5], useMean=True)',
+            # # #    'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.5], useMean=True)',
+            # # #    },
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=10,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'stoppingOrStimOff',
+                'winStart': -0.35,  # start 0.2 ( + .15 burn in period) before whatever the query was
+                'winStop': .2  # stop .2 sec after stoppingOrStimOff
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
@@ -737,7 +795,7 @@ def parseAnalysisOptions(
             },
         }
     #
-    for optsKey in ['ca', 'cb', 'cc']:
+    for optsKey in ['ca', 'cb', 'cc', 'cd']:
         iteratorOpts[optsKey]['cvKWArgs']['splitterKWArgs']['samplerKWArgs']['test_size'] = 0.2
     iteratorOpts['ccs'] = iteratorOpts['cc'].copy()
     iteratorOpts['ccm'] = iteratorOpts['cc'].copy()
@@ -756,13 +814,14 @@ def parseAnalysisOptions(
         'hBound': [14,      29,     55,      120,       1000]
         })
     outlierDetectOptions = dict(
-        targetEpochSize=200e-3,
-        windowSize=(-.7, .8),
-        twoTailed=True,
-        qThresh=1e-3,
+        windowSize=(-.8, 1.2),
+        twoTailed=False,
+        qThresh=7.62e-24,
         devQuantile=None,
+        fitWindow=(-150e-3, 350e-3)
         )
     csdOpts = {
+
         'filterOpts': {
             'low': {
                 # 'Wn': 400,

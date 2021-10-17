@@ -19,6 +19,7 @@ Options:
     --invertOutlierMask                    delete outlier trials? [default: False]
     --showFigures                          show plots interactively? [default: False]
     --plotThePieces                        show plots interactively? [default: False]
+    --plotTheAverage                       show plots interactively? [default: False]
 """
 import logging, sys
 logging.captureWarnings(True)
@@ -47,6 +48,7 @@ import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
+import dataAnalysis.plotting.spike_sorting_plots as ssplt
 import dataAnalysis.preproc.ns5 as ns5
 import os
 from docopt import docopt
@@ -80,6 +82,7 @@ snsRCParams = {
         "font.size": 5,
         "axes.labelsize": 7,
         "axes.titlesize": 5,
+        'axes.facecolor': 'w',
         "xtick.labelsize": 5,
         "ytick.labelsize": 5,
         "legend.fontsize": 5,
@@ -199,8 +202,8 @@ relativeStatsDF.loc[:, 'T_abs'] = relativeStatsDF['T'].abs()
 nFeats = plotRC['feature'].unique().shape[0]
 nFeatsToPlot = min(4, int(np.ceil(nFeats/2)))
 keepTopIdx = (
-    [i for i in range(nFeatsToPlot)] +
-    [i for i in range(-1 * nFeatsToPlot, -1)]
+    [i for i in range(nFeatsToPlot - 1)] +
+    [i for i in range(-1 * (nFeatsToPlot + 1), -1)]
     )
 statsRankingDF = relativeStatsDF.groupby('feature').mean().sort_values('T_abs')
 keepCols = (
@@ -222,7 +225,9 @@ averageRaucDF.loc[:, 'feature'] = 'averageFeature'
 averageRaucDF.loc[:, 'freqBandName'] = 'averageFeature'
 refGroupAverage = averageRaucDF.loc[averageRaucDF['electrode'] == 'NA', :]
 testGroupAverage = averageRaucDF.loc[averageRaucDF['electrode'] != 'NA', :]
-
+recCurveFeatureInfo.loc[:, 'xIdx'], recCurveFeatureInfo.loc[:, 'yIdx'] = ssplt.coordsToIndices(recCurveFeatureInfo['xCoords'], recCurveFeatureInfo['yCoords'])
+for cN in ['xCoords', 'yCoords', 'xIdx', 'yIdx', 'freqBandName']:
+    statsRankingDF.loc[:, cN] = statsRankingDF.index.map(recCurveFeatureInfo[['feature', cN]].set_index('feature')[cN])
 ########
 # plotRC = plotRC.loc[plotRC['feature'].str.contains('_all'), :]
 colName = 'electrode'
@@ -360,8 +365,27 @@ with PdfPages(pdfPath) as pdf:
             plt.show()
         else:
             plt.close()
-    plotTheAverage = False
-    if plotTheAverage:
+    if True: # topo view t statistics
+        for freqBandName, statsThisFB in statsRankingDF.groupby('freqBandName'):
+            try:
+                stats2D = statsThisFB.pivot(index='yCoords', columns='xCoords', values='T_abs')
+                fig, ax = plt.subplots(
+                1, 2, figsize=(3, 2),
+                gridspec_kw={
+                    'width_ratios': [10, 1],
+                    'wspace': 0.1})
+                ax = sns.heatmap(data=stats2D, cmap=sns.color_palette("viridis", as_cmap=True), linewidths=0, ax=ax[0], cbar_ax=ax[1])
+                figTitle = fig.suptitle('Frequency band {}, absolute value of T-statistic'.format(freqBandName))
+                fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(
+                    bbox_inches='tight', pad_inches=0, bbox_extra_artists=[figTitle])
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+            except Exception:
+                pass
+    if arguments['plotTheAverage']:
         widthRatios = [4] * np.unique(testGroupAverage[colName]).shape[0] + [1]
         g = sns.relplot(
             col=colName,

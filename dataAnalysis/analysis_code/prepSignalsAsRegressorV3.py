@@ -193,6 +193,8 @@ if __name__ == '__main__':
         'amplitude_raster': MinMaxScaler(feature_range=(0., 1)),
         'RateInHz': MinMaxScaler(feature_range=(0., .5)),
         'velocity': MinMaxScaler(feature_range=(-1., 1.)),
+        'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
+        'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
         }
     lOfTransformers = []
@@ -212,6 +214,9 @@ if __name__ == '__main__':
     lhsDF = lhsDF.loc[:, keepMask]
     lhsDF.rename(columns=regressionColumnRenamer, level='feature', inplace=True)
     lhsDF.columns = lhsDF.columns.get_level_values('feature')
+    print('Saving left hand side DF to {}\\lhsDF...\n lhs columns are:\n{}'.format(
+        designMatrixPath, lhsDF.columns
+    ))
     lhsDF.to_hdf(designMatrixPath, 'lhsDF', mode='a')
     ######## make lhs masks
     maskList = []

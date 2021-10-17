@@ -76,7 +76,7 @@ def shadeAUCEpochsPerFacet(g, ro, co, hu, dataSubset):
 argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
-        'winStart': '-150', 'winStop': '350', 'limitPages': None,
+        'winStart': '-350', 'winStop': '900', 'limitPages': None,
         'unitQuery': "chanName.isin(['position#0', 'position_x#0', 'position_y#0','velocity#0', 'velocity_x#0', 'velocity_y#0', 'amplitude#0', 'amplitude_raster#0'])",
         'alignQuery': None,
         # 'alignQuery': "conditionUID == 2",
@@ -110,8 +110,8 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_illustration': {
         'recalcStats': True,
-        'winStart': '-150', 'winStop': '350', 'limitPages': None,
-        'unitQuery': "chanName.isin(['utah_csd_91#0', 'utah_csd_76#0'])",
+        'winStart': '-350', 'winStop': '900', 'limitPages': None,
+        'unitQuery': "chanName.isin(['utah_csd_2#0', 'utah_csd_29#0', 'utah_csd_91#0', 'utah_csd_76#0'])",
         'alignQuery': None,
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
@@ -573,6 +573,7 @@ relPlotKWArgsLookup = {
     'mahal_per_trial_illustration': {
         'linewidth': 1., 'height': 1.5, 'aspect': 2,
         'palette': "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1",
+        'alpha': 0.5,
         'errorbar': None
     }
 }

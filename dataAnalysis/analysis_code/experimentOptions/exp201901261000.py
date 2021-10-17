@@ -281,7 +281,7 @@ def getExpOpts():
             },
         'cd': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3],
                 }
             },
         'ra': {

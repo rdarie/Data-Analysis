@@ -240,7 +240,7 @@ def getExpOpts():
         },
         'cd': {
             'experimentsToAssemble': {
-                '202101281100-Rupert': [1, 2, 3],
+                '202101281100-Rupert': [2, 3],
                 }
         },
         'ra': {

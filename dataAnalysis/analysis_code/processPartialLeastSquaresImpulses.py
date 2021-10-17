@@ -371,18 +371,18 @@ if pickingColors:
     for tIdx, tN in enumerate(primaryPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
 rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
-    columns=['r', 'g', 'b'], index=['v', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
+    primaryPalette.iloc[[1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
+    columns=['r', 'g', 'b'], index=['vx', 'vy', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
 hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
-hls.loc['v*r', :] = hls.loc[['v', 'r'], :].mean()
-hls.loc['v*a', :] = hls.loc[['v', 'v', 'a'], :].mean()
-hls.loc['v*a*r', :] = hls.loc[['v', 'a', 'r'], :].mean()
-for sN in ['a*r', 'v*r', 'v*a', 'v*a*r']:
+hls.loc['vx*r', :] = hls.loc[['vx', 'r'], :].mean()
+hls.loc['vx*a', :] = hls.loc[['vx', 'vx', 'a'], :].mean()
+hls.loc['vx*a*r', :] = hls.loc[['vx', 'a', 'r'], :].mean()
+for sN in ['a*r', 'vx*r', 'vx*a', 'vx*a*r']:
     hls.loc[sN, 's'] = hls.loc[sN, 's'] * 0.75
     hls.loc[sN, 'l'] = hls.loc[sN, 'l'] * 1.2
-hls.loc['v*a*r', 's'] = hls.loc['v*a*r', 's'] * 0.5
-hls.loc['v*a*r', 'l'] = hls.loc['v*a*r', 'l'] * 1.5
+hls.loc['vx*a*r', 's'] = hls.loc['vx*a*r', 's'] * 0.5
+hls.loc['vx*a*r', 'l'] = hls.loc['vx*a*r', 'l'] * 1.5
 for rhsMaskIdx in range(rhsMasks.shape[0]):
     rhGroup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
     lumVals = np.linspace(0.3, 0.7, rhGroup.shape[1])

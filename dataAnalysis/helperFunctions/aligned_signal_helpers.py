@@ -63,10 +63,16 @@ def processOutlierTrials(
         **kwargs
         ):
     if maskOutlierBlocks:
-        resultPath = os.path.join(
+        resultPathCSV = os.path.join(
             scratchPath, 'outlierTrials', alignFolderName,
-            prefix + '_{}_outliers.h5'.format(window))
-        oBlocks = pd.read_hdf(resultPath, 'rejectBlock')
+            prefix + '_{}_outliers.csv'.format(window))
+        if os.path.exists(resultPathCSV):
+            oBlocks = pd.read_csv(resultPathCSV).set_index(['segment', 't'])['rejectBlock']
+        else:
+            resultPathH5 = os.path.join(
+                scratchPath, 'outlierTrials', alignFolderName,
+                prefix + '_{}_outliers.h5'.format(window))
+            oBlocks = pd.read_hdf(resultPathH5, 'rejectBlock')
         oBlocksCount = oBlocks.sum()
         oBlocksSize = oBlocks.shape[0]
         print('Loading outlier trials. Rejecting a proportion of {:.2f} ({} out of {})'.format(

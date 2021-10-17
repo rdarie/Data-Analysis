@@ -299,11 +299,14 @@ def ERA(
     if plotting:
         ax[2].plot(s, label='singular values of H')
         ax[2].set_title('singular values of Hankel matrix (ERA)')
-        ax[2].set_ylabel('s')
-        ax[2].axvline(stateSpaceNDim, color='r', label='optimal state space n. dim.')
-        ax[2].axvline(p, color='g', label='AR(p) order')
+        ax[2].set_ylabel('a. u.')
+        ax[2].axvline(
+            stateSpaceNDim, color='r',
+            label='optimal state space n. dim. = {}'.format(stateSpaceNDim))
+        ax[2].axvline(p, color='g', label='AR(p) order = {}'.format(p))
         ax[2].legend()
-        ax[2].set_xlabel('Count')
+        ax[2].set_xlim([0, 3 * max(p, stateSpaceNDim)])
+        ax[2].set_xlabel('singular value count')
     #
     u = u[:, :stateSpaceNDim]
     s = s[:stateSpaceNDim]

@@ -288,7 +288,8 @@ if __name__ == '__main__':
     allMask = pd.Series(True, index=featuresDF.columns).to_frame()
     allMask.columns = allGroupIdx
     maskList.append(allMask.T)
-    if selectionName == 'lfp_CAR_spectral':
+    # if selectionName == 'lfp_CAR_spectral':
+    if 'spectral' in selectionName:
         # each freq band
         for name, group in featuresDF.groupby('freqBandName', axis='columns'):
             attrValues = ['all' for fgn in featureColumnFields]

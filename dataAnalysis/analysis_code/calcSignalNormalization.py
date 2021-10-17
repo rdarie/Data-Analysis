@@ -254,7 +254,7 @@ if __name__ == '__main__':
         mode='a')
     #
     outputLoadingMeta = deepcopy(loadingMeta)
-    outputLoadingMeta['arguments']['unitQuery'] = 'lfp'
+    outputLoadingMeta['arguments']['unitQuery'] = 'laplace'
     outputLoadingMeta['arguments']['selectionName'] = outputSelectionName
     # these were already applied, no need to apply them again
     for k in ['decimate', 'procFun', 'addLags']:

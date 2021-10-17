@@ -1231,6 +1231,7 @@ def alignedAsigsToDF(
             makeControlProgram, removeFuzzyName
             ])
     if outlierTrials is not None:
+        '''
         def rejectionLookup(entry):
             key = []
             for subKey in outlierTrials.index.names:
@@ -1240,10 +1241,17 @@ def alignedAsigsToDF(
             # outlierTrials.iloc[1, :]
             # allWaveforms.iloc[1, :]
             return outlierTrials[tuple(key)]
-        #
+        # pdb.set_trace()
+        '''
+        waveformsOutlierIndex = allWaveforms.index.to_frame()
+        waveformsOutlierIndex.loc[:, 't'] = np.round(waveformsOutlierIndex['t'], decimals=9)
         outlierMask = np.asarray(
-            allWaveforms.index.map(rejectionLookup),
-            dtype=bool)
+            (
+                waveformsOutlierIndex
+                .set_index(outlierTrials.index.names)
+                .index
+                .map(outlierTrials)
+            ), dtype=bool)
         if invertOutlierMask:
             outlierMask = ~outlierMask
         allWaveforms = allWaveforms.loc[~outlierMask, :]

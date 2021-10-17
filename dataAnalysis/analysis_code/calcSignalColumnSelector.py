@@ -169,7 +169,7 @@ if __name__ == '__main__':
     #     ('utah93', 0, 0.0, 5.0, 'NA', 'NA'),
     #     ('utah96', 0, 0.0, 8.0, 'NA', 'NA')
     #     ]
-    selectMethod = 'decimateSpace'
+    selectMethod = 'mostModulated'
     if selectMethod == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
         keepX = np.unique(featureInfo['xCoords'])[::2]
@@ -181,6 +181,19 @@ if __name__ == '__main__':
         listOfColumns = dataDF.columns[xyMask.to_numpy()].to_list()
     elif selectMethod == 'keepAll':
         listOfColumns = dataDF.columns.to_list()
+    elif selectMethod == 'mostModulated':
+        blockBaseName, _ = hf.processBasicPaths(arguments)
+        raucResultsPath = os.path.join(
+            dataFramesFolder,
+            '{}_{}_{}_rauc.h5'.format(blockBaseName, selectionName, loadingMeta['arguments']['window'])
+            )
+        relativeStatsDF = pd.read_hdf(raucResultsPath, 'relativeStatsDF')
+        relativeStatsDF.loc[:, 'T_abs'] = relativeStatsDF['T'].abs()
+        statsRankingDF = relativeStatsDF.groupby(dataDF.columns.names).mean().sort_values('T_abs', ascending=False, kind='mergesort')
+        # add to list based on dataDF to maintain ordering
+        listOfColumns = [cN for cN in dataDF.columns.to_list() if cN in statsRankingDF.index[:16]]
+    selectedColumnsStr = '\n'.join(['{}'.format(cN) for cN in listOfColumns])
+    print('Selecting columns:\n{}\n'.format(selectedColumnsStr))
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     workIdx = cvIterator.work
     workingDataDF = dataDF.iloc[workIdx, :]

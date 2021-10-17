@@ -22,16 +22,14 @@
 #SBATCH --array=1-2
 #SBATCH --export=CCV_HEADLESS=1
 
-# SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=1
 source shellScripts/run_exp_preamble_202101_28.sh
 source shellScripts/run_align_stim_preamble.sh
 #
 ALIGNQUERY="--alignQuery=stimOn"
-#
-UNITQUERY="--unitQuery=lfp"
-INPUTBLOCKNAME="--inputBlockSuffix=lfp"
-# python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
-python -u ./calcTrialOutliersV2.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
+UNITQUERY="--unitQuery=laplace"
+INPUTBLOCKNAME="--inputBlockSuffix=laplace"
+python -u ./calcTrialOutliersV3.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
 
 # calculate spike stats, once outliers do not affect the calculation
 # python -u ./calcUnitMeanFR.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --maskOutlierBlocks
