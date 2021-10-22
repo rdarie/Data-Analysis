@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sbatch shellScripts/step12a_apply_baseline_normalization_stim.sh
+sbatch shellScripts/step12b_apply_baseline_normalization_motion.sh

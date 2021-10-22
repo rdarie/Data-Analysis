@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sbatch shellScripts/step04c_regression_testtrainsplit_stim.sh
+sbatch shellScripts/step04d_regression_testtrainsplit_motion.sh
