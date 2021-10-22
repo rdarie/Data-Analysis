@@ -237,69 +237,71 @@ if __name__ == '__main__':
         allTargetsDF.loc[:, 'parentProcess'] = allTargetsDF['targetIdx'] // slurmGroupSize
         for modelIdx in range(processSlurmTaskCount):
             thisEstimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(modelIdx))
-            prf.print_memory_usage('Loading predictions from {}'.format(thisEstimatorPath))
-            with pd.HDFStore(thisEstimatorPath) as store:
-                ##
-                thisScoresStack = pd.read_hdf(store, 'processedCVScores')
-                print('these scoresStack, thisScoresStack.shape = {}'.format(thisScoresStack.shape))
-                if memoryEfficientLoad:
-                    if scoresStack is None:
-                        scoresStack = thisScoresStack
+            try:
+                with pd.HDFStore(thisEstimatorPath) as store:
+                    ##
+                    thisScoresStack = pd.read_hdf(store, 'processedCVScores')
+                    print('these scoresStack, thisScoresStack.shape = {}'.format(thisScoresStack.shape))
+                    if memoryEfficientLoad:
+                        if scoresStack is None:
+                            scoresStack = thisScoresStack
+                        else:
+                            scoresStack = scoresStack.append(thisScoresStack)
                     else:
-                        scoresStack = scoresStack.append(thisScoresStack)
-                else:
-                    scoresStackList.append(thisScoresStack)
-                ##
-                thisLl = pd.read_hdf(store, 'processedLogLike')
-                if llIndexNames is None:
-                    llIndexNames = thisLl.index.names
-                thisLl.reset_index(inplace=True)
-                print('these ll, thisLl.shape = {}'.format(thisLl.shape))
+                        scoresStackList.append(thisScoresStack)
+                    ##
+                    thisLl = pd.read_hdf(store, 'processedLogLike')
+                    if llIndexNames is None:
+                        llIndexNames = thisLl.index.names
+                    thisLl.reset_index(inplace=True)
+                    print('these ll, thisLl.shape = {}'.format(thisLl.shape))
 
-                if memoryEfficientLoad:
-                    if llDF is None:
-                        llDF = thisLl
+                    if memoryEfficientLoad:
+                        if llDF is None:
+                            llDF = thisLl
+                        else:
+                            llDF = llDF.append(thisLl)
                     else:
-                        llDF = llDF.append(thisLl)
-                else:
-                    llList.append(thisLl)
+                        llList.append(thisLl)
 
-                ##
-                thisAic = pd.read_hdf(store,  'processedAIC')
-                if aicIndexNames is None:
-                    aicIndexNames = thisAic.index.names
-                thisAic.reset_index(inplace=True)
-                print('these Aic, thisAic.shape = {}'.format(thisAic.shape))
+                    ##
+                    thisAic = pd.read_hdf(store,  'processedAIC')
+                    if aicIndexNames is None:
+                        aicIndexNames = thisAic.index.names
+                    thisAic.reset_index(inplace=True)
+                    print('these Aic, thisAic.shape = {}'.format(thisAic.shape))
 
-                if memoryEfficientLoad:
-                    if aicDF is None:
-                        aicDF = thisAic
+                    if memoryEfficientLoad:
+                        if aicDF is None:
+                            aicDF = thisAic
+                        else:
+                            aicDF = aicDF.append(thisAic)
                     else:
-                        aicDF = aicDF.append(thisAic)
-                else:
-                    aicList.append(thisAic)
+                        aicList.append(thisAic)
 
-                #
-                thisR2Per = pd.read_hdf(store, 'processedR2')
-                if R2PerIndexNames is None:
-                    R2PerIndexNames = thisR2Per.index.names
-                thisR2Per.reset_index(inplace=True)
-                print('these R2, thisR2.shape = {}'.format(thisR2Per.shape))
+                    #
+                    thisR2Per = pd.read_hdf(store, 'processedR2')
+                    if R2PerIndexNames is None:
+                        R2PerIndexNames = thisR2Per.index.names
+                    thisR2Per.reset_index(inplace=True)
+                    print('these R2, thisR2.shape = {}'.format(thisR2Per.shape))
 
-                if memoryEfficientLoad:
-                    if R2Per is None:
-                        R2Per = thisR2Per
+                    if memoryEfficientLoad:
+                        if R2Per is None:
+                            R2Per = thisR2Per
+                        else:
+                            R2Per = R2Per.append(thisR2Per)
                     else:
-                        R2Per = R2Per.append(thisR2Per)
-                else:
-                    R2PerList.append(thisR2Per)
+                        R2PerList.append(thisR2Per)
+                prf.print_memory_usage('Loaded predictions from {}'.format(thisEstimatorPath))
+            except:
+                traceback.print_exc()
     #  else:
     #      print('Loading predictions from {}'.format(estimatorPath))
     #      thisPred = pd.read_hdf(estimatorPath, 'predictions')
     #      predList.append(thisPred)
     ###
     prf.print_memory_usage('concatenating ll from .h5 array')
-    gc.collect()
     if not memoryEfficientLoad:
         llDF = pd.concat(llList, copy=False)
         del llList
@@ -336,7 +338,7 @@ if __name__ == '__main__':
     print('all scoresStack, scoresStack.shape = {}'.format(scoresStack.shape))
     gc.collect()
     prf.print_memory_usage('done concatenating scoresStack from .h5 array')
-    #
+    ##
     estimatorsDict = {}
     gsScoresDict = {}
     for rowIdx, row in allTargetsDF.iterrows():
@@ -361,15 +363,21 @@ if __name__ == '__main__':
             'cv_estimators__lhsMask_{}__rhsMask_{}__{}.joblib'.format(
                 lhsMaskIdx, rhsMaskIdx, targetName
             ))
-        thisEstimatorJBDict = jb.load(thisEstimatorJBPath)
-        thisEstimatorJB = pd.Series(thisEstimatorJBDict)
-        thisEstimatorJB.index.name = 'fold'
-        estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = thisEstimatorJB
-        #####
-        gsScoresDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
-            thisEstimatorPath, 'gs_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
-                lhsMaskIdx, rhsMaskIdx, targetName
-            ))
+        try:
+            thisEstimatorJBDict = jb.load(thisEstimatorJBPath)
+            thisEstimatorJB = pd.Series(thisEstimatorJBDict)
+            thisEstimatorJB.index.name = 'fold'
+            estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = thisEstimatorJB
+            #####
+            gsScoresDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
+                thisEstimatorPath, 'gs_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
+                    lhsMaskIdx, rhsMaskIdx, targetName
+                ))
+        except:
+            traceback.print_exc()
+    ##
+    pdb.set_trace()
+    savingResults = False
     prf.print_memory_usage('concatenating estimators from .h5 array')
     estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     del estimatorsDict
@@ -380,7 +388,7 @@ if __name__ == '__main__':
     #
     with pd.HDFStore(estimatorPath) as store:
         #
-        coefDF = pd.read_hdf(store, 'coefficients')
+        # coefDF = pd.read_hdf(store, 'coefficients')
         sourcePalette = pd.read_hdf(store, 'sourcePalette')
         termPalette = pd.read_hdf(store, 'termPalette')
         factorPalette = pd.read_hdf(store, 'factorPalette')
@@ -421,9 +429,10 @@ if __name__ == '__main__':
     modelCompareFUDE.name = 'score'
     modelCompareFUDEStats = pd.concat(FUDEStatsDict, names=['testLhsMaskIdx', 'refLhsMaskIdx', 'testType', 'lagSpec', 'testHasEnsembleHistory'])
     modelCompareScores = pd.concat(ScoresDict, names=['testLhsMaskIdx', 'refLhsMaskIdx', 'testType', 'lagSpec', 'testHasEnsembleHistory'])
-    modelCompareFUDE.to_hdf(estimatorPath, 'modelCompareFUDE')
-    modelCompareFUDEStats.to_hdf(estimatorPath, 'modelCompareFUDEStats')
-    modelCompareScores.to_hdf(estimatorPath, 'modelCompareScores')
+    if savingResults:
+        modelCompareFUDE.to_hdf(estimatorPath, 'modelCompareFUDE')
+        modelCompareFUDEStats.to_hdf(estimatorPath, 'modelCompareFUDEStats')
+        modelCompareScores.to_hdf(estimatorPath, 'modelCompareScores')
     print('Loaded and saved scores and partial scores')
     plotAIC = aicDF.xs('all', level='electrode').reset_index()
     plotAIC.loc[:, 'fullDesignAsLabel'] = plotAIC['fullFormulaDescr'].apply(lambda x: x.replace(' + ', ' +\n'))
@@ -698,8 +707,8 @@ if __name__ == '__main__':
         gsScoresDF.reset_index(drop=True, inplace=True)
         gsScoresDF.rename(columns={cN: cN.replace('regressor__regressor__', '') for cN in hpNames}, inplace=True)
         hpNames = [cN.replace('regressor__regressor__', '') for cN in hpNames]
+        gsScoresDF = gsScoresDF.groupby(hpNames + ['lhsMaskIdx', 'rhsMaskIdx', 'fold']).mean().reset_index()
         issueMask = gsScoresDF['score'].abs() > 1e3
-        # pdb.set_trace()
         if issueMask.any():
             # gsScoresDF.loc[issueMask, 'lhsMaskIdx']
             gsScoresDF.loc[issueMask, 'score'] = np.nan

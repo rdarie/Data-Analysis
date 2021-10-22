@@ -1924,17 +1924,18 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             if key in ['maxiter', 'tol', 'disp']:
                 if getattr(self, key) is not None:
                     fit_opts.update({key: getattr(self, key)})
+        pdb.set_trace()
         if not len(regular_opts.keys()):
             self.results_ = self.model_.fit(**fit_opts)
         else:
             if 'tol' in fit_opts:
                 tol = fit_opts.pop('tol')
                 fit_opts['cnvrg_tol'] = tol
+                fit_opts['zero_tol'] = tol * 0.1
             if 'disp' in fit_opts:
                 fit_opts.pop('disp')
             self.results_ = self.model_.fit_regularized(
                 **regular_opts, **fit_opts)
-        pdb.set_trace()
         self.coef_ = self.results_.params
         self.summary_ = self.results_.summary()
         self.summary2_ = self.results_.summary2()
