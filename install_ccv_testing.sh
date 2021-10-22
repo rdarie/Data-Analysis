@@ -34,7 +34,7 @@ module unload python
 conda activate
 
 echo "Please wait for conda to install the environment..."
-conda env create -f environment-open.yml
+conda env create -f environment-testing.yml
 
 echo "Please check if installation was successful"
 read FILLER
