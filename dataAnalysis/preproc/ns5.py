@@ -497,13 +497,13 @@ def concatenateBlocks(
                     analysisFilterOpts = {
                         'low': {
                             'Wn': float(samplingRate / 3),
-                            'N': 4,
+                            'N': 8,
                             'btype': 'low',
                             'ftype': 'butter'
                         },
                         'high': {
                             'Wn': .1,
-                            'N': 4,
+                            'N': 8,
                             'btype': 'high',
                             'ftype': 'butter'
                         }

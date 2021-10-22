@@ -76,7 +76,7 @@ def shadeAUCEpochsPerFacet(g, ro, co, hu, dataSubset):
 argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
-        'winStart': '-350', 'winStop': '900', 'limitPages': None,
+        'winStart': '-350', 'winStop': '1200', 'limitPages': None,
         'unitQuery': "chanName.isin(['position#0', 'position_x#0', 'position_y#0','velocity#0', 'velocity_x#0', 'velocity_y#0', 'amplitude#0', 'amplitude_raster#0'])",
         'alignQuery': None,
         # 'alignQuery': "conditionUID == 2",
@@ -110,19 +110,23 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_illustration': {
         'recalcStats': True,
-        'winStart': '-350', 'winStop': '900', 'limitPages': None,
-        'unitQuery': "chanName.isin(['utah_csd_2#0', 'utah_csd_29#0', 'utah_csd_91#0', 'utah_csd_76#0'])",
-        'alignQuery': None,
+        'winStart': '-200', 'winStop': '1500', 'limitPages': None,
         # 'unitQuery': None,
+        'unitQuery': "chanName.isin(['utah_csd_2#0', 'utah_csd_29#0', 'utah_csd_30#0', 'utah_csd_37#0', 'utah_csd_39#0', 'utah_csd_40#0', 'utah_csd_51#0', 'utah_csd_60#0', 'utah_csd_79#0', 'utah_csd_80#0', 'utah_csd_83#0', 'utah_csd_86#0', 'utah_csd_89#0', 'utah_csd_94#0', 'utah_csd_97#0', 'utah_csd_98#0'])",
+        'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
-        'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        ###
+        'hueName': 'trialAmplitude', 'hueControl': '',
         'colName': 'kinematicConditionNoSize', 'colControl': '',
         'colOrder': [
-            'NA_NA',
+           'NA_NA',
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
             ],
+        # 'hueName': 'kinematicConditionNoSize', 'hueControl': '',
+        # 'colName': '', 'colControl': '',
+        ####
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'laplace_illustration_topo': {
@@ -535,7 +539,7 @@ relPlotKWArgsLookup = {
     'laplace_illustration': {
         'linewidth': 1., 'height': 1.5, 'aspect': 2,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': None
+        'errorbar': 'se'
     },
     'laplace_illustration_topo': {
         'linewidth': 1., 'height': 1.5, 'aspect': 1.5,

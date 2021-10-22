@@ -338,7 +338,7 @@ if __name__ == '__main__':
     prf.print_memory_usage('done concatenating scoresStack from .h5 array')
     #
     estimatorsDict = {}
-    # scoresDict = {}
+    gsScoresDict = {}
     for rowIdx, row in allTargetsDF.iterrows():
         lhsMaskIdx, rhsMaskIdx, targetName = row.name
         if processSlurmTaskCount is not None:
@@ -365,15 +365,18 @@ if __name__ == '__main__':
         thisEstimatorJB = pd.Series(thisEstimatorJBDict)
         thisEstimatorJB.index.name = 'fold'
         estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = thisEstimatorJB
+        #####
+        gsScoresDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
+            thisEstimatorPath, 'gs_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
+                lhsMaskIdx, rhsMaskIdx, targetName
+            ))
     prf.print_memory_usage('concatenating estimators from .h5 array')
     estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     del estimatorsDict
     prf.print_memory_usage('done concatenating estimators from .h5 array')
-    # prf.print_memory_usage('concatenating scores from .h5 array')
-    # scoresDF = pd.concat(scoresDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
-    # del scoresDict
-    # prf.print_memory_usage('done concatenating scores from .h5 array')
-    # gc.collect()
+    gsScoresDF = pd.concat(gsScoresDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
+    del gsScoresDict
+    prf.print_memory_usage('done concatenating gs scores from h5 file')
     #
     with pd.HDFStore(estimatorPath) as store:
         #
@@ -686,6 +689,96 @@ if __name__ == '__main__':
     estimatorsDF.apply(
         lambda x: print(x.regressor_.named_steps['regressor']))
     '''
+    pdfPath = os.path.join(
+        figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'hyperparameters_gridSearch'))
+    with PdfPages(pdfPath) as pdf:
+        height, width = 3, 4
+        aspect = width / height
+        hpNames = [cN for cN in gsScoresDF.columns if 'regressor__regressor__' in cN]
+        gsScoresDF.reset_index(drop=True, inplace=True)
+        gsScoresDF.rename(columns={cN: cN.replace('regressor__regressor__', '') for cN in hpNames}, inplace=True)
+        hpNames = [cN.replace('regressor__regressor__', '') for cN in hpNames]
+        issueMask = gsScoresDF['score'].abs() > 1e3
+        # pdb.set_trace()
+        if issueMask.any():
+            # gsScoresDF.loc[issueMask, 'lhsMaskIdx']
+            gsScoresDF.loc[issueMask, 'score'] = np.nan
+            print(gsScoresDF.loc[issueMask, :].drop_duplicates(subset=['lhsMaskIdx', 'rhsMaskIdx', 'fold']))
+        for hpN in hpNames:
+            # for rhsMaskIdx, plotScores in gsScoresDF.loc[~issueMask, :].groupby('rhsMaskIdx', sort=False):
+            for rhsMaskIdx, plotScores in gsScoresDF.groupby('rhsMaskIdx', sort=False):
+                rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
+                #
+                for annotationName in ['historyLen', 'designFormula', 'ensembleTemplate']:
+                    plotScores.loc[:, annotationName] = plotScores['lhsMaskIdx'].map(lhsMasksInfo[annotationName])
+                #
+                plotScores.loc[:, 'designType'] = ''
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] == 'NULL') &
+                        (plotScores['ensembleTemplate'] == 'NULL')
+                    )
+                assert (not thisDesignTypeMask.any())
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] == 'NULL') &
+                        (plotScores['ensembleTemplate'] != 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleOnly'
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] != 'NULL') &
+                        (plotScores['ensembleTemplate'] == 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'exogenousOnly'
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] != 'NULL') &
+                        (plotScores['ensembleTemplate'] != 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndExogenous'
+                thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
+                g = sns.relplot(
+                    y='score', x=hpN,
+                    row='designType',
+                    hue='trialType',
+                    data=plotScores, kind='line', errorbar='se',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    height=height, aspect=aspect,
+                    facet_kws=dict(sharex=False, sharey=False)
+                    )
+                # xLimsRel = [a.get_xlim() for a in g.axes.flat]
+                g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                plotScoresCV = scoresStack.loc[scoresStack['rhsMaskIdx'] == rhsMaskIdx, :]
+                designTypeLookup = plotScores.loc[:, ['lhsMaskIdx', 'designType']].drop_duplicates().set_index('lhsMaskIdx')['designType']
+                plotScoresCV.loc[:, 'designType'] = plotScoresCV['lhsMaskIdx'].map(designTypeLookup)
+                paramLookup = estimatorsDF.apply(lambda x: x.regressor_.named_steps['regressor'].get_params()[hpN])
+                paramLookup = paramLookup.xs(rhsMaskIdx, level='rhsMaskIdx', drop_level=False)
+                paramLookup = paramLookup.reset_index(name=hpN).set_index(['lhsMaskIdx', 'fold'])[hpN]
+                plotScoresCV.loc[:, hpN] = plotScoresCV.set_index(['lhsMaskIdx', 'fold']).index.map(paramLookup)
+                g = sns.catplot(
+                    data=plotScoresCV,
+                    row='designType',
+                    x=hpN, y='score',
+                    hue='trialType',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    height=height, aspect=aspect,
+                    facet_kws=dict(sharey=False),
+                    kind='violin'
+                    )
+                # for aIdx, a in enumerate(g.axes.flat):
+                #     a.set_xlim(xLimsRel[aIdx])
+                g.suptitle('Cross validated R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
     pdfPath = os.path.join(
         figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'hyperparameters'))
     with PdfPages(pdfPath) as pdf:

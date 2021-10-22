@@ -370,9 +370,14 @@ if pickingColors:
     palAx = plt.gca()
     for tIdx, tN in enumerate(primaryPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
+    plt.show()
 rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
-    columns=['r', 'g', 'b'], index=['vx', 'vy', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
+    primaryPalette.iloc[[1, 1, 1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
+    columns=['r', 'g', 'b'],
+    index=[
+        'vx', 'vy', 'vxa', 'vya', 'a', 'r',
+        'ens', 'residuals',
+        'prediction', 'ground_truth'])
 hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
 hls.loc['vx*r', :] = hls.loc[['vx', 'r'], :].mean()
@@ -471,7 +476,6 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
     # theseEstimators = estimatorsDF.xs(lhsMaskIdx, level='lhsMaskIdx')
     theseCoefs = coefDF.xs(lhsMaskIdx, level='lhsMaskIdx')
     ensTemplate = lhsMaskParams['ensembleTemplate']
-    histDesignList = []
     if ensTemplate != 'NULL':
         ensDesignInfo = histDesignInfoDict[(rhsMaskIdx, ensTemplate)]
         ensTermNames = [key for key in ensDesignInfo.term_names]
@@ -479,12 +483,7 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
             np.atleast_1d(ensDesignInfo.column_names[sl])
             for key, sl in ensDesignInfo.term_name_slices.items()
             ])
-        thisEnsDesignDF = histImpulseDict[(rhsMaskIdx, ensTemplate)].loc[:, ensFactorNames]
-        histDesignList.append(thisEnsDesignDF)
-        # columnsInDesign = [cN for cN in coefs.index if cN in ensFactorNames]
-        # ensIR = thisEnsDesignDF * coefs.loc[columnsInDesign]
-        # for cN in ensFactorNames:
-        #     outputIR.loc[:, cN] = np.nan
+        histDesignDF = histImpulseDict[(rhsMaskIdx, ensTemplate)].loc[:, ensFactorNames]
     else:
         ensTermNames = []
     #
@@ -498,26 +497,29 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
             estimatorMeta['designMatrixPath'],
             'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
         estimator = estimatorsDF.loc[idxSl[lhsMaskIdx, rhsMaskIdx, freqBandName, fold, :]].iloc[0]
-        #
+        regressor = estimator.regressor_.named_steps['regressor']
+        estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
         coefs = coefsPrime.copy()
         coefs.index = coefs.index.get_level_values('factor')
         _x_mean = pd.Series(estimator.regressor_.named_steps['regressor']._x_mean, index=coefs.index)
         _y_mean = pd.Series(estimator.regressor_.named_steps['regressor']._y_mean, index=rhGroup.columns)
         _x_std = pd.Series(estimator.regressor_.named_steps['regressor']._x_std, index=coefs.index)
         _y_std = pd.Series(estimator.regressor_.named_steps['regressor']._y_std, index=rhGroup.columns)
+        xOffset = np.dot(coefs, _x_mean / _x_std)
         #
         allIRList = []
         allIRPerSourceList = []
         #
-        if len(histDesignList):
-            histDesignDF = pd.concat(histDesignList, axis='columns')
-            columnsInDesign = [cN for cN in coefs.index if cN in histDesignDF.columns]
-            assert len(columnsInDesign) == histDesignDF.columns.shape[0]
-            # endogIR = (histDesignDF.loc[:, columnsInDesign] - _x_mean.loc[columnsInDesign]) / _x_std.loc[columnsInDesign] * coefs.loc[columnsInDesign]
-            endogIR = histDesignDF.loc[:, columnsInDesign] * coefs.loc[columnsInDesign]
-            # pdb.set_trace()
+        designListForCheck = []
+        if ensTemplate != 'NULL':
+            histColumnsInDesign = [cN for cN in coefs.index if cN in histDesignDF.columns]
+            assert len(histColumnsInDesign) == histDesignDF.columns.shape[0]
+            designListForCheck.append(histDesignDF.loc[:, histColumnsInDesign])
+            scaledTransformedHistDesignDF = histDesignDF.loc[:, histColumnsInDesign] / _x_std.loc[histColumnsInDesign]
+            endogIR = scaledTransformedHistDesignDF * coefs.loc[histColumnsInDesign] # + _y_mean[targetName]
             iRLookup = pd.Series(
-                endogIR.columns.map(factorPalette.loc[:, ['factor', 'term']].set_index('factor')['term']),
+                endogIR.columns.map(
+                    factorPalette.loc[:, ['factor', 'term']].set_index('factor')['term']),
                 index=endogIR.columns)
             histIpsList = []
             for endoTermName in termPalette['term']:
@@ -533,9 +535,9 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
         if designFormula != 'NULL':
             columnsInDesign = [cN for cN in coefs.index if cN in designDF.columns]
             assert len(columnsInDesign) == designDF.columns.shape[0]
-            # columnsNotInDesign = [cN for cN in coefs.index if cN not in designDF.columns]
-            # exogIR = (designDF.loc[:, columnsInDesign] - _x_mean.loc[columnsInDesign]) / _x_std.loc[columnsInDesign] * coefs.loc[columnsInDesign]
-            exogIR = designDF.loc[:, columnsInDesign] * coefs.loc[columnsInDesign]
+            designListForCheck.append(designDF.loc[:, columnsInDesign])
+            scaledTransformedDesignDF = designDF.loc[:, columnsInDesign] / _x_std.loc[columnsInDesign]
+            exogIR = scaledTransformedDesignDF * coefs.loc[columnsInDesign]
             #####
             extDesignTermNames = []
             ipsList = []
@@ -607,12 +609,39 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
             exogIR = None
             exogIRPerSource = None
         outputIR = pd.concat(allIRList, axis='columns')
+        # pdb.set_trace()
+        sanityCheckScaling = False
+        if sanityCheckScaling:
+            bla = pd.concat(designListForCheck, axis='columns')
+            for cNIdx, cN in enumerate(bla.columns):
+                blabla = bla.copy()
+                blabla.loc[:, ~(blabla.columns == cN)] = 0
+                predictionsNormalWay = pd.DataFrame(
+                    regressor.predict(blabla),
+                    index=outputIR.index,
+                    columns=rhGroup.columns).loc[:, targetName]
+                fig, ax = plt.subplots()
+                ax.plot(
+                    blabla.sum(axis='columns').to_numpy(),
+                    label='mean input')
+                plotIR = (
+                    outputIR[cN].to_numpy()
+                    # - xOffset - _y_mean[targetName]
+                    )
+                ax.plot(plotIR, label='outputIR')
+                plotPredictions = predictionsNormalWay.to_numpy() + xOffset - _y_mean[targetName]
+                ax.plot(plotPredictions, '--', label='prediction')
+                ax.legend()
+                plt.show()
+                break
+                #if cNIdx > 1:
+                #    break
         outputIRPerSource = pd.concat(allIRPerSourceList, axis='columns')
         termNames = designTermNames + ensTermNames
         ###########################
         sanityCheckIRs = False
         # check that the impulse responses are equivalent to the sum of the weighted basis functions
-        if sanityCheckIRs:
+        if sanityCheckIRs and (designInfo is not None):
             plotIR = outputIR.copy()
             plotIR.index = plotIR.index.droplevel([idxName for idxName in plotIR.index.names if idxName not in ['trialUID', 'bin']])
             fig, ax = plt.subplots()
@@ -641,6 +670,7 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
                             ax[1].plot(irDF.index.get_level_values('bin'), irDF[cN], '--', label='IR {}'.format(cN))
                         ax[0].legend()
                         ax[1].legend()
+            plt.show()
         ###########################
         prf.print_memory_usage('Calculated IR for {}, {}\n'.format((lhsMaskIdx, designFormula), (rhsMaskIdx, targetName, fold)))
         iRPerFactorDict1[(rhsMaskIdx, targetName, fold)] = outputIR
@@ -693,7 +723,6 @@ sourcePalette.to_hdf(estimatorPath, 'sourcePalette')
 trialTypePalette.to_hdf(estimatorPath, 'trialTypePalette')
 predictionLineStyleDF.to_hdf(estimatorPath, 'termLineStyleDF')
 #
-
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
 with PdfPages(pdfPath) as pdf:
@@ -721,6 +750,9 @@ with PdfPages(pdfPath) as pdf:
         kinOrder = kinConditionLookupIR.loc[kinConditionLookupIR.isin(plotDF['kinCondition'])].to_list()
         stimOrder = stimConditionLookupIR.loc[stimConditionLookupIR.isin(plotDF['stimCondition'])].to_list()
         thisTermPalette = termPalette.loc[termPalette['term'].isin(plotDF['term']), :]
+        theseSources = plotDF['term'].map(termPalette.loc[:, ['term', 'source']].set_index('term')['source'])
+        plotDF.loc[:, 'termType'] = plotDF['term'].map(termPalette.reset_index().loc[:, ['term', 'type']].set_index('term')['type'])
+        plotDF.loc[plotDF['target'] == theseSources, 'termType'] = 'self'
         g = sns.relplot(
             # row='kinCondition', row_order=kinOrder,
             # col='stimCondition', col_order=stimOrder,
@@ -728,8 +760,9 @@ with PdfPages(pdfPath) as pdf:
             x='bin', y='signal', hue='term',
             hue_order=thisTermPalette['term'].to_list(),
             palette=thisTermPalette.loc[:, ['term', 'color']].set_index('term')['color'].to_dict(),
+            style='termType',
             kind='line', errorbar='se', data=plotDF, facet_kws=dict(sharex=False),
-        )
+            )
         g.set_axis_labels("Lag (sec)", 'contribution to target')
         g.suptitle('Impulse responses (per term) for model {}'.format(thisTitleFormula))
         asp.reformatFacetGridLegend(

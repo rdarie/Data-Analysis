@@ -718,10 +718,14 @@ if __name__ == '__main__':
         gsScoresDF.rename(columns={cN: cN.replace('regressor__regressor__', '') for cN in hpNames}, inplace=True)
         hpNames = [cN.replace('regressor__regressor__', '') for cN in hpNames]
         issueMask = gsScoresDF['score'].abs() > 1e3
+        # pdb.set_trace()
         if issueMask.any():
-            gsScoresDF.loc[issueMask, :].drop_duplicates(subset=['lhsMaskIdx', 'rhsMaskIdx', 'fold'])
+            # gsScoresDF.loc[issueMask, 'lhsMaskIdx']
+            gsScoresDF.loc[issueMask, 'score'] = np.nan
+            print(gsScoresDF.loc[issueMask, :].drop_duplicates(subset=['lhsMaskIdx', 'rhsMaskIdx', 'fold']))
         for hpN in hpNames:
-            for rhsMaskIdx, plotScores in gsScoresDF.loc[~issueMask, :].groupby('rhsMaskIdx', sort=False):
+            # for rhsMaskIdx, plotScores in gsScoresDF.loc[~issueMask, :].groupby('rhsMaskIdx', sort=False):
+            for rhsMaskIdx, plotScores in gsScoresDF.groupby('rhsMaskIdx', sort=False):
                 rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
                 #
                 for annotationName in ['historyLen', 'designFormula', 'ensembleTemplate']:
@@ -759,7 +763,35 @@ if __name__ == '__main__':
                     height=height, aspect=aspect,
                     facet_kws=dict(sharex=False, sharey=False)
                     )
+                # xLimsRel = [a.get_xlim() for a in g.axes.flat]
                 g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                plotScoresCV = scoresStack.loc[scoresStack['rhsMaskIdx'] == rhsMaskIdx, :]
+                designTypeLookup = plotScores.loc[:, ['lhsMaskIdx', 'designType']].drop_duplicates().set_index('lhsMaskIdx')['designType']
+                plotScoresCV.loc[:, 'designType'] = plotScoresCV['lhsMaskIdx'].map(designTypeLookup)
+                paramLookup = estimatorsDF.apply(lambda x: x.regressor_.named_steps['regressor'].get_params()[hpN])
+                paramLookup = paramLookup.xs(rhsMaskIdx, level='rhsMaskIdx', drop_level=False)
+                paramLookup = paramLookup.reset_index(name=hpN).set_index(['lhsMaskIdx', 'fold'])[hpN]
+                plotScoresCV.loc[:, hpN] = plotScoresCV.set_index(['lhsMaskIdx', 'fold']).index.map(paramLookup)
+                g = sns.catplot(
+                    data=plotScoresCV,
+                    row='designType',
+                    x=hpN, y='score',
+                    hue='trialType',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    height=height, aspect=aspect,
+                    facet_kws=dict(sharey=False),
+                    kind='violin'
+                    )
+                # for aIdx, a in enumerate(g.axes.flat):
+                #     a.set_xlim(xLimsRel[aIdx])
+                g.suptitle('Cross validated R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
                 g.tight_layout(pad=styleOpts['tight_layout.pad'])
                 pdf.savefig(bbox_inches='tight', pad_inches=0)
                 if arguments['showFigures']:
@@ -771,8 +803,8 @@ if __name__ == '__main__':
     with PdfPages(pdfPath) as pdf:
         for pName in ['L1_wt', 'alpha', 'n_components']:
             try:
-                hyperParams = estimatorsDF.apply(
-                    lambda x: x.regressor_.named_steps['regressor'].get_params()[pName])
+                pdb.set_trace()
+                hyperParams = estimatorsDF.apply(lambda x: x.regressor_.named_steps['regressor'].get_params()[pName])
                 titleText = pName
                 plotDF = hyperParams.to_frame(name='parameter').reset_index()
                 g = sns.catplot(
@@ -788,14 +820,20 @@ if __name__ == '__main__':
                             procFun(g, ro, co, hu, dataSubset)
                 print('Saving {} hyperparam counts to \n to {}'.format(titleText, pdfPath))
                 g.tight_layout(pad=styleOpts['tight_layout.pad'])
-                pdf.savefig(
-                    bbox_inches='tight',
-                    )
+                pdf.savefig(bbox_inches='tight',)
                 if arguments['showFigures']:
                     plt.show()
                 else:
                     plt.close()
             except Exception:
                 print('An error was triggered when retrieving hyperparameter {}'.format(pName))
-                # traceback.print_exc()
+        try:
+            for (lhsMaskIdx, rhsMaskIdx), theseEstimators in estimatorsDF.groupby(['lhsMaskIdx', 'rhsMaskIdx']):
+                yMean = theseEstimators.apply(lambda x: pd.Series(x.regressor_.named_steps['regressor']._y_mean))
+                xMean = theseEstimators.apply(lambda x: pd.Series(x.regressor_.named_steps['regressor']._x_mean))
+                yStd = theseEstimators.apply(lambda x: pd.Series(x.regressor_.named_steps['regressor']._y_std))
+                xStd = theseEstimators.apply(lambda x: pd.Series(x.regressor_.named_steps['regressor']._x_std))
+                break
+        except Exception:
+            #
     print('\n' + '#' * 50 + '\n{}\nCompleted.\n'.format(__file__) + '#' * 50 + '\n')

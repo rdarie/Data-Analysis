@@ -7,7 +7,7 @@ from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
 from sklearn.base import clone
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance, MinCovDet
 from sklearn.linear_model import ElasticNet, ElasticNetCV
 from sklearn.pipeline import make_pipeline, Pipeline
@@ -429,8 +429,6 @@ def tTestNadeauCorrection(
     if not isinstance(thisY, pd.Series):
         statsResDF[ci_name] += thisY
     statsResDF['cohen-d'] = statsResDF['cohen-d'] * corrFactor
-    # if np.isnan(statsResDF['cohen-d']):
-    #     pdb.set_trace()
     if tail == "two-sided":
         statsResDF['p-val'] = 2 * scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
     else:
@@ -1183,6 +1181,8 @@ def gridSearchHyperparameters(
                 estimatorInstance, verbose=verbose, **workGridSearchKWArgs)
         if verbose > 0:
             print('Fitting gridSearchCV...')
+            print('X.dtypes = {}'.format(X.dtypes))
+            print('y.dtypes = {}'.format(y.dtypes))
         gridSearcher.fit(X, y)
         workGridSearcher.fit(X, y)
     if timeThis:
@@ -1224,7 +1224,6 @@ def gridSearchHyperparameters(
         maxScore, minScore = scoreMean.max(), scoreMean.min()
         scoreSem = prelimGsCVResultsDF.groupby(paramColNamesShort).sem()['test_score']
         threshold = minScore + (maxScore - minScore) * 0.95 - scoreSem.loc[scoreMean.idxmax()]
-        # pdb.set_trace()
         if scoreMean.index.names == ['dim_red__n_components']:
             optParams = {'dim_red__n_components': scoreMean.loc[scoreMean > threshold].index.min()}
             print('Resetting optimal params to:\n{}\n'.format(optParams))
@@ -1326,6 +1325,21 @@ def shiftSmoothDecimate(x, lag=0, winWidth=1, decimate=1):
     else:
         return procDF.iloc[:, halfRollingWin:-halfRollingWin:decimate]
 
+
+class absMinMaxScaler(MinMaxScaler):
+
+    def fit(self, X, y=None):
+        if isinstance(X, pd.DataFrame):
+            super().fit(X.abs(), y=y)
+        else:
+            super().fit(np.abs(X), y=y)
+        return self
+    
+    def transform(self, X):
+        if isinstance(X, pd.DataFrame):
+            return super().transform(X.abs())
+        else:
+            return super().transform(np.abs(X))
 
 class flatStandardScaler(StandardScaler):
 
@@ -1761,7 +1775,7 @@ class LedoitWolfTransformer(LedoitWolf, TransformerMixin):
     def transform(self, X):
         return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 
-class SMWrapper(BaseEstimator, RegressorMixin):
+class SMWrapperBackup(BaseEstimator, RegressorMixin):
     """
         A universal sklearn-style wrapper for statsmodels regressors
         based on https://stackoverflow.com/questions/41045752/using-statsmodel-estimations-with-scikit-learn-cross-validation-is-it-possible/
@@ -1818,7 +1832,109 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             self.results_ = self.model_.fit_regularized(
                 **regular_opts, **fit_opts)
         self.coef_ = self.results_.params
-        # pdb.set_trace()
+        self.summary_ = self.results_.summary()
+        self.summary2_ = self.results_.summary2()
+        self.results_.remove_data()
+    #
+    def predict(self, X):
+        if self.fit_intercept:
+            XX = sm.add_constant(X)
+        else:
+            XX = X
+        return self.results_.predict(XX)
+    #
+    def score(self, X, y=None):
+        if 'family' in dir(self):
+            if 'Poisson' in str(self.family):
+                return poisson_pseudoR2(self, X, y)
+            if 'Gaussian' in str(self.family):
+                return r2_score(y, self.predict(X))
+
+
+class SMWrapper(BaseEstimator, RegressorMixin):
+    """
+        A universal sklearn-style wrapper for statsmodels regressors
+        based on https://stackoverflow.com/questions/41045752/using-statsmodel-estimations-with-scikit-learn-cross-validation-is-it-possible/
+        by David Dale
+    """
+    def __init__(
+            self, sm_class, family=None,
+            alpha=None, L1_wt=None, refit=None,
+            maxiter=100, tol=1e-6, disp=False, fit_intercept=False,
+            calc_frequency_weights=False, frequency_weights_index='trialUID',
+            frequency_group_columns=['electrode', 'trialAmplitude', 'trialRateInHz', 'pedalMovementCat', 'pedalDirection', 'pedalSizeCat']
+            ):
+        self.sm_class = sm_class
+        self.family = family
+        self.fit_intercept = fit_intercept
+        self.alpha = alpha
+        self.L1_wt = L1_wt
+        self.refit = refit
+        self.maxiter = maxiter
+        self.tol = tol
+        self.disp = disp
+        self.calc_frequency_weights = calc_frequency_weights
+        self.frequency_weights_index = frequency_weights_index
+        self.frequency_group_columns = frequency_group_columns
+        self.model_ = None
+        self.results_ = None
+
+    #
+    def fit(self, X, y):
+        model_opts = {}
+        for key in dir(self):
+            if key in ['family']:
+                model_opts.update({key: getattr(self, key)})
+        if self.calc_frequency_weights:
+            infoByTrial = X.index.to_frame().drop_duplicates(self.frequency_weights_index).reset_index(drop=True)
+            # dropCols = [cN for cN in ['conditionUID', 'bin'] if cN in infoByTrial.columns]
+            # infoByTrial.drop(columns=dropCols, inplace=True)
+            infoByTrial.loc[:, 'freqWeight'] = 1
+            conditionCount = infoByTrial.groupby(self.frequency_group_columns).sum()['freqWeight']
+            maxCount = conditionCount.max()
+            for name, group in infoByTrial.groupby(self.frequency_group_columns):
+                thisDeficit = group.shape[0]
+                whole = maxCount // thisDeficit
+                if whole > 0:
+                    infoByTrial.loc[group.index, 'freqWeight'] += whole
+                remainder = maxCount % thisDeficit
+                if remainder > 0:
+                    infoByTrial.loc[group.index[:remainder], 'freqWeight'] += 1
+            weightMap = infoByTrial.loc[:, [self.frequency_weights_index, 'freqWeight']].set_index(self.frequency_weights_index)['freqWeight']
+            frequency_weights = X.index.get_level_values(self.frequency_weights_index).map(weightMap).to_list()
+            model_opts['freq_weights'] = frequency_weights
+        #####
+        if self.fit_intercept:
+            XX = sm.add_constant(X)
+        else:
+            XX = X
+        try:
+            self.model_ = self.sm_class(
+                y, XX, **model_opts)
+        except Exception:
+            traceback.print_exc()
+        ####
+        regular_opts = {}
+        for key in dir(self):
+            if key in ['alpha', 'L1_wt', 'refit']:
+                if getattr(self, key) is not None:
+                    regular_opts.update({key: getattr(self, key)})
+        fit_opts = {}
+        for key in dir(self):
+            if key in ['maxiter', 'tol', 'disp']:
+                if getattr(self, key) is not None:
+                    fit_opts.update({key: getattr(self, key)})
+        if not len(regular_opts.keys()):
+            self.results_ = self.model_.fit(**fit_opts)
+        else:
+            if 'tol' in fit_opts:
+                tol = fit_opts.pop('tol')
+                fit_opts['cnvrg_tol'] = tol
+            if 'disp' in fit_opts:
+                fit_opts.pop('disp')
+            self.results_ = self.model_.fit_regularized(
+                **regular_opts, **fit_opts)
+        self.coef_ = self.results_.params
         self.summary_ = self.results_.summary()
         self.summary2_ = self.results_.summary2()
         self.results_.remove_data()

@@ -219,7 +219,8 @@ if __name__ == '__main__':
     globalMaxNC = int(1e3)
     #n_components': Number of components to keep. Should be in [1, min(n_samples, n_features, n_targets)]
     regressorClass = PLSRegression
-    regressorKWArgs = dict(scale=False, max_iter=1000)
+    regressorKWArgs = dict(
+        scale=False, max_iter=1000, tol=1e-8)
     regressorInstance = regressorClass(**regressorKWArgs)
     #
     for hIdx, histOpts in enumerate(addHistoryTerms):
@@ -413,9 +414,11 @@ if __name__ == '__main__':
             if fastTrack:
                 gsKWA['param_grid']['regressor__regressor__n_components'] = [2, int(maxNC / 2), maxNC]
             else:
-                gsKWA['param_grid']['regressor__regressor__n_components'] = [
+                listNC = [
                     nc
-                    for nc in range(maxNC, minNC, -1 * int(np.ceil(maxNC / 10)))]
+                    for nc in range(maxNC, minNC, -1 * int(np.ceil(maxNC / 16)))]
+                listNC = np.unique(listNC).tolist()
+                gsKWA['param_grid']['regressor__regressor__n_components'] = listNC
             print('grid search candidates are\n{}'.format(gsKWA['param_grid']))
             cvScores, gridSearcherDict, gsScoresDF = tdr.gridSearchHyperparameters(
                 fullDesignDF, rhGroup,

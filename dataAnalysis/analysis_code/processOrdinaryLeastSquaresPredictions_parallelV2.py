@@ -142,10 +142,10 @@ if __name__ == '__main__':
         locals().update({'hto{}'.format(hIdx): formattedHistOpts})
         histOptsForExportDict['hto{}'.format(hIdx)] = formattedHistOpts
         # locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
-    histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
-    histOptsHtmlPath = os.path.join(
-        figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'histOpts'))
-    histOptsForExportDF.to_html(histOptsHtmlPath)
+    # histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
+    # histOptsHtmlPath = os.path.join(
+    #     figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'histOpts'))
+    # histOptsForExportDF.to_html(histOptsHtmlPath)
     thisEnv = patsy.EvalEnvironment.capture()
 
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()

@@ -265,6 +265,7 @@ if __name__ == '__main__':
         cN
         for cN in [
             'amplitude_raster', 'amplitude', 'position', 'utah_rawAverage_0', 'utah_artifact_0',
+            'utah_csd_10', 'utah_csd_12', 'utah_csd_29', 'utah_csd_91', 'utah_csd_76',
             'utah_csd_11', 'utah_csd_18', 'utah_csd_81', 'utah_csd_88']
         if cN in featureInfo['feature'].to_list()]
     insChans = [

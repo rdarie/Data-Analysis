@@ -22,6 +22,7 @@ Options:
     --selectionNameLhs=selectionNameLhs        how to restrict channels? [default: fr_sqrt]
     --transformerNameLhs=transformerNameLhs    how to restrict channels?
     --estimatorName=estimatorName              filename for resulting estimator (cross-validated n_comps)
+    --takeDerivative                           load from raw, or regular? [default: False]
 """
 import logging
 logging.captureWarnings(True)
@@ -129,6 +130,7 @@ if __name__ == '__main__':
         designMatrixDatasetName + '.h5'
         )
     if os.path.exists(designMatrixPath):
+        print('\n{}\nAlready Exists. Removing.'.format(designMatrixPath))
         os.remove(designMatrixPath)
     loadingMetaPathLhs = os.path.join(
         dataFramesFolder,
@@ -184,8 +186,15 @@ if __name__ == '__main__':
     #
     lhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
     rhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
+    if arguments['takeDerivative']:
+        pdb.set_trace()
     ##################### end of data loading
     ## scale external covariates
+    if ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+        lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].abs()
+    if ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+        lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].abs()
+    # pdb.set_trace()
     transformersLookup = {
         # 'forceMagnitude': MinMaxScaler(feature_range=(0., 1)),
         # 'forceMagnitude_prime': MinMaxScaler(feature_range=(-1., 1)),
@@ -195,6 +204,8 @@ if __name__ == '__main__':
         'velocity': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
+        'velocity_x_abs': MinMaxScaler(feature_range=(0., 1.)),
+        'velocity_y_abs': MinMaxScaler(feature_range=(0., 1.)),
         'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
         }
     lOfTransformers = []
@@ -217,6 +228,8 @@ if __name__ == '__main__':
     print('Saving left hand side DF to {}\\lhsDF...\n lhs columns are:\n{}'.format(
         designMatrixPath, lhsDF.columns
     ))
+    if arguments['takeDerivative']:
+        pdb.set_trace()
     lhsDF.to_hdf(designMatrixPath, 'lhsDF', mode='a')
     ######## make lhs masks
     maskList = []
@@ -274,6 +287,8 @@ if __name__ == '__main__':
     # histDesignDict = {}
     thisEnv = patsy.EvalEnvironment.capture()
     targetsList = []
+    histSourceTermDict = {}
+    histSourceFactorDict = {}
     for rhsMaskIdx in range(rhsMasks.shape[0]):
         prf.print_memory_usage('Prepping RHS on rhsRow {}'.format(rhsMaskIdx))
         rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
@@ -293,7 +308,7 @@ if __name__ == '__main__':
         theseMaxNumFeatures = min(rhGroup.shape[1], int(arguments['maxNumFeatures']))
         print('Restricting target group to its first {} features'.format(theseMaxNumFeatures))
         rhGroup = rhGroup.iloc[:, :theseMaxNumFeatures]
-        ####################
+        #####################
         rhGroup.to_hdf(designMatrixPath, 'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
         targetsList.append(pd.Series(rhGroup.columns).to_frame(name='target'))
         targetsList[-1].loc[:, 'rhsMaskIdx'] = rhsMaskIdx
@@ -314,7 +329,15 @@ if __name__ == '__main__':
                         index=rhGroup.index,
                         columns=ensDesignInfo.column_names))
                 thisHistDesign.columns.name = 'factor'
+                # pdb.set_trace()
+                histSourceTermDict.update({ensTemplate.format(cN): cN for cN in rhGroup.columns})
+                for key, sl in ensDesignInfo.term_name_slices.items():
+                    histSourceFactorDict.update({cN: key for cN in ensDesignInfo.column_names[sl]})
+                featureInfo = thisHistDesign.columns.to_frame().reset_index(drop=True)
+                featureInfo.loc[:, 'term'] = featureInfo['factor'].map(histSourceFactorDict)
+                featureInfo.loc[:, 'source'] = featureInfo['term'].map(histSourceTermDict)
                 thisHistDesign.to_hdf(designMatrixPath, 'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
+                featureInfo.to_hdf(designMatrixPath, 'histDesigns/rhsMask_{}/term_lookup_{}'.format(rhsMaskIdx, templateIdx))
     del rhsDF
     ###
     allTargetsList = []
@@ -337,6 +360,7 @@ if __name__ == '__main__':
     htmlPathPLS = os.path.join(figureOutputFolder, '{}_pls.html'.format(designMatrixDatasetName))
     allTargetsPLS.to_html(htmlPathPLS)
     # prep lhs dataframes
+    sourceFactorDict = {}
     for parentFormulaIdx, parentFormula in enumerate(masterExogFormulas):
         prf.print_memory_usage('calculating exog terms for: {}'.format(parentFormula))
         pt = PatsyTransformer(parentFormula, eval_env=thisEnv, return_type="matrix")
@@ -350,8 +374,14 @@ if __name__ == '__main__':
                 index=lhsDF.index,
                 columns=designInfo.column_names))
         designDF.columns.name = 'factor'
+        for key, sl in designInfo.term_name_slices.items():
+            sourceFactorDict.update({cN: key for cN in designInfo.column_names[sl]})
         designDF.to_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
-    #
+        featureInfo = designDF.columns.to_frame().reset_index(drop=True)
+        featureInfo.loc[:, 'term'] = featureInfo['factor'].map(sourceFactorDict)
+        featureInfo.loc[:, 'source'] = featureInfo['term'].map(sourceTermDict)
+        featureInfo.to_hdf(designMatrixPath, 'designs/exogParents/term_lookup_{}'.format(parentFormulaIdx))
+    '''
     for formulaIdx, designFormula in enumerate(lOfDesignFormulas):
         if designFormula != 'NULL':
             prf.print_memory_usage('Looking up exog terms for: {}'.format(designFormula))
@@ -365,9 +395,15 @@ if __name__ == '__main__':
             theseColumns = designInfo.column_names
             designDF = pd.read_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
             designDF = designDF.loc[:, theseColumns]
+            featureInfo = designDF.columns.to_frame().reset_index(drop=True)
+            featureInfo.loc[:, 'term'] = featureInfo['factor'].map(sourceFactorDict)
+            featureInfo.loc[:, 'source'] = featureInfo['term'].map(sourceTermDict)
+            # pdb.set_trace()
             designDF.to_hdf(designMatrixPath, 'designs/formula_{}'.format(formulaIdx))
-    #####################################################################################################################
-    ###
+            featureInfo.to_hdf(designMatrixPath, 'designs/term_lookup_{}'.format(formulaIdx))
+            print('Saved designs/term_lookup_{}'.format(formulaIdx))
+    '''
+    ###################################################################################################################
     #
     '''
     lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
