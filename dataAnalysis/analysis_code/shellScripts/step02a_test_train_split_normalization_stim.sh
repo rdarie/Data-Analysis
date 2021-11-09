@@ -10,11 +10,11 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J s02a_tts_norm_stim_201901_27
+#SBATCH -J s02a_tts_norm_stim_201902
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/s02a_test_train_split_normalization_stim_201901_27-%a.out
-#SBATCH -e ../../batch_logs/s02a_test_train_split_normalization_stim_201901_27-%a.out
+#SBATCH -o ../../batch_logs/s02a_test_train_split_normalization_stim_201902-%a.out
+#SBATCH -e ../../batch_logs/s02a_test_train_split_normalization_stim_201902-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -23,10 +23,11 @@
 #SBATCH --array=5
 #SBATCH --export=CCV_HEADLESS=1
 
-#    SLURM_ARRAY_TASK_ID=2
+#    SLURM_ARRAY_TASK_ID=1
 
+# exps=(201902_03 201902_04 201902_05)
 # exps=(201901_25 201901_26 201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(201901_27)
+exps=(201902_03 201902_04)
 for A in "${exps[@]}"
 do
   echo "test train split motion norm $A"

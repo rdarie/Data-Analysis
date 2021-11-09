@@ -317,7 +317,7 @@ estimatorName = arguments['estimatorName']
 fullEstimatorName = '{}_{}_{}'.format(
     estimatorName, arguments['datasetPrefix'], selectionName)
 resultPath = os.path.join(estimatorsSubFolder, '{}_{}.h5'.format(fullEstimatorName, 'covarianceMatrixCalc'))
-listOfIteratorSuffixes =[x.strip() for x in arguments['iteratorSuffixList'].split(',')]
+listOfIteratorSuffixes = [x.strip() for x in arguments['iteratorSuffixList'].split(',')]
 covMatDict = {}
 eVSDict = {}
 estimatorsDict = {}

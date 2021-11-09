@@ -543,7 +543,8 @@ def concatenateBlocks(
                         analysisHampelFilterOpts = dict()
                     print('Applying hampel filter, analysisHampelFilterOpts={}'.format(analysisHampelFilterOpts))
                     analysisHampelFilterOpts.update({'debug_plots': diagnosticPlots})
-                    tdDF, (fig, ax) = hampel(tdDF, **analysisHampelFilterOpts)
+                    tdDF, tdSAD, (fig, ax) = hampel(tdDF, **analysisHampelFilterOpts)
+                    del tdSAD
                 #
                 if filterSignals:
                     if trackMemory:
@@ -3399,6 +3400,13 @@ def preprocBlockToNix(
                             .median(axis=1).to_numpy()
                             )
                 if calcArtifactTrace:
+                    print('Applying hampel filter for artifact detection')
+                    outlier_mask, scaled_absolute_deviation, (fig, ax) = hampel(
+                        tempLFPStore, window_size=31, thresh=3, imputation=False,
+                        average_across_channels=True, debug_plots=False
+                        )
+                    artifactSignal[:, subListIdx] = scaled_absolute_deviation.to_numpy()
+                    '''
                     if LFPFilterOpts is not None:
                         print('applying LFPFilterOpts to cached asigs for artifact ID')
                         # tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfilt(
@@ -3421,6 +3429,7 @@ def preprocBlockToNix(
                             .median(axis=1).diff().fillna(0)
                             )
                     artifactSignal[:, subListIdx] = np.abs(stats.zscore(tempCenter.to_numpy()))
+                    '''
                 if calcOutliers:
                     if plotDevFilterDebug:
                         ddfAx[subListIdx].plot(

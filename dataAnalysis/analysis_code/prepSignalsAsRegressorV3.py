@@ -129,9 +129,6 @@ if __name__ == '__main__':
         dataFramesFolder,
         designMatrixDatasetName + '.h5'
         )
-    if os.path.exists(designMatrixPath):
-        print('\n{}\nAlready Exists. Removing.'.format(designMatrixPath))
-        os.remove(designMatrixPath)
     loadingMetaPathLhs = os.path.join(
         dataFramesFolder,
         arguments['datasetNameLhs'] + '_' + arguments['selectionNameLhs'] + '_meta.pickle'
@@ -178,6 +175,32 @@ if __name__ == '__main__':
     else:
         workingPipelinesLhs = None
     #
+    ####
+    if arguments['plotting']:
+        pdfPath = os.path.join(
+            figureOutputFolder, '{}_history_basis.pdf'.format(designMatrixDatasetName)
+            )
+        cm = PdfPages(pdfPath)
+    else:
+        import contextlib
+        cm = contextlib.nullcontext()
+    with cm as pdf:
+        for hIdx, histOpts in enumerate(addHistoryTerms):
+            formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
+            locals().update({'hto{}'.format(hIdx): formattedHistOpts})
+            raisedCosBaser = tdr.raisedCosTransformer(formattedHistOpts)
+            if arguments['plotting']:
+                fig, ax = raisedCosBaser.plot_basis()
+                fig.suptitle('hto{}'.format(hIdx))
+                fig.tight_layout()
+                pdf.savefig(
+                    bbox_inches='tight',
+                    )
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+    ###
     trialInfoLhs = lhsDF.index.to_frame().reset_index(drop=True)
     trialInfoRhs = rhsDF.index.to_frame().reset_index(drop=True)
     checkSameMeta = stimulusConditionNames + ['bin', 'trialUID', 'conditionUID']
@@ -230,6 +253,9 @@ if __name__ == '__main__':
     ))
     if arguments['takeDerivative']:
         pdb.set_trace()
+    if os.path.exists(designMatrixPath):
+        print('\n{}\nAlready Exists. Removing.'.format(designMatrixPath))
+        os.remove(designMatrixPath)
     lhsDF.to_hdf(designMatrixPath, 'lhsDF', mode='a')
     ######## make lhs masks
     maskList = []
@@ -257,31 +283,6 @@ if __name__ == '__main__':
     lhsMasks.set_index('maskName', append=True, inplace=True)
     lhsMasks.to_hdf(
         designMatrixPath, 'featureMasks', mode='a')
-    ####
-    if arguments['plotting']:
-        pdfPath = os.path.join(
-            figureOutputFolder, '{}_history_basis.pdf'.format(designMatrixDatasetName)
-            )
-        cm = PdfPages(pdfPath)
-    else:
-        import contextlib
-        cm = contextlib.nullcontext()
-    with cm as pdf:
-        for hIdx, histOpts in enumerate(addHistoryTerms):
-            formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-            locals().update({'hto{}'.format(hIdx): formattedHistOpts})
-            raisedCosBaser = tdr.raisedCosTransformer(formattedHistOpts)
-            if arguments['plotting']:
-                fig, ax = raisedCosBaser.plot_basis()
-                fig.suptitle('hto{}'.format(hIdx))
-                fig.tight_layout()
-                pdf.savefig(
-                    bbox_inches='tight',
-                    )
-                if arguments['showFigures']:
-                    plt.show()
-                else:
-                    plt.close()
     ##
     # prep rhs dataframes
     # histDesignDict = {}

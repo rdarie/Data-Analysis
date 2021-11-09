@@ -475,7 +475,6 @@ if __name__ == "__main__":
             rowKeys=groupNames, colKeys=['lag'],
             daskPersist=True, useDask=True,
             daskComputeOpts=daskComputeOpts)
-        # pdb.set_trace()
         zScoreDF.columns = ['zScore']
         mostDeviantMask = (mahalDistNormalized.abs() < zScoreDF['zScore'].abs())
         overallDeviation = mahalDistNormalized.mask(mostDeviantMask, zScoreDF['zScore'])
@@ -499,7 +498,7 @@ if __name__ == "__main__":
     print('If the test is two-tailed, the log probability limit is {}'.format(refLogProba))
     print('#######################################################')
     try:
-        manualOutlierOverride = manualOutlierOverrideDict[int(arguments['blockIdx'])]
+        manualOutlierOverride = manualOutlierOverrideDict[arguments['alignFolderName']][int(arguments['blockIdx'])]
     except:
         manualOutlierOverride = None
     outlierTrials = findOutliers(

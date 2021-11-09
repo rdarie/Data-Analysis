@@ -205,7 +205,7 @@ def getExpOpts():
         1: [0, 1, 2]
         }
     manualOutlierOverrideDict = {
-        4: [187]
+        'motion': {4: [187]}
         }
     ##############
     spikeSortingOpts = {

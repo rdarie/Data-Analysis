@@ -4,6 +4,7 @@ from neo import (
     AnalogSignal, Event, Block,
     Segment, ChannelIndex, SpikeTrain, Unit)
 import neo
+from tqdm import tqdm
 from collections.abc import Iterable
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
@@ -1591,7 +1592,7 @@ def getINSStimLogFromJson(
 def stimStatusSerialtoLong(
         stimStSer, idxT='t', namePrefix='ins_', expandCols=[],
         deriveCols=[], progAmpNames=[], dropDuplicates=True,
-        amplitudeCatBins=4,
+        amplitudeCatBins=4, cycleTimeCorrection=15e-3,
         dummyTherapySwitches=False, elecConfiguration=None):
     fullExpandCols = copy(expandCols)
     #  fixes issue with 'program' and 'amplitude' showing up unrequested
@@ -1696,7 +1697,7 @@ def stimStatusSerialtoLong(
                     for i in np.arange(
                         firstT, lastT,
                         # (thisCycleOnTime + thisCycleOffTime)
-                        (thisCycleOnTime + thisCycleOffTime) + 10e-3
+                        (thisCycleOnTime + thisCycleOffTime) + cycleTimeCorrection
                         )
                     if i > firstT]
                 offTimes = [
@@ -1705,7 +1706,7 @@ def stimStatusSerialtoLong(
                         firstT + thisCycleOffTime,
                         lastT,
                         # (thisCycleOnTime + thisCycleOffTime)
-                        (thisCycleOnTime + thisCycleOffTime) + 10e-3
+                        (thisCycleOnTime + thisCycleOffTime) + cycleTimeCorrection
                         )]
                 dummyEntriesOn = pd.DataFrame(
                     np.nan, index=range(len(onTimes)), columns=group.columns)
@@ -2406,6 +2407,43 @@ def getINSStimOnset(
         'usedSlotToDetect',
         'rankInTrain', 'trainNPulses', 'trialSegment']
     # warnings.filterwarnings("error")
+    '''
+        if False:
+            nominalCyclePeriodSec = 2.
+            nominalCyclePeriodSamp = int(nominalCyclePeriodSec * fs)
+            windowSizeSec = 50e-3
+            windowSizeSamp = int(windowSizeSec * fs)
+            lagsSec = []
+            lagsSamp = []
+            lagsOffsets = []
+            lagMultipliers = []
+            for mul in range(1,6):
+                theseLagsSamp = [lag for lag in range(nominalCyclePeriodSamp * mul - windowSizeSamp, nominalCyclePeriodSamp * mul + windowSizeSamp)]
+                lagsSamp += theseLagsSamp
+                lagsSec += [float(lag / fs) for lag in theseLagsSamp]
+                lagsOffsets += [float((lag - nominalCyclePeriodSamp * mul) / fs) for lag in theseLagsSamp]
+                lagMultipliers += [mul for lag in theseLagsSamp]
+            masterDict = {}
+            for cN in allDataCol:
+                autoCorrDict = {}
+                for lIdx, lSec in enumerate(tqdm(lagsSec)):
+                    lSamp = lagsSamp[lIdx]
+                    autoCorrDict[lSec] = tdDF.loc[:, 'ins_td0'].autocorr(lag=lSamp)
+                masterDict[cN] = pd.Series(autoCorrDict)
+                masterDict[cN].index.name = 'lag'
+            autoCorrDF = pd.concat(masterDict, names=['feature'], axis='columns')
+            autoCorrDF.loc[:, 'lagOffset'] = lagsOffsets
+            autoCorrDF.loc[:, 'lagMult'] = lagMultipliers
+            autoCorrDF.reset_index(drop=True, inplace=True)
+            autoCorrDF = autoCorrDF.set_index(['lagMult', 'lagOffset']).unstack('lagMult')
+            for cN in autoCorrDF.columns:
+                scaled = MinMaxScaler().fit_transform(autoCorrDF[cN].to_numpy().reshape(-1, 1))
+                autoCorrDF.loc[:, cN] = scaled.flatten()
+            fig, ax = plt.subplots()
+            ax.plot(autoCorrDF.index, autoCorrDF.mean(axis='columns'))
+            ax.legend()
+            plt.show()
+        '''
     for name, group in tdDF.groupby('amplitudeRound'):
         anomalyOccured = False
         # check that this round is worth analyzing
@@ -2505,6 +2543,7 @@ def getINSStimOnset(
             continue
         else:
             lastAmplitude = lastAmplitudeSer.iloc[0]
+        print('   ')
         if (lastRate != stimRate):
             # recalculate every time we increment amplitude from zero
             # (these should usually be very visible)
@@ -2975,7 +3014,9 @@ def getINSStimOnset(
                     timesIndex.shape[0], len(unitDetectedOn),
                     left_sweep_samples + right_sweep_samples + 1),
                 dtype=float)
-            for idx, tIdx in enumerate(timesIndex):
+            print('    Extracting waveforms')
+            tIterator = enumerate(tqdm(timesIndex, mininterval=30., maxinterval=120.))
+            for idx, tIdx in tIterator:
                 thisWaveform = (
                     tdDF.loc[
                         tIdx - int(left_sweep * fs):tIdx + int(right_sweep * fs),

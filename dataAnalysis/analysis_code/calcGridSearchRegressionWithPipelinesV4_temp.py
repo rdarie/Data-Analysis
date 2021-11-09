@@ -208,7 +208,7 @@ if __name__ == '__main__':
         'family': sm.families.Gaussian(),
         'alpha': 1e-12, 'L1_wt': .1,
         'refit': True, 'tol': 1e-4,
-        'maxiter': 25, 'disp': False,
+        'maxiter': 100, 'disp': False,
         'calc_frequency_weights': True
         }
     regressorClass = tdr_temp.SMWrapper

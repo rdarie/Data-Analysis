@@ -189,7 +189,7 @@ if __name__ == '__main__':
             )
         relativeStatsDF = pd.read_hdf(raucResultsPath, 'relativeStatsDF')
         relativeStatsDF.loc[:, 'T_abs'] = relativeStatsDF['T'].abs()
-        statsRankingDF = relativeStatsDF.groupby(dataDF.columns.names).mean().sort_values('T_abs', ascending=False, kind='mergesort')
+        statsRankingDF = relativeStatsDF.groupby(dataDF.columns.names).mean().sort_values('T', ascending=False, kind='mergesort')
         # add to list based on dataDF to maintain ordering
         print('Choosing top {} features from\n{}'.format(16, statsRankingDF.head(16)))
         listOfColumns = [cN for cN in dataDF.columns.to_list() if cN in statsRankingDF.index[:16]]

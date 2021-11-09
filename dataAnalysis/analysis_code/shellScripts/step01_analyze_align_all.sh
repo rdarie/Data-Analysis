@@ -20,7 +20,7 @@
 #SBATCH -e ../../batch_logs/s01_analyze_align_all_2021-%a.out
 
 # Request custom resources
-#SBATCH --array=1-3
+#SBATCH --array=1-4
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -43,7 +43,7 @@ BLOCKPREFIX="--sourceFilePrefix=utah"
 # 
 # exps=(201901_25 201901_26 201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 # exps=(201902_03 201902_04 201902_05)
-exps=(202101_25 202102_02)
+exps=(202101_20 202101_21 202101_22)
 for A in "${exps[@]}"
 do
   echo "step 01, on $A"
@@ -72,7 +72,7 @@ do
   ALIGNQUERY="--alignQuery=stimOn"
   UNITQUERY="--unitQuery=lfp"
   INPUTBLOCKNAME="--inputBlockSuffix=lfp"
-  python -u ./calcTrialOutliersV2.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
+  python -u ./calcTrialOutliersV3.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
   
   source shellScripts/run_align_motion_preamble.sh
   ###
@@ -90,5 +90,5 @@ do
   ALIGNQUERY="--alignQuery=starting"
   UNITQUERY="--unitQuery=lfp"
   INPUTBLOCKNAME="--inputBlockSuffix=lfp"
-  python -u ./calcTrialOutliersV2.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
+  python -u ./calcTrialOutliersV3.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
 done

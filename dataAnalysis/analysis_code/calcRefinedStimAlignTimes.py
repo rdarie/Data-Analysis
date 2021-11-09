@@ -217,7 +217,8 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
         tMask = pd.Series(True, index=stimStatus.index)
         nspMask = pd.Series(True, index=thisNspDF.index)
         evMask = pd.Series(True, index=eventDF.index)
-    if (~nspMask).any():
+    # pdb.set_trace()
+    if (not nspMask.any()):
         thisNspDF.loc[~nspMask, 'tapDetectSignal'] = np.nan
         thisNspDF.loc[:, 'tapDetectSignal'] = (
             thisNspDF.loc[:, 'tapDetectSignal']
@@ -249,7 +250,7 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     ampUpdateMask = (eventDF['property'] == 'amplitude')
     ampMask = stimStatus['t'].isin(eventDF.loc[ampUpdateMask, 't'])
     #
-    categories = stimStatus.loc[ampMask, availableCateg + ['t']].reset_index(drop=True)
+    categories = stimStatus.loc[ampMask & tMask, availableCateg + ['t']].reset_index(drop=True)
     categories.loc[categories['amplitude'] > 0, 'stimCat'] = 'stimOn'
     categories.loc[categories['amplitude'] == 0, 'stimCat'] = 'stimOff'
     # check for alternation

@@ -121,9 +121,7 @@ sns.set(
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
-
 print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
-
 
 # if debugging in a console:
 '''

@@ -3,8 +3,8 @@ import dataAnalysis.custom_transformers.tdr as tdr
 import pdb
 
 processSlurmTaskCountPLS = 3
-processSlurmTaskCount = 24
-processSlurmTaskCountTransferFunctions = 18
+processSlurmTaskCount = 48
+processSlurmTaskCountTransferFunctions = 48
 joblibBackendArgs = dict(
     backend='loky',
     n_jobs=-1
@@ -14,8 +14,8 @@ addHistoryTerms = [
     {
         'nb': 10, 'logBasis': True,
         'dt': None,
-        'historyLen': 150e-3,
-        'b': 2e-2, 'useOrtho': True,
+        'historyLen': 200e-3,
+        'b': 3e-2, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,

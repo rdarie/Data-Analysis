@@ -284,16 +284,19 @@ def calcTransferFunctionFromLeastSquares():
     #################################################################
     with cm as pdf:
         for modelIdx, (name, iRGroup0) in enumerate(iRPerTerm.groupby(iRGroupNames)):
-            print('modelIdx {}, modelIdx // slurmGroupSize {}'.format(modelIdx, modelIdx // slurmGroupSize))
+            print('slurmTaskID ({}), modelIdx ({}), modelIdx // slurmGroupSize ({})'.format(slurmTaskID, modelIdx, modelIdx // slurmGroupSize))
             if (modelIdx // slurmGroupSize) != slurmTaskID:
                 continue
             iRWorkingCopy = iRGroup0.copy()
             iRWorkingCopy.dropna(inplace=True, axis='columns')
             ##
             lhsMaskIdx, designFormula, rhsMaskIdx, fold = name
+            print('lhsMaskIdx, designFormula, rhsMaskIdx, fold = {}'.format(name))
             if not designIsLinear[designFormula]:
+                print('Skipping because designIsLinear[designFormula] = {}'.format(designIsLinear[designFormula]))
                 continue
             if not (lhsMaskIdx in lhsMasksOfInterest['varVsEnsemble']):
+                print('not (lhsMaskIdx in lhsMasksOfInterest)')
                 continue
             print('Calculating state space coefficients for\n{}\n    {}\n'.format(
                 lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr'],

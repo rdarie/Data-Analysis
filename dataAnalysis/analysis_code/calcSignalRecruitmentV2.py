@@ -21,6 +21,7 @@ Options:
     --winStop=winStop                      end of absolute window (when loading)
     --loadFromFrames                       delete outlier trials? [default: False]
     --plotting                             delete outlier trials? [default: False]
+    --showFigures                          show figures? [default: False]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --iteratorSuffix=iteratorSuffix        filename for resulting estimator (cross-validated n_comps)
@@ -35,6 +36,7 @@ if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('Agg')   # generate postscript output
 else:
     matplotlib.use('QT5Agg')   # generate interactive output
+from matplotlib.backends.backend_pdf import PdfPages
 #
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -75,6 +77,13 @@ if consoleDebug:
         'analysisName': 'hiRes', 'inputBlockPrefix': 'Block'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     '''
+
+from pandas import IndexSlice as idxSl
+from datetime import datetime as dt
+try:
+    print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+except:
+    pass
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -147,14 +156,22 @@ if __name__ == "__main__":
         iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
     else:
         iteratorSuffix = ''
+    figureOutputFolder = os.path.join(
+        figureFolder, arguments['analysisName'], 'lfp_recruitment')
+    if not os.path.exists(figureOutputFolder):
+        os.makedirs(figureOutputFolder, exist_ok=True)
     #  Overrides
     limitPages = None
     funKWArgs = dict(
         tStart=-100e-3, tStop=200e-3,
         maskBaseline=False,
-        baselineTStart=-300e-3, baselineTStop=-100e-3)
+        baselineTStart=-300e-3, baselineTStop=-150e-3)
     #  End Overrides
     if not arguments['loadFromFrames']:
+        pdfPath = os.path.join(
+            figureOutputFolder,
+            blockBaseName + '_{}_{}_{}_rauc_normalization.pdf'.format(
+                expDateTimePathStr, inputBlockSuffix, arguments['window']))
         resultPath = os.path.join(
             calcSubFolder,
             blockBaseName + '{}_{}_rauc.h5'.format(
@@ -197,6 +214,10 @@ if __name__ == "__main__":
         # loading from dataframe
         datasetName = arguments['datasetName']
         selectionName = arguments['selectionName']
+        pdfPath = os.path.join(
+            figureOutputFolder,
+            blockBaseName + '_{}_{}_{}_rauc_normalization.pdf'.format(
+                expDateTimePathStr, selectionName, arguments['window']))
         resultPath = os.path.join(
             calcSubFolder,
             blockBaseName + '_{}_{}_rauc.h5'.format(
@@ -232,8 +253,15 @@ if __name__ == "__main__":
         ### detrend as a group?
         tMask = ((trialInfo['bin'] >= funKWArgs['baselineTStart']) & (trialInfo['bin'] < funKWArgs['baselineTStop']))
         baseline = dataDF.loc[tMask.to_numpy(), :].median()
+        # pdb.set_trace()
+        '''
+        if True:
+            fig, ax = plt.subplots(1, 2)
+            sns.histplot(dataDF.loc[tMask.to_numpy(), :], ax=ax[0])
+            sns.histplot(dataDF.subtract(baseline, axis='columns').loc[tMask.to_numpy(), :], ax=ax[1])
+            plt.show()
+            '''
         dataDF = dataDF.subtract(baseline, axis='columns')
-
     groupNames = ['originalIndex', 'segment', 't']
     daskComputeOpts = dict(
         # scheduler='processes'
@@ -248,7 +276,6 @@ if __name__ == "__main__":
         daskComputeOpts=daskComputeOpts)
     for cN in rawRaucDF.columns:
         rawRaucDF.loc[:, cN] = rawRaucDF[cN].astype(float)
-    # pdb.set_trace()
     rawRaucDF.columns = colFeatureInfo
     rawRaucDF.index = rawRaucDF.index.droplevel('bin')
     trialInfo = rawRaucDF.index.to_frame().reset_index(drop=True)
@@ -277,6 +304,7 @@ if __name__ == "__main__":
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
     infIndices = clippedRaucDF.index[np.isinf(clippedRaucDF).any(axis='columns')]
+    # pdb.set_trace()
     clippedRaucDF.drop(infIndices, inplace=True)
     clippedScaledRaucDF.drop(infIndices, inplace=True)
     rawRaucDF.drop(infIndices, inplace=True)
@@ -296,21 +324,25 @@ if __name__ == "__main__":
         columns=rawRaucDF.columns)
     scalers = pd.Series({'scale': qScaler, 'normalize': mmScaler, 'scale_normalize': mmScaler2})
     #
+    dfRelativeTo = clippedRaucDF
     referenceRaucDF = (
-        clippedRaucDF
+        dfRelativeTo
             .xs('NA', level='electrode', drop_level=False)
             .xs('NA_NA', level='kinematicCondition', drop_level=False)
             # .median()
             )
     referenceScaler = StandardScaler()
+    # referenceScaler = PowerTransformer()
     referenceScaler.fit(referenceRaucDF)
     #
     #relativeRaucDF = clippedRaucDF / referenceRaucDF
     relativeRaucDF = pd.DataFrame(
-        referenceScaler.transform(clippedRaucDF.to_numpy()),
-        index=clippedRaucDF.index, columns=clippedRaucDF.columns
+        referenceScaler.transform(dfRelativeTo.to_numpy()),
+        index=dfRelativeTo.index, columns=dfRelativeTo.columns
         )
-    clippedRaucDF.to_hdf(resultPath, 'raw')
+    print('Saving Rauc to {} ..'.format(resultPath))
+    rawRaucDF.to_hdf(resultPath, 'raw')
+    clippedRaucDF.to_hdf(resultPath, 'clipped')
     clippedScaledRaucDF.to_hdf(resultPath, 'scaled')
     normalizedRaucDF.to_hdf(resultPath, 'normalized')
     scaledNormalizedRaucDF.to_hdf(resultPath, 'scaled_normalized')
@@ -318,10 +350,12 @@ if __name__ == "__main__":
     relativeRaucDF.to_hdf(resultPath, 'relative')
     scalers.to_hdf(resultPath, 'scalers')
     #
+    dfForStats = clippedRaucDF
+    confidence_alpha = 0.99
     amplitudeStatsDict = {}
     relativeStatsDict = {}
-    recCurve = relativeRaucDF.reset_index()
-    for name, group in recCurve.groupby(['electrode', 'kinematicCondition']):
+    recCurve = dfForStats.reset_index()
+    for name, group in recCurve.groupby(['stimCondition', 'kinematicCondition']):
         elecName, kinName = name
         if elecName != 'NA':
             refMask = (recCurve['electrode'] == 'NA') & (recCurve['kinematicCondition'] == kinName)
@@ -330,25 +364,54 @@ if __name__ == "__main__":
             else:
                 refMask = (recCurve['electrode'] == 'NA')
                 refGroup = recCurve.loc[refMask, :]
-            for colName in relativeRaucDF.columns:
+            for colName in dfForStats.columns:
                 if isinstance(colName, tuple):
                     thisEntry = tuple([elecName, kinName] + [a for a in colName])
                 else:
                     thisEntry = tuple([elecName, kinName, colName])
                 lm = pg.linear_regression(group['trialAmplitude'], group[colName])
                 amplitudeStatsDict[thisEntry] = lm
-                maxAmpMask = (group['trialAmplitude'] == group['trialAmplitude'].max())
-                tt = pg.ttest(group.loc[maxAmpMask, colName], refGroup[colName])
+                highAmps = np.unique(group['trialAmplitude'])[-2:]
+                maxAmpMask = group['trialAmplitude'].isin(highAmps)
+                # maxAmpMask = group['trialAmplitude'] == group['trialAmplitude'].max())
+                tt = pg.ttest(
+                    group.loc[maxAmpMask, colName], refGroup[colName],
+                    confidence=confidence_alpha)
+                tt.loc[:, 'cohen-d'] = np.sign(tt['T']) * tt['cohen-d']
+                tt.loc[:, 'critical_T_max'] = tt['dof'].apply(lambda x: stats.t(x).isf((1 - confidence_alpha) / 2))
+                tt.loc[:, 'critical_T_min'] = tt['critical_T_max'] * (-1)
+                tt.rename(columns={'p-val': 'pval'}, inplace=True)
+                '''
+                if True:
+                    fig, ax = plt.subplots()
+                    tx = np.linspace(-2 * tt['T'].abs().iloc[0], 2 * tt['T'].abs().iloc[0], 100)
+                    rv = stats.t(tt['dof'].iloc[0])
+                    ax.plot(tx, rv.pdf(tx), 'k-', lw=2, label='frozen pdf')
+                    ax.axvline(tt['critical_T_max'].iloc[0])
+                    ax.axvline(tt['critical_T_min'].iloc[0])
+                    plt.show()
+                '''
                 relativeStatsDict[thisEntry] = tt
-    ampStatsDF = pd.concat(amplitudeStatsDict, names=['electrode', 'kinematicCondition'] + relativeRaucDF.columns.names)
+        else:
+            pass
+            # TODO: implement pairwise ttest between no-stim groups
+    ampStatsDF = pd.concat(amplitudeStatsDict, names=['stimCondition', 'kinematicCondition'] + dfForStats.columns.names)
     ampStatsDF.set_index('names', append=True, inplace=True)
-    ampStatsDF.to_hdf(resultPath, 'amplitudeStats')
-    relativeStatsDF = pd.concat(relativeStatsDict, names=['electrode', 'kinematicCondition'] + relativeRaucDF.columns.names)
+    # TODO: concatenate stats, correct multicomp, reassign
+    # pdb.set_trace()
+    reject, pval = pg.multicomp(ampStatsDF['pval'].to_numpy(), alpha=confidence_alpha)
+    ampStatsDF.loc[:, 'pval'] = pval
+    ampStatsDF.loc[:, 'reject'] = reject
+    relativeStatsDF = pd.concat(relativeStatsDict, names=['stimCondition', 'kinematicCondition'] + dfForStats.columns.names)
+    reject, pval = pg.multicomp(relativeStatsDF['pval'].to_numpy(), alpha=confidence_alpha)
+    relativeStatsDF.loc[:, 'pval'] = pval
+    relativeStatsDF.loc[:, 'reject'] = reject
     relativeStatsDF.to_hdf(resultPath, 'relativeStatsDF')
+    ampStatsDF.to_hdf(resultPath, 'amplitudeStats')
     #####
     amplitudeStatsPerFBDict = {}
     relativeStatsPerFBDict = {}
-    for name, group in recCurve.groupby(['electrode', 'kinematicCondition']):
+    for name, group in recCurve.groupby(['stimCondition', 'kinematicCondition']):
         elecName, kinName = name
         if elecName != 'NA':
             refMask = (recCurve['electrode'] == 'NA') & (recCurve['kinematicCondition'] == kinName)
@@ -357,7 +420,7 @@ if __name__ == "__main__":
             else:
                 refMask = (recCurve['electrode'] == 'NA')
                 refGroup = recCurve.loc[refMask, :]
-            for freqBandName, freqGroup in relativeRaucDF.groupby('freqBandName', axis='columns'):
+            for freqBandName, freqGroup in dfForStats.groupby('freqBandName', axis='columns'):
                 thisEntry = tuple([elecName, kinName, freqBandName])
                 freqRefGroup = refGroup.loc[:, refGroup.columns.isin(freqGroup.columns)]
                 freqGroup.columns = freqGroup.columns.get_level_values('feature')
@@ -367,12 +430,31 @@ if __name__ == "__main__":
                 lm = pg.linear_regression(freqGroupStack['trialAmplitude'], freqGroupStack['rauc'])
                 amplitudeStatsPerFBDict[thisEntry] = lm
                 maxAmpMask = (freqGroupStack['trialAmplitude'] == freqGroupStack['trialAmplitude'].max())
-                tt = pg.ttest(freqGroupStack.loc[maxAmpMask, 'rauc'], freqRefGroupStack['rauc'])
+                highAmps = np.unique(freqGroupStack['trialAmplitude'])[-2:]
+                maxAmpMask = freqGroupStack['trialAmplitude'].isin(highAmps)
+                tt = pg.ttest(
+                    freqGroupStack.loc[maxAmpMask, 'rauc'], freqRefGroupStack['rauc'],
+                    confidence=confidence_alpha)
+                tt.loc[:, 'critical_T_max'] = tt['dof'].apply(lambda x: stats.t(x).isf((1 - confidence_alpha) / 2))
+                tt.loc[:, 'critical_T_min'] = tt['critical_T_max'] * (-1)
+                tt.loc[:, 'cohen-d'] = np.sign(tt['T']) * tt['cohen-d']
+                tt.rename(columns={'p-val': 'pval'}, inplace=True)
                 relativeStatsPerFBDict[thisEntry] = tt
-    ampStatsPerFBDF = pd.concat(amplitudeStatsPerFBDict, names=['electrode', 'kinematicCondition', 'freqBandName'])
+        else:
+            pass
+            # TODO: implement pairwise ttest between no-stim groups
+    ampStatsPerFBDF = pd.concat(amplitudeStatsPerFBDict, names=['stimCondition', 'kinematicCondition', 'freqBandName'])
     ampStatsPerFBDF.set_index('names', append=True, inplace=True)
+    reject, pval = pg.multicomp(ampStatsPerFBDF['pval'].to_numpy(), alpha=confidence_alpha)
+    ampStatsPerFBDF.loc[:, 'pval'] = pval
+    ampStatsPerFBDF.loc[:, 'reject'] = reject
     ampStatsPerFBDF.to_hdf(resultPath, 'amplitudeStatsPerFreqBand')
-    relativeStatsPerFBDF = pd.concat(relativeStatsPerFBDict, names=['electrode', 'kinematicCondition', 'freqBandName'])
+    relativeStatsPerFBDF = pd.concat(
+        relativeStatsPerFBDict,
+        names=['stimCondition', 'kinematicCondition', 'freqBandName'])
+    reject, pval = pg.multicomp(relativeStatsPerFBDF['pval'].to_numpy(), alpha=confidence_alpha)
+    relativeStatsPerFBDF.loc[:, 'pval'] = pval
+    relativeStatsPerFBDF.loc[:, 'reject'] = reject
     relativeStatsPerFBDF.to_hdf(resultPath, 'relativeStatsDFPerFreqBand')
     #
     defaultSamplerKWArgs = dict(random_state=42, test_size=0.5)
@@ -381,13 +463,11 @@ if __name__ == "__main__":
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
         continuousFactors=['segment', 'originalIndex', 't'],
-        samplerClass=None,
-        samplerKWArgs=defaultSamplerKWArgs)
+        samplerClass=None, samplerKWArgs=defaultSamplerKWArgs)
     defaultPrelimSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
         continuousFactors=['segment', 'originalIndex', 't'],
-        samplerClass=None,
-        samplerKWArgs=defaultPrelimSamplerKWArgs)
+        samplerClass=None, samplerKWArgs=defaultPrelimSamplerKWArgs)
     iteratorKWArgs = dict(
         n_splits=7,
         splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
@@ -395,7 +475,7 @@ if __name__ == "__main__":
         resamplerClass=None, resamplerKWArgs={},
         )
     cvIterator = tdr.trainTestValidationSplitter(
-        dataDF=clippedRaucDF, **iteratorKWArgs)
+        dataDF=dfForStats, **iteratorKWArgs)
     iteratorInfo = {
         'iteratorKWArgs': iteratorKWArgs,
         'cvIterator': cvIterator
@@ -403,20 +483,29 @@ if __name__ == "__main__":
     with open(iteratorPath, 'wb') as _f:
         pickle.dump(iteratorInfo, _f)
     if arguments['plotting']:
-        plotDFsDict = {
-            'raw': rawRaucDF.reset_index(drop=True),
-            'scaled': scaledRaucDF.reset_index(drop=True),
-            'clippedScaled': clippedScaledRaucDF.reset_index(drop=True),
-            'clipped': clippedRaucDF.reset_index(drop=True)
-            }
-        plotDF = pd.concat(plotDFsDict, names=['dataType'])
-        plotDF.columns = plotDF.columns.get_level_values('feature')
-        plotDF = plotDF.stack().reset_index()
-        plotDF.columns = ['dataType', 'trial', 'feature', 'rauc']
-        g = sns.displot(
-            data=plotDF, col='dataType',
-            x='rauc', hue='feature', kind='hist', element='step'
-            )
-
-    if arguments['lazy']:
-        dataReader.file.close()
+        with PdfPages(pdfPath) as pdf:
+            plotDFsDict = {
+                'raw': rawRaucDF.reset_index(drop=True),
+                'scaled': scaledRaucDF.reset_index(drop=True),
+                'clippedScaled': clippedScaledRaucDF.reset_index(drop=True),
+                'clipped': dfForStats.reset_index(drop=True)
+                }
+            plotDF = pd.concat(plotDFsDict, names=['dataType'])
+            plotDF.columns = plotDF.columns.get_level_values('feature')
+            plotDF = plotDF.stack().reset_index()
+            plotDF.columns = ['dataType', 'trial', 'feature', 'rauc']
+            g = sns.displot(
+                data=plotDF, col='dataType',
+                x='rauc', hue='feature', kind='hist', element='step'
+                )
+            pdf.savefig(
+                bbox_inches='tight',
+                )
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+        if arguments['lazy']:
+            dataReader.file.close()
+    #############
+    print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

@@ -216,7 +216,7 @@ for rowIdx, row in allTargetsDF.iterrows():
         print('Warning! {} does not exists.'.format(thisEstimatorJBPath))
 estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
 # pdb.set_trace()
-savingResults = False
+savingResults = True
 # prep rhs dataframes
 histDesignInfoDict = {}
 histImpulseDict = {}

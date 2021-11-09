@@ -43,14 +43,14 @@ python --version
 # has 3-5 motion 6 minirc; blocks 1 and 2 were bad;
 # EXP="exp201902031100"
 # has 1-4 motion 5 minirc;
-# EXP="exp201902041100"
+EXP="exp201902041100"
 # has 1-4 motion 5 minirc;
 # EXP="exp201902051100"
 # has 1-4 motion
 ########
-EXP="exp202101201100"
+# EXP="exp202101201100"
 # has 1 minirc 2 motion+stim 3 motionOnly
-EXP="exp202101211100"
+# EXP="exp202101211100"
 # has 1 minirc 2,3 motion+stim 4 motionOnly
 # EXP="exp202101221100"
 # has 1 minirc 2 motion+stim 3 motionOnly
@@ -65,12 +65,12 @@ EXP="exp202101211100"
 # 
 BLOCKSELECTOR=""
 # BLOCKSELECTOR="--inputINSBlockSuffix="
-# SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=5
 
 ## --showFigures --forceRecalc
 #
-# python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --usedTENSPulses --forceRecalc
-python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --forceRecalc --showFigures
+python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --usedTENSPulses --forceRecalc
+# python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --forceRecalc --showFigures
 
 #
 # python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy

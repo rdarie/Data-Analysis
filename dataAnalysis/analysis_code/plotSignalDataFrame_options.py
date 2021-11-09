@@ -77,8 +77,8 @@ argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
         'winStart': '-350', 'winStop': '1200', 'limitPages': None,
-        'unitQuery': "chanName.isin(['position#0', 'position_x#0', 'position_y#0','velocity#0', 'velocity_x#0', 'velocity_y#0', 'amplitude#0', 'amplitude_raster#0'])",
-        'alignQuery': None,
+        'unitQuery': "chanName.isin(['position#0', 'position_x#0', 'position_y#0','velocity#0', 'velocity_x#0', 'velocity_y#0', 'amplitude#0', 'amplitude_raster#0', 'ins_td0#0', 'ins_td2#0'])",
+        # 'alignQuery': None,
         # 'alignQuery': "conditionUID == 2",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -95,7 +95,7 @@ argumentsLookup = {
         'recalcStats': True,
         'winStart': '-150', 'winStop': '350', 'limitPages': None,
         'unitQuery': "chanName.isin(['utah1#0', 'utah75#0'])",
-        'alignQuery': None,
+        # 'alignQuery': None,
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -112,8 +112,8 @@ argumentsLookup = {
         'recalcStats': True,
         'winStart': '-200', 'winStop': '1500', 'limitPages': None,
         # 'unitQuery': None,
-        'unitQuery': "chanName.isin(['utah_csd_2#0', 'utah_csd_29#0', 'utah_csd_30#0', 'utah_csd_37#0', 'utah_csd_39#0', 'utah_csd_40#0', 'utah_csd_51#0', 'utah_csd_60#0', 'utah_csd_79#0', 'utah_csd_80#0', 'utah_csd_83#0', 'utah_csd_86#0', 'utah_csd_89#0', 'utah_csd_94#0', 'utah_csd_97#0', 'utah_csd_98#0'])",
-        'alignQuery': None,
+        'unitQuery': "chanName.isin(['utah_csd_14#0', 'utah_csd_33#0', 'utah_csd_3#0', 'utah_csd_2#0', 'utah_csd_79#0', 'utah_csd_60#0', 'utah_csd_80#0', 'utah_csd_16#0', 'utah_csd_17#0'])",
+        # 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
         ###
@@ -131,9 +131,9 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_illustration_topo': {
         'recalcStats': True,
-        'winStart': '-100', 'winStop': '200', 'limitPages': None,
+        'winStart': '-200', 'winStop': '400', 'limitPages': None,
         'unitQuery': None,
-        'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
+        # 'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'yCoords', 'rowControl': '',
@@ -144,9 +144,9 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_spectral_illustration_topo': {
         'recalcStats': True,
-        'winStart': '-100', 'winStop': '200', 'limitPages': None,
+        'winStart': '-400', 'winStop': '800', 'limitPages': None,
         'unitQuery': None,
-        'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
+        # 'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'yCoords', 'rowControl': '',
@@ -159,7 +159,7 @@ argumentsLookup = {
         'recalcStats': True,
         'winStart': '-150', 'winStop': '350', 'limitPages': None,
         'unitQuery': "chanName.isin(['fa_all001#0', 'fa_all002#0', 'fa_all003#0', 'fa_all004#0'])",
-        'alignQuery': None,
+        # 'alignQuery': None,
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -174,10 +174,10 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'spectral_illustration': {
         'recalcStats': True,
-        'winStart': '-150', 'winStop': '350', 'limitPages': None,
+        'winStart': '-400', 'winStop': '800', 'limitPages': None,
         'unitQuery': "chanName.isin(['utah1_alpha#0', 'utah1_beta#0', 'utah1_gamma#0', 'utah1_higamma#0', 'utah1_spb#0'])",
         # 'unitQuery': None,
-        'alignQuery': None,
+        # 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
@@ -191,10 +191,10 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_spectral_illustration': {
         'recalcStats': True,
-        'winStart': '-150', 'winStop': '350', 'limitPages': None,
-        'unitQuery': "chanName.isin(['utah_csd_91_alpha#0', 'utah_csd_91_beta#0', 'utah_csd_91_gamma#0', 'utah_csd_91_higamma#0', 'utah_csd_91_spb#0'])",
+        'winStart': '-400', 'winStop': '800', 'limitPages': None,
+        'unitQuery': "chanName.isin(['utah_csd_2_alpha#0', 'utah_csd_60_alpha#0', 'utah_csd_14_alpha#0', 'utah_csd_63_alpha#0', 'utah_csd_2_beta#0', 'utah_csd_11_beta#0', 'utah_csd_56_beta#0', 'utah_csd_19_beta#0', 'utah_csd_30_gamma#0', 'utah_csd_60_gamma#0', 'utah_csd_53_gamma#0', 'utah_csd_17_gamma#0', 'utah_csd_40_higamma#0', 'utah_csd_60_higamma#0', 'utah_csd_27_higamma#0', 'utah_csd_14_higamma#0', 'utah_csd_70_spb#0', 'utah_csd_80_spb#0', 'utah_csd_28_spb#0', 'utah_csd_14_spb#0'])",
         # 'unitQuery': None,
-        'alignQuery': None,
+        # 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
@@ -208,7 +208,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'mahal_illustration': {
         'recalcStats': True,
-        'winStart': '-250', 'winStop': '350', 'limitPages': None,
+        'winStart': '-400', 'winStop': '800', 'limitPages': None,
         'unitQuery': None, 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -225,6 +225,22 @@ argumentsLookup = {
         'recalcStats': True,
         'winStart': '-250', 'winStop': '350', 'limitPages': None,
         'unitQuery': None, 'alignQuery': None,
+        'individualTraces': True, 'overlayStats': False,
+        'hueName': 'trialAmplitude', 'hueControl': '',
+        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
+            'NA_NA',
+            'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return',
+            ],
+        'sizeName': '', 'sizeControl': '',
+        'styleName': '', 'styleControl': ''},
+    'rig_per_trial_illustration': {
+        'recalcStats': True,
+        'winStart': '-250', 'winStop': '350', 'limitPages': None,
+        'unitQuery': "chanName.isin(['utah_artifact_0#0', 'utah_rawAverage_0#0', 'position#0'])",
+        # 'unitQuery': None, 'alignQuery': None,
         'individualTraces': True, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
@@ -341,6 +357,7 @@ statsTestOptsLookup = {
         ),
     }
 statsTestOptsLookup['mahal_per_trial_illustration'] = statsTestOptsLookup['mahal_illustration']
+statsTestOptsLookup['rig_per_trial_illustration'] = statsTestOptsLookup['rig_illustration']
 #
 plotProcFunsLookup = {
     'rig_illustration': [
@@ -497,6 +514,8 @@ plotProcFunsLookup = {
             ]
     }
 plotProcFunsLookup['mahal_per_trial_illustration'] = plotProcFunsLookup['mahal_illustration']
+plotProcFunsLookup['rig_per_trial_illustration'] = plotProcFunsLookup['rig_illustration']
+
 unusedPlotProcFuns = [
     asp.genNumRepAnnotator(
         hue_var=argumentsLookup['rig_illustration']['hueName'],
@@ -579,6 +598,12 @@ relPlotKWArgsLookup = {
         'palette': "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1",
         'alpha': 0.5,
         'errorbar': None
+    },
+    'rig_per_trial_illustration': {
+        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'palette': "ch:0.8,-.3,dark=.25,light=0.75,reverse=1",
+        'alpha': 0.5,
+        'errorbar': None
     }
 }
 
@@ -621,6 +646,7 @@ catPlotKWArgsLookup = {
     }
 }
 catPlotKWArgsLookup['mahal_per_trial_illustration'] = catPlotKWArgsLookup['mahal_illustration']
+catPlotKWArgsLookup['rig_per_trial_illustration'] = catPlotKWArgsLookup['rig_illustration']
 #
 legendTitleOverridesLookup = {
     'rig_illustration': {
@@ -652,6 +678,7 @@ legendTitleOverridesLookup = {
     }
 }
 legendTitleOverridesLookup['mahal_per_trial_illustration'] = legendTitleOverridesLookup['mahal_illustration']
+legendTitleOverridesLookup['rig_per_trial_illustration'] = legendTitleOverridesLookup['rig_illustration']
 legendContentOverridesLookup = {}
 
 styleOptsLookup = {
@@ -685,6 +712,7 @@ styleOptsLookup = {
 }
 
 styleOptsLookup['mahal_per_trial_illustration'] = styleOptsLookup['mahal_illustration']
+styleOptsLookup['rig_per_trial_illustration'] = styleOptsLookup['rig_illustration']
 xAxisLabelLookup = {
     }
 yAxisLabelLookup = {
@@ -710,6 +738,7 @@ yAxisLabelLookup = {
     }
 }
 yAxisLabelLookup['mahal_per_trial_illustration'] = yAxisLabelLookup['mahal_illustration']
+yAxisLabelLookup['rig_per_trial_illustration'] = yAxisLabelLookup['rig_illustration']
 titlesOptsLookup = {
     'mahal_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'rig_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
@@ -721,7 +750,9 @@ titlesOptsLookup = {
     }
 
 titlesOptsLookup['mahal_per_trial_illustration'] = titlesOptsLookup['mahal_illustration']
+titlesOptsLookup['rig_per_trial_illustration'] = titlesOptsLookup['rig_illustration']
 titleTextLookup = {}
 customCodeLookup = {
-    'rig_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100"
+    'rig_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100",
+    'rig_per_trial_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100"
     }

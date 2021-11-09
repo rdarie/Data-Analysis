@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J s04b_apply_norm_motion_lfp_201901_27
+#SBATCH -J s04b_apply_norm_motion_lfp_201902
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/s04b_apply_norm_motion_lfp_201901_27-%a.out
-#SBATCH -e ../../batch_logs/s04b_apply_norm_motion_lfp_201901_27-%a.out
+#SBATCH -o ../../batch_logs/s04b_apply_norm_motion_lfp_201902-%a.out
+#SBATCH -e ../../batch_logs/s04b_apply_norm_motion_lfp_201902-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -23,8 +23,9 @@
 # Request custom resources
 #SBATCH --array=1-4
 
+# exps=(201902_03 201902_04 201902_05)
 # exps=(201901_25 201901_26 201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(201901_27)
+exps=(201902_03 201902_04 201902_05)
 TRAINDATASET=""
 # TRAINDATASET="--datasetExp=201901271000-Murdoc"
 for A in "${exps[@]}"
@@ -51,6 +52,20 @@ do
   python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --selectionName=$TARGET $COMMONOPTS $TRAINDATASET
   
   ITERATOR="--iteratorSuffix=ca"
+  ALIGNQUERYTERM="outbound"
+  CONTROLSTATUS="--controlSet"
+  ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
+  ###
+  python -u './calcTestTrainSplit.py' $CONTROLSTATUS --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS
+  ###
+  python -u './applyTestTrainSplit.py' $CONTROLSTATUS --resetHDF --inputBlockSuffix="laplace" --unitQuery="laplace" --selectionName='laplace' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+  python -u './applyTestTrainSplit.py' $CONTROLSTATUS            --inputBlockSuffix="laplace_spectral" --unitQuery="laplace" --selectionName='laplace_spectral' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+  python -u './applyTestTrainSplit.py' $CONTROLSTATUS            --inputBlockSuffix="laplace_scaled" --unitQuery="laplace" --selectionName='laplace_scaled' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+  python -u './applyTestTrainSplit.py' $CONTROLSTATUS            --inputBlockSuffix="laplace_spectral_scaled" --unitQuery="laplace" --selectionName='laplace_spectral_scaled' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+  # python -u './applyTestTrainSplit.py' $CONTROLSTATUS            --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+  python -u './applyTestTrainSplit.py' $CONTROLSTATUS            --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+  #
+  ITERATOR="--iteratorSuffix=cd"
   ALIGNQUERYTERM="outbound"
   CONTROLSTATUS="--controlSet"
   ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"

@@ -145,7 +145,10 @@ def getExpOpts():
     stimDetectOverrideStartTimes = {
         #  each key is a Block
         1: None,
-        # 2: [96.43, 191.689],
+        5: [
+            #  each entry is an ins session
+            [135.430, 137.460, 139.48, 141.5, 143.51, 145.54, 147.55, 149.57, 151.59, 153.62, 155.63, 157.66, 158.315, 220.245, ]
+            ],
     }
     ####################
     detectStim = True
@@ -180,11 +183,10 @@ def getExpOpts():
     #
     alignTimeBoundsLookup = {
         #  per block
-        # 1: [
-        #     #  per ins session
-        #     [257, 552],
-        #     [670, 1343],
-        #     ],
+        5: [
+            #  per ins session
+            [190, 1980],
+            ],
         }
     pedalPositionZeroEpochs = None
     dropMotionRounds = {
@@ -263,7 +265,7 @@ def getExpOpts():
             },
         'cd': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3, 4],
                 }
             },
         'ra': {

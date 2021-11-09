@@ -505,7 +505,7 @@ if __name__ == "__main__":
             rowKeys=groupNames, colKeys=['lag'],
             daskPersist=True, useDask=True,
             daskComputeOpts=daskComputeOpts)
-        pdb.set_trace()
+        # pdb.set_trace()
         zScoreDF.columns = ['zScore']
         if arguments['saveResults']:
             if os.path.exists(resultPath):

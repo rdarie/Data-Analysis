@@ -11,30 +11,34 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_dual_201902_03-05
+#SBATCH -J s00_preproc_dual_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/preproc_dual_201902_03-05-%a.out
-#SBATCH -e ../../batch_logs/preproc_dual_201902_03-05-%a.out
+#SBATCH -o ../../batch_logs/s00_preproc_dual_202101_27-%a.out
+#SBATCH -e ../../batch_logs/s00_preproc_dual_202101_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 #SBATCH --export=CCV_HEADLESS=1
 
 # Request custom resources
-#SBATCH --array=1-6
+#SBATCH --array=1-3
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
-exps=(201902_03 201902_04 201902_05)
+
+# SLURM_ARRAY_TASK_ID=1
+
+# exps=(201901_25 201901_26 201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
+# exps=(201902_03 201902_04 201902_05)
+exps=(202101_27)
 for A in "${exps[@]}"
 do
   echo "step 00 preprocess, on $A"
   source ./shellScripts/run_exp_preamble_$A.sh
-  # SLURM_ARRAY_TASK_ID=3
   
   ########### get analog inputs separately to run synchronization, etc
   # !! --maskMotorEncoder ignores all motor events outside alignTimeBounds

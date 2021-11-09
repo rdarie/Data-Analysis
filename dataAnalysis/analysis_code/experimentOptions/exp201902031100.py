@@ -192,11 +192,10 @@ def getExpOpts():
     #
     alignTimeBoundsLookup = {
         #  per block
-        # 1: [
-        #     #  per ins session
-        #     [257, 552],
-        #     [670, 1343],
-        #     ],
+        5: [
+            #  per ins session
+            [2010, 2580], [2750, 2830]
+            ],
         }
     spikeSortingOpts = {
         'utah': {
@@ -258,12 +257,6 @@ def getExpOpts():
                 '201902051100-Murdoc': [1, 2, 3, 4],
                 }
             },
-        'cc': {
-            'experimentsToAssemble': {
-                experimentName: [5],
-                '201902041100-Murdoc': [5],
-                }
-            },
         'ccm': {
             'experimentsToAssemble': {
                 experimentName: [1, 2, 3, 4],
@@ -279,12 +272,12 @@ def getExpOpts():
             },
         'cd': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3, 4],
                 }
             },
         'ra': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3, 4, 5],
                 '201902041100-Murdoc': [1, 2, 3, 4, 5],
                 '201902051100-Murdoc': [1, 2, 3, 4],
                 }

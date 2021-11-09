@@ -10,11 +10,11 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J s13c_apply_mahal_dist_stim_202101_27
+#SBATCH -J s13c_apply_mahal_dist_stim_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/covariance/s13c_apply_mahal_dist_stim_202101_27-%a.out
-#SBATCH -e ../../batch_logs/covariance/s13c_apply_mahal_dist_stim_202101_27-%a.out
+#SBATCH -o ../../batch_logs/covariance/s13c_apply_mahal_dist_stim_202101_21-%a.out
+#SBATCH -e ../../batch_logs/covariance/s13c_apply_mahal_dist_stim_202101_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,8 +25,9 @@
 
 #  SLURM_ARRAY_TASK_ID=1
 
+# 201902_03 201902_04 201902_05
 # exps=(201901_25 201901_26 201901_27 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_27)
+exps=(202101_21)
 for A in "${exps[@]}"
 do
   echo "step 11 calc mahal dist, on $A"

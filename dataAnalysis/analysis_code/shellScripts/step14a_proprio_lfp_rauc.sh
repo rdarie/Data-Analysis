@@ -10,11 +10,11 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J s12_mahal_dist_rauc_202101_27
+#SBATCH -J s14a_mahal_dist_rauc_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/covariance/s12_mahal_dist_rauc_202101_27.out
-#SBATCH -e ../../batch_logs/covariance/s12_mahal_dist_rauc_202101_27.out
+#SBATCH -o ../../batch_logs/covariance/s14a_mahal_dist_rauc_202101_21.out
+#SBATCH -e ../../batch_logs/covariance/s14a_mahal_dist_rauc_202101_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,9 +24,10 @@
 #SBATCH --array=999
 
 # SLURM_ARRAY_TASK_ID=2
-# exps=(201901_27 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
+# exps=(201901_27 201902_03 201902_04 201902_05
+# # 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 
-exps=(202101_27)
+exps=(202101_21)
 for A in "${exps[@]}"
 do
   echo "step 12 lfp rauc, on $A"
@@ -58,30 +59,30 @@ do
   ALIGNQUERYTERM="starting"
   ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
   #
-  TARGET="laplace_spectral_scaled_${ESTIMATOR}"
-  INPUTBLOCKNAME="--inputBlockSuffix=${TARGET} --inputBlockPrefix=Block"
-  #
-  python -u "./calcSignalRecruitmentV2.py" --iteratorSuffix=$ITERATOR --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
-  python -u "./plotSignalRecruitmentV2.py" --plotThePieces --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
-  #
   TARGET="laplace_scaled_${ESTIMATOR}"
   INPUTBLOCKNAME="--inputBlockSuffix=${TARGET} --inputBlockPrefix=Block"
   #
-  python -u "./calcSignalRecruitmentV2.py" --iteratorSuffix=$ITERATOR --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
-  python -u "./plotSignalRecruitmentV2.py" --plotThePieces --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
+  python -u "./calcSignalRecruitmentV4.py" --iteratorSuffix=$ITERATOR --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
+  python -u "./plotSignalRecruitmentV4.py" --plotThePieces --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
   #
-  TARGET="laplace_spectral_baseline"
+  TARGET="laplace_spectral_scaled_${ESTIMATOR}"
   INPUTBLOCKNAME="--inputBlockSuffix=${TARGET} --inputBlockPrefix=Block"
   #
-  python -u "./calcSignalRecruitmentV2.py" --iteratorSuffix=$ITERATOR --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
-  python -u "./plotSignalRecruitmentV2.py" --plotThePieces --plotTheAverage --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
+  python -u "./calcSignalRecruitmentV4.py" --iteratorSuffix=$ITERATOR --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
+  python -u "./plotSignalRecruitmentV4.py" --plotThePieces --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
   #
   TARGET="laplace_baseline"
   INPUTBLOCKNAME="--inputBlockSuffix=${TARGET} --inputBlockPrefix=Block"
   #
-  python -u "./calcSignalRecruitmentV2.py" --iteratorSuffix=$ITERATOR --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
-  python -u "./plotSignalRecruitmentV2.py" --plotThePieces --plotTheAverage --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
+  python -u "./calcSignalRecruitmentV4.py" --iteratorSuffix=$ITERATOR --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
+  python -u "./plotSignalRecruitmentV4.py" --plotThePieces --plotTheAverage --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
+  #
+  TARGET="laplace_spectral_baseline"
+  INPUTBLOCKNAME="--inputBlockSuffix=${TARGET} --inputBlockPrefix=Block"
+  #
+  python -u "./calcSignalRecruitmentV4.py" --iteratorSuffix=$ITERATOR --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
+  python -u "./plotSignalRecruitmentV4.py" --plotThePieces --plotTheAverage --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
   #
   python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  python -u './plotSignalDataFrameV2.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName="laplace_spectral_scaled_${ESTIMATOR}" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  python -u './plotSignalDataFrameV3.py' --plotSuffix="mahal_illustration" --verbose=1 --selectionName="laplace_spectral_scaled_${ESTIMATOR}" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
 done

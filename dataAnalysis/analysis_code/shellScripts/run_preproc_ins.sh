@@ -10,18 +10,18 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_ins_202101_21
+#SBATCH -J preproc_ins_201902_04
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/preproc_ins_202101_21-%a.out
-#SBATCH -e ../../batch_logs/preproc_ins_202101_21-%a.out
+#SBATCH -o ../../batch_logs/preproc_ins_201902_04-%a.out
+#SBATCH -e ../../batch_logs/preproc_ins_201902_04-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 #SBATCH --export=CCV_HEADLESS=1
 
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=5
 
 
 module load anaconda/2020.02
@@ -57,7 +57,7 @@ python --version
 # has 3-5 motion 6 minirc; blocks 1 and 2 were bad;
 # EXP="exp201902031100"
 # has 1-4 motion 5 minirc;
-# EXP="exp201902041100"
+EXP="exp201902041100"
 # has 1-4 motion 5 minirc;
 # EXP="exp201902051100"
 # has 1-4 motion
@@ -66,8 +66,8 @@ python --version
 # EXP="exp202101141100"
 # has 1-2
 # EXP="exp202101191100"
-EXP="exp202101201100"
-EXP="exp202101211100"
+# EXP="exp202101201100"
+# EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
 # EXP="exp202101271100"
@@ -79,7 +79,7 @@ EXP="exp202101211100"
 # EXP="exp202102101100"
 # EXP="exp202102151100"
 
-#   SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=5
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots

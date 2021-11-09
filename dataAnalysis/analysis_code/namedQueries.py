@@ -50,7 +50,7 @@ namedQueries = {
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'neural': "((chanName.str.contains('elec'))or(chanName.str.contains('nform')))or(chanName.str.contains('utah'))",
         # 'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('utah'))or(chanName.str.contains('nform'))or(chanName.str.contains('ainp')))",
-        'rig': "((chanName.str.contains('_rawAverage_'))or(chanName.str.contains('_artifact_')))or(not((chanName.str.contains('elec'))or(chanName.str.contains('utah'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))))",
+        'rig': "((chanName.str.contains('_rawAverage_'))or(chanName.str.contains('_artifact_'))or(chanName.str.contains('ins_')))or(not((chanName.str.contains('elec'))or(chanName.str.contains('utah'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))))",
         'jointAngle': "chanName.isin(['right_hip_angle#0', 'right_knee_angle#0', 'right_ankle_angle#0'])",
         'jointAngularVelocity': "chanName.isin(['right_hip_omega#0', 'right_knee_omega#0', 'right_ankle_omega#0'])",
         'jointAngularVelocityMagnitude': "chanName.isin(['right_hip_omega_abs#0', 'right_knee_omega_abs#0', 'right_ankle_omega_abs#0'])",
@@ -78,7 +78,7 @@ namedQueries = {
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'notoeaux': "not((chanName.str.contains('AUX')))",
         # 'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('utah'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform')))",
-        'rig': "((chanName.str.contains('_rawAverage_'))or(chanName.str.contains('_artifact_')))or(not((chanName.str.contains('elec'))or(chanName.str.contains('utah'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))))",
+        'rig': "((chanName.str.contains('_rawAverage_'))or(chanName.str.contains('_artifact_'))or(chanName.str.contains('ins_')))or(not((chanName.str.contains('elec'))or(chanName.str.contains('utah'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))))",
         'notainp': "not((chanName.str.contains('ainp'))or(chanName.str.contains('analog')))",
         'isispinaloremg': "((chanName.str.contains('caudal'))or(chanName.str.contains('rostral'))or(chanName.str.contains('Emg')))",
         'isispinal': "( (chanName.str.contains('caudal'))or(chanName.str.contains('rostral')) )",
@@ -189,7 +189,16 @@ for eNameIdx in range(16):
         'starting{}'.format(eName): '(' + '&'.join([
             namedQueries['align']['starting'],
             namedQueries['align']['{}'.format(eName)],
-            "(trialRateInHz > 20)"
+            # "(trialAmplitude > 200)",
+            "(trialRateInHz > 40)"
+            ]) + ')'
+        })
+    namedQueries['align'].update({
+        'stimOn{}'.format(eName): '(' + '&'.join([
+            namedQueries['align']['stimOn'],
+            namedQueries['align']['{}'.format(eName)],
+            # "(trialAmplitude > 200)",
+            "(trialRateInHz > 40)"
             ]) + ')'
         })
     namedQueries['align'].update({
@@ -199,10 +208,16 @@ for eNameIdx in range(16):
             ]) + ')'
         })
     namedQueries['align'].update({
-        'stimOn{}'.format(eName): '(' + '&'.join([
-            namedQueries['align']['stimOn'],
-            namedQueries['align']['{}'.format(eName)],
-            "(trialRateInHz > 20)"
+        'startingOrStimOn{}OrNone'.format(eName): '(' + '|'.join([
+            namedQueries['align']['starting{}'.format(eName)],
+            namedQueries['align']['stimOn{}'.format(eName)],
+            namedQueries['align']['startingNoStim'],
+            ]) + ')'
+        })
+    namedQueries['align'].update({
+        'startingOrStimOn{}'.format(eName): '(' + '|'.join([
+            namedQueries['align']['starting{}'.format(eName)],
+            namedQueries['align']['stimOn{}'.format(eName)],
             ]) + ')'
         })
 ####
@@ -227,6 +242,20 @@ namedQueries['align'].update({
         namedQueries['align']['stimOnE11'],
         ]) + ')'
     })
+namedQueries['align'].update({
+    'startingOrStimOnE00E09E11OrNone': '(' + '|'.join([
+        namedQueries['align']['startingOrStimOnE00OrNone'],
+        namedQueries['align']['startingOrStimOnE09OrNone'],
+        namedQueries['align']['startingOrStimOnE11OrNone'],
+        ]) + ')'
+    })
+namedQueries['align'].update({
+    'startingOrStimOnE00E09E11': '(' + '|'.join([
+        namedQueries['align']['startingOrStimOnE00'],
+        namedQueries['align']['startingOrStimOnE09'],
+        namedQueries['align']['startingOrStimOnE11'],
+        ]) + ')'
+    })
 ####
 namedQueries['align'].update({
     'startingE00E09E14': '(' + '|'.join([
@@ -249,51 +278,98 @@ namedQueries['align'].update({
         namedQueries['align']['stimOnE14'],
         ]) + ')'
     })
+namedQueries['align'].update({
+    'startingOrStimOnE00E09E14': '(' + '|'.join([
+        namedQueries['align']['startingOrStimOnE00'],
+        namedQueries['align']['startingOrStimOnE09'],
+        namedQueries['align']['startingOrStimOnE14'],
+        ]) + ')'
+    })
+namedQueries['align'].update({
+    'startingOrStimOnE00E09E14OrNone': '(' + '|'.join([
+        namedQueries['align']['startingOrStimOnE00OrNone'],
+        namedQueries['align']['startingOrStimOnE09OrNone'],
+        namedQueries['align']['startingOrStimOnE14OrNone'],
+        ]) + ')'
+    })
 ###
 namedQueries['align'].update({'stimOnExp201901_25': namedQueries['align']['stimOnE00E09E14']})
 namedQueries['align'].update({'startingExp201901_25': namedQueries['align']['startingE00E09E14']})
 namedQueries['align'].update({'startingOrNoneExp201901_25': namedQueries['align']['startingE00E09E14OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp201901_25': namedQueries['align']['startingOrStimOnE00E09E14']})
+namedQueries['align'].update({'startingOrStimOnExp201901_25OrNone': namedQueries['align']['startingOrStimOnE00E09E14OrNone']})
 ###
 namedQueries['align'].update({'stimOnExp201901_26': namedQueries['align']['stimOnE00E09E14']})
 namedQueries['align'].update({'startingExp201901_26': namedQueries['align']['startingE00E09E14']})
 namedQueries['align'].update({'startingOrNoneExp201901_26': namedQueries['align']['startingE00E09E14OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp201901_26': namedQueries['align']['startingOrStimOnE00E09E14']})
+namedQueries['align'].update({'startingOrStimOnExp201901_26OrNone': namedQueries['align']['startingOrStimOnE00E09E14OrNone']})
 ###
 namedQueries['align'].update({'stimOnExp201901_27': namedQueries['align']['stimOnE00E09E14']})
 namedQueries['align'].update({'startingExp201901_27': namedQueries['align']['startingE00E09E14']})
 namedQueries['align'].update({'startingOrNoneExp201901_27': namedQueries['align']['startingE00E09E14OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp201901_27': namedQueries['align']['startingOrStimOnE00E09E14']})
+namedQueries['align'].update({'startingOrStimOnExp201901_27OrNone': namedQueries['align']['startingOrStimOnE00E09E14OrNone']})
 ###
 namedQueries['align'].update({'stimOnExp201902_03': namedQueries['align']['stimOnE00E09E11']})
 namedQueries['align'].update({'startingExp201902_03': namedQueries['align']['startingE00E09E11']})
 namedQueries['align'].update({'startingOrNoneExp201902_03': namedQueries['align']['startingE00E09E11OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp201902_03': namedQueries['align']['startingOrStimOnE00E09E11']})
+namedQueries['align'].update({'startingOrStimOnExp201902_03OrNone': namedQueries['align']['startingOrStimOnE00E09E11OrNone']})
+#
 namedQueries['align'].update({'stimOnExp201902_04': namedQueries['align']['stimOnE00E09E11']})
 namedQueries['align'].update({'startingExp201902_04': namedQueries['align']['startingE00E09E11']})
 namedQueries['align'].update({'startingOrNoneExp201902_04': namedQueries['align']['startingE00E09E11OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp201902_04': namedQueries['align']['startingOrStimOnE00E09E11']})
+namedQueries['align'].update({'startingOrStimOnExp201902_04OrNone': namedQueries['align']['startingOrStimOnE00E09E11OrNone']})
 ###
 namedQueries['align'].update({'stimOnExp201902_05': namedQueries['align']['stimOnE00E09E11']})
 namedQueries['align'].update({'startingExp201902_05': namedQueries['align']['startingE00E09E11']})
 namedQueries['align'].update({'startingOrNoneExp201902_05': namedQueries['align']['startingE00E09E11OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp201902_05': namedQueries['align']['startingOrStimOnE00E09E11']})
+namedQueries['align'].update({'startingOrStimOnExp201902_05OrNone': namedQueries['align']['startingOrStimOnE00E09E11OrNone']})
 ###
 namedQueries['align'].update({'stimOnExp202101_20': namedQueries['align']['stimOnE13']})
 namedQueries['align'].update({'startingExp202101_20': namedQueries['align']['startingE13']})
 namedQueries['align'].update({'startingOrNoneExp202101_20': namedQueries['align']['startingE13OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp202101_20': namedQueries['align']['startingOrStimOnE13']})
+namedQueries['align'].update({'startingOrStimOnExp202101_20OrNone': namedQueries['align']['startingOrStimOnE13OrNone']})
+#
 namedQueries['align'].update({'stimOnExp202101_21': namedQueries['align']['stimOnE04']})
 namedQueries['align'].update({'startingExp202101_21': namedQueries['align']['startingE04']})
 namedQueries['align'].update({'startingOrNoneExp202101_21': namedQueries['align']['startingE04OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp202101_21': namedQueries['align']['startingOrStimOnE04']})
+namedQueries['align'].update({'startingOrStimOnExp202101_21OrNone': namedQueries['align']['startingOrStimOnE04OrNone']})
+#
 namedQueries['align'].update({'stimOnExp202101_22': namedQueries['align']['stimOnE12']})
 namedQueries['align'].update({'startingExp202101_22': namedQueries['align']['startingE12']})
 namedQueries['align'].update({'startingOrNoneExp202101_22': namedQueries['align']['startingE12OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp202101_22': namedQueries['align']['startingOrStimOnE12']})
+namedQueries['align'].update({'startingOrStimOnExp202101_22OrNone': namedQueries['align']['startingOrStimOnE12OrNone']})
+#
 namedQueries['align'].update({'stimOnExp202101_25': namedQueries['align']['stimOnE02']})
 namedQueries['align'].update({'startingExp202101_25': namedQueries['align']['startingE02']})
 namedQueries['align'].update({'startingOrNoneExp202101_25': namedQueries['align']['startingE02OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp202101_25': namedQueries['align']['startingOrStimOnE02']})
+namedQueries['align'].update({'startingOrStimOnExp202101_25OrNone': namedQueries['align']['startingOrStimOnE02OrNone']})
+#
 namedQueries['align'].update({'stimOnExp202101_27': namedQueries['align']['stimOnE05']})
 namedQueries['align'].update({'startingExp202101_27': namedQueries['align']['startingE05']})
 namedQueries['align'].update({'startingOrNoneExp202101_27': namedQueries['align']['startingE05OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp202101_27': namedQueries['align']['startingOrStimOnE05']})
+namedQueries['align'].update({'startingOrStimOnExp202101_27OrNone': namedQueries['align']['startingOrStimOnE05OrNone']})
+#
 namedQueries['align'].update({'stimOnExp202101_28': namedQueries['align']['stimOnE09']})
 namedQueries['align'].update({'startingExp202101_28': namedQueries['align']['startingE09']})
 namedQueries['align'].update({'startingOrNoneExp202101_28': namedQueries['align']['startingE09OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp202101_28': namedQueries['align']['startingOrStimOnE09']})
+namedQueries['align'].update({'startingOrStimOnExp202101_28OrNone': namedQueries['align']['startingOrStimOnE09OrNone']})
+#
 namedQueries['align'].update({'stimOnExp202102_02': namedQueries['align']['stimOnE11']})
 namedQueries['align'].update({'startingExp202102_02': namedQueries['align']['startingE11']})
 namedQueries['align'].update({'startingOrNoneExp202102_02': namedQueries['align']['startingE11OrNone']})
+namedQueries['align'].update({'startingOrStimOnExp202102_02': namedQueries['align']['startingOrStimOnE11']})
+namedQueries['align'].update({'startingOrStimOnExp202102_02OrNone': namedQueries['align']['startingOrStimOnE11OrNone']})
 ####
 namedQueries['align'].update({
     'stopping': '|'.join([
@@ -547,12 +623,12 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'stimOnHighRate': '&'.join([
         namedQueries['align']['stimOn'],
-        "(trialRateInHz > 20)"
+        "(trialRateInHz > 40)"
         ])
     })
 namedQueries['align'].update({
     'stimOffHighRate': '&'.join([
         namedQueries['align']['stimOff'],
-        "(trialRateInHz > 20)"
+        "(trialRateInHz > 40)"
         ])
     })

@@ -114,12 +114,23 @@ estimatorPath = os.path.join(
     estimatorsSubFolder,
     fullEstimatorName + '.h5'
     )
+datasetNamePrefix = datasetName.split('_df_')[0] + '_df'
+sampleCountPath = os.path.join(
+    estimatorsSubFolder,
+    '{}_{}_{}.h5'.format(
+        'sampleCount', datasetNamePrefix, selectionName)
+    )
+sampleCountSummaryDF = pd.read_hdf(sampleCountPath, 'sampleCount')
+maxNSamples = sampleCountSummaryDF.groupby('iterator').sum()['numSamples'].min()
 #
 with open(loadingMetaPath, 'rb') as _f:
     loadingMeta = pickle.load(_f)
     # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
     iteratorsBySegment = loadingMeta['iteratorsBySegment']
-    # cv_kwargs = loadingMeta['cv_kwargs']
+    cvIteratorOpts = loadingMeta['iteratorOpts']['cvKWArgs']
+    prelimTestSize = cvIteratorOpts['prelimSplitterKWArgs']['samplerKWArgs']['test_size']
+    testSize = cvIteratorOpts['splitterKWArgs']['samplerKWArgs']['test_size']
+    trainSize = (1 - prelimTestSize) * (1 - testSize)
     if 'normalizeDataset' in loadingMeta:
         normalizeDataset = loadingMeta['normalizeDataset']
         unNormalizeDataset = loadingMeta['unNormalizeDataset']
@@ -135,13 +146,13 @@ if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
     if 'ledoit' in estimatorName:
         estimatorClass = tdr.LedoitWolfTransformer
-        estimatorKWArgs = dict(maxNSamples=12.5e3)
+        estimatorKWArgs = dict(maxNSamples=int(trainSize * maxNSamples))
     elif 'emp' in estimatorName:
         estimatorClass = tdr.EmpiricalCovarianceTransformer
-        estimatorKWArgs = dict(maxNSamples=12.5e3)
+        estimatorKWArgs = dict(maxNSamples=int(trainSize * maxNSamples))
     elif 'mcd' in estimatorName:
         estimatorClass = tdr.MinCovDetTransformer
-        estimatorKWArgs = dict(maxNSamples=12.5e3)
+        estimatorKWArgs = dict(maxNSamples=int(trainSize * maxNSamples))
     crossvalKWArgs = dict(
         cv=cvIterator,
         return_train_score=True, return_estimator=True)
@@ -185,7 +196,6 @@ if __name__ == '__main__':
     cvScoresDict = {}
     cvCovMatDict = {}
     lOfColumnTransformers = []
-    # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
@@ -273,7 +283,6 @@ if __name__ == '__main__':
     #
     features = chosenEstimator.transform(dataDF)
     #
-    # pdb.set_trace()
     featuresDF = pd.DataFrame(
         features,
         index=dataDF.index, columns=outputFeaturesIndex)

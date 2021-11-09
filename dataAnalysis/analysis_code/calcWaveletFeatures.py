@@ -61,6 +61,7 @@ if consoleDebug:
         'alignFolderName': 'motion', 'inputBlockPrefix': 'Block'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
+DEBUGGING = False
 
 def calcCWT(
         partition, dataColNames=None, originalColumns=None, plotting=False,
@@ -93,7 +94,7 @@ def calcCWT(
     outputList = []
     if plotting:
         fig, ax = plt.subplots()
-    for wvlDict in waveletList:
+    for wvlIdx, wvlDict in enumerate(waveletList):
         coefs, freq = pywt.cwt(
             partitionData, wvlDict['scales'],
             wvlDict['wavelet'], **pycwtKWs)
@@ -106,12 +107,12 @@ def calcCWT(
         #
         coefDF.insert(0, 'scale', scalesIdx.reshape(-1))
         coefDF.insert(1, 'freqBandName', wvlDict['name'])
-        coefDF.insert(2, 'center', wvlDict['center'])   # TODO reconcile with freq
+        coefDF.insert(2, 'center', wvlDict['center'])      # TODO reconcile with freq
         coefDF.insert(3, 'bandwidth', wvlDict['bandwidth'])
         coefDF.insert(4, 'waveletName', wvlDict['wavelet'].name)
         outputList.append(coefDF)
         if plotting:
-            print(wvlDict['name'])
+            print('Making plots for freq band {}'.format(wvlDict['name']))
             plotData = pd.concat({
                 'original': partitionData.reset_index(drop=True).stack().reset_index(),
                 wvlDict['name']: coefDF.iloc[:, 5:].reset_index(drop=True).stack().reset_index()})
@@ -120,10 +121,13 @@ def calcCWT(
             plotData.columns = ['type', 'level_1', 'rowIdx', 'bin', 'signal']
             sns.lineplot(
                 x='bin', y='signal', hue='type',
-                data=plotData, ax=ax, errorbar='se', palette={
-                    'original': 'b', 'low': 'r', 'beta': 'g', 'hi': 'c',
+                data=plotData.loc[plotData['rowIdx'] == 0, :], ax=ax,
+                # errorbar='se',
+                estimator=None, units='rowIdx',
+                palette={
+                    'original': 'b', 'alpha': 'r', 'beta': 'g', 'gamma': 'c', 'higamma': 'c',
                     'spb': 'm'
-                })
+                    })
             ax.set_title(('{}_f_c={} Hz'.format(wvlDict['name'], wvlDict['center'])))
     if plotting:
         plt.show()
@@ -185,7 +189,6 @@ if __name__ == "__main__":
         getMetaData=essentialMetadataFields + ['xCoords', 'yCoords'],
         decimate=1, metaDataToCategories=False))
 
-    DEBUGGING = False
     outputPath = os.path.join(
         alignSubFolder,
         blockBaseName + inputBlockSuffix + '_spectral_{}'.format(arguments['window']))
@@ -213,7 +216,7 @@ if __name__ == "__main__":
     dummySt = dataBlock.filter(
         objects=[ns5.SpikeTrain, ns5.SpikeTrainProxy])[0]
     fs = float(dummySt.sampling_rate)
-    dt = fs ** -1
+    DT = fs ** -1
     scale = 100
     waveletList = []
     ###
@@ -221,10 +224,10 @@ if __name__ == "__main__":
         waveletList=waveletList,
         plotting=False,
         pycwtKWs=dict(
-            sampling_period=dt, axis=-1,
-            precision=14
+            sampling_period=DT, axis=-1,
+            precision=15
             # method='conv',
-        ))
+            ))
     ###
     if arguments['plotting']:
         pdfPath = os.path.join(figureFolder, blockBaseName + 'wavelets.pdf')
@@ -239,14 +242,14 @@ if __name__ == "__main__":
         wavelet = pywt.ContinuousWavelet(waveletName)
         wavelet.lower_bound = (-1) * minWidth / 2
         wavelet.upper_bound = minWidth / 2
-        frequencies = pywt.scale2frequency(wavelet, [scale]) / dt
+        frequencies = pywt.scale2frequency(wavelet, [scale]) / DT
         if arguments['plotting']:
             # generate new wavelet to not interfere with the objects
             # being used for the calculations
             bws, fcs, bw_ratios, figsDict = pywthf.plotKernels(
                 pywt.ContinuousWavelet(waveletName),
                 np.asarray([scale / 2, scale]),
-                dt=dt, precision=cwtOpts['pycwtKWs']['precision'], verbose=True,
+                dt=DT, precision=cwtOpts['pycwtKWs']['precision'], verbose=True,
                 width=minWidth)
             scalesAx = figsDict['scales'][1][0, 0]
             scalesAx.set_title('{} ({} frequency: {} Hz to {} Hz)'.format(
@@ -258,7 +261,7 @@ if __name__ == "__main__":
         waveletList.append({
             'name': fBName, 'center': center,
             'bandwidth': bandwidth, 'wavelet': wavelet,
-            'scales': [scale], 'kernelDuration': (scale * minWidth + 1) * dt
+            'scales': [scale], 'kernelDuration': (scale * minWidth + 1) * DT
             })
     waveletDF = pd.DataFrame(waveletList)
     if arguments['plotting']:
@@ -274,7 +277,9 @@ if __name__ == "__main__":
         newMetadataNames=[
             'scale', 'freqBandName', 'center',
             'bandwidth', 'waveletName'],
-        sortIndexBy=['feature', 'lag', 'freqBandName', 'segment', 'originalIndex', 't'],
+        sortIndexBy=[
+            'feature', 'lag', 'freqBandName',
+            'segment', 'originalIndex', 't'],
         funKWArgs=cwtOpts,
         rowKeys=groupBy, colKeys=None,
         daskProgBar=True, daskPersist=False,
@@ -300,7 +305,6 @@ if __name__ == "__main__":
     spectralDF.loc[:, 'feature'] = newFeatNames
     spectralDF.set_index(['parentFeature', 'feature'], inplace=True, append=True)
     trialTimes = np.asarray((spectralDF.index.get_level_values('t')).unique())
-    # pdb.set_trace()
     spikeTrainMeta = {
         'units': pq.s,
         'wvfUnits': pq.dimensionless,

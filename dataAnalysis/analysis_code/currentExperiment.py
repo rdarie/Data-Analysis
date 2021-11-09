@@ -525,6 +525,9 @@ def parseAnalysisOptions(
     # args for the sklearn StratifiedShuffleSplit
     defaultSamplerKWArgs = dict(random_state=42, test_size=0.2)
     defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.15)
+    #
+    covarianceSamplerKWArgs = dict(random_state=42, test_size=0.2)
+    covariancePrelimSamplerKWArgs = dict(random_state=42, test_size=0.)
     # args for tdr.
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
@@ -536,6 +539,16 @@ def parseAnalysisOptions(
         continuousFactors=['segment', 'originalIndex', 't'],
         samplerClass=None,
         samplerKWArgs=defaultPrelimSamplerKWArgs)
+    covarianceSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=covarianceSamplerKWArgs)
+    covariancePrelimSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=covariancePrelimSamplerKWArgs)
     #
     iteratorOpts = {
         # rest period from before movement onset
@@ -544,14 +557,14 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
+            'forceBinInterval': 2e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=25,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                splitterClass=None, splitterKWArgs=covarianceSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=covariancePrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -571,14 +584,14 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
+            'forceBinInterval': 2e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=25,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                splitterClass=None, splitterKWArgs=covarianceSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=covariancePrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -598,14 +611,14 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
+            'forceBinInterval': 2e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=25,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                splitterClass=None, splitterKWArgs=covarianceSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=covariancePrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -625,14 +638,14 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
+            'forceBinInterval': 2e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=25,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                splitterClass=None, splitterKWArgs=covarianceSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=covariancePrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -745,7 +758,7 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
+            'forceBinInterval': 2e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -772,7 +785,7 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 1e-3,
+            'forceBinInterval': 2e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -808,11 +821,13 @@ def parseAnalysisOptions(
     spectralFeatureOpts = dict(
         winLen=100e-3, stepLen=20e-3, R=20,
         fStart=None, fStop=None)
+    freqBandOrder = ['alpha', 'beta', 'gamma', 'higamma', 'spb']
     freqBandsDict = ({
-        'name':   ['alpha', 'beta', 'gamma', 'higamma', 'spb'],
+        'name':   freqBandOrder,
         'lBound': [7,       15,     30,      60,        250],
         'hBound': [14,      29,     55,      120,       1000]
         })
+    freqBandOrderExtended = freqBandOrder + ['NA']
     outlierDetectOptions = dict(
         windowSize=(-.8, 1.2),
         twoTailed=False,

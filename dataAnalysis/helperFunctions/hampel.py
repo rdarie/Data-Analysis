@@ -19,7 +19,7 @@ def hampel(
         ):
     """
     Median absolute deviation (MAD) outlier in Time Series
-    :param ts: a pandas Series object representing the timeseries
+    :param ts: a pandas Series or DataFrame object representing the timeseries
     :param window_size: total window size
     :param thresh: threshold, default is 3 (Pearson's rule)
     :param imputation: If set to False, then the algorithm will be used for outlier detection.
@@ -167,9 +167,13 @@ def hampel(
             ax[2].legend(loc='lower right')
             #
             fig.suptitle(proportion_message)
+        if average_across_channels:
+            scaled_absolute_deviation = scaled_absolute_deviation.mean(axis='columns')
         if type(ts) == pd.Series:
-            return ts_cleaned['data'], (fig, ax)
+            return ts_cleaned['data'], scaled_absolute_deviation, (fig, ax)
         else:
-            return ts_cleaned, (fig, ax)
+            return ts_cleaned, scaled_absolute_deviation, (fig, ax)
     #
-    return outlier_mask, (fig, ax)
+    if average_across_channels:
+        scaled_absolute_deviation = scaled_absolute_deviation.mean(axis='columns')
+    return outlier_mask, scaled_absolute_deviation, (fig, ax)

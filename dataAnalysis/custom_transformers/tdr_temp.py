@@ -1931,7 +1931,6 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             if 'tol' in fit_opts:
                 tol = fit_opts.pop('tol')
                 fit_opts['cnvrg_tol'] = tol
-                fit_opts['zero_tol'] = tol * 0.1
             if 'disp' in fit_opts:
                 fit_opts.pop('disp')
             self.results_ = self.model_.fit_regularized(

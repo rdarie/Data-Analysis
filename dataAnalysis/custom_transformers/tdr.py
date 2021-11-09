@@ -7,7 +7,7 @@ from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
 from sklearn.base import clone
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, PowerTransformer
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance, MinCovDet
 from sklearn.linear_model import ElasticNet, ElasticNetCV
 from sklearn.pipeline import make_pipeline, Pipeline
@@ -964,7 +964,6 @@ class trialAwareStratifiedKFold:
             for idx, (name, group) in enumerate(labelsPerTrial.groupby(self.stratifyFactors)):
                 stratifyGroup.loc[group.index, :] = idx
             ## check that there are no single element groups
-            #
             sgvc = stratifyGroup['stratifyGroup'].value_counts()
             badIndices = stratifyGroup.index[stratifyGroup['stratifyGroup'].isin(sgvc.index[sgvc < 2].to_numpy())]
             if not badIndices.empty:
@@ -981,7 +980,14 @@ class trialAwareStratifiedKFold:
         self.raw_folds = []
         self.folds_per_trial = []
         self.raw_folds_per_trial = []
-        for tr, te in self.sampler.split(infoPerTrial, stratifyGroup):
+        #
+        if self.sampler.test_size == 0:
+            sampleIterator = [
+                (np.arange(infoPerTrial.shape[0], dtype=np.int), np.asarray([], dtype=np.int))
+                for idx in range(self.sampler.n_splits)]
+        else:
+            sampleIterator = self.sampler.split(infoPerTrial, stratifyGroup)
+        for tr, te in sampleIterator:
             trainCG = infoPerTrial['continuousGroup'].iloc[tr].reset_index(drop=True)
             rawTrainCG = trainCG.to_list()
             rawTrainIdx = np.concatenate(trainCG.apply(cgLookup).to_list())
@@ -991,12 +997,17 @@ class trialAwareStratifiedKFold:
             trainIdx = np.concatenate(trainCG.apply(cgLookup).to_list())
             #
             testCG = infoPerTrial['continuousGroup'].iloc[te].reset_index(drop=True)
-            rawTestCG = testCG.to_list()
-            rawTestIdx = np.concatenate(testCG.apply(cgLookup).to_list())
-            if self.resampler is not None:
-                X_res2, _ = self.resampler.fit_resample(testCG.to_numpy().reshape(-1, 1), stratifyGroup.iloc[te])
-                testCG = pd.Series(X_res2.flatten())
-            testIdx = np.concatenate(testCG.apply(cgLookup).to_list())
+            rawTestCG = []
+            if self.sampler.test_size == 0:
+                rawTestIdx = np.asarray([], dtype=np.int)
+                testIdx = np.asarray([], dtype=np.int)
+            else:
+                rawTestCG = testCG.to_list()
+                rawTestIdx = np.concatenate(testCG.apply(cgLookup).to_list())
+                if self.resampler is not None:
+                    X_res2, _ = self.resampler.fit_resample(testCG.to_numpy().reshape(-1, 1), stratifyGroup.iloc[te])
+                    testCG = pd.Series(X_res2.flatten())
+                testIdx = np.concatenate(testCG.apply(cgLookup).to_list())
             self.folds.append((trainIdx, testIdx))
             self.raw_folds.append((rawTrainIdx, rawTestIdx))
             self.folds_per_trial.append((trainCG.to_list(), testCG.to_list()))
@@ -1755,6 +1766,7 @@ class MinCovDetTransformer(MinCovDet, TransformerMixin):
 class LedoitWolfTransformer(LedoitWolf, TransformerMixin):
     def __init__(self, maxNSamples=None, **kwds):
         self.maxNSamples = int(maxNSamples) if maxNSamples is not None else None
+        self.rescaler = PowerTransformer(method='box-cox')
         super().__init__(**kwds)
 
     def fit(self, X, y=None):
@@ -1767,13 +1779,16 @@ class LedoitWolfTransformer(LedoitWolf, TransformerMixin):
             if isinstance(X, pd.DataFrame):
                 seekIdx = rng.choice(X.index, chooseN, replace=False)
                 super().fit(X.loc[seekIdx, :], y=y)
+                self.rescaler.fit(self.mahalanobis(X.loc[seekIdx, :]).reshape(-1, 1))
             else:
                 seekIdx = rng.choice(range(X.shape[0]), chooseN, replace=False)
                 super().fit(X[seekIdx, :], y=y)
+                self.rescaler.fit(self.mahalanobis(X[seekIdx, :]).reshape(-1, 1))
         return self
 
     def transform(self, X):
-        return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
+        return self.rescaler.transform(self.mahalanobis(X).reshape(-1, 1))
+        # return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 
 class SMWrapperBackup(BaseEstimator, RegressorMixin):
     """

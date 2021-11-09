@@ -207,8 +207,8 @@ if __name__ == '__main__':
         'sm_class': sm.GLM,
         'family': sm.families.Gaussian(),
         'alpha': 1e-12, 'L1_wt': .1,
-        'refit': True, 'tol': 1e-2,
-        'maxiter': 1000, 'disp': False,
+        'refit': True, 'tol': 5e-5,
+        'maxiter': 100, 'disp': False,
         'calc_frequency_weights': True
         }
     regressorClass = tdr.SMWrapper
@@ -505,15 +505,21 @@ if __name__ == '__main__':
                             alphas = np.atleast_1d(alphas).tolist()
                             fastTrack = True
                             if fastTrack:
-                                alphas = [alphas[0], alphas[-1]]
+                                alphas = [alphas[-1], alphas[0]]
                             gsParams.append(
                                 {
                                     l1_ratio_name: [l1Ratio],
                                     alpha_name: alphas,
-                                    'regressor__regressor__calc_frequency_weights': [True, False]
-                                })
+                                    'regressor__regressor__calc_frequency_weights': [True]
+                                    })
                             alphasStr = ['{:.3g}'.format(a) for a in alphas]
                             print('Evaluating alphas: {}'.format(alphasStr))
+                        gsParams.append(
+                            {
+                                l1_ratio_name: [0.5],
+                                alpha_name: [0.],
+                                'regressor__regressor__calc_frequency_weights': [True]
+                                })
                         gsKWA['param_grid'] = gsParams
                 #############
                 #  estimatorInstance.fit(fullDesignDF, targetDF)
