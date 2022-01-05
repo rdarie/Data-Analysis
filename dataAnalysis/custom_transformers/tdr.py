@@ -433,9 +433,10 @@ def tTestNadeauCorrection(
         statsResDF['p-val'] = 2 * scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
     else:
         statsResDF['p-val'] = scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
+    # pdb.set_trace()
     statsResDF['power'] = pg.power_ttest(
         d=statsResDF['cohen-d'], n=J, power=None, alpha=powerAlpha,
-        contrast='paired', tail=tail)
+        contrast='paired', alternative=tail)
     statsResDF.drop('BF10', inplace=True)
     return statsResDF
 

@@ -362,6 +362,9 @@ if __name__ == '__main__':
                 g = sns.relplot(
                     x='bin', y='signal',
                     **rowColArgs, **relplotKWArgs, data=plotDF)
+                if arguments['plotSuffix'] in titlesOptsLookup:
+                    titlesOpts = titlesOptsLookup[arguments['plotSuffix']]
+                    g.set_titles(**titlesOpts)
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
                     #  print('(ro, co, hu) = {}'.format((ro, co, hu)))
@@ -392,9 +395,6 @@ if __name__ == '__main__':
                 else:
                     yAxisLabel = '{}'.format(colGroupName)
                 g.set_axis_labels(xAxisLabel, yAxisLabel)
-                if arguments['plotSuffix'] in titlesOptsLookup:
-                    titlesOpts = titlesOptsLookup[arguments['plotSuffix']]
-                    g.set_titles(**titlesOpts)
                 if arguments['plotSuffix'] in titleTextLookup:
                     titleText = titleTextLookup[arguments['plotSuffix']]
                     g.suptitle(titleText)

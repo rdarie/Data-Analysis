@@ -110,23 +110,20 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_illustration': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '1500', 'limitPages': None,
+        'winStart': '-200', 'winStop': '400', 'limitPages': None,
         # 'unitQuery': None,
-        'unitQuery': "chanName.isin(['utah_csd_14#0', 'utah_csd_33#0', 'utah_csd_3#0', 'utah_csd_2#0', 'utah_csd_79#0', 'utah_csd_60#0', 'utah_csd_80#0', 'utah_csd_16#0', 'utah_csd_17#0'])",
+        'unitQuery': "chanName.isin(['utah_csd_14#0', 'utah_csd_30#0', 'utah_csd_33#0', 'utah_csd_3#0', 'utah_csd_2#0', 'utah_csd_79#0', 'utah_csd_60#0', 'utah_csd_80#0', 'utah_csd_16#0', 'utah_csd_17#0'])",
         # 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
-        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
-        ###
+        'colName': 'stimCondition', 'colControl': '',
+        # 'rowOrder':
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'colName': 'kinematicConditionNoSize', 'colControl': '',
-        'colOrder': [
+        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
+        'rowOrder': [
            'NA_NA',
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
             ],
-        # 'hueName': 'kinematicConditionNoSize', 'hueControl': '',
-        # 'colName': '', 'colControl': '',
-        ####
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'laplace_illustration_topo': {
@@ -144,7 +141,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_spectral_illustration_topo': {
         'recalcStats': True,
-        'winStart': '-400', 'winStop': '800', 'limitPages': None,
+        'winStart': '-200', 'winStop': '800', 'limitPages': None,
         'unitQuery': None,
         # 'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
@@ -157,7 +154,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'factor_illustration': {
         'recalcStats': True,
-        'winStart': '-150', 'winStop': '350', 'limitPages': None,
+        'winStart': '-200', 'winStop': '350', 'limitPages': None,
         'unitQuery': "chanName.isin(['fa_all001#0', 'fa_all002#0', 'fa_all003#0', 'fa_all004#0'])",
         # 'alignQuery': None,
         # 'unitQuery': None,
@@ -174,7 +171,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'spectral_illustration': {
         'recalcStats': True,
-        'winStart': '-400', 'winStop': '800', 'limitPages': None,
+        'winStart': '-200', 'winStop': '400', 'limitPages': None,
         'unitQuery': "chanName.isin(['utah1_alpha#0', 'utah1_beta#0', 'utah1_gamma#0', 'utah1_higamma#0', 'utah1_spb#0'])",
         # 'unitQuery': None,
         # 'alignQuery': None,
@@ -191,16 +188,17 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_spectral_illustration': {
         'recalcStats': True,
-        'winStart': '-400', 'winStop': '800', 'limitPages': None,
+        'winStart': '-200', 'winStop': '400', 'limitPages': None,
         'unitQuery': "chanName.isin(['utah_csd_2_alpha#0', 'utah_csd_60_alpha#0', 'utah_csd_14_alpha#0', 'utah_csd_63_alpha#0', 'utah_csd_2_beta#0', 'utah_csd_11_beta#0', 'utah_csd_56_beta#0', 'utah_csd_19_beta#0', 'utah_csd_30_gamma#0', 'utah_csd_60_gamma#0', 'utah_csd_53_gamma#0', 'utah_csd_17_gamma#0', 'utah_csd_40_higamma#0', 'utah_csd_60_higamma#0', 'utah_csd_27_higamma#0', 'utah_csd_14_higamma#0', 'utah_csd_70_spb#0', 'utah_csd_80_spb#0', 'utah_csd_28_spb#0', 'utah_csd_14_spb#0'])",
         # 'unitQuery': None,
         # 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
+        'colName': 'stimCondition', 'colControl': '',
+        # 'rowOrder':
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
-        'colName': 'kinematicConditionNoSize', 'colControl': '',
-        'colOrder': [
-            'NA_NA',
+        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
+        'rowOrder': [
+           'NA_NA',
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
             ],
@@ -208,14 +206,15 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'mahal_illustration': {
         'recalcStats': True,
-        'winStart': '-400', 'winStop': '800', 'limitPages': None,
+        'winStart': '-200', 'winStop': '400', 'limitPages': None,
         'unitQuery': None, 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
+        'colName': 'stimCondition', 'colControl': '',
+        # 'rowOrder':
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
-        'colName': 'kinematicConditionNoSize', 'colControl': '',
-        'colOrder': [
-            'NA_NA',
+        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
+        'rowOrder': [
+           'NA_NA',
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
             ],
@@ -358,156 +357,121 @@ statsTestOptsLookup = {
     }
 statsTestOptsLookup['mahal_per_trial_illustration'] = statsTestOptsLookup['mahal_illustration']
 statsTestOptsLookup['rig_per_trial_illustration'] = statsTestOptsLookup['rig_illustration']
-#
+titleLabelLookup = {
+    'stimCondition = NA_0.0': 'No stim.',
+    'NA_0.0': 'No stim.',
+    'kinematicCondition = NA_NA': 'No movement',
+    'kinematicCondition = CW_outbound': 'Start of movement\n(extension)',
+    'kinematicCondition = CW_return': 'Return to start\n(flexion)',
+    'kinematicCondition = CCW_outbound': 'Start of movement\n(flexion)',
+    'kinematicCondition = CCW_return': 'Return to start\n(extension)',
+    'kinematicConditionNoSize = NA_NA': 'No movement',
+    'kinematicConditionNoSize = CW_outbound': 'Start of movement\n(extension)',
+    'kinematicConditionNoSize = CW_return': 'Return to start\n(flexion)',
+    'kinematicConditionNoSize = CCW_outbound': 'Start of movement\n(flexion)',
+    'kinematicConditionNoSize = CCW_return': 'Return to start\n(extension)',
+    'NA_NA': 'No movement',
+    'CW_outbound': 'Start of movement\n(extension)',
+    'CW_return': 'Return to start\n(flexion)',
+    'CCW_outbound': 'Start of movement\n(flexion)',
+    'CCW_return': 'Return to start\n(extension)',
+    'broadband': 'Broadband',
+    'alpha': 'Alpha',
+    'beta': 'Beta',
+    'gamma': 'Gamma',
+    'higamma': 'High gamma',
+    'spb': 'Spike band',
+    }
+for eIdx in range(16):
+    titleLabelLookup['stimCondition = -E{:02d}+E16_100.0'.format(eIdx)] = 'Stim. E{:02d} (100 Hz)'.format(eIdx)
+    titleLabelLookup['stimCondition = -E{:02d}+E16_50.0'.format(eIdx)] = 'Stim. E{:02d} (50 Hz)'.format(eIdx)
+    titleLabelLookup['-E{:02d}+E16_100.0'.format(eIdx)] = 'Stim. E{:02d} (100 Hz)'.format(eIdx)
+    titleLabelLookup['-E{:02d}+E16_50.0'.format(eIdx)] = 'Stim. E{:02d} (50 Hz)'.format(eIdx)
+for eIdx in range(97):
+    for fbn in ['alpha', 'beta', 'gamma', 'higamma', 'spb', None]:
+        fbSuffix = '_{}'.format(fbn) if fbn is not None else ''
+        fbPrettyName = '\n({})'.format(titleLabelLookup[fbn]) if fbn is not None else ''
+        titleLabelLookup['feature = utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
+        titleLabelLookup['utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
 plotProcFunsLookup = {
     'rig_illustration': [
     # shadeTaskEpochsPerFacet,
     asp.xLabelsTime,
     asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
     asp.genLegendRounder(decimals=2),
-        # asp.genTitleChanger({
-        #     'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-        #     'stimCondition = NA_0.0': 'No stimulation',
-        #     'kinematicConditionNoSize = NA_NA': 'No movement',
-        #     'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        #     'kinematicConditionNoSize = CW_return': 'Return to start (flexion)'
-        #     })
+        # asp.genTitleChanger(titleLabelLookup)
         ],
     'lfp_illustration': [
-        # shadeAUCEpochsPerFacet,
+        shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genStimVLineAdder(
             'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=0., tOffset=.35,
+            tOnset=-100e-3, tOffset=.4,
             includeLeft=False, includeRight=False),
-        # asp.genTitleChanger({
-        #     'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-        #     'stimCondition = NA_0.0': 'No stimulation',
-        #     'kinematicConditionNoSize = NA_NA': 'No movement',
-        #     'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        #     'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-        #     'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-        #     'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-        #     })
+        asp.genTitleChanger(titleLabelLookup)
         ],
     'laplace_illustration': [
-        # shadeAUCEpochsPerFacet,
+        shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genStimVLineAdder(
             'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=0., tOffset=.35, includeLeft=False, includeRight=False),
-        # asp.genTitleChanger({
-        #     'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-        #     'stimCondition = NA_0.0': 'No stimulation',
-        #     'kinematicConditionNoSize = NA_NA': 'No movement',
-        #     'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        #     'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-        #     'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-        #     'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-        #     })
+            tOnset=-100e-3, tOffset=.4, includeLeft=False, includeRight=False),
+        asp.genTitleChanger(titleLabelLookup)
         ],
     'laplace_illustration_topo': [
         # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genLegendRounder(decimals=2),
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
-        # asp.genTitleChanger({
-        #     'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-        #     'stimCondition = NA_0.0': 'No stimulation',
-        #     'kinematicConditionNoSize = NA_NA': 'No movement',
-        #     'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        #     'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-        #     'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-        #     'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-        #     })
+        # asp.genTitleChanger(titleLabelLookup)
         ],
     'laplace_spectral_illustration_topo': [
-        # shadeAUCEpochsPerFacet,
+        shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genLegendRounder(decimals=2),
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
-        # asp.genTitleChanger({
-        #     'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-        #     'stimCondition = NA_0.0': 'No stimulation',
-        #     'kinematicConditionNoSize = NA_NA': 'No movement',
-        #     'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-        #     'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-        #     'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-        #     'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-        #     })
+        # asp.genTitleChanger(titleLabelLookup)
         ],
     'factor_illustration': [
-        # shadeAUCEpochsPerFacet,
+        shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}, dropNaNCol='trialUID'),
         asp.genLegendRounder(decimals=2),
         asp.genStimVLineAdder(
             'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
             tOnset=0., tOffset=.35, includeLeft=False, includeRight=False, dropNaNCol='trialUID'),
-        asp.genTitleChanger({
-            'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-            'stimCondition = NA_0.0': 'No stimulation',
-            'kinematicConditionNoSize = NA_NA': 'No movement',
-            'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-            'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-            'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-            'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-            })],
+        asp.genTitleChanger(titleLabelLookup)],
     'spectral_illustration': [
-        # shadeAUCEpochsPerFacet,
+        shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genStimVLineAdder(
             'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=0., tOffset=.35, includeLeft=False, includeRight=False),
-        asp.genTitleChanger({
-            'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-            'stimCondition = NA_0.0': 'No stimulation',
-            'kinematicConditionNoSize = NA_NA': 'No movement',
-            'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-            'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-            'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-            'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-            })],
+            tOnset=-.10, tOffset=.4, includeLeft=False, includeRight=False),
+        asp.genTitleChanger(titleLabelLookup)],
     'laplace_spectral_illustration': [
-        # shadeAUCEpochsPerFacet,
+        shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genStimVLineAdder(
             'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=0., tOffset=.35, includeLeft=False, includeRight=False),
-        asp.genTitleChanger({
-            'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-            'stimCondition = NA_0.0': 'No stimulation',
-            'kinematicConditionNoSize = NA_NA': 'No movement',
-            'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-            'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-            'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-            'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-            })],
+            tOnset=-0.10, tOffset=.4, includeLeft=False, includeRight=False),
+        asp.genTitleChanger(titleLabelLookup)],
     'mahal_illustration': [
-        # shadeAUCEpochsPerFacet,
+        shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genStimVLineAdder(
             'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=0., tOffset=.35, includeLeft=False, includeRight=False),
-        asp.genTitleChanger({
-            'stimCondition = + E16 - E5_100.0': '+ E16 - E5 (100.0 Hz)',
-            'stimCondition = NA_0.0': 'No stimulation',
-            'kinematicConditionNoSize = NA_NA': 'No movement',
-            'kinematicConditionNoSize = CW_outbound': 'Start of movement (extension)',
-            'kinematicConditionNoSize = CW_return': 'Return to start (flexion)',
-            'kinematicConditionNoSize = CCW_outbound': 'Start of movement (flexion)',
-            'kinematicConditionNoSize = CCW_return': 'Return to start (extension)',
-            }),
+            tOnset=-.10, tOffset=.4, includeLeft=False, includeRight=False),
+        asp.genTitleChanger(titleLabelLookup),
             # asp.genTraceAnnotator(
             #     unit_var='trialUID', labelsList=['segment', 't'],
             #     textOpts=dict(ha='left', va='bottom', fontsize=4))
@@ -546,61 +510,62 @@ unusedPlotProcFuns = [
     ]
 relPlotKWArgsLookup = {
     'rig_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:0.8,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': None
+        'errorbar': 'se'
     },
     'lfp_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': None
+        'errorbar': 'se'
     },
     'laplace_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': 'se'
     },
     'laplace_illustration_topo': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 1.5,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'facet_kws': {'sharey': True},
-        'errorbar': None
+        'errorbar': 'se'
     },
     'laplace_spectral_illustration_topo': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 1.5,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'facet_kws': {'sharey': True},
-        'errorbar': None
+        'errorbar': 'se'
     },
     'factor_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
-        'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1"
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
+        'errorbar': 'se'
     },
     'spectral_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:0.,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': None
+        'errorbar': 'se'
     },
     'laplace_spectral_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:0.,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': None
+        'errorbar': 'se'
     },
     'mahal_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': None
+        'errorbar': 'se'
         # 'facet_kws': {'sharey': False},
         # 'estimator': None, 'units': 'trialUID'
     },
     'mahal_per_trial_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1",
         'alpha': 0.5,
         'errorbar': None
     },
     'rig_per_trial_illustration': {
-        'linewidth': 1., 'height': 1.5, 'aspect': 2,
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:0.8,-.3,dark=.25,light=0.75,reverse=1",
         'alpha': 0.5,
         'errorbar': None
@@ -754,5 +719,8 @@ titlesOptsLookup['rig_per_trial_illustration'] = titlesOptsLookup['rig_illustrat
 titleTextLookup = {}
 customCodeLookup = {
     'rig_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100",
-    'rig_per_trial_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100"
+    'rig_per_trial_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100",
+    'laplace_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_spectral_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'mahal_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()"
     }

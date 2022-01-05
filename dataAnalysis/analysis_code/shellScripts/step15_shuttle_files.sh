@@ -80,7 +80,7 @@ WINDOW="XL"
 KEYPROMPT=""
 #  # exps=(exp201901251000 exp201901261000 exp201901271000 exp201902031100 exp201902041100 exp201902051100 exp202101201100 exp202101211100 exp202101221100 exp202101251100 exp202101271100 exp202101281100 exp202102021100)
 #  # exps=(exp201901251000 exp201901261000 exp201901271000 exp202101271100 exp202101281100)
-exps=(exp202101211100 exp202101271100)
+exps=(exp201901251000 exp201901261000 exp201901271000)
 for EXP in "${exps[@]}"
 do
   echo "step 15 cleanup, on $EXP"
@@ -169,9 +169,9 @@ do
   python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="baseline_*_ca_*.joblib" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
   python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="baseline_*_ca_*.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
   
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_ma_*.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_ma.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_ma_*_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_ma_*.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_ma.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_ma_*_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
   
   iters=(ca cb ccm ccs cd)
   for ITER in "${iters[@]}"
@@ -188,12 +188,12 @@ do
   
   # misc
   # #
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_rauc.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rauc_iterator_*.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_epochs.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.csv" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_rauc.h5" --fromScratchToData --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rauc_iterator_*.pickle" --fromScratchToData --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_epochs.nix" --fromScratchToData --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.nix" --fromScratchToData --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.h5" --fromScratchToData --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.csv" --fromScratchToData --filesIncluded ${KEYPROMPT}
   # #
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_*viewable.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
   # #

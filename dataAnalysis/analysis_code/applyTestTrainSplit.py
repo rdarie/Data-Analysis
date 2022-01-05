@@ -130,7 +130,11 @@ if 'procFun' in iteratorOpts:
         if iteratorOpts['procFun'][arguments['selectionName']] is not None:
             print('Applying processing to signal: {}'.format(iteratorOpts['procFun'][arguments['selectionName']]))
             alignedAsigsKWargs['procFun'] = eval(iteratorOpts['procFun'][arguments['selectionName']])
-
+#
+outlierResultsPathCSV = os.path.join(
+    scratchFolder, 'outlierTrials', arguments['alignFolderName'],
+    blockBaseName + '_{}_outliers.csv'.format(arguments['window']))
+outlierTrialsForReference = pd.read_csv(outlierResultsPathCSV).set_index(['segment', 't'])
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 nSeg = len(dataBlock.segments)
@@ -176,6 +180,7 @@ for segIdx in range(nSeg):
             print('(contradictory this data)\n{}'.format(trialInfo.drop_duplicates('t').loc[:, nonMatchingAnns]))
             print('(contradictory loaded from iterator)\n{}'.format(loadedTrialInfo.drop_duplicates('t').loc[:, nonMatchingAnns]))
             pdb.set_trace()
+    # pdb.set_trace()
     listOfDataFrames.append(dataDF)
 if arguments['verbose']:
     prf.print_memory_usage('Done loading')
@@ -217,6 +222,12 @@ else:
 if arguments['verbose']:
     prf.print_memory_usage(
         'Saving {} to {}'.format(exportKey, outputDFPath))
+
+trialInfo = exportDF.index.to_frame().reset_index(drop=True)
+trialInfo.loc[:, 't'] = np.round(trialInfo['t'], decimals=9)
+trialInfo.loc[:, 'isOutlierTrial'] = trialInfo.set_index(['segment', 't']).index.map(outlierTrialsForReference['rejectBlock'])
+trialInfo.loc[:, 'outlierDeviation'] = trialInfo.set_index(['segment', 't']).index.map(outlierTrialsForReference['deviation'])
+exportDF.index = pd.MultiIndex.from_frame(trialInfo)
 exportDF.to_hdf(outputDFPath, exportKey, mode='a')
 ##
 featureGroupNames = [cN for cN in exportDF.columns.names]

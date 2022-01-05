@@ -273,8 +273,8 @@ def parseAnalysisOptions(
         stimulusConditionNames = motionConditionNames
     else:
         stimulusConditionNames = stimConditionNames + motionConditionNames
-    print('Block type {}; using the following stimulus condition breakdown:'.format(blockExperimentType))
-    print('\n'.join(['    {}'.format(scn) for scn in stimulusConditionNames]))
+    # print('Block type {}; using the following stimulus condition breakdown:'.format(blockExperimentType))
+    # print('\n'.join(['    {}'.format(scn) for scn in stimulusConditionNames]))
     #
     if blockExperimentType == 'proprio-miniRC':
         #  override with settings for detecting cycling stim trains
@@ -827,7 +827,7 @@ def parseAnalysisOptions(
         'lBound': [7,       15,     30,      60,        250],
         'hBound': [14,      29,     55,      120,       1000]
         })
-    freqBandOrderExtended = freqBandOrder + ['NA']
+    freqBandOrderExtended = freqBandOrder + ['NA', 'all', 'broadband', 'cross_frequency']
     outlierDetectOptions = dict(
         windowSize=(-.8, 1.2),
         twoTailed=False,
@@ -850,5 +850,97 @@ def parseAnalysisOptions(
                 'ftype': 'butter'
             },
         }
+        }
+    prettyNameLookup = {
+        'T': 'T',
+        'hedges': 'g',
+        'coef': r"$\beta$",
+        'electrode = NA': 'No stim.',
+        'stimCondition = NA_0.0': 'No stim.',
+        'NA': 'No stim.',
+        'kinematicCondition = NA_NA': 'No movement',
+        'kinematicCondition = CW_outbound': 'Start of movement\n(extension)',
+        'kinematicCondition = CW_return': 'Return to start\n(flexion)',
+        'kinematicCondition = CCW_outbound': 'Start of movement\n(flexion)',
+        'kinematicCondition = CCW_return': 'Return to start\n(extension)',
+        'feature = mahal_ledoit_all': 'Mahal. dist.\n(Broadband)',
+        'feature = mahal_ledoit_alpha': 'Mahal. dist.\n(Alpha)',
+        'feature = mahal_ledoit_beta': 'Mahal. dist.\n(Beta)',
+        'feature = mahal_ledoit_gamma': 'Mahal. dist.\n(Gamma)',
+        'feature = mahal_ledoit_higamma': 'Mahal. dist.\n(High gamma)',
+        'feature = mahal_ledoit_spb': 'Mahal. dist.\n(Spike band)',
+        'freqBandName': 'Frequency band',
+        'electrode': 'Stim. electrode (cathode)',
+        'NA': 'Broadband',
+        'all': 'Broadband',
+        'broadband': 'Broadband',
+        'cross_frequency': 'Cross Freq.',
+        'alpha': 'Alpha',
+        'beta': 'Beta',
+        'gamma': 'Gamma',
+        'higamma': 'High gamma',
+        'spb': 'Spike band',
+        'trialRateInHzStr': 'Stim. rate (Hz)',
+        '0.0': 'No stim.',
+        '50.0': '50',
+        '100.0': '100',
+        '0.0_md': 'No stim. (Mahal. dist.)',
+        '50.0_md': '50 (Mahal. dist.)',
+        '100.0_md': '100 (Mahal. dist.)',
+        'namesAndMD': 'Regressors',
+        'trialAmplitude': 'Stim. amplitude',
+        'trialAmplitude:trialRateInHz': 'Stim. rate interaction',
+        'trialAmplitude_md': 'Stim. amplitude (Mahal. dist.)',
+        'trialAmplitude:trialRateInHz_md': 'Stim. rate interaction (Mahal. dist.)',
+        }
+    for eIdx in range(16):
+        prettyNameLookup['electrode = -E{:02d}+E16'.format(eIdx)] = 'Stim. E{:02d}'.format(eIdx)
+        prettyNameLookup['-E{:02d}+E16'.format(eIdx)] = 'Stim. E{:02d}'.format(eIdx)
+        prettyNameLookup['stimCondition = -E{:02d}+E16_50.0'.format(eIdx)] = 'Stim. E{:02d} (50 Hz)'.format(eIdx)
+        prettyNameLookup['-E{:02d}+E16_50.0'.format(eIdx)] = 'E{:02d} (50 Hz'.format(eIdx)
+        prettyNameLookup['stimCondition = -E{:02d}+E16_100.0'.format(eIdx)] = 'Stim. E{:02d} (100 Hz)'.format(eIdx)
+        prettyNameLookup['-E{:02d}+E16_100.0'.format(eIdx)] = 'E{:02d} (100 Hz)'.format(eIdx)
+    for fbn in freqBandOrderExtended + [None]:
+        if fbn in prettyNameLookup:
+            prettyNameLookup['freqBandName = {}'.format(fbn)] = prettyNameLookup[fbn]
+        for eIdx in range(97):
+            fbSuffix = '_{}'.format(fbn) if fbn is not None else ''
+            fbPrettyName = '\n({})'.format(prettyNameLookup[fbn]) if fbn is not None else ''
+            prettyNameLookup['feature = utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
+            prettyNameLookup['utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
+    applyPrettyNameLookup = lambda x: prettyNameLookup[x] if x in prettyNameLookup else x
+    expNameElectrodeLookup = {
+        'Murdoc': {
+            'exp201901251000': ['-E14+E16', ],
+            'exp201902031100': ['-E00+E16', '-E09+E16', '-E11+E16']
+        },
+        'Rupert': {
+            'exp202101201100': ['-E13+E16'],
+            'exp202101211100': ['-E04+E16'],
+            'exp202101221100': ['-E12+E16'],
+            'exp202101251100': ['-E02+E16'],
+            'exp202101271100': ['-E05+E16'],
+            'exp202101281100': ['-E09+E16'],
+            'exp202102021100': ['-E11+E16']
+        }
+    }
+    spinalElectrodeMaps = {
+        'Murdoc': pd.DataFrame({
+            'NA': [0, 0, True],
+            '-E14+E16': [1, 1, False],
+            '-E11+E16': [2, 1, False],
+            '-E09+E16': [3, 1, False],
+            '-E00+E16': [4, 1, False],
+            }, index=['xCoords', 'yCoords', 'isDummy']).T,
+        'Rupert': pd.DataFrame({
+            'NA': [0, 0, True],
+            '-E13+E16': [1, 2, False],
+            '-E09+E16': [2, 1, False],
+            '-E11+E16': [3, 2, False],
+            '-E12+E16': [4, 1, False],
+            '-E02+E16': [5, 2, False],
+            '-E05+E16': [6, 1, False],
+            '-E04+E16': [7, 2, False],
+            }, index=['xCoords', 'yCoords', 'isDummy']).T,
         }
     return expOpts, locals()

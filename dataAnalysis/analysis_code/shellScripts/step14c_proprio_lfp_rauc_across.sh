@@ -10,11 +10,11 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J s14c_temp_mahal_dist_rauc_2021
+#SBATCH -J s14c_temp_mahal_dist_rauc_2019
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/covariance/s14c_temp_mahal_dist_rauc_2021.out
-#SBATCH -e ../../batch_logs/covariance/s14c_temp_mahal_dist_rauc_2021.out
+#SBATCH -o ../../batch_logs/covariance/s14c_temp_mahal_dist_rauc_2019.out
+#SBATCH -e ../../batch_logs/covariance/s14c_temp_mahal_dist_rauc_2019.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,20 +24,25 @@
 #SBATCH --array=999
 
 # SLURM_ARRAY_TASK_ID=2
-# exps=(201901_27 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
+# exps=(201901_25 201902_03)
+# exps=(202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 
-exps=(202101_27)
+exps=(202102_02)
 for A in "${exps[@]}"
 do
   source ./shellScripts/run_exp_preamble_$A.sh
   source ./shellScripts/calc_aligned_motion_preamble.sh
   #
-  BLOCKSELECTOR="--blockIdx=2 --processAll"
-  #
   ITERATOR="ma"
   ESTIMATOR='mahal_ledoit'
+  BLOCKSELECTOR="--blockIdx=2 --processAll"
   #
+  #
+  # SELECTIONLIST="laplace_spectral_baseline, laplace_baseline"
   SELECTIONLIST="laplace_spectral_baseline, laplace_baseline, laplace_spectral_scaled_mahal_ledoit, laplace_scaled_mahal_ledoit"
-  # exp202101211100  exp202101271100
-  python -u "./plotSignalRecruitmentAcrossExp.py" --expList="exp202101211100, exp202101271100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+  #
+  # exp201901251000, exp201902031100
+  # exp202101201100, exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100
+  # exp202101281100, exp202102021100, exp202101211100,
+  python -u "./plotSignalRecruitmentAcrossExp.py" --expList="exp202101281100, exp202102021100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
 done

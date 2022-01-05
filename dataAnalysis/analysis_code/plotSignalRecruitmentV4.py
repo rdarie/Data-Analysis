@@ -297,6 +297,18 @@ def genStatsAnnotator(ampDF, relDF, hN, hP):
                 g.axes[ro, co].starsAnnotated = True
         return
     return statsAnnotator
+
+def genNumSigAnnotator(pvalDF, dataDF):
+    def numSigAnnotator(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset.iloc[:, 0].isna().all()))
+        if not emptySubset:
+            if not hasattr(g.axes[ro, co], 'pvalsAnnotated'):
+                pdb.set_trace()
+                g.axes[ro, co].pvalsAnnotated = True
+        return
+    return numSigAnnotator
 #
 titleLabelLookup = {
     'electrode = + E16 - E5': 'Stimulation (+ E16 - E5)',

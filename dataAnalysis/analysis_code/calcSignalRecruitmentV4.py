@@ -173,6 +173,10 @@ if __name__ == "__main__":
             figureOutputFolder,
             blockBaseName + '_{}_{}_{}_rauc_normalization.pdf'.format(
                 expDateTimePathStr, inputBlockSuffix, arguments['window']))
+        htmlOutputPath = os.path.join(
+            figureOutputFolder,
+            blockBaseName + '_{}_{}_{}_rauc_sorted.html'.format(
+                expDateTimePathStr, inputBlockSuffix, arguments['window']))
         resultPath = os.path.join(
             calcSubFolder,
             blockBaseName + '{}_{}_rauc.h5'.format(
@@ -219,6 +223,10 @@ if __name__ == "__main__":
             figureOutputFolder,
             blockBaseName + '_{}_{}_{}_rauc_normalization.pdf'.format(
                 expDateTimePathStr, selectionName, arguments['window']))
+        htmlOutputPath = os.path.join(
+            figureOutputFolder,
+            blockBaseName + '_{}_{}_{}_rauc_sorted.html'.format(
+                expDateTimePathStr, selectionName, arguments['window']))
         resultPath = os.path.join(
             calcSubFolder,
             blockBaseName + '_{}_{}_rauc.h5'.format(
@@ -246,28 +254,49 @@ if __name__ == "__main__":
         arguments.update(loadingMeta['arguments'])
         cvIterator = iteratorsBySegment[0]
         dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+        if ('mahal' in arguments['selectionName']) and ('spectral' in arguments['selectionName']):
+            oldColumns = dataDF.columns.to_frame().reset_index(drop=True)
+            oldColumns.loc[:, 'freqBandName'] = oldColumns['freqBandName'].apply(lambda x: 'cross_frequency' if x in ['all', 'NA'] else x)
+            dataDF.columns = pd.MultiIndex.from_frame(oldColumns)
+        elif ('spectral' not in arguments['selectionName']):
+            oldColumns = dataDF.columns.to_frame().reset_index(drop=True)
+            oldColumns.loc[:, 'freqBandName'] = oldColumns['freqBandName'].apply(lambda x: 'broadband' if x in ['all', 'NA'] else x)
+            dataDF.columns = pd.MultiIndex.from_frame(oldColumns)
         # hack control time base to look like main time base
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         deltaB = trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'].min() - trialInfo.loc[trialInfo['controlFlag'] == 'main', 'bin'].min()
         trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'] -= deltaB
         dataDF.index = pd.MultiIndex.from_frame(trialInfo)
         ### detrend as a group?
-        tMask = ((trialInfo['bin'] >= funKWArgs['baselineTStart']) & (trialInfo['bin'] < funKWArgs['baselineTStop']))
-        baseline = dataDF.loc[tMask.to_numpy(), :].median()
-        # pdb.set_trace()
-        '''
-        if True:
-            fig, ax = plt.subplots(1, 2)
-            sns.histplot(dataDF.loc[tMask.to_numpy(), :], ax=ax[0])
-            sns.histplot(dataDF.subtract(baseline, axis='columns').loc[tMask.to_numpy(), :], ax=ax[1])
-            plt.show()
-            '''
-        dataDF = dataDF.subtract(baseline, axis='columns')
+        detrendAsGroup = True
+        if detrendAsGroup:
+            tMask = ((trialInfo['bin'] >= funKWArgs['baselineTStart']) & (trialInfo['bin'] < funKWArgs['baselineTStop']))
+            baseline = dataDF.loc[tMask.to_numpy(), :].median()
+            dataDF = dataDF.subtract(baseline, axis='columns')
+    if os.path.exists(resultPath):
+        print('Previous results found at {}. deleting...'.format(resultPath))
+        os.remove(resultPath)
+    if os.path.exists(pdfPath):
+        print('Previous printout found at {}. deleting...'.format(pdfPath))
+        os.remove(pdfPath)
     groupNames = ['originalIndex', 'segment', 't']
     daskComputeOpts = dict(
         # scheduler='processes'
         scheduler='single-threaded'
         )
+    ####################################################################################
+    # Remove amplitudes that were not tested across all movement types
+    trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+    maskForAmps = pd.Series(False, index=trialInfo.index)
+    for elecName, tig in trialInfo.groupby('electrode'):
+        if elecName != 'NA':
+            minAmp = tig.groupby(['pedalDirection', 'pedalMovementCat']).min()['trialAmplitude'].max()
+            maxAmp = tig.groupby(['pedalDirection', 'pedalMovementCat']).max()['trialAmplitude'].min()
+            thisMaskForAmps = (tig['trialAmplitude'] > maxAmp) | (tig['trialAmplitude'] < minAmp)
+            maskForAmps.loc[tig.index] = maskForAmps.loc[tig.index] | thisMaskForAmps
+    if maskForAmps.any():
+        dataDF = dataDF.loc[~maskForAmps.to_numpy(), :]
+    ####################################################################################
     colFeatureInfo = dataDF.columns.copy()
     dataDF.columns = dataDF.columns.get_level_values('feature')
     rawRaucDF = ash.splitApplyCombine(
@@ -295,7 +324,12 @@ if __name__ == "__main__":
         compoundAnnLookup.append(thisCAL)
     compoundAnnLookupDF = pd.concat(compoundAnnLookup)
     rawRaucDF.index = pd.MultiIndex.from_frame(trialInfo)
-    #####
+    #
+    raucForExport = rawRaucDF.xs('main', level='controlFlag').mean(axis=1).sort_values(ascending=False).to_frame(name='average_rauc')
+    raucForExportTrialInfo = raucForExport.index.to_frame().reset_index(drop=True)
+    raucForExportTrialInfo = raucForExportTrialInfo.loc[:, ['expName', 'segment', 'originalIndex', 't', 'stimCondition', 'kinematicCondition']]
+    raucForExport.index = pd.MultiIndex.from_frame(raucForExportTrialInfo)
+    raucForExport.to_html(htmlOutputPath)
     dfRelativeTo = rawRaucDF
     referenceRaucDF = (
         dfRelativeTo
@@ -317,7 +351,6 @@ if __name__ == "__main__":
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
     infIndices = clippedRaucDF.index[np.isinf(clippedRaucDF).any(axis='columns')]
-    # pdb.set_trace()
     # print('clippedRaucDF.max().max(): {}, rawRaucDF.max().max(): {}'.format(clippedRaucDF.max().max(), rawRaucDF.max().max()))
     # clippedRaucDF.max(); rawRaucDF.max()
     # dummyScaledDF = rawRaucDF.iloc[:10, :] ** 0
@@ -354,7 +387,6 @@ if __name__ == "__main__":
     compoundAnnLookupDF.to_hdf(resultPath, 'compoundAnnLookup')
     #
     dfForStats = rawRaucDF
-    confidence_alpha = 0.99
     recCurve = dfForStats.reset_index()
     recCurve.loc[:, 'trialAmplitude'] /= recCurve['trialAmplitude'].max()
     recCurve.loc[:, 'trialRateInHz'] /= recCurve['trialRateInHz'].max()
@@ -362,28 +394,25 @@ if __name__ == "__main__":
     for name, group in recCurve.groupby(['electrode', 'kinematicCondition']):
         elecName, kinName = name
         if elecName != 'NA':
-            refMask = (recCurve['electrode'] == 'NA') & (recCurve['kinematicCondition'] == kinName)
-            if refMask.any():
-                refGroup = recCurve.loc[refMask, :]
-            else:# 
-                refMask = (recCurve['electrode'] == 'NA')
-                refGroup = recCurve.loc[refMask, :]
+            xPt = PatsyTransformer("trialAmplitude/trialRateInHz", return_type="dataframe")
+            X = xPt.fit_transform(group)
             for colName in dfForStats.columns:
                 if isinstance(colName, tuple):
                     thisEntry = tuple([elecName, kinName] + [a for a in colName])
                 else:
                     thisEntry = tuple([elecName, kinName, colName])
-                xPt = PatsyTransformer("trialAmplitude/trialRateInHz", return_type="dataframe")
-                X = xPt.fit_transform(group)
                 lm = pg.linear_regression(X, group[colName], relimp=True)
                 amplitudeStatsDict[thisEntry] = lm
-    ampStatsDF = pd.concat(amplitudeStatsDict, names=['electrode', 'kinematicCondition'] + dfForStats.columns.names)
+    ampStatsDF = pd.concat(amplitudeStatsDict, names=['electrode', 'kinematicCondition'] + dfForStats.columns.names + ['factorIndex'])
+    ampStatsDF.index = ampStatsDF.index.droplevel('factorIndex')
     ampStatsDF.set_index('names', append=True, inplace=True)
     # TODO: concatenate stats, correct multicomp, reassign
-    # pdb.set_trace()
-    reject, pval = pg.multicomp(ampStatsDF['pval'].to_numpy(), alpha=confidence_alpha)
-    ampStatsDF.loc[:, 'pval'] = pval
-    ampStatsDF.loc[:, 'reject'] = reject
+    confidence_alpha = 0.05
+    correctMultiCompHere = False
+    if correctMultiCompHere:
+        reject, pval = pg.multicomp(ampStatsDF['pval'].to_numpy(), alpha=confidence_alpha)
+        ampStatsDF.loc[:, 'pval'] = pval
+        ampStatsDF.loc[:, 'reject'] = reject
     ####
     relativeStatsDict = {}
     for name, group in recCurve.groupby(['stimCondition', 'kinematicCondition']):
@@ -402,18 +431,26 @@ if __name__ == "__main__":
                 else:
                     thisEntry = tuple([stimConditionName, kinName, colName])
                 ####
-                # highAmps = np.unique(group['trialAmplitude'])[-2:]
-                # maxAmpMask = group['trialAmplitude'].isin(highAmps)
+                highAmps = np.unique(group['trialAmplitude'])[-2:]
+                maxAmpMask = group['trialAmplitude'].isin(highAmps)
                 ####
-                maxAmpMask = (group['trialAmplitude'] == group['trialAmplitude'].max())
+                # maxAmpMask = (group['trialAmplitude'] == group['trialAmplitude'].max())
+                ####
                 tt = pg.ttest(
                     group.loc[maxAmpMask, colName], refGroup[colName],
                     confidence=confidence_alpha)
+                u1 = np.mean(group.loc[maxAmpMask, colName])
+                u2 = np.mean(refGroup[colName])
+                s2 = np.std(refGroup[colName])
+                tt.loc[:, 'glass'] = (u1 - u2) / s2
                 tt.loc[:, 'cohen-d'] = np.sign(tt['T']) * tt['cohen-d']
                 tt.loc[:, 'critical_T_max'] = tt['dof'].apply(lambda x: stats.t(x).isf((1 - confidence_alpha) / 2))
                 tt.loc[:, 'critical_T_min'] = tt['critical_T_max'] * (-1)
                 tt.rename(columns={'p-val': 'pval'}, inplace=True)
-                tt.loc[:, 'hedges'] = pg.convert_effsize(tt['cohen-d'], 'cohen', 'hedges', nx=group.loc[maxAmpMask, colName].shape[0], ny=refGroup[colName].shape[0])
+                tt.loc[:, 'hedges'] = pg.convert_effsize(
+                    tt['cohen-d'], 'cohen', 'hedges',
+                    nx=group.loc[maxAmpMask, colName].shape[0],
+                    ny=refGroup[colName].shape[0])
                 '''
                 if True:
                     fig, ax = plt.subplots()
@@ -425,10 +462,12 @@ if __name__ == "__main__":
                     plt.show()
                 '''
                 relativeStatsDict[thisEntry] = tt
-    relativeStatsDF = pd.concat(relativeStatsDict, names=['stimCondition', 'kinematicCondition'] + dfForStats.columns.names)
-    reject, pval = pg.multicomp(relativeStatsDF['pval'].to_numpy(), alpha=confidence_alpha)
-    relativeStatsDF.loc[:, 'pval'] = pval
-    relativeStatsDF.loc[:, 'reject'] = reject
+    relativeStatsDF = pd.concat(relativeStatsDict, names=['stimCondition', 'kinematicCondition'] + dfForStats.columns.names + ['testType'])
+    relativeStatsDF.index = relativeStatsDF.index.droplevel('testType')
+    if correctMultiCompHere:
+        reject, pval = pg.multicomp(relativeStatsDF['pval'].to_numpy(), alpha=confidence_alpha)
+        relativeStatsDF.loc[:, 'pval'] = pval
+        relativeStatsDF.loc[:, 'reject'] = reject
     for cN in ['electrode', 'trialRateInHz']:
         relativeStatsDF.loc[:, cN] = relativeStatsDF.index.get_level_values('stimCondition').map(compoundAnnLookupDF[cN])
         relativeStatsDF.set_index(cN, append=True, inplace=True)
@@ -445,22 +484,38 @@ if __name__ == "__main__":
         anovaRes = pg.welch_anova(data=dataNoStim, dv=featName, between='kinematicCondition')
         anovaRes.rename(columns={'p-unc': 'pval'}, inplace=True)
         tt = pg.pairwise_gameshowell(data=dataNoStim, dv=featName, between='kinematicCondition')
-        # pdb.set_trace()
         tt.loc[:, 'critical_T_max'] = tt['df'].apply(lambda x: stats.t(x).isf((1 - confidence_alpha) / 2))
         tt.loc[:, 'critical_T_min'] = tt['critical_T_max'] * (-1)
+        ###
+        tt.rename(columns={'pval': 'pval-corr'}, inplace=True)
+        groupSizes = dataNoStim.groupby('kinematicCondition', observed=True)[featName].count()
+        pUncFun = lambda x: stats.t.sf(np.abs(x['T']), groupSizes[x['A']] + groupSizes[x['B']] - 2) * 2
+        tt.loc[:, 'pval'] = tt.apply(pUncFun, axis='columns')
+        cohenDFun = lambda x: pg.compute_effsize_from_t(x['T'], nx=groupSizes[x['A']], ny=groupSizes[x['B']], eftype='cohen')
+        tt.loc[:, 'cohen-d'] = tt.apply(cohenDFun, axis='columns')
+        # pdb.set_trace()
+        def glass(x):
+            u1 = dataNoStim.loc[dataNoStim['kinematicCondition'] == x['A'], featName].mean()
+            u2 = dataNoStim.loc[dataNoStim['kinematicCondition'] == x['B'], featName].mean()
+            s2 = dataNoStim.loc[dataNoStim['kinematicCondition'] == x['B'], featName].std()
+            return (u1 - u2) / s2
+        tt.loc[:, 'glass'] = tt.apply(glass, axis='columns')
+        ###
         noStimTTestDict[colName] = tt
         noStimAnovaDict[colName] = anovaRes
     #####
     noStimAnovaDF = pd.concat(noStimAnovaDict, names=dfForStats.columns.names)
-    reject, pval = pg.multicomp(noStimAnovaDF['pval'].to_numpy(), alpha=confidence_alpha)
-    noStimAnovaDF.loc[:, 'pval'] = pval
-    noStimAnovaDF.loc[:, 'reject'] = reject
+    if correctMultiCompHere:
+        reject, pval = pg.multicomp(noStimAnovaDF['pval'].to_numpy(), alpha=confidence_alpha)
+        noStimAnovaDF.loc[:, 'pval'] = pval
+        noStimAnovaDF.loc[:, 'reject'] = reject
     noStimAnovaDF.to_hdf(resultPath, 'noStimAnova')
     ##
     noStimTTestDF = pd.concat(noStimTTestDict, names=dfForStats.columns.names)
-    reject, pval = pg.multicomp(noStimTTestDF['pval'].to_numpy(), alpha=confidence_alpha)
-    noStimTTestDF.loc[:, 'pval'] = pval
-    noStimTTestDF.loc[:, 'reject'] = reject
+    if correctMultiCompHere:
+        reject, pval = pg.multicomp(noStimTTestDF['pval'].to_numpy(), alpha=confidence_alpha)
+        noStimTTestDF.loc[:, 'pval'] = pval
+        noStimTTestDF.loc[:, 'reject'] = reject
     noStimTTestDF.to_hdf(resultPath, 'noStimTTest')
     ###
     amplitudeStatsPerFBDict = {}
@@ -485,9 +540,10 @@ if __name__ == "__main__":
                 amplitudeStatsPerFBDict[thisEntry] = lm
     ampStatsPerFBDF = pd.concat(amplitudeStatsPerFBDict, names=['electrode', 'kinematicCondition', 'freqBandName'])
     ampStatsPerFBDF.set_index('names', append=True, inplace=True)
-    reject, pval = pg.multicomp(ampStatsPerFBDF['pval'].to_numpy(), alpha=confidence_alpha)
-    ampStatsPerFBDF.loc[:, 'pval'] = pval
-    ampStatsPerFBDF.loc[:, 'reject'] = reject
+    if correctMultiCompHere:
+        reject, pval = pg.multicomp(ampStatsPerFBDF['pval'].to_numpy(), alpha=confidence_alpha)
+        ampStatsPerFBDF.loc[:, 'pval'] = pval
+        ampStatsPerFBDF.loc[:, 'reject'] = reject
     ampStatsPerFBDF.to_hdf(resultPath, 'amplitudeStatsPerFreqBand')
     ######
     relativeStatsPerFBDict = {}
@@ -509,12 +565,17 @@ if __name__ == "__main__":
                 freqGroupStack = freqGroup.stack().to_frame(name='rauc').reset_index()
                 freqRefGroupStack = freqRefGroup.stack().to_frame(name='rauc').reset_index()
                 #####
-                maxAmpMask = (freqGroupStack['trialAmplitude'] == freqGroupStack['trialAmplitude'].max())
-                # highAmps = np.unique(freqGroupStack['trialAmplitude'])[-2:]
-                # maxAmpMask = freqGroupStack['trialAmplitude'].isin(highAmps)
+                # maxAmpMask = (freqGroupStack['trialAmplitude'] == freqGroupStack['trialAmplitude'].max())
+                highAmps = np.unique(freqGroupStack['trialAmplitude'])[-2:]
+                maxAmpMask = freqGroupStack['trialAmplitude'].isin(highAmps)
+                #####
                 tt = pg.ttest(
                     freqGroupStack.loc[maxAmpMask, 'rauc'], freqRefGroupStack['rauc'],
                     confidence=confidence_alpha)
+                u1 = np.mean(freqGroupStack.loc[maxAmpMask, 'rauc'])
+                u2 = np.mean(freqRefGroupStack['rauc'])
+                s2 = np.std(freqRefGroupStack['rauc'])
+                tt.loc[:, 'glass'] = (u1 - u2) / s2
                 tt.loc[:, 'critical_T_max'] = tt['dof'].apply(lambda x: stats.t(x).isf((1 - confidence_alpha) / 2))
                 tt.loc[:, 'critical_T_min'] = tt['critical_T_max'] * (-1)
                 tt.loc[:, 'cohen-d'] = np.sign(tt['T']) * tt['cohen-d']
@@ -527,9 +588,10 @@ if __name__ == "__main__":
     relativeStatsPerFBDF = pd.concat(
         relativeStatsPerFBDict,
         names=['stimCondition', 'kinematicCondition', 'freqBandName'])
-    reject, pval = pg.multicomp(relativeStatsPerFBDF['pval'].to_numpy(), alpha=confidence_alpha)
-    relativeStatsPerFBDF.loc[:, 'pval'] = pval
-    relativeStatsPerFBDF.loc[:, 'reject'] = reject
+    if correctMultiCompHere:
+        reject, pval = pg.multicomp(relativeStatsPerFBDF['pval'].to_numpy(), alpha=confidence_alpha)
+        relativeStatsPerFBDF.loc[:, 'pval'] = pval
+        relativeStatsPerFBDF.loc[:, 'reject'] = reject
     relativeStatsPerFBDF.to_hdf(resultPath, 'relativeStatsDFPerFreqBand')
     #
     noStimAnovaPerFBDict = {}
@@ -549,15 +611,17 @@ if __name__ == "__main__":
         noStimAnovaPerFBDict[freqBandName] = anovaRes
     #####
     noStimAnovaDFPerFB = pd.concat(noStimAnovaPerFBDict, names=['freqBandName'])
-    reject, pval = pg.multicomp(noStimAnovaDFPerFB['pval'].to_numpy(), alpha=confidence_alpha)
-    noStimAnovaDFPerFB.loc[:, 'pval'] = pval
-    noStimAnovaDFPerFB.loc[:, 'reject'] = reject
+    if correctMultiCompHere:
+        reject, pval = pg.multicomp(noStimAnovaDFPerFB['pval'].to_numpy(), alpha=confidence_alpha)
+        noStimAnovaDFPerFB.loc[:, 'pval'] = pval
+        noStimAnovaDFPerFB.loc[:, 'reject'] = reject
     noStimAnovaDFPerFB.to_hdf(resultPath, 'noStimAnovaPerFB')
     ##
     noStimTTestDFPerFB = pd.concat(noStimTTestPerFBDict, names=['freqBandName'])
-    reject, pval = pg.multicomp(noStimTTestDFPerFB['pval'].to_numpy(), alpha=confidence_alpha)
-    noStimTTestDFPerFB.loc[:, 'pval'] = pval
-    noStimTTestDFPerFB.loc[:, 'reject'] = reject
+    if correctMultiCompHere:
+        reject, pval = pg.multicomp(noStimTTestDFPerFB['pval'].to_numpy(), alpha=confidence_alpha)
+        noStimTTestDFPerFB.loc[:, 'pval'] = pval
+        noStimTTestDFPerFB.loc[:, 'reject'] = reject
     noStimTTestDFPerFB.to_hdf(resultPath, 'noStimTTestPerFB')
     #######
     defaultSamplerKWArgs = dict(random_state=42, test_size=0.5)
@@ -599,7 +663,8 @@ if __name__ == "__main__":
             plotDF.columns = ['dataType', 'trial', 'feature', 'rauc']
             g = sns.displot(
                 data=plotDF, col='dataType',
-                x='rauc', hue='feature', kind='hist', element='step'
+                x='rauc', hue='feature', kind='hist', element='step',
+                legend=False
                 )
             pdf.savefig(
                 bbox_inches='tight',

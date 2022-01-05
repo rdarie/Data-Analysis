@@ -60,6 +60,7 @@ pip install git+git://github.com/G-Node/nixpy@v1.5.0b3 --target="/users/rdarie/a
 pip install git+git://github.com/hector-sab/ttictoc@v0.4.1 --target="/users/rdarie/anaconda/nda3/lib/python3.7/site-packages" --no-deps
 pip install git+git://github.com/raphaelvallat/pingouin@v0.3.11 --target="/users/rdarie/anaconda/nda3/lib/python3.7/site-packages" --no-deps
 pip install git+git://github.com/melizalab/libtfr --target="/users/rdarie/anaconda/nda3/lib/python3.7/site-packages" --no-deps
+pip install git+git://github.com/jiffyclub/palettable@v3.3.0 --target="/users/rdarie/anaconda/nda3/lib/python3.7/site-packages" --no-deps
 #
 for i in ${RepoList[*]}; do
     echo $GitRepoRoot$i".git"

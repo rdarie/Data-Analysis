@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s11_compare_covariances_201901_25
+#SBATCH -J s11_compare_covariances_202102_02
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/covariance/s11_compare_covariances_201901_25.out
-#SBATCH -e ../../batch_logs/covariance/s11_compare_covariances_201901_25.out
+#SBATCH -o ../../batch_logs/covariance/s11_compare_covariances_202102_02.out
+#SBATCH -e ../../batch_logs/covariance/s11_compare_covariances_202102_02.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -26,9 +26,9 @@
 # Request custom resources
 #SBATCH --array=999
 
-# exps=(201901_25 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
+# exps=(201901_25 201902_03 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 
-exps=(201901_25)
+exps=(202102_02)
 for A in "${exps[@]}"
 do
   echo "step 10 compare covariances, on $A"
@@ -36,7 +36,7 @@ do
   source ./shellScripts/calc_aligned_motion_preamble.sh
   #
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  
+  #
   ITERATOR="--iteratorSuffix=ca"
   CONTROLSTATUS="--controlSet"
   python -u './calcTestTrainSplit.py' $BLOCKSELECTOR $ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $LAZINESS $TIMEWINDOWOPTS

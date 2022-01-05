@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pdb
 import math
+import vg
 from copy import copy, deepcopy
 import seaborn as sns
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
@@ -1161,7 +1162,7 @@ def genBlockShader(patchOpts, dropNaNCol='segment'):
             g.axes[ro, co].axhspan(
                 dataSubset[g._y_var].min(), dataSubset[g._y_var].max(),
                 **patchOpts
-            )
+                )
             print('g.addShading = {}'.format(g.axes[ro, co].addShading))
             # Create list for all the patches
             # y = (dataSubset[g._y_var].max() + dataSubset[g._y_var].min()) / 2
@@ -1312,6 +1313,46 @@ def plotSignificance(
         pdf.savefig(bbox_inches='tight', pad_inches=0.1)
         plt.close()
     return
+
+
+def annotateLine(
+        pointsToPlot, ax,
+        x_var=None, y_var=None,
+        offsets=None, plotKWArgs=None,
+        textLocation=None, text=None, textKWArgs={}):
+    left, right = pointsToPlot[x_var].idxmin(), pointsToPlot[x_var].idxmax()
+    bottom, top = pointsToPlot[y_var].idxmin(), pointsToPlot[y_var].idxmax()
+    p1 = pointsToPlot.loc[left, :].to_numpy()
+    p1 = np.append(p1, [0])
+    p2 = pointsToPlot.loc[right, :].to_numpy()
+    p2 = np.append(p2, [0])
+    deltaPDir = vg.normalize(p2 - p1)
+    if offsets is not None:
+        p1 = p1 + offsets[left] * deltaPDir
+        p2 = p2 - offsets[right] * deltaPDir
+    pointsToPlot.loc[left, :] = p1[:2]
+    pointsToPlot.loc[right, :] = p2[:2]
+    ax.plot(
+        pointsToPlot[x_var], pointsToPlot[y_var], **plotKWArgs,
+        )
+    if text is not None:
+        if textLocation == 'average':
+            xpos, ypos = pointsToPlot[x_var].mean(), pointsToPlot[y_var].mean()
+        else:
+            xpos, ypos = textLocation
+        ax.text(xpos, ypos, text, **textKWArgs)
+    return
+
+
+def distanceBetweenSites(
+        inputSrs=None, mapDF=None,
+        spacing=1., xSpacing=1., ySpacing=1.):
+    # fromFeat = 'utah1'
+    # toFeat = 'utah10'
+    dX = xSpacing * (mapDF.loc[inputSrs['fromFeat'], 'xCoords'] - mapDF.loc[inputSrs['toFeat'], 'xCoords'])
+    dY = ySpacing * (mapDF.loc[inputSrs['fromFeat'], 'yCoords'] - mapDF.loc[inputSrs['toFeat'], 'yCoords'])
+    distance = np.sqrt(dX**2 + dY**2)
+    return distance
 
 
 def twin_relplot(
