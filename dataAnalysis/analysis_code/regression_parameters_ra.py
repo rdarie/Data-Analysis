@@ -30,7 +30,8 @@ regressionColumnsToUse = [
     'amplitude_raster', 'electrode',
     ]
 regressionColumnRenamer = {
-    'velocity_abs': 'v', 'amplitude_raster': 'a', 'electrode': 'e',
+    'velocity_abs': 'v', 'amplitude_raster': 'a',
+    'electrode': 'e',
     'velocity_x': 'vx', 'velocity_y': 'vy',
     'velocity_x_abs': 'vxa', 'velocity_y_abs': 'vya',
     }

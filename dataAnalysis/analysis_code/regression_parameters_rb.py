@@ -3,8 +3,8 @@ import dataAnalysis.custom_transformers.tdr as tdr
 import pdb
 
 processSlurmTaskCountPLS = 3
-processSlurmTaskCount = 24
-processSlurmTaskCountTransferFunctions = 18
+processSlurmTaskCount = 48
+processSlurmTaskCountTransferFunctions = 48
 joblibBackendArgs = dict(
     backend='loky',
     n_jobs=-1
@@ -12,9 +12,9 @@ joblibBackendArgs = dict(
 addHistoryTerms = [
     # hto0
     {
-        'nb': 10, 'logBasis': True,
+        'nb': 5, 'logBasis': True,
         'dt': None,
-        'historyLen': 150e-3,
+        'historyLen': 250e-3,
         'b': 2e-2, 'useOrtho': True,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
@@ -26,13 +26,16 @@ addHistoryTerms = [
 regressionColumnsToUse = [
     # 'velocity_abs',
     'velocity_x', 'velocity_y',
-    'velocity_x_abs', 'velocity_y_abs',
-    'amplitude_raster', 'electrode',
+    # 'velocity_x_abs', 'velocity_y_abs',
+    'position_x', 'position_y',
+    'amplitude', 'electrode', 'RateInHz',
     ]
 regressionColumnRenamer = {
-    'velocity_abs': 'v', 'amplitude_raster': 'a', 'electrode': 'e',
+    'velocity_abs': 'v', 'amplitude': 'a',
+    'electrode': 'e', 'RateInHz': 'r',
     'velocity_x': 'vx', 'velocity_y': 'vy',
-    'velocity_x_abs': 'vxa', 'velocity_y_abs': 'vya',
+    'position_x': 'px', 'position_y': 'py',
+    # 'velocity_x_abs': 'vxa', 'velocity_y_abs': 'vya',
     }
 
 def iWrap(x):
@@ -66,7 +69,7 @@ def absWrap(x):
     return('abv({})'.format(x))
 
 designFormulaTemplates = [
-    '{vx} + {vy} + {vxa} + {vya} + {a} - 1',
+    '{vx} + {vy} + {px} + {py} + {a} + {r} - 1',
     ]
 
 lOfDesignFormulas = []
@@ -91,11 +94,17 @@ for lagSpecIdx in range(len(addHistoryTerms)):
     wrapperFun = genRcbWrap(lagSpec)
     elecWrapperFun = genElecRcbWrap(lagSpec)
     laggedModels = {}
-    for source in ['vx', 'vy', 'vxa', 'vya']:
+    for source in ['vx', 'vy', 'px', 'py', 'vxa', 'vya']:
         laggedModels[source] = wrapperFun(source)
         sourceTermDict[wrapperFun(source)] = source
         sourceHistOptsDict[wrapperFun(source).replace(' ', '')] = addHistoryTerms[lagSpecIdx]
-    for source in ['a', 'vx*a', 'vy*a', 'vxa*a', 'vya*a']:
+    for source in [
+        'a', 'vx*a', 'vy*a', 'vxa*a', 'vya*a',
+        'r', 'vx*r', 'vy*r', 'vxa*r', 'vya*r',
+        'a', 'px*a', 'py*a', 'pxa*a', 'pya*a',
+        'r', 'px*r', 'py*r', 'pxa*r', 'pya*r',
+        'a*r', 'vx*a*r', 'vy*a*r', 'vxa*a*r', 'vya*a*r',
+        'a*r', 'pvx*a*r', 'py*a*r', 'pxa*a*r', 'pya*a*r',]:
         laggedModels[source] = elecWrapperFun(source)
         sourceTermDict[elecWrapperFun(source)] = source
         sourceHistOptsDict[elecWrapperFun(source).replace(' ', '')] = addHistoryTerms[lagSpecIdx]

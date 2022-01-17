@@ -302,7 +302,6 @@ def parseAnalysisOptions(
     nspCmpPath = os.path.join('.', 'murdoc_map.cmp')
     cmpDF = prb_meta.cmpToDF(nspCmpPath)
     experimentDateStr = re.search(r'(\d*)', experimentName).groups()[0]
-    # pdb.set_trace()
     try:
         impedances = prb_meta.getLatestImpedance(
             impedanceFilePath=os.path.join(remoteBasePath, 'impedances.h5'),
@@ -528,6 +527,9 @@ def parseAnalysisOptions(
     #
     covarianceSamplerKWArgs = dict(random_state=42, test_size=0.2)
     covariancePrelimSamplerKWArgs = dict(random_state=42, test_size=0.)
+    #
+    equalSamplerKWArgs = dict(random_state=42, test_size=0.5)
+    equalPrelimSamplerKWArgs = dict(random_state=42, test_size=0.15)
     # args for tdr.
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
@@ -549,6 +551,16 @@ def parseAnalysisOptions(
         continuousFactors=['segment', 'originalIndex', 't'],
         samplerClass=None,
         samplerKWArgs=covariancePrelimSamplerKWArgs)
+    equalSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=equalSamplerKWArgs)
+    equalPrelimSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=equalPrelimSamplerKWArgs)
     #
     iteratorOpts = {
         # rest period from before movement onset
@@ -696,24 +708,26 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 2e-3,
-            'procFun': {
-                'laplace_scaled': 'ash.genDetrender(useMean=True)',
-                'laplace_spectral_scaled': 'ash.genDetrender(useMean=True)',
-                },
+            'forceBinInterval': 25e-3,
+            'forceRollingWindow': 300,
+            # 'procFun': {
+            #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
+            #     'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
+            #     },
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
+            'maskEachFreqBand': False,
             'cvKWArgs': dict(
-                n_splits=10,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                n_splits=5,
+                splitterClass=None, splitterKWArgs=equalSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=equalPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': 'stoppingOrStimOff',
                 'winStart': -0.35,  # start 0.2 ( + .15 burn in period) before whatever the query was
-                'winStop': .2  # stop .2 sec after stoppingOrStimOff
+                'winStop': 0.2  # stop .1 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
                 'alignQuery': None,

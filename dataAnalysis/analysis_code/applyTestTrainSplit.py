@@ -6,7 +6,7 @@ Options:
     --exp=exp                              which experimental day to analyze
     --blockIdx=blockIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
-    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --analysisName=analysisName            append a name to the resulting blocks? [default: hiRes]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --window=window                        process with short window? [default: long]
     --lazy                                 load from raw, or regular? [default: False]
@@ -150,8 +150,8 @@ for segIdx in range(nSeg):
         prf.print_memory_usage('Loading {}'.format(triggeredPath))
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
-    print(dataDF.index.names)
-    print(dataDF.columns)
+    print('dataDF.index.names = {}'.format(dataDF.index.names))
+    print('dataDF.columns = {}'.format(dataDF.columns.to_frame().reset_index(drop=True)))
     #
     colRenamer = {fN: fN.replace('#0', '') for fN in dataDF.columns.get_level_values('feature')}
     dataDF.rename(columns=colRenamer, level='feature', inplace=True)
@@ -180,7 +180,6 @@ for segIdx in range(nSeg):
             print('(contradictory this data)\n{}'.format(trialInfo.drop_duplicates('t').loc[:, nonMatchingAnns]))
             print('(contradictory loaded from iterator)\n{}'.format(loadedTrialInfo.drop_duplicates('t').loc[:, nonMatchingAnns]))
             pdb.set_trace()
-    # pdb.set_trace()
     listOfDataFrames.append(dataDF)
 if arguments['verbose']:
     prf.print_memory_usage('Done loading')
@@ -240,7 +239,11 @@ allMask = pd.Series(True, index=exportDF.columns).to_frame()
 allMask.columns = allGroupIdx
 maskList.append(allMask.T)
 nFreqBands = exportDF.columns.get_level_values('freqBandName').unique().size
-if nFreqBands > 1:
+makeMaskPerFreqBand = False
+if 'maskEachFreqBand' in iteratorOpts:
+    if (iteratorOpts['maskEachFreqBand']) and (nFreqBands > 1):
+        makeMaskPerFreqBand = True
+if makeMaskPerFreqBand:
     # each freq band
     for name, group in exportDF.groupby('freqBandName', axis='columns'):
         attrValues = ['all' for fgn in featureGroupNames]

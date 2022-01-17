@@ -63,7 +63,9 @@ addHistoryTerms = [
         'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
     ]
 
-regressionColumnsToUse = ['velocity_abs', 'amplitude', 'RateInHz', 'electrode']
+regressionColumnsToUse = [
+    'velocity_abs', 'amplitude',
+    'RateInHz', 'electrode']
 regressionColumnRenamer = {
     'velocity_abs': 'v', 'amplitude': 'a', 'RateInHz': 'r', 'electrode': 'e'
     }

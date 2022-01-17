@@ -79,10 +79,6 @@ pickle.settings['recurse'] = True
 import gc, sys
 from copy import deepcopy
 import colorsys
-sns.set(
-    context='talk', style='darkgrid',
-    palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True)
 for arg in sys.argv:
     print(arg)
 idxSl = pd.IndexSlice

@@ -13,7 +13,7 @@ Options:
     --plotting                                 load from raw, or regular? [default: False]
     --showFigures                              load from raw, or regular? [default: False]
     --debugging                                load from raw, or regular? [default: False]
-    --maxNumFeatures=maxNumFeatures            load from raw, or regular? [default: 100]
+    --maxNumFeatures=maxNumFeatures            load from raw, or regular? [default: 200]
     --verbose=verbose                          print diagnostics? [default: 0]
     --datasetNameRhs=datasetNameRhs            which trig_ block to pull [default: Block]
     --selectionNameRhs=selectionNameRhs        how to restrict channels? [default: fr_sqrt]
@@ -227,6 +227,8 @@ if __name__ == '__main__':
         'velocity': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
+        'position_x': MinMaxScaler(feature_range=(0., 1.)),
+        'position_y': MinMaxScaler(feature_range=(0., 1.)),
         'velocity_x_abs': MinMaxScaler(feature_range=(0., 1.)),
         'velocity_y_abs': MinMaxScaler(feature_range=(0., 1.)),
         'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
@@ -354,12 +356,14 @@ if __name__ == '__main__':
     htmlPath = os.path.join(figureOutputFolder, '{}.html'.format(designMatrixDatasetName))
     allTargetsDF.to_html(htmlPath)
     ###
-    allTargetsPLS = allTargetsDF.reset_index().drop(['target', 'targetIdx'], axis='columns').drop_duplicates(subset=['lhsMaskIdx', 'rhsMaskIdx']).reset_index(drop=True)
-    allTargetsPLS.loc[:, 'targetIdx'] = range(allTargetsPLS.shape[0])
-    print('Saving list of all pls targets to {}'.format(designMatrixPath))
-    allTargetsPLS.to_hdf(designMatrixPath, 'allTargetsPLS')
-    htmlPathPLS = os.path.join(figureOutputFolder, '{}_pls.html'.format(designMatrixDatasetName))
-    allTargetsPLS.to_html(htmlPathPLS)
+    savePLS = False
+    if savePLS:
+        allTargetsPLS = allTargetsDF.reset_index().drop(['target', 'targetIdx'], axis='columns').drop_duplicates(subset=['lhsMaskIdx', 'rhsMaskIdx']).reset_index(drop=True)
+        allTargetsPLS.loc[:, 'targetIdx'] = range(allTargetsPLS.shape[0])
+        print('Saving list of all pls targets to {}'.format(designMatrixPath))
+        allTargetsPLS.to_hdf(designMatrixPath, 'allTargetsPLS')
+        htmlPathPLS = os.path.join(figureOutputFolder, '{}_pls.html'.format(designMatrixDatasetName))
+        allTargetsPLS.to_html(htmlPathPLS)
     # prep lhs dataframes
     sourceFactorDict = {}
     for parentFormulaIdx, parentFormula in enumerate(masterExogFormulas):

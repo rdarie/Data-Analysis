@@ -1919,7 +1919,7 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             weightMap = infoByTrial.loc[:, [self.frequency_weights_index, 'freqWeight']].set_index(self.frequency_weights_index)['freqWeight']
             frequency_weights = X.index.get_level_values(self.frequency_weights_index).map(weightMap).to_list()
             model_opts['freq_weights'] = frequency_weights
-        #####
+            # print('Setting frequency weights to : {}'.format(model_opts['freq_weights']))
         if self.fit_intercept:
             XX = sm.add_constant(X)
         else:

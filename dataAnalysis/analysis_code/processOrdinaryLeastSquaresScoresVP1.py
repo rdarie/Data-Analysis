@@ -375,6 +375,13 @@ if __name__ == '__main__':
                 ))
         except:
             traceback.print_exc()
+        try:
+            thisNIters = pd.read_hdf(
+                thisEstimatorPath, 'cv_estimators/lhsMask_{}/rhsMask_{}/{}/cv_estimators_n_iter'.format(
+                    lhsMaskIdx, rhsMaskIdx, targetName
+                ))
+        except:
+            pass
     ##
     savingResults = False
     prf.print_memory_usage('concatenating estimators from .h5 array')

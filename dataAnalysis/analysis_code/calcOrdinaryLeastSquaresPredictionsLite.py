@@ -186,11 +186,11 @@ if __name__ == '__main__':
     savingResults = True
     ################
     # savingResults = False
-    # slurmTaskID = 9
-    # slurmTaskCount = processSlurmTaskCount
-    # slurmTaskMin = 0
-    # slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
-    # estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
+    # # slurmTaskID = 9
+    # # slurmTaskCount = processSlurmTaskCount
+    # # slurmTaskMin = 0
+    # # slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
+    # # estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
     ################ collect estimators and scores
     estimatorsDict = {}
     scoresDict = {}
@@ -503,6 +503,7 @@ if __name__ == '__main__':
         regressor = estimator.regressor_.steps[-1][1]
         K = regressor.results_.df_model
         thesePred = predDF.xs(targetName, level='target').xs(lhsMaskIdx, level='lhsMaskIdx').xs(fold, level='fold')
+        # pdb.set_trace()
         llDict2 = {}
         aicDict2 = {}
         if hasattr(regressor, 'results_'):

@@ -7,7 +7,7 @@ Options:
     --maskOutlierBlocks                                  delete outlier trials? [default: False]
     --blockIdx=blockIdx                                  which trial to analyze [default: 1]
     --processAll                                         process entire experimental day? [default: False]
-    --analysisName=analysisName                          append a name to the resulting blocks? [default: default]
+    --analysisName=analysisName                          append a name to the resulting blocks? [default: hiRes]
     --alignFolderName=alignFolderName                    append a name to the resulting blocks? [default: motion]
     --window=window                                      process with short window? [default: long]
     --winStart=winStart                                  start of absolute window (when loading)
@@ -183,6 +183,7 @@ if arguments['verbose']:
     prf.print_memory_usage('before load data')
 
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
+print('binOpts[binInterval] = {}'.format(binOpts['binInterval']))
 if theseIteratorOpts['nCovariateBasisTerms'] > 1:
     lags = np.linspace(
         -1 * theseIteratorOpts['covariateHistoryLen'],
@@ -191,10 +192,12 @@ if theseIteratorOpts['nCovariateBasisTerms'] > 1:
     alignedAsigsKWargs['addLags'] = {'all': lags.astype(int).tolist()}
 if theseIteratorOpts['forceBinInterval'] is not None:
     alignedAsigsKWargs['decimate'] = int(theseIteratorOpts['forceBinInterval'] / binOpts['binInterval'])
+    print('Set alignedAsigsKWargs[decimate] to {}'.format(alignedAsigsKWargs['decimate']))
     if 'forceRollingWindow' in theseIteratorOpts:
         alignedAsigsKWargs['rollingWindow'] = theseIteratorOpts['forceRollingWindow']
     else:
         alignedAsigsKWargs['rollingWindow'] = alignedAsigsKWargs['decimate']
+    print('Set alignedAsigsKWargs[rollingWindow] to {}'.format(alignedAsigsKWargs['rollingWindow']))
     binInterval = theseIteratorOpts['forceBinInterval']
 else:
     binInterval = binOpts['binInterval']

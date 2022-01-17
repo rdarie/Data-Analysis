@@ -110,7 +110,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_illustration': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '400', 'limitPages': None,
+        'winStart': '-200', 'winStop': '1000', 'limitPages': None,
         # 'unitQuery': None,
         'unitQuery': "chanName.isin(['utah_csd_14#0', 'utah_csd_30#0', 'utah_csd_33#0', 'utah_csd_3#0', 'utah_csd_2#0', 'utah_csd_79#0', 'utah_csd_60#0', 'utah_csd_80#0', 'utah_csd_16#0', 'utah_csd_17#0'])",
         # 'alignQuery': None,
@@ -188,7 +188,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_spectral_illustration': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '400', 'limitPages': None,
+        'winStart': '-200', 'winStop': '1000', 'limitPages': None,
         'unitQuery': "chanName.isin(['utah_csd_2_alpha#0', 'utah_csd_60_alpha#0', 'utah_csd_14_alpha#0', 'utah_csd_63_alpha#0', 'utah_csd_2_beta#0', 'utah_csd_11_beta#0', 'utah_csd_56_beta#0', 'utah_csd_19_beta#0', 'utah_csd_30_gamma#0', 'utah_csd_60_gamma#0', 'utah_csd_53_gamma#0', 'utah_csd_17_gamma#0', 'utah_csd_40_higamma#0', 'utah_csd_60_higamma#0', 'utah_csd_27_higamma#0', 'utah_csd_14_higamma#0', 'utah_csd_70_spb#0', 'utah_csd_80_spb#0', 'utah_csd_28_spb#0', 'utah_csd_14_spb#0'])",
         # 'unitQuery': None,
         # 'alignQuery': None,

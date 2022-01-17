@@ -3,8 +3,8 @@ Usage:
     temp.py [options]
 
 Options:
-    --exp=exp                              which experimental day to analyze
-    --blockIdx=blockIdx                    which trial to analyze [default: 1]
+    --exp=exp                                  which experimental day to analyze
+    --blockIdx=blockIdx                        which trial to analyze [default: 1]
     --processAll                               process entire experimental day? [default: False]
     --analysisName=analysisName                append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName          append a name to the resulting blocks? [default: motion]
@@ -207,8 +207,8 @@ if __name__ == '__main__':
         'sm_class': sm.GLM,
         'family': sm.families.Gaussian(),
         'alpha': 1e-12, 'L1_wt': .1,
-        'refit': True, 'tol': 5e-5,
-        'maxiter': 100, 'disp': False,
+        'refit': True, 'tol': 1e-4,
+        'maxiter': 50, 'disp': False,
         'calc_frequency_weights': True
         }
     regressorClass = tdr.SMWrapper
@@ -221,7 +221,7 @@ if __name__ == '__main__':
         param_grid={
             'regressor__regressor__calc_frequency_weights': [True],
             l1_ratio_name: [.1, 0.9],
-            alpha_name: [0.] + np.logspace(-5, 0, 4).tolist()}
+            alpha_name: [0.] + np.logspace(-4, -1, nAlphas - 1).tolist()}
         )
     #
     '''regressorClass = ElasticNet
@@ -527,10 +527,10 @@ if __name__ == '__main__':
                     nIters = cvScoresDF['estimator'].apply(lambda es: es.regressor_.named_steps['regressor'].n_iter_)
                     print('n iterations per estimator:\n{}'.format(nIters))
                     nIters.to_hdf(
-                    estimatorPath,
-                    'cv_estimators/lhsMask_{}/rhsMask_{}/{}/cv_estimators_n_iter'.format(
-                        lhsMaskIdx, rhsMaskIdx, targetName
-                        ))
+                        estimatorPath,
+                        'cv_estimators/lhsMask_{}/rhsMask_{}/{}/cv_estimators_n_iter'.format(
+                            lhsMaskIdx, rhsMaskIdx, targetName
+                            ))
                 #
                 gsScoresStack = pd.concat({
                     'test': gsScoresDF['test_score'],

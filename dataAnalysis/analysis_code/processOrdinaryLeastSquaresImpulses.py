@@ -29,7 +29,22 @@ else:
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-from datetime import datetime
+from datetime import datetime as dt
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+# if debugging in a console:
+'''
+
+consoleDebugging = True
+if consoleDebugging:
+    arguments = {
+        'showFigures': False, 'analysisName': 'hiRes', 'exp': 'exp202101271100', 'datasetName': 'Block_XL_df_rb',
+        'debugging': False, 'blockIdx': '2', 'alignFolderName': 'motion', 'estimatorName': 'pls_select_scaled',
+        'plotting': True, 'verbose': '1', 'processAll': True}
+    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+'''
+exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
+
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -45,20 +60,6 @@ from scipy.stats import zscore, mode
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
-from docopt import docopt
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-# if debugging in a console:
-'''
-
-consoleDebugging = True
-if consoleDebugging:
-    arguments = {
-        'showFigures': False, 'analysisName': 'hiRes', 'exp': 'exp202101271100', 'datasetName': 'Block_XL_df_rb',
-        'debugging': False, 'blockIdx': '2', 'alignFolderName': 'motion', 'estimatorName': 'enr2_select_scaled',
-        'plotting': True, 'verbose': '1', 'processAll': True}
-    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-'''
-exec('from dataAnalysis.analysis_code.regression_parameters_{} import *'.format(arguments['datasetName'].split('_')[-1]))
 
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import LinearRegression
@@ -70,8 +71,8 @@ import dill as pickle
 pickle.settings['recurse'] = True
 import gc
 from itertools import product
-
 import colorsys
+import sys
 idxSl = pd.IndexSlice
 useDPI = 200
 dpiFactor = 72 / useDPI
@@ -121,7 +122,7 @@ sns.set(
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 #
-print('\n' + '#' * 50 + '\n{}\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
+print('\n' + '#' * 50 + '\n{}\n{}\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')
 
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -420,8 +421,10 @@ if pickingColors:
     for tIdx, tN in enumerate(primaryPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
 rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 1, 1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
-    columns=['r', 'g', 'b'], index=['vx', 'vxa', 'vy', 'vya', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
+    primaryPalette.iloc[[1, 1, 1, 1, 1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
+    columns=['r', 'g', 'b'],
+    index=[
+        'vx', 'vxa', 'vy', 'vya', 'px', 'py', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
 hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
 # hls.loc['v*r', :] = hls.loc[['v', 'r'], :].mean()

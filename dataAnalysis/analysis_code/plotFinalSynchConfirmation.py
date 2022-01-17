@@ -264,10 +264,15 @@ if __name__ == '__main__':
     rigChans = [
         cN
         for cN in [
-            'amplitude_raster', 'amplitude', 'position', 'utah_rawAverage_0', 'utah_artifact_0',
-            'utah_csd_10', 'utah_csd_2', 'utah_csd_12', 'utah_csd_29', 'utah_csd_91', 'utah_csd_76',
-            'utah_csd_11', 'utah_csd_18', 'utah_csd_81', 'utah_csd_88']
+            'amplitude_raster', 'amplitude', 'RateInHz',
+            'position', 'utah_rawAverage_0', 'utah_artifact_0',
+            ]
         if cN in featureInfo['feature'].to_list()]
+    for chanNum in [30, 96]:
+        for freqSuffix in ['', '_beta', '_gamma', '_higamma']:
+            cN = 'utah_csd_{}{}'.format(chanNum, freqSuffix)
+            if cN in featureInfo['feature'].to_list():
+                rigChans.append(cN)
     insChans = [
         cN
         for cN in featureInfo['feature'].to_list()
@@ -276,7 +281,7 @@ if __name__ == '__main__':
     with PdfPages(pdfPath) as pdf:
         for pr in tqdm(plotRounds.unique()):
             plotMask = (plotRounds == pr).to_numpy()
-            fig, ax = plt.subplots(1, 1, figsize=(50, 3))
+            fig, ax = plt.subplots(1, 1, figsize=(50, 4))
             extraArtists = []
             for cIdx, cN in enumerate(rigChans):
                 plotTrace = dataDF.xs(cN, level='feature', axis='columns').iloc[plotMask, :].to_numpy()

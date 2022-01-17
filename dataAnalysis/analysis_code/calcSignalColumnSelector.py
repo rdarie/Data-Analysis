@@ -172,8 +172,8 @@ if __name__ == '__main__':
     selectMethod = 'mostModulated'
     if selectMethod == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
-        keepX = np.unique(featureInfo['xCoords'])[::2]
-        keepY = np.unique(featureInfo['yCoords'])[::2]
+        keepX = np.unique(featureInfo['xCoords'])[::3]
+        keepY = np.unique(featureInfo['yCoords'])[::3]
         xyMask = (
             featureInfo['xCoords'].isin(keepX) &
             featureInfo['yCoords'].isin(keepY)
@@ -191,10 +191,13 @@ if __name__ == '__main__':
         relativeStatsDF.loc[:, 'T_abs'] = relativeStatsDF['T'].abs()
         statsRankingDF = relativeStatsDF.groupby(dataDF.columns.names).mean().sort_values('T', ascending=False, kind='mergesort')
         # add to list based on dataDF to maintain ordering
-        print('Choosing top {} features from\n{}'.format(16, statsRankingDF.head(16)))
-        listOfColumns = [cN for cN in dataDF.columns.to_list() if cN in statsRankingDF.index[:16]]
+        print('Choosing top 32 features from statsRankingDF')
+        listOfColumns = [cN for cN in dataDF.columns.to_list() if cN in statsRankingDF.index[:32]]
+    #
+    excludeFreqBands = ['alpha', 'spb']
+    listOfColumns = [cN for cN in listOfColumns if cN[4] not in excludeFreqBands]
     selectedColumnsStr = '\n'.join(['{}'.format(cN) for cN in listOfColumns])
-    print('Selecting columns:\n{}\n'.format(selectedColumnsStr))
+    print('Selecting {} columns:\n{}\n'.format(len(listOfColumns), selectedColumnsStr))
     print(', '.join(["'{}#0'".format(cN[0]) for cN in listOfColumns]))
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     workIdx = cvIterator.work
