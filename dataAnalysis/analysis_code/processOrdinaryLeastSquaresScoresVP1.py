@@ -92,8 +92,8 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': 1,
-        'lines.markersize': 2.4,
+        'lines.linewidth': .2,
+        'lines.markersize': .5,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -280,7 +280,7 @@ if __name__ == '__main__':
                         aicList.append(thisAic)
 
                     #
-                    thisR2Per = pd.read_hdf(store, 'processedR2')
+                    thisR2Per = pd.read_hdf(store, 'processedR')
                     if R2PerIndexNames is None:
                         R2PerIndexNames = thisR2Per.index.names
                     thisR2Per.reset_index(inplace=True)
@@ -341,6 +341,7 @@ if __name__ == '__main__':
     ##
     estimatorsDict = {}
     gsScoresDict = {}
+    nItersDict = {}
     for rowIdx, row in allTargetsDF.iterrows():
         lhsMaskIdx, rhsMaskIdx, targetName = row.name
         if processSlurmTaskCount is not None:
@@ -380,6 +381,7 @@ if __name__ == '__main__':
                 thisEstimatorPath, 'cv_estimators/lhsMask_{}/rhsMask_{}/{}/cv_estimators_n_iter'.format(
                     lhsMaskIdx, rhsMaskIdx, targetName
                 ))
+            nItersDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = thisNIters
         except:
             pass
     ##
@@ -392,6 +394,10 @@ if __name__ == '__main__':
     gsScoresDF.drop(columns=['lhsMaskIdx', 'rhsMaskIdx'], inplace=True)
     del gsScoresDict
     prf.print_memory_usage('done concatenating gs scores from h5 file')
+    if len(nItersDict):
+        nItersDF = pd.concat(nItersDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
+    else:
+        nItersDF = None
     #
     with pd.HDFStore(estimatorPath) as store:
         #
@@ -500,203 +506,208 @@ if __name__ == '__main__':
                     fontsize=snsRCParams['font.size'], transform=g.axes[ro, co].transAxes)
             return
     #
-    pdfPath = os.path.join(
-        figureOutputFolder,
-        '{}_{}.pdf'.format(fullEstimatorName, 'partial_scores'))
-    with PdfPages(pdfPath) as pdf:
-        height, width = 3, 3
-        aspect = width / height
-        # maskSecondOrderTests = modelsToTestDF['testType'] == 'secondOrderInteractions'
-        for testTypeName, modelsToTestGroup in modelsToTestDF.groupby('testType'):
-            if 'captionStr' in modelsToTestGroup:
-                titleText = modelsToTestGroup['captionStr'].iloc[0]
-            else:
-                titleText = 'partial R2 scores for {} compared to {}'.format(
-                    modelsToTestGroup['testDesign'].iloc[0], modelsToTestGroup['refDesign'].iloc[0])
-            if 'refCaption' in modelsToTestGroup:
-                refCaption = modelsToTestGroup['refCaption'].iloc[0]
-            else:
-                refCaption = lhsMasksInfo.loc[modelsToTestGroup['refDesign'].iloc[0], 'fullFormulaDescr']
-            if 'testCaption' in modelsToTestGroup:
-                testCaption = modelsToTestGroup['testCaption'].iloc[0]
-            else:
-                testCaption = lhsMasksInfo.loc[modelsToTestGroup['testDesign'].iloc[0], 'fullFormulaDescr']
-            #
-            plotFUDE = modelCompareFUDE.xs(testTypeName, level='testType').xs('all', level='electrode').reset_index()
-            plotFUDE = plotFUDE.loc[plotFUDE['trialType'].isin(['test']), :]
-            plotFUDEStats = modelCompareFUDEStats.xs(testTypeName, level='testType').xs('all', level='electrode').reset_index()
-            plotScores = modelCompareScores.loc[modelCompareScores['electrode'] == 'all'].xs(testTypeName, level='testType').reset_index()
-            plotScores = plotScores.loc[plotScores['trialType'].isin(['test']), :]
-            #
-            lookupBasedOn = ['testLhsMaskIdx', 'refLhsMaskIdx', 'target']
-            lookupAt = pd.MultiIndex.from_frame(plotScores.loc[:, lookupBasedOn])
-            lookupFrom = plotFUDEStats.loc[:, lookupBasedOn + ['p-val']].set_index(lookupBasedOn)['p-val']
-            plotPVals = lookupFrom.loc[lookupAt]
-            plotScores.loc[:, 'significant'] = (plotPVals < 0.01).to_numpy()
-            ###
-            thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
-            g = sns.catplot(
-                data=plotFUDE, kind='box',
-                y='score', x='target', hue='trialType',
-                hue_order=thisPalette.index.to_list(),
-                palette=thisPalette.to_dict(),
-                height=height, aspect=aspect,
-                sharey=True
-                )
-            g.set_xticklabels(rotation=30, ha='right')
-            g.set_titles(template="data subset: {col_name}")
-            g.suptitle(titleText)
-            g.set_axis_labels('target signal', '{} R2 w.r.t. {}'.format(testCaption, refCaption))
-            print('Saving {}\n to {}'.format(titleText, pdfPath))
-            # g.axes.flat[0].set_ylim(allScoreQuantiles)
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(
-                bbox_inches='tight',
-                )
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            tc = thisPalette.loc['test']
-            signiPalette = {
-                True: (tc[0], tc[1], tc[2], .75),
-                False: (tc[0], tc[1], tc[2], .25)
-                }
-            #
-            g = sns.relplot(
-                data=plotScores, kind='scatter',
-                y='test_score', x='ref_score',
-                hue='significant',
-                height=height, aspect=aspect,
-                edgecolor=None,
-                hue_order=[True, False],
-                palette=signiPalette,
-                style='target',
-                # hue_order=thisPalette.index.to_list(),
-                # palette=thisPalette.to_dict(),
-                )
-            g.set_axis_labels(refCaption, testCaption)
-            g.set_titles(template="data subset: {col_name}")
-            g.suptitle(titleText)
-            plotProcFuns = [drawUnityLine, annotateWithPVal]
-            for (ro, co, hu), dataSubset in g.facet_data():
-                if len(plotProcFuns):
-                    for procFun in plotProcFuns:
-                        procFun(g, ro, co, hu, dataSubset)
-            print('Saving {}\n to {}'.format(titleText, pdfPath))
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(
-                bbox_inches='tight',
-                )
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-    #
+    try:
+        pdfPath = os.path.join(
+            figureOutputFolder,
+            '{}_{}.pdf'.format(fullEstimatorName, 'partial_scores'))
+        with PdfPages(pdfPath) as pdf:
+            height, width = 1, 1
+            aspect = width / height
+            # maskSecondOrderTests = modelsToTestDF['testType'] == 'secondOrderInteractions'
+            for testTypeName, modelsToTestGroup in modelsToTestDF.groupby('testType'):
+                if 'captionStr' in modelsToTestGroup:
+                    titleText = modelsToTestGroup['captionStr'].iloc[0]
+                else:
+                    titleText = 'partial R2 scores for {} compared to {}'.format(
+                        modelsToTestGroup['testDesign'].iloc[0], modelsToTestGroup['refDesign'].iloc[0])
+                if 'refCaption' in modelsToTestGroup:
+                    refCaption = modelsToTestGroup['refCaption'].iloc[0]
+                else:
+                    refCaption = lhsMasksInfo.loc[modelsToTestGroup['refDesign'].iloc[0], 'fullFormulaDescr']
+                if 'testCaption' in modelsToTestGroup:
+                    testCaption = modelsToTestGroup['testCaption'].iloc[0]
+                else:
+                    testCaption = lhsMasksInfo.loc[modelsToTestGroup['testDesign'].iloc[0], 'fullFormulaDescr']
+                #
+                plotFUDE = modelCompareFUDE.xs(testTypeName, level='testType').xs('all', level='electrode').reset_index()
+                plotFUDE = plotFUDE.loc[plotFUDE['trialType'].isin(['test']), :]
+                plotFUDEStats = modelCompareFUDEStats.xs(testTypeName, level='testType').xs('all', level='electrode').reset_index()
+                plotScores = modelCompareScores.loc[modelCompareScores['electrode'] == 'all'].xs(testTypeName, level='testType').reset_index()
+                plotScores = plotScores.loc[plotScores['trialType'].isin(['test']), :]
+                #
+                lookupBasedOn = ['testLhsMaskIdx', 'refLhsMaskIdx', 'target']
+                lookupAt = pd.MultiIndex.from_frame(plotScores.loc[:, lookupBasedOn])
+                lookupFrom = plotFUDEStats.loc[:, lookupBasedOn + ['p-val']].set_index(lookupBasedOn)['p-val']
+                plotPVals = lookupFrom.loc[lookupAt]
+                plotScores.loc[:, 'significant'] = (plotPVals < 0.01).to_numpy()
+                ###
+                thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
+                g = sns.catplot(
+                    data=plotFUDE, kind='box',
+                    y='score', x='target', hue='trialType',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    height=height, aspect=aspect,
+                    sharey=True
+                    )
+                g.set_xticklabels(rotation=30, ha='right')
+                g.set_titles(template="data subset: {col_name}")
+                g.suptitle(titleText)
+                g.set_axis_labels('target signal', '{} R2 w.r.t. {}'.format(testCaption, refCaption))
+                print('Saving {}\n to {}'.format(titleText, pdfPath))
+                # g.axes.flat[0].set_ylim(allScoreQuantiles)
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(
+                    bbox_inches='tight',
+                    )
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                tc = thisPalette.loc['test']
+                signiPalette = {
+                    True: (tc[0], tc[1], tc[2], .75),
+                    False: (tc[0], tc[1], tc[2], .25)
+                    }
+                #
+                g = sns.relplot(
+                    data=plotScores, kind='scatter',
+                    y='test_score', x='ref_score',
+                    hue='significant',
+                    height=height, aspect=aspect,
+                    edgecolor=None,
+                    hue_order=[True, False],
+                    palette=signiPalette,
+                    style='target',
+                    # hue_order=thisPalette.index.to_list(),
+                    # palette=thisPalette.to_dict(),
+                    )
+                g.set_axis_labels(refCaption, testCaption)
+                g.set_titles(template="data subset: {col_name}")
+                g.suptitle(titleText)
+                plotProcFuns = [drawUnityLine, annotateWithPVal]
+                for (ro, co, hu), dataSubset in g.facet_data():
+                    if len(plotProcFuns):
+                        for procFun in plotProcFuns:
+                            procFun(g, ro, co, hu, dataSubset)
+                print('Saving {}\n to {}'.format(titleText, pdfPath))
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(
+                    bbox_inches='tight',
+                    )
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+    except:
+        traceback.print_exc()
     # estimatorsDF.iloc[0].regressor_.named_steps['regressor'].results_.summary()
-    pdfPath = os.path.join(
-        figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'r2'))
-    with PdfPages(pdfPath) as pdf:
-        height, width = 3, 4
-        aspect = width / height
-        for rhsMaskIdx, plotScores in scoresStack.groupby(['rhsMaskIdx'], sort=False):
-            rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
-            #
-            for annotationName in ['historyLen', 'designFormula', 'ensembleTemplate']:
-                plotScores.loc[:, annotationName] = plotScores['lhsMaskIdx'].map(lhsMasksInfo[annotationName])
-            #
-            plotScores.loc[:, 'designType'] = ''
-            thisDesignTypeMask = (
-                    (plotScores['designFormula'] == 'NULL') &
-                    (plotScores['ensembleTemplate'] == 'NULL')
-                )
-            assert (not thisDesignTypeMask.any())
-            thisDesignTypeMask = (
-                    (plotScores['designFormula'] == 'NULL') &
-                    (plotScores['ensembleTemplate'] != 'NULL')
-                )
-            plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleOnly'
-            thisDesignTypeMask = (
-                    (plotScores['designFormula'] != 'NULL') &
-                    (plotScores['ensembleTemplate'] == 'NULL')
-                )
-            plotScores.loc[thisDesignTypeMask, 'designType'] = 'exogenousOnly'
-            thisDesignTypeMask = (
-                    (plotScores['designFormula'] != 'NULL') &
-                    (plotScores['ensembleTemplate'] != 'NULL')
-                )
-            plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndExogenous'
-            #
-            trialTypesToPlot = ['test', 'train']
-            thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
-            g = sns.catplot(
-                data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
-                y='score', hue='trialType',
-                x='fullDesignAsLabel',
-                col='target', row='designType',
-                hue_order=thisPalette.index.to_list(),
-                palette=thisPalette.to_dict(),
-                kind='box', height=height, aspect=aspect, sharey=False)
-            g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
-            g.set_xticklabels(rotation=-30, ha='left')
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            #
-            trialTypesToPlot = ['train']
-            g = sns.catplot(
-                data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
-                hue='trialType',
-                y='dAIC',
-                x='fullDesignAsLabel',
-                col='target', row='designType',
-                hue_order=thisPalette.index.to_list(),
-                palette=thisPalette.to_dict(),
-                kind='box', height=height, aspect=aspect, sharey=False)
-            g.suptitle('AIC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
-            g.set_xticklabels(rotation=-30, ha='left')
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            #
-            trialTypesToPlot = ['test', 'train', 'work', 'validation']
-            g = sns.catplot(
-                data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
-                y='score', hue='trialType',
-                x='fullDesignAsLabel', row='designType',
-                hue_order=thisPalette.index.to_list(),
-                palette=thisPalette.to_dict(),
-                kind='box', height=height, aspect=aspect, sharey=False)
-            g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
-            g.set_xticklabels(rotation=-30, ha='left')
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            trialTypesToPlot = ['train']
-            g = sns.catplot(
-                data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
-                y='dAIC', hue='trialType',
-                x='fullDesignAsLabel', row='designType',
-                hue_order=thisPalette.index.to_list(),
-                palette=thisPalette.to_dict(),
-                kind='box', height=height, aspect=aspect, sharey=False)
-            g.suptitle('AIC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
-            g.set_xticklabels(rotation=-30, ha='left')
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
+    try:
+        pdfPath = os.path.join(
+            figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'r2'))
+        with PdfPages(pdfPath) as pdf:
+            height, width = 1.5, 2
+            aspect = width / height
+            for rhsMaskIdx, plotScores in scoresStack.groupby(['rhsMaskIdx'], sort=False):
+                rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
+                #
+                for annotationName in ['historyLen', 'designFormula', 'ensembleTemplate']:
+                    plotScores.loc[:, annotationName] = plotScores['lhsMaskIdx'].map(lhsMasksInfo[annotationName])
+                #
+                plotScores.loc[:, 'designType'] = ''
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] == 'NULL') &
+                        (plotScores['ensembleTemplate'] == 'NULL')
+                    )
+                assert (not thisDesignTypeMask.any())
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] == 'NULL') &
+                        (plotScores['ensembleTemplate'] != 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleOnly'
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] != 'NULL') &
+                        (plotScores['ensembleTemplate'] == 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'exogenousOnly'
+                thisDesignTypeMask = (
+                        (plotScores['designFormula'] != 'NULL') &
+                        (plotScores['ensembleTemplate'] != 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndExogenous'
+                #
+                trialTypesToPlot = ['test', 'train']
+                thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
+                g = sns.catplot(
+                    data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
+                    y='score', hue='trialType',
+                    x='fullDesignAsLabel',
+                    col='target', row='designType',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    kind='box', height=height, aspect=aspect, sharey=False)
+                g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.set_xticklabels(rotation=-30, ha='left')
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                #
+                trialTypesToPlot = ['train']
+                g = sns.catplot(
+                    data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
+                    hue='trialType',
+                    y='dAIC',
+                    x='fullDesignAsLabel',
+                    col='target', row='designType',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    kind='box', height=height, aspect=aspect, sharey=False)
+                g.suptitle('AIC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.set_xticklabels(rotation=-30, ha='left')
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                #
+                trialTypesToPlot = ['test', 'train', 'work', 'validation']
+                g = sns.catplot(
+                    data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
+                    y='score', hue='trialType',
+                    x='fullDesignAsLabel', row='designType',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    kind='box', height=height, aspect=aspect, sharey=False)
+                g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.set_xticklabels(rotation=-30, ha='left')
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                trialTypesToPlot = ['train']
+                g = sns.catplot(
+                    data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
+                    y='dAIC', hue='trialType',
+                    x='fullDesignAsLabel', row='designType',
+                    hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    kind='box', height=height, aspect=aspect, sharey=False)
+                g.suptitle('AIC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.set_xticklabels(rotation=-30, ha='left')
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+    except:
+        traceback.print_exc()
 
     '''
     pName = 'alpha'
@@ -708,7 +719,7 @@ if __name__ == '__main__':
     pdfPath = os.path.join(
         figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'hyperparameters_gridSearch'))
     with PdfPages(pdfPath) as pdf:
-        height, width = 3, 4
+        height, width = 1.5, 2
         aspect = width / height
         hpNames = [cN for cN in gsScoresDF.columns if 'regressor__regressor__' in cN]
         gsScoresDF.reset_index(inplace=True)
@@ -753,7 +764,25 @@ if __name__ == '__main__':
             )
         gsScoresDF.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndExogenous'
         bestParamsDF.loc[:, 'designType'] = bestParamsDF['lhsMaskIdx'].map(gsScoresDF.loc[:, ['lhsMaskIdx', 'designType']].drop_duplicates().set_index('lhsMaskIdx')['designType'])
+        # thisNIters
         for rhsMaskIdx in gsScoresDF['rhsMaskIdx'].unique():
+            if nItersDF is not None:
+                plotNIters = nItersDF.xs(rhsMaskIdx, level='rhsMaskIdx').to_frame(name='nIters').reset_index()
+                g = sns.displot(
+                    data=plotNIters,
+                    row='lhsMaskIdx',
+                    x='nIters',
+                    height=height, aspect=aspect,
+                    facet_kws=dict(sharey=False),
+                    kind='hist'
+                    )
+                g.suptitle('number of iterations (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
             # for rhsMaskIdx, plotScores in gsScoresDF.loc[~issueMask, :].groupby('rhsMaskIdx', sort=False):
             # for rhsMaskIdx, plotScores in gsScoresDF.groupby('rhsMaskIdx', sort=False):
             for hpN in hpNames:

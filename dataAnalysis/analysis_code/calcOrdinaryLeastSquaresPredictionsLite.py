@@ -186,11 +186,11 @@ if __name__ == '__main__':
     savingResults = True
     ################
     # savingResults = False
-    # # slurmTaskID = 9
-    # # slurmTaskCount = processSlurmTaskCount
-    # # slurmTaskMin = 0
-    # # slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
-    # # estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
+    # slurmTaskID = 9
+    # slurmTaskCount = processSlurmTaskCount
+    # slurmTaskMin = 0
+    # slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
+    # estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
     ################ collect estimators and scores
     estimatorsDict = {}
     scoresDict = {}
@@ -290,10 +290,16 @@ if __name__ == '__main__':
             parentFormula = masterExogLookup[designFormula]
             parentFormulaIdx = masterExogFormulas.index(parentFormula)
             designDF = pd.read_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
-            designDF = designDF.loc[:, theseColumns]
+            try:
+                designDF = designDF.loc[:, theseColumns]
+            except:
+                traceback.print_exc()
             thisFeatureInfo = pd.read_hdf(designMatrixPath, 'designs/exogParents/term_lookup_{}'.format(parentFormulaIdx))
             ##
-            designDF.columns = pd.MultiIndex.from_frame(thisFeatureInfo)
+            try:
+                designDF.columns = pd.MultiIndex.from_frame(thisFeatureInfo.loc[thisFeatureInfo['factor'].isin(theseColumns), :])
+            except:
+                traceback.print_exc()
             designDF = designDF.loc[:, designDF.columns.get_level_values('factor').isin(theseColumns)]
             exogList = [designDF]
             designTermNames = designInfo.term_names
@@ -550,5 +556,6 @@ if __name__ == '__main__':
     R2Per.set_index('fullFormulaDescr', append=True, inplace=True)
     if savingResults:
         R2Per.to_hdf(estimatorPath, 'processedR2')
+        np.sqrt(R2Per).to_hdf(estimatorPath, 'processedR')
     print('Loaded and saved scores and partial scores')
     print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

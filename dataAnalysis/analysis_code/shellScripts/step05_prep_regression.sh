@@ -49,7 +49,8 @@ do
   python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix='rig' --selectionName='rig' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
   ##
   OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER}"
-  python -u './plotFinalSynchConfirmation.py' --plotSuffix="final_synch_confirmation" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --winStart="-300" --winStop="1000" --verbose=1 --selectionName="rig" --selectionName2="laplace_scaled" $OPTS
+  python -u './plotFinalSynchConfirmation.py' --plotSuffix="final_synch_confirmation_scaled" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --winStart="-300" --winStop="1000" --verbose=1 --selectionName="rig" --selectionName2="laplace_scaled" $OPTS
+  python -u './plotFinalSynchConfirmation.py' --plotSuffix="final_synch_confirmation_spectral_scaled" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --winStart="-300" --winStop="1000" --verbose=1 --selectionName="rig" --selectionName2="laplace_spectral_scaled" $OPTS
   ##
   ESTIMATOR="select"
   TARGET="laplace_scaled"

@@ -530,175 +530,7 @@ class raisedCosTransformer(object):
         self.b = b
         self.endpoints = raisedCosBoundary(
             b=b, DT=historyLen,
-            minX=0.,
-            nb=nb, nlin=nlin, invnl=invnl, causal=causalShift)
-        if logBasis:
-            self.ihbasisDF, self.orthobasisDF = makeLogRaisedCosBasis(
-                nb=nb, dt=dt, endpoints=self.endpoints, b=b,
-                zflag=zflag, normalize=normalize, causal=causalFill)
-        else:
-            self.ihbasisDF, self.orthobasisDF = makeRaisedCosBasis(
-                nb=nb, dt=dt, endpoints=self.endpoints,
-                normalize=normalize, causal=causalFill)
-        self.iht = np.asarray(self.ihbasisDF.index)
-        if self.timeDelay != 0:
-            extraSamples = int(self.timeDelay / self.dt)
-            extraTime = self.iht[-1] + self.dt * np.arange(1, extraSamples + 1)
-            self.iht = np.concatenate([self.iht, extraTime])
-            extraPadding = pd.DataFrame(0, columns=self.ihbasisDF.columns, index=extraTime)
-            self.ihbasisDF = pd.concat([extraPadding, self.ihbasisDF])
-            self.ihbasisDF.index = self.iht
-            self.orthobasisDF = pd.concat([extraPadding, self.orthobasisDF])
-            self.orthobasisDF.index = self.iht
-        if self.useOrtho:
-            self.basisDF = self.orthobasisDF
-        else:
-            self.basisDF = self.ihbasisDF
-        self.leftShiftBasis = int(((max(self.iht) - min(self.iht)) / 2 + min(self.iht)) / self.dt) + 1
-
-        def transformPiece(name, group):
-            resDF = pd.DataFrame(np.nan, index=group.index, columns=self.basisDF.columns)
-            for cNIdx, cN in enumerate(self.basisDF.columns):
-                resCN = resDF.columns[cNIdx]
-                sig = self.preprocFun(group)
-                convResult = scipy.signal.convolve(
-                    sig.to_numpy(),
-                    self.basisDF[cN].to_numpy(),
-                    mode='full', method=self.convolveMethod)
-                leftSeek = max(
-                    int(convResult.shape[0] / 2 - group.shape[0] / 2 - self.leftShiftBasis), 0)
-                rightSeek = leftSeek + group.shape[0]
-                convResult = convResult[leftSeek:rightSeek]
-                resDF.loc[group.index, resCN] = convResult
-            return resDF
-        self.transformPiece = transformPiece
-        return
-
-    def memorize_finish(self):
-        return
-
-    def transform(
-            self, vecSrs, nb=1, dt=1.,
-            historyLen=None, b=1e-3,
-            normalize=False, useOrtho=True,
-            timeDelay=0.,
-            groupBy='trialUID', tLabel='bin',
-            zflag=False, logBasis=True, causalShift=True, causalFill=False,
-            addInputToOutput=False,
-            selectColumns=None, preprocFun=None,
-            convolveMethod='auto', joblibBackendArgs=None, verbose=0):
-        # print('Starting to apply raised cos basis to {} (size={})'.format(vecSrs.name, vecSrs.size))
-        # for line in traceback.format_stack():
-        #     print(line.strip())
-        columnNames = ['{}_{}'.format(vecSrs.name, basisCN) for basisCN in self.basisDF.columns]
-        # resDF = pd.DataFrame(np.nan, index=vecSrs.index, columns=columnNames)
-        '''
-            lOfPieces = []
-            for name, group in vecSrs.groupby(self.groupBy):
-                lOfPieces.append(self.transformPiece(name, group))
-            '''
-        if self.joblibBackendArgs is None:
-            contextManager = contextlib.nullcontext()
-        else:
-            contextManager = parallel_backend(**self.joblibBackendArgs)
-        if self.verbose >= 1:
-            if self.verbose >= 2:
-                print('Analyzing signal {}'.format(vecSrs.name))
-                print('joblibBackendArgs = {}'.format(self.joblibBackendArgs))
-                print('joblib context manager = {}'.format(contextManager))
-            #  tIterator = tqdm(vecSrs.groupby(self.groupBy), mininterval=30., maxinterval=120.)
-            tIterator = vecSrs.groupby(self.groupBy)
-        else:
-            tIterator = vecSrs.groupby(self.groupBy)
-        with contextManager:
-            lOfPieces = Parallel(verbose=self.verbose)(
-                delayed(self.transformPiece)(name, group)
-                for name, group in tIterator)
-            resDF = pd.concat(lOfPieces)
-            resDF = resDF.loc[vecSrs.index, :]
-            resDF.columns = columnNames
-        if self.addInputToOutput:
-            sig = self.preprocFun(vecSrs)
-            resDF.insert(0, 0., sig)
-        if self.selectColumns is not None:
-            resDF = resDF.iloc[:, self.selectColumns]
-        #
-        return resDF
-
-    def plot_basis(self):
-        fig, ax = plt.subplots(2, 1, sharex=True)
-        ax[0].plot(self.ihbasisDF)
-        titleStr = 'raised log cos basis' if self.logBasis else 'raised cos basis'
-        ax[0].set_title(titleStr)
-        ax[1].plot(self.orthobasisDF)
-        ax[1].set_title('orthogonalized basis')
-        ax[1].set_xlabel('Time (sec)')
-        return fig, ax
-
-class raisedCosTransformerBackup(object):
-    def __init__(self, kWArgs=None):
-        if kWArgs is not None:
-            self.memorize_chunk(None, **kWArgs)
-        return
-
-    def memorize_chunk(
-            self, vecSrs, nb=1, dt=1.,
-            historyLen=None, b=1e-3,
-            normalize=False, useOrtho=True,
-            groupBy='trialUID', tLabel='bin',
-            zflag=False, logBasis=True,
-            addInputToOutput=False,
-            causalShift=True, causalFill=False,
-            selectColumns=None, preprocFun=None,
-            joblibBackendArgs=None, convolveMethod='auto', verbose=0):
-        ##
-        if logBasis:
-            nlin = None
-            invnl = None
-        else:
-            nlin = lambda x: x
-            invnl = lambda x: x
-            b = 0
-        self.verbose = verbose
-        self.convolveMethod = convolveMethod
-        if joblibBackendArgs is not None:
-            self.joblibBackendArgs = joblibBackendArgs.copy()
-            if joblibBackendArgs['backend'] == 'dask':
-                daskComputeOpts = self.joblibBackendArgs.pop('daskComputeOpts')
-                if daskComputeOpts['scheduler'] == 'single-threaded':
-                    daskClient = Client(LocalCluster(n_workers=1))
-                elif daskComputeOpts['scheduler'] == 'processes':
-                    daskClient = Client(LocalCluster(processes=True))
-                elif daskComputeOpts['scheduler'] == 'threads':
-                    daskClient = Client(LocalCluster(processes=False))
-                else:
-                    print('Scheduler name is not correct!')
-                    daskClient = Client()
-        else:
-            self.joblibBackendArgs = None
-        self.nb = nb
-        self.dt = dt
-        self.historyLen = historyLen
-        self.zflag = zflag
-        self.logBasis = logBasis
-        self.normalize = normalize
-        self.useOrtho = useOrtho
-        self.groupBy = groupBy
-        self.tLabel = tLabel
-        self.addInputToOutput = addInputToOutput
-        self.selectColumns = selectColumns
-        if preprocFun is None:
-            self.preprocFun = lambda x: x
-        else:
-            self.preprocFun = preprocFun
-        self.causalShift = causalShift
-        self.causalFill = causalFill
-        if not logBasis:
-            b = 0.
-        self.b = b
-        self.endpoints = raisedCosBoundary(
-            b=b, DT=historyLen,
-            minX=0.,
+            minX=timeDelay,
             nb=nb, nlin=nlin, invnl=invnl, causal=causalShift)
         if logBasis:
             self.ihbasisDF, self.orthobasisDF = makeLogRaisedCosBasis(
@@ -740,6 +572,7 @@ class raisedCosTransformerBackup(object):
             self, vecSrs, nb=1, dt=1.,
             historyLen=None, b=1e-3,
             normalize=False, useOrtho=True,
+            timeDelay=0.,
             groupBy='trialUID', tLabel='bin',
             zflag=False, logBasis=True, causalShift=True, causalFill=False,
             addInputToOutput=False,
@@ -1938,8 +1771,6 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             self.results_ = self.model_.fit_regularized(
                 **regular_opts, **fit_opts)
         self.coef_ = self.results_.params
-        # print(self.results_.fit_history)
-        self.n_iter_ = self.results_.fit_history['iteration']
         self.summary_ = self.results_.summary()
         self.summary2_ = self.results_.summary2()
         self.results_.remove_data()

@@ -258,7 +258,7 @@ if __name__ == '__main__':
                     else:
                         predList.append(thisPred)
                     ##
-                    thisR2Per = pd.read_hdf(store, 'processedR2')
+                    thisR2Per = pd.read_hdf(store, 'processedR')
                     if R2PerIndexNames is None:
                         R2PerIndexNames = thisR2Per.index.names
                     thisR2Per.reset_index(inplace=True)

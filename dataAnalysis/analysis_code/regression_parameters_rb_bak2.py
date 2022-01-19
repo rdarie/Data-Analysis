@@ -2,16 +2,9 @@
 import dataAnalysis.custom_transformers.tdr as tdr
 import pdb
 
-processSlurmTaskCount = 6
-
-'''joblibBackendArgs = dict(
-    backend='dask',
-    daskComputeOpts=dict(
-        scheduler='processes'
-        ),
-    # backend='loky',
-    n_jobs=-1
-    )'''
+processSlurmTaskCountPLS = 3
+processSlurmTaskCount = 48
+processSlurmTaskCountTransferFunctions = 48
 joblibBackendArgs = dict(
     backend='loky',
     n_jobs=-1
@@ -19,43 +12,11 @@ joblibBackendArgs = dict(
 addHistoryTerms = [
     # hto0
     {
-        'nb': 6, 'logBasis': True,
+        'nb': 5, 'logBasis': True,
         'dt': None,
-        'historyLen': 240e-3,
-        'b': 5e-2, 'useOrtho': True,
-        'normalize': True, 'groupBy': 'trialUID',
-        'zflag': False,
-        'causalShift': True, 'causalFill': True,
-        'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
-    # hto1
-    {
-        'nb': 6, 'logBasis': True,
-        'dt': None,
-        'historyLen': 240e-3,
-        'b': 5e-2, 'useOrtho': False,
-        'normalize': True, 'groupBy': 'trialUID',
-        'zflag': False,
-        'causalShift': True, 'causalFill': True,
-        'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
-    # hto2
-    {
-        'nb': 6, 'logBasis': True,
-        'dt': None,
-        'historyLen': 60e-3,
-        'b': 2e-2, 'useOrtho': True,
-        'normalize': True, 'groupBy': 'trialUID',
-        'zflag': False,
-        'causalShift': True, 'causalFill': True,
-        'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
-    # hto3
-    {
-        'nb': 6, 'logBasis': True,
-        'dt': None,
-        'historyLen': 60e-3,
-        'b': 2e-2, 'useOrtho': False,
+        'historyLen': 300e-3,
+        'timeDelay': 100e-3,
+        'b': 1e-3, 'useOrtho': True,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,
@@ -64,10 +25,18 @@ addHistoryTerms = [
     ]
 
 regressionColumnsToUse = [
-    'velocity_abs', 'amplitude',
-    'RateInHz', 'electrode']
+    # 'velocity_abs',
+    'velocity_x', 'velocity_y',
+    # 'velocity_x_abs', 'velocity_y_abs',
+    'position_x', 'position_y',
+    'amplitude', 'electrode', 'RateInHz',
+    ]
 regressionColumnRenamer = {
-    'velocity_abs': 'v', 'amplitude': 'a', 'RateInHz': 'r', 'electrode': 'e'
+    'velocity_abs': 'v', 'amplitude': 'a',
+    'electrode': 'e', 'RateInHz': 'r',
+    'velocity_x': 'vx', 'velocity_y': 'vy',
+    'position_x': 'px', 'position_y': 'py',
+    # 'velocity_x_abs': 'vxa', 'velocity_y_abs': 'vya',
     }
 
 def iWrap(x):
@@ -101,7 +70,7 @@ def absWrap(x):
     return('abv({})'.format(x))
 
 designFormulaTemplates = [
-    '{v} + {a} + {r} - 1',
+    '{vx} + {vy} + {px} + {py} + {a} + {r} - 1',
     ]
 
 lOfDesignFormulas = []
@@ -120,16 +89,23 @@ designIsLinear = {}
 formulasShortHand = {}
 #
 lOfEndogAndExogTemplates = []
-for lagSpecIdx in range(2):
+#
+for lagSpecIdx in range(len(addHistoryTerms)):
     lagSpec = 'hto{}'.format(lagSpecIdx)
     wrapperFun = genRcbWrap(lagSpec)
     elecWrapperFun = genElecRcbWrap(lagSpec)
     laggedModels = {}
-    for source in ['v']:
+    for source in ['vx', 'vy', 'px', 'py', 'vxa', 'vya']:
         laggedModels[source] = wrapperFun(source)
         sourceTermDict[wrapperFun(source)] = source
         sourceHistOptsDict[wrapperFun(source).replace(' ', '')] = addHistoryTerms[lagSpecIdx]
-    for source in ['a', 'r', 'a*r', 'v*r', 'v*a', 'v*a*r']:
+    for source in [
+        'a', 'vx*a', 'vy*a', 'vxa*a', 'vya*a',
+        'r', 'vx*r', 'vy*r', 'vxa*r', 'vya*r',
+        'a', 'px*a', 'py*a', 'pxa*a', 'pya*a',
+        'r', 'px*r', 'py*r', 'pxa*r', 'pya*r',
+        'a*r', 'vx*a*r', 'vy*a*r', 'vxa*a*r', 'vya*a*r',
+        'a*r', 'pvx*a*r', 'py*a*r', 'pxa*a*r', 'pya*a*r',]:
         laggedModels[source] = elecWrapperFun(source)
         sourceTermDict[elecWrapperFun(source)] = source
         sourceHistOptsDict[elecWrapperFun(source).replace(' ', '')] = addHistoryTerms[lagSpecIdx]
@@ -145,15 +121,12 @@ for lagSpecIdx in range(2):
     for tf in theseFormulas:
         masterExogLookup[tf] = theseFormulas[0]
     lOfDesignFormulas += theseFormulas
+    histTemplate = 'rcb({}, **{})'.format('{}', lagSpec)
+    lOfHistTemplates.append(histTemplate)
     designHistOptsDict.update({
         thisForm: addHistoryTerms[lagSpecIdx]
         for thisForm in theseFormulas})
-    ########################
-    lagSpecIdxHist = lagSpecIdx + 2
-    lagSpecHist = 'hto{}'.format(lagSpecIdxHist)
-    histTemplate = 'rcb({}, **{})'.format('{}', lagSpecHist)
-    lOfHistTemplates.append(histTemplate)
-    templateHistOptsDict[histTemplate] = addHistoryTerms[lagSpecIdxHist]
+    templateHistOptsDict[histTemplate] = addHistoryTerms[lagSpecIdx]
     for exogFormula in ['NULL'] + theseFormulas:
         for endogFormula in ['NULL', histTemplate]:
             if not ((exogFormula == 'NULL') and (endogFormula == 'NULL')):
@@ -167,20 +140,21 @@ designIsLinear['NULL'] = True
 lOfEnsembleTemplates = [
     (hT, hT) for hT in lOfHistTemplates
     ]
-
+#
 lhsMasksOfInterest = {
     'plotPredictions': [1, 2],
-    'varVsEnsemble': [2, 5]
+    'varVsEnsemble': [2]
     }
-burnInPeriod = 250e-3
-
+# 
+burnInPeriod = 300e-3
+#
 def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
     hTDict['dt'] = binInterval
     return hTDict
 
 fullFormulaReadableLabels = {
-    '({v} + {a} + {r} - 1, **hto1) + rcb(ensemble, **hto1) + rcb(self, **hto1)': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v + a + r)$',
+    '({v} + {a} - 1, **hto0) + rcb(ensemble, **hto0) + rcb(self, **hto0)': '$\dot{x} = \mathbf{A}x + \mathbf{B}(v + a)$',
     }
 
 modelsTestReadable = {

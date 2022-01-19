@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s05_temp_prep_regression_stb_202101_27
+#SBATCH -J s05_spectral_prep_regression_stb_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s05_temp_prep_regression_stb_202101_27.out
-#SBATCH -e ../../batch_logs/regression/s05_temp_prep_regression_stb_202101_27.out
+#SBATCH -o ../../batch_logs/regression/s05_spectral_prep_regression_stb_202101_27.out
+#SBATCH -e ../../batch_logs/regression/s05_spectral_prep_regression_stb_202101_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -47,13 +47,13 @@ do
   # #python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix='rig' --selectionName='rig' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
   #
   OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER}"
-  python -u './plotFinalSynchConfirmation.py' --plotSuffix="final_synch_confirmation_scaled" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --winStart="-300" --winStop="500" --verbose=1 --selectionName="rig" --selectionName2="laplace_scaled" $OPTS
-  # #python -u './plotFinalSynchConfirmation.py' --plotSuffix="final_synch_confirmation_spectral_scaled" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --winStart="-300" --winStop="500" --verbose=1 --selectionName="rig" --selectionName2="laplace_spectral_scaled" $OPTS
+  python -u './plotFinalSynchConfirmation.py' --plotSuffix="final_synch_confirmation_scaled" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --winStart="-300" --winStop="1000" --verbose=1 --selectionName="rig" --selectionName2="laplace_scaled" $OPTS
+  python -u './plotFinalSynchConfirmation.py' --plotSuffix="final_synch_confirmation_spectral_scaled" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --winStart="-300" --winStop="1000" --verbose=1 --selectionName="rig" --selectionName2="laplace_spectral_scaled" $OPTS
   #
   ESTIMATOR="select"
-  TARGET="laplace_scaled"
+  TARGET="laplace_spectral_scaled"
   #  --averageByTrial
-  # #python -u './calcSignalColumnSelector.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+  python -u './calcSignalColumnSelector.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
   #
   ############################################################################################################
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"

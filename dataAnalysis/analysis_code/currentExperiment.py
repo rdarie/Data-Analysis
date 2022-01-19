@@ -522,7 +522,7 @@ def parseAnalysisOptions(
     except Exception:
         pass
     # args for the sklearn StratifiedShuffleSplit
-    defaultSamplerKWArgs = dict(random_state=42, test_size=0.2)
+    defaultSamplerKWArgs = dict(random_state=42, test_size=0.3)
     defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.15)
     #
     covarianceSamplerKWArgs = dict(random_state=42, test_size=0.2)
@@ -708,8 +708,8 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 25e-3,
-            'forceRollingWindow': 300,
+            'forceBinInterval': 20e-3,
+            'forceRollingWindow': 300, # 100 msec smoothing
             # 'procFun': {
             #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
             #     'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
@@ -720,13 +720,13 @@ def parseAnalysisOptions(
             'maskEachFreqBand': False,
             'cvKWArgs': dict(
                 n_splits=5,
-                splitterClass=None, splitterKWArgs=equalSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=equalPrelimSplitterKWArgs,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': 'stoppingOrStimOff',
-                'winStart': -0.35,  # start 0.2 ( + .15 burn in period) before whatever the query was
+                'winStart': -0.6,  # start 0.2 ( + .15 burn in period) before whatever the query was
                 'winStop': 0.2  # stop .1 sec after startingOrStimOn
             },
             'timeROIOpts_control': {

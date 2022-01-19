@@ -200,7 +200,7 @@ if __name__ == '__main__':
         return_train_score=True, return_estimator=True)
     estimatorMetadata['crossvalKWArgs'] = crossvalKWArgs
     ###
-    nAlphas = 10
+    nAlphas = 5
     ###
     ## statsmodels elasticnet
     regressorKWArgs = {
@@ -208,7 +208,7 @@ if __name__ == '__main__':
         'family': sm.families.Gaussian(),
         'alpha': 1e-12, 'L1_wt': .1,
         'refit': True, 'tol': 1e-4,
-        'maxiter': 50, 'disp': False,
+        'maxiter': 500, 'disp': False,
         'calc_frequency_weights': True
         }
     regressorClass = tdr.SMWrapper

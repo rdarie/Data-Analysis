@@ -306,7 +306,7 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
         designDF = designDF.loc[:, theseColumns]
         thisFeatureInfo = pd.read_hdf(designMatrixPath, 'designs/exogParents/term_lookup_{}'.format(parentFormulaIdx))
         ##
-        designDF.columns = pd.MultiIndex.from_frame(thisFeatureInfo)
+        designDF.columns = pd.MultiIndex.from_frame(thisFeatureInfo.loc[thisFeatureInfo['factor'].isin(theseColumns), :])
         designDF = designDF.loc[:, designDF.columns.get_level_values('factor').isin(theseColumns)]
         exogList = [designDF]
         designTermNames = designInfo.term_names

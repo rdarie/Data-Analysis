@@ -3,7 +3,7 @@ import dataAnalysis.custom_transformers.tdr as tdr
 import pdb
 
 processSlurmTaskCountPLS = 3
-processSlurmTaskCount = 48
+processSlurmTaskCount = 46
 processSlurmTaskCountTransferFunctions = 48
 joblibBackendArgs = dict(
     backend='loky',
@@ -14,8 +14,9 @@ addHistoryTerms = [
     {
         'nb': 5, 'logBasis': True,
         'dt': None,
-        'historyLen': 250e-3,
-        'b': 2e-2, 'useOrtho': True,
+        'historyLen': 300e-3,
+        'timeDelay': 100e-3,
+        'b': 10e-3, 'useOrtho': True,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,
@@ -70,6 +71,8 @@ def absWrap(x):
 
 designFormulaTemplates = [
     '{vx} + {vy} + {px} + {py} + {a} + {r} - 1',
+    '{vx} + {vy} + {px} + {py} - 1',
+    '{a} + {r} - 1',
     ]
 
 lOfDesignFormulas = []
@@ -127,7 +130,8 @@ for lagSpecIdx in range(len(addHistoryTerms)):
         for thisForm in theseFormulas})
     templateHistOptsDict[histTemplate] = addHistoryTerms[lagSpecIdx]
     for exogFormula in ['NULL'] + theseFormulas:
-        for endogFormula in ['NULL', histTemplate]:
+        # for endogFormula in ['NULL', histTemplate]:
+        for endogFormula in ['NULL']:
             if not ((exogFormula == 'NULL') and (endogFormula == 'NULL')):
                 lOfEndogAndExogTemplates.append((exogFormula, endogFormula, endogFormula,))
 #
@@ -141,11 +145,11 @@ lOfEnsembleTemplates = [
     ]
 #
 lhsMasksOfInterest = {
-    'plotPredictions': [1, 2],
+    'plotPredictions': [0],
     'varVsEnsemble': [2]
     }
 # 
-burnInPeriod = 150e-3
+burnInPeriod = 400e-3
 #
 def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']

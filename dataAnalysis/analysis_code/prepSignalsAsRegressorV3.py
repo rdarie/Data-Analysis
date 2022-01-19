@@ -227,8 +227,8 @@ if __name__ == '__main__':
         'velocity': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
-        'position_x': MinMaxScaler(feature_range=(0., 1.)),
-        'position_y': MinMaxScaler(feature_range=(0., 1.)),
+        'position_x': MinMaxScaler(feature_range=(-1., 1.)),
+        'position_y': MinMaxScaler(feature_range=(-1., 1.)),
         'velocity_x_abs': MinMaxScaler(feature_range=(0., 1.)),
         'velocity_y_abs': MinMaxScaler(feature_range=(0., 1.)),
         'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
@@ -557,6 +557,7 @@ if __name__ == '__main__':
             'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
             'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
         })'''
+    '''
     for lhsMaskIdx in lhsMasksOfInterest['varVsEnsemble']:
         modelsToTest.append({
             'testDesign': lhsMaskIdx,
@@ -567,7 +568,7 @@ if __name__ == '__main__':
             'testType': 'ensembleTerms',
             'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
             'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })
+            })
         modelsToTest.append({
             'testDesign': lhsMaskIdx,
             'refDesign': lhsMaskIdx - 2,
@@ -578,6 +579,31 @@ if __name__ == '__main__':
             'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
             'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
         })
-    modelsToTestDF = pd.DataFrame(modelsToTest)
-    modelsToTestDF.to_hdf(designMatrixPath, 'modelsToTest')
+        '''
+    try:
+        for lhsMaskIdx in lhsMasksOfInterest['varVsEnsemble']:
+            modelsToTest.append({
+                'testDesign': lhsMaskIdx,
+                'refDesign': lhsMaskIdx - 1,
+                'testCaption': 'v + a + r',
+                'refCaption': 'v',
+                'captionStr': 'partial R2 of adding terms for signal ensemble history to V+A+R',
+                'testType': 'ensembleTerms',
+                'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
+                'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
+                })
+            modelsToTest.append({
+                'testDesign': lhsMaskIdx,
+                'refDesign': lhsMaskIdx - 2,
+                'testCaption': 'v + a + r',
+                'refCaption': 'a + r',
+                'captionStr': 'partial R2 of adding terms for V+A+R to ensemble history',
+                'testType': 'VARNoEnsembleTerms',
+                'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
+                'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
+            })
+        modelsToTestDF = pd.DataFrame(modelsToTest)
+        modelsToTestDF.to_hdf(designMatrixPath, 'modelsToTest')
+    except:
+        traceback.print_exc()
     print('\n' + '#' * 50 + '\n{}\nComplete.\n'.format(__file__) + '#' * 50 + '\n')

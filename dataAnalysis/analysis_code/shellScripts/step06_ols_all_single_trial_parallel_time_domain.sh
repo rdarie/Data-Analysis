@@ -23,7 +23,7 @@
 #SBATCH --account=carney-dborton-condo
 #SBATCH --export=CCV_HEADLESS=1
 # Request custom resources
-#SBATCH --array=0-47
+#SBATCH --array=0-45
 
 # exps=(201901_27 201902_03 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 exps=(202101_27)
