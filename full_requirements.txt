@@ -23,7 +23,7 @@ dill==0.3.0
 docopt==0.6.2
 h5py==2.10.0
 ipython-genutils==0.2.0   # via traitlets
-ipython==7.8.0            # via line-profiler
+ipython==7.16.3            # via line-profiler
 jedi==0.15.1              # via ipython
 joblib==0.13.2
 kiwisolver==1.1.0         # via matplotlib
