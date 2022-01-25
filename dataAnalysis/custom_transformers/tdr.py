@@ -433,7 +433,6 @@ def tTestNadeauCorrection(
         statsResDF['p-val'] = 2 * scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
     else:
         statsResDF['p-val'] = scipy.stats.t.sf(np.abs(statsResDF['T']), df=statsResDF['dof'])
-    # pdb.set_trace()
     statsResDF['power'] = pg.power_ttest(
         d=statsResDF['cohen-d'], n=J, power=None, alpha=powerAlpha,
         contrast='paired', alternative=tail)
@@ -1863,7 +1862,8 @@ class SMWrapper(BaseEstimator, RegressorMixin):
     def __init__(
             self, sm_class, family=None,
             alpha=None, L1_wt=None, refit=None,
-            maxiter=100, tol=1e-6, disp=False, fit_intercept=False,
+            maxiter=100, tol=1e-6, disp=False, check_step=True,
+            fit_intercept=False, start_params=None,
             calc_frequency_weights=False, frequency_weights_index='trialUID',
             frequency_group_columns=['electrode', 'trialAmplitude', 'trialRateInHz', 'pedalMovementCat', 'pedalDirection', 'pedalSizeCat']
             ):
@@ -1876,6 +1876,8 @@ class SMWrapper(BaseEstimator, RegressorMixin):
         self.maxiter = maxiter
         self.tol = tol
         self.disp = disp
+        self.check_step = check_step
+        self.start_params = start_params
         self.calc_frequency_weights = calc_frequency_weights
         self.frequency_weights_index = frequency_weights_index
         self.frequency_group_columns = frequency_group_columns
@@ -1917,9 +1919,12 @@ class SMWrapper(BaseEstimator, RegressorMixin):
         except Exception:
             traceback.print_exc()
         ####
+        if self.start_params is not None:
+            if isinstance(self.start_params, float):
+                self.start_params = self.start_params * np.ones(XX.shape[1])
         regular_opts = {}
         for key in dir(self):
-            if key in ['alpha', 'L1_wt', 'refit']:
+            if key in ['alpha', 'L1_wt', 'refit', 'check_step', 'start_params']:
                 if getattr(self, key) is not None:
                     regular_opts.update({key: getattr(self, key)})
         fit_opts = {}
@@ -1940,6 +1945,9 @@ class SMWrapper(BaseEstimator, RegressorMixin):
         self.coef_ = self.results_.params
         # print(self.results_.fit_history)
         self.n_iter_ = self.results_.fit_history['iteration']
+        self.convergence_history = pd.DataFrame(
+            self.results_.fit_history.pop('convergence_history', None),
+            columns=['iter', 'param', 'cost'])
         self.summary_ = self.results_.summary()
         self.summary2_ = self.results_.summary2()
         self.results_.remove_data()

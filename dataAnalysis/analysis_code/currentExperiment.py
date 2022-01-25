@@ -709,7 +709,7 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 20e-3,
-            'forceRollingWindow': 300, # 100 msec smoothing
+            'forceRollingWindow': 100e-3,
             # 'procFun': {
             #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
             #     'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',

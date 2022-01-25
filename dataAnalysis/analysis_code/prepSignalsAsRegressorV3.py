@@ -13,7 +13,7 @@ Options:
     --plotting                                 load from raw, or regular? [default: False]
     --showFigures                              load from raw, or regular? [default: False]
     --debugging                                load from raw, or regular? [default: False]
-    --maxNumFeatures=maxNumFeatures            load from raw, or regular? [default: 200]
+    --maxNumFeatures=maxNumFeatures            load from raw, or regular? [default: 500]
     --verbose=verbose                          print diagnostics? [default: 0]
     --datasetNameRhs=datasetNameRhs            which trig_ block to pull [default: Block]
     --selectionNameRhs=selectionNameRhs        how to restrict channels? [default: fr_sqrt]
@@ -184,14 +184,32 @@ if __name__ == '__main__':
     else:
         import contextlib
         cm = contextlib.nullcontext()
+    histOptsForExportDict = {}
     with cm as pdf:
-        for hIdx, histOpts in enumerate(addHistoryTerms):
+        for hIdx, histOpts in enumerate(addEndogHistoryTerms):
             formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-            locals().update({'hto{}'.format(hIdx): formattedHistOpts})
+            locals().update({'enhto{}'.format(hIdx): formattedHistOpts})
+            histOptsForExportDict['enhto{}'.format(hIdx)] = formattedHistOpts
             raisedCosBaser = tdr.raisedCosTransformer(formattedHistOpts)
             if arguments['plotting']:
                 fig, ax = raisedCosBaser.plot_basis()
-                fig.suptitle('hto{}'.format(hIdx))
+                fig.suptitle('enhto{}'.format(hIdx))
+                fig.tight_layout()
+                pdf.savefig(
+                    bbox_inches='tight',
+                    )
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+        for hIdx, histOpts in enumerate(addExogHistoryTerms):
+            formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
+            locals().update({'exhto{}'.format(hIdx): formattedHistOpts})
+            histOptsForExportDict['exhto{}'.format(hIdx)] = formattedHistOpts
+            raisedCosBaser = tdr.raisedCosTransformer(formattedHistOpts)
+            if arguments['plotting']:
+                fig, ax = raisedCosBaser.plot_basis()
+                fig.suptitle('exhto{}'.format(hIdx))
                 fig.tight_layout()
                 pdf.savefig(
                     bbox_inches='tight',
@@ -201,6 +219,12 @@ if __name__ == '__main__':
                 else:
                     plt.close()
     ###
+    if arguments['plotting']:
+        histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
+        histOptsHtmlPath = os.path.join(
+            figureOutputFolder, '{}_{}.html'.format(designMatrixDatasetName, 'histOpts'))
+        histOptsForExportDF.to_html(histOptsHtmlPath)
+    #
     trialInfoLhs = lhsDF.index.to_frame().reset_index(drop=True)
     trialInfoRhs = rhsDF.index.to_frame().reset_index(drop=True)
     checkSameMeta = stimulusConditionNames + ['bin', 'trialUID', 'conditionUID']
@@ -213,25 +237,46 @@ if __name__ == '__main__':
         pdb.set_trace()
     ##################### end of data loading
     ## scale external covariates
-    if ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
-        lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].abs()
-    if ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
-        lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].abs()
-    # pdb.set_trace()
+    # if ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+    #     lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].abs()
+    # if ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+    #     lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].abs()
+    if ('position', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+        posSrs = lhsDF[('position', 0, 'NA', 'NA', 'NA', 'NA')].copy()
+        lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')] = np.cos(np.radians(posSrs * 100.))
+        lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')] = np.sin(np.radians(posSrs * 100))
+        lhsDF.loc[:, ('position', 0, 'NA', 'NA', 'NA', 'NA')] = posSrs / posSrs.abs().max()
+        if ('velocity', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+            velDF = lhsDF[('velocity', 0, 'NA', 'NA', 'NA', 'NA')].copy()
+            velDF = velDF / velDF.abs().max()
+            lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')] = (-1) * np.sin(np.radians(posSrs * 100)) * velDF
+            lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')] = np.cos(np.radians(posSrs * 100.)) * velDF
+            lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].abs()
+            lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].abs()
+            lhsDF.loc[:, ('velocity', 0, 'NA', 'NA', 'NA', 'NA')] = velDF
+        if False:
+            fig, ax = plt.subplots(2, 1, sharex=True)
+            plotPosSrs = posSrs / posSrs.abs().max()
+            ax[0].plot(plotPosSrs.to_numpy())
+            ax[0].plot(velDF.to_numpy())
+            ax[1].plot(lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+            ax[1].plot(lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+            ax[1].plot(lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+            ax[1].plot(lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
     transformersLookup = {
         # 'forceMagnitude': MinMaxScaler(feature_range=(0., 1)),
         # 'forceMagnitude_prime': MinMaxScaler(feature_range=(-1., 1)),
         'amplitude': MinMaxScaler(feature_range=(0., 1)),
         'amplitude_raster': MinMaxScaler(feature_range=(0., 1)),
         'RateInHz': MinMaxScaler(feature_range=(0., .5)),
-        'velocity': MinMaxScaler(feature_range=(-1., 1.)),
-        'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
-        'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
-        'position_x': MinMaxScaler(feature_range=(-1., 1.)),
-        'position_y': MinMaxScaler(feature_range=(-1., 1.)),
-        'velocity_x_abs': MinMaxScaler(feature_range=(0., 1.)),
-        'velocity_y_abs': MinMaxScaler(feature_range=(0., 1.)),
-        'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
+        # 'velocity': MinMaxScaler(feature_range=(-1., 1.)),
+        # 'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
+        # 'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
+        # 'position_x': MinMaxScaler(feature_range=(0., 1.)),
+        # 'position_y': MinMaxScaler(feature_range=(0., 1.)),
+        # 'velocity_x_abs': MinMaxScaler(feature_range=(0., 1.)),
+        # 'velocity_y_abs': MinMaxScaler(feature_range=(0., 1.)),
+        # 'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
         }
     lOfTransformers = []
     for cN in lhsDF.columns:
@@ -332,7 +377,6 @@ if __name__ == '__main__':
                         index=rhGroup.index,
                         columns=ensDesignInfo.column_names))
                 thisHistDesign.columns.name = 'factor'
-                # pdb.set_trace()
                 histSourceTermDict.update({ensTemplate.format(cN): cN for cN in rhGroup.columns})
                 for key, sl in ensDesignInfo.term_name_slices.items():
                     histSourceFactorDict.update({cN: key for cN in ensDesignInfo.column_names[sl]})
@@ -343,14 +387,17 @@ if __name__ == '__main__':
                 featureInfo.to_hdf(designMatrixPath, 'histDesigns/rhsMask_{}/term_lookup_{}'.format(rhsMaskIdx, templateIdx))
     del rhsDF
     ###
-    allTargetsList = []
-    for lhsMaskIdx in range(lhsMasks.shape[0]):
-        allTargetsList.append(pd.concat(targetsList))
-        allTargetsList[-1].loc[:, 'lhsMaskIdx'] = lhsMaskIdx
-    allTargetsDF = pd.concat(allTargetsList, ignore_index=True)
-    allTargetsDF.index.name = 'targetIdx'
-    allTargetsDF.reset_index(inplace=True)
-    allTargetsDF.set_index(['lhsMaskIdx', 'rhsMaskIdx', 'target'], inplace=True)
+    allTargetsDict1 = {}
+    for regressorName, lhsIndices in validTargetLhsMaskIdx.items():
+        allTargetsDict2 = {}
+        for lhsMaskIdx in lhsIndices:
+            allTargetsDict2[lhsMaskIdx] = pd.concat(targetsList)
+            # allTargetsList[-1].loc[:, 'lhsMaskIdx'] = lhsMaskIdx
+        allTargetsDict1[regressorName] = pd.concat(allTargetsDict2, names=['lhsMaskIdx', 'targetIdx']).reset_index()
+        allTargetsDict1[regressorName].loc[:, 'targetIdx'] = np.arange(allTargetsDict1[regressorName].shape[0])
+    allTargetsDF = pd.concat(allTargetsDict1, names=['regressorName', 'index']).reset_index()
+    allTargetsDF.drop(columns=['index'], inplace=True)
+    allTargetsDF.set_index(['regressorName', 'lhsMaskIdx', 'rhsMaskIdx', 'target'], inplace=True)
     print('Saving list of all targets to {}'.format(designMatrixPath))
     allTargetsDF.to_hdf(designMatrixPath, 'allTargets')
     htmlPath = os.path.join(figureOutputFolder, '{}.html'.format(designMatrixDatasetName))
@@ -365,6 +412,15 @@ if __name__ == '__main__':
         htmlPathPLS = os.path.join(figureOutputFolder, '{}_pls.html'.format(designMatrixDatasetName))
         allTargetsPLS.to_html(htmlPathPLS)
     # prep lhs dataframes
+    if False:
+        fig, ax = plt.subplots(2, 1, sharex=True)
+        plotPosSrs = posSrs / posSrs.abs().max()
+        ax[0].plot(plotPosSrs.to_numpy())
+        ax[0].plot(velDF.to_numpy())
+        ax[1].plot(lhsDF['px'].to_numpy())
+        ax[1].plot(lhsDF['py'].to_numpy())
+        ax[1].plot(lhsDF['vx'].to_numpy())
+        ax[1].plot(lhsDF['vy'].to_numpy())
     sourceFactorDict = {}
     for parentFormulaIdx, parentFormula in enumerate(masterExogFormulas):
         prf.print_memory_usage('calculating exog terms for: {}'.format(parentFormula))
@@ -386,6 +442,10 @@ if __name__ == '__main__':
         featureInfo.loc[:, 'term'] = featureInfo['factor'].map(sourceFactorDict)
         featureInfo.loc[:, 'source'] = featureInfo['term'].map(sourceTermDict)
         featureInfo.to_hdf(designMatrixPath, 'designs/exogParents/term_lookup_{}'.format(parentFormulaIdx))
+    # pdb.set_trace()
+    # plt.plot(lhsDF.loc[:, ['px', 'py', 'vx', 'vy']].to_numpy()); plt.show()
+    # plt.plot(lhsDF.loc[:, ['p', 'v']].to_numpy()); plt.show()
+    # plt.plot(designDF.to_numpy()); plt.show()
     '''
     for formulaIdx, designFormula in enumerate(lOfDesignFormulas):
         if designFormula != 'NULL':
@@ -440,10 +500,10 @@ if __name__ == '__main__':
     for rowIdx, row in lhsMasksInfo.iterrows():
         if row['designFormula'] in designHistOptsDict:
             theseHistOpts = designHistOptsDict[row['designFormula']]
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
+            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'exhto{}'.format(addExogHistoryTerms.index(theseHistOpts))
         elif row['ensembleTemplate'] in templateHistOptsDict:
             theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'hto{}'.format(addHistoryTerms.index(theseHistOpts))
+            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'enhto{}'.format(addEndogHistoryTerms.index(theseHistOpts))
         else:
             lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'NULL'
     htmlPath = os.path.join(
@@ -580,30 +640,56 @@ if __name__ == '__main__':
             'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
         })
         '''
-    try:
-        for lhsMaskIdx in lhsMasksOfInterest['varVsEnsemble']:
-            modelsToTest.append({
-                'testDesign': lhsMaskIdx,
-                'refDesign': lhsMaskIdx - 1,
-                'testCaption': 'v + a + r',
-                'refCaption': 'v',
-                'captionStr': 'partial R2 of adding terms for signal ensemble history to V+A+R',
-                'testType': 'ensembleTerms',
-                'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-                'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-                })
-            modelsToTest.append({
-                'testDesign': lhsMaskIdx,
-                'refDesign': lhsMaskIdx - 2,
-                'testCaption': 'v + a + r',
-                'refCaption': 'a + r',
-                'captionStr': 'partial R2 of adding terms for V+A+R to ensemble history',
-                'testType': 'VARNoEnsembleTerms',
-                'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-                'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-            })
-        modelsToTestDF = pd.DataFrame(modelsToTest)
-        modelsToTestDF.to_hdf(designMatrixPath, 'modelsToTest')
-    except:
-        traceback.print_exc()
+    modelsToTest.append({
+        'testDesign': 0,
+        'refDesign': 1,
+        'testCaption': 'v + a + r',
+        'refCaption': 'v',
+        'captionStr': 'partial R2 of adding terms for A+R to V',
+        'testType': 'ARTerms',
+        'testHasEnsembleHistory': lhsMasksInfo.loc[0, 'selfTemplate'] != 'NULL',
+        'lagSpec': lhsMasksInfo.loc[0, 'lagSpec'],
+        })
+    modelsToTest.append({
+        'testDesign': 0,
+        'refDesign': 2,
+        'testCaption': 'v + a + r',
+        'refCaption': 'a + r',
+        'captionStr': 'partial R2 of adding terms for V to A+R',
+        'testType': 'VTerms',
+        'testHasEnsembleHistory': lhsMasksInfo.loc[0, 'selfTemplate'] != 'NULL',
+        'lagSpec': lhsMasksInfo.loc[0, 'lagSpec'],
+        })
+    modelsToTest.append({
+        'testDesign': 3,
+        'refDesign': 0,
+        'testCaption': 'v + a + r + self',
+        'refCaption': 'v + a + r',
+        'captionStr': 'partial R2 of adding terms for self to V+A+R',
+        'testType': 'selfTerms',
+        'testHasEnsembleHistory': lhsMasksInfo.loc[3, 'selfTemplate'] != 'NULL',
+        'lagSpec': lhsMasksInfo.loc[3, 'lagSpec'],
+        })
+    modelsToTest.append({
+        'testDesign': 5,
+        'refDesign': 4,
+        'testCaption': 'v + a + r + ensemble',
+        'refCaption': 'v + ensemble',
+        'captionStr': 'partial R2 of adding terms for A+R to V+A+R+Ens',
+        'testType': 'AREnsTerms',
+        'testHasEnsembleHistory': lhsMasksInfo.loc[4, 'selfTemplate'] != 'NULL',
+        'lagSpec': lhsMasksInfo.loc[4, 'lagSpec'],
+        })
+    modelsToTest.append({
+        'testDesign': 6,
+        'refDesign': 4,
+        'testCaption': 'v + a + r + ensemble',
+        'refCaption': 'a + r + ensemble',
+        'captionStr': 'partial R2 of adding terms for V to V+A+R+Ens',
+        'testType': 'VEnsTerms',
+        'testHasEnsembleHistory': lhsMasksInfo.loc[4, 'selfTemplate'] != 'NULL',
+        'lagSpec': lhsMasksInfo.loc[4, 'lagSpec'],
+        })
+    modelsToTestDF = pd.DataFrame(modelsToTest)
+    modelsToTestDF.to_hdf(designMatrixPath, 'modelsToTest')
     print('\n' + '#' * 50 + '\n{}\nComplete.\n'.format(__file__) + '#' * 50 + '\n')

@@ -19,6 +19,7 @@ Options:
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
+    --selectMethod=selectMethod            filename for resulting estimator (cross-validated n_comps)
 """
 
 import logging
@@ -169,8 +170,19 @@ if __name__ == '__main__':
     #     ('utah93', 0, 0.0, 5.0, 'NA', 'NA'),
     #     ('utah96', 0, 0.0, 8.0, 'NA', 'NA')
     #     ]
-    selectMethod = 'keepAll'
-    if selectMethod == 'decimateSpace':
+    if arguments['selectMethod'] == 'fromRegression':
+        referenceRegressionName = 'ols_select_baseline_{}'.format(datasetName)
+        referenceRegressionPath = os.path.join(
+            estimatorsSubFolder,
+            referenceRegressionName + '.h5'
+            )
+        # pdb.set_trace()
+        referenceScores = pd.read_hdf(referenceRegressionPath, 'processedScores')
+        referenceTrainMask = (referenceScores['trialType'] == 'train')
+        trainCCDF = referenceScores.loc[referenceTrainMask, ['target', 'cc']].groupby('target').mean()
+        listOfTargetNames = trainCCDF.sort_values('cc', ascending=False, kind='mergesort').index.to_list()
+        listOfColumns = [cN for cN in dataDF.columns if cN[0] in listOfTargetNames[:16]]
+    if arguments['selectMethod'] == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
         keepX = np.unique(featureInfo['xCoords'])[::3]
         keepY = np.unique(featureInfo['yCoords'])[::3]
@@ -179,9 +191,9 @@ if __name__ == '__main__':
             featureInfo['yCoords'].isin(keepY)
             )
         listOfColumns = dataDF.columns[xyMask.to_numpy()].to_list()
-    elif selectMethod == 'keepAll':
+    elif arguments['selectMethod'] == 'keepAll':
         listOfColumns = dataDF.columns.to_list()
-    elif selectMethod == 'mostModulated':
+    elif arguments['selectMethod'] == 'mostModulated':
         blockBaseName, _ = hf.processBasicPaths(arguments)
         raucResultsPath = os.path.join(
             dataFramesFolder,

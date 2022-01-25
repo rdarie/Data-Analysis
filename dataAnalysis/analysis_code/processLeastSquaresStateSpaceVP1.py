@@ -179,8 +179,10 @@ with open(loadingMetaPath, 'rb') as _f:
     iteratorOpts = loadingMeta['iteratorOpts']
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
 #
-for hIdx, histOpts in enumerate(addHistoryTerms):
-    locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+for hIdx, histOpts in enumerate(addEndogHistoryTerms):
+    locals().update({'enhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+for hIdx, histOpts in enumerate(addExogHistoryTerms):
+    locals().update({'exhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
 thisEnv = patsy.EvalEnvironment.capture()
 
 iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()

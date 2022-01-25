@@ -137,10 +137,14 @@ if __name__ == '__main__':
         binInterval = iteratorOpts['forceBinInterval'] if (iteratorOpts['forceBinInterval'] is not None) else rasterOpts['binInterval']
     #
     histOptsForExportDict = {}
-    for hIdx, histOpts in enumerate(addHistoryTerms):
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
         formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-        locals().update({'hto{}'.format(hIdx): formattedHistOpts})
-        histOptsForExportDict['hto{}'.format(hIdx)] = formattedHistOpts
+        locals().update({'enhto{}'.format(hIdx): formattedHistOpts})
+        histOptsForExportDict['enhto{}'.format(hIdx)] = formattedHistOpts
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
+        locals().update({'exhto{}'.format(hIdx): formattedHistOpts})
+        histOptsForExportDict['exhto{}'.format(hIdx)] = formattedHistOpts
         # locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
     # histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
     # histOptsHtmlPath = os.path.join(
@@ -308,6 +312,8 @@ if __name__ == '__main__':
                 selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
             ####
             for targetName in rhGroup.columns:
+                if (lhsMaskIdx, rhsMaskIdx, targetName) not in allTargetsDF.index:
+                    continue
                 targetIdx = allTargetsDF.loc[(lhsMaskIdx, rhsMaskIdx, targetName), 'targetIdx']
                 if (targetIdx // slurmGroupSize) != slurmTaskID:
                     continue

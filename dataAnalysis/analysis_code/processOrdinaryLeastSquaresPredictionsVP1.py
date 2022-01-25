@@ -88,8 +88,8 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': 1,
-        'lines.markersize': 2.4,
+        'lines.linewidth': .2,
+        'lines.markersize': 1.,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -178,16 +178,12 @@ if __name__ == '__main__':
         iteratorOpts = loadingMeta['iteratorOpts']
         binInterval = iteratorOpts['forceBinInterval'] if (iteratorOpts['forceBinInterval'] is not None) else rasterOpts['binInterval']
     #
-    histOptsForExportDict = {}
-    for hIdx, histOpts in enumerate(addHistoryTerms):
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
         formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-        locals().update({'hto{}'.format(hIdx): formattedHistOpts})
-        histOptsForExportDict['hto{}'.format(hIdx)] = formattedHistOpts
-        # locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
-    # histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
-    # histOptsHtmlPath = os.path.join(
-    #     figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'histOpts'))
-    # histOptsForExportDF.to_html(histOptsHtmlPath)
+        locals().update({'enhto{}'.format(hIdx): formattedHistOpts})
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
+        locals().update({'exhto{}'.format(hIdx): formattedHistOpts})
     thisEnv = patsy.EvalEnvironment.capture()
 
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
@@ -272,7 +268,7 @@ if __name__ == '__main__':
                     else:
                         scoresStackList.append(thisScoresStack)
                     ##
-                    thisR2Per = pd.read_hdf(store, 'processedR')
+                    thisR2Per = pd.read_hdf(store, 'processedR2')
                     if R2PerIndexNames is None:
                         R2PerIndexNames = thisR2Per.index.names
                     thisR2Per.reset_index(inplace=True)
@@ -409,7 +405,7 @@ if __name__ == '__main__':
     featsToPlot = (
         scoresStack.loc[scoresStack['fullDesign'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmax(),
         scoresStack.loc[scoresStack['fullDesign'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmin())
-    height, width = 2, 4
+    height, width = 1, 2
     aspect = width / height
     commonOpts = dict(
         )
@@ -435,16 +431,17 @@ if __name__ == '__main__':
                 scoresStack[cN] == nmLk0[cN]
                 for cN in groupPagesBy]
             plotScores = scoresStack.loc[np.logical_and.reduce(scoreMasks), :]
+            plotScores.loc[:, 'r'] = np.sqrt(plotScores['score'])
             thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['foldType'])]
             g = sns.catplot(
                 data=plotScores, hue='foldType',
-                x='target', y='score',
+                x='target', y='r',
                 hue_order=thisPalette.index.to_list(),
                 palette=thisPalette.to_dict(),
                 height=height, aspect=aspect,
                 kind='box')
             g.set_xticklabels(rotation=-30, ha='left')
-            g.suptitle('R^2 of model {fullFormulaDescr}'.format(**nmLk0))
+            g.suptitle('R of model {fullFormulaDescr}'.format(**nmLk0))
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:

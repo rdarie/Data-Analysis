@@ -200,7 +200,7 @@ if __name__ == '__main__':
         return_train_score=True, return_estimator=True)
     estimatorMetadata['crossvalKWArgs'] = crossvalKWArgs
     ###
-    nAlphas = 5
+    nAlphas = 10
     ###
     ## statsmodels elasticnet
     regressorKWArgs = {
@@ -208,7 +208,8 @@ if __name__ == '__main__':
         'family': sm.families.Gaussian(),
         'alpha': 1e-12, 'L1_wt': .1,
         'refit': True, 'tol': 1e-4,
-        'maxiter': 500, 'disp': False,
+        'maxiter': 50, 'disp': False, 'check_step': False,
+        'start_params': 1.0,
         'calc_frequency_weights': True
         }
     regressorClass = tdr.SMWrapper
@@ -220,8 +221,8 @@ if __name__ == '__main__':
         refit=False,
         param_grid={
             'regressor__regressor__calc_frequency_weights': [True],
-            l1_ratio_name: [.1, 0.9],
-            alpha_name: [0.] + np.logspace(-4, -1, nAlphas - 1).tolist()}
+            l1_ratio_name: [.5],
+            alpha_name: np.logspace(-12, -2, nAlphas).tolist()}
         )
     #
     '''regressorClass = ElasticNet
@@ -241,8 +242,10 @@ if __name__ == '__main__':
         return_train_score=True,
         refit=False
         )'''
-    for hIdx, histOpts in enumerate(addHistoryTerms):
-        locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
+        locals().update({'enhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        locals().update({'exhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
     thisEnv = patsy.EvalEnvironment.capture()
     #
     crossvalKWArgs['cv'] = cvIterator
@@ -256,7 +259,7 @@ if __name__ == '__main__':
     #
     lhsMasks = pd.read_hdf(designMatrixPath, '/featureMasks')
     lhsMasksInfo = pd.read_hdf(designMatrixPath, '/lhsMasksInfo')
-    allTargetsDF = pd.read_hdf(designMatrixPath, 'allTargets')
+    allTargetsDF = pd.read_hdf(designMatrixPath, 'allTargets').xs(arguments['estimatorName'], level='regressorName')
     rhsMasks = pd.read_hdf(rhsDatasetPath, '/{}/featureMasks'.format(arguments['selectionNameRhs']))
     #
     if arguments['transformerNameRhs'] is not None:
@@ -305,7 +308,6 @@ if __name__ == '__main__':
     histDesignInfoDict = {}
     #
     for rhsMaskIdx in range(rhsMasks.shape[0]):
-        #
         prf.print_memory_usage('\n    On rhsRow {}\n'.format(rhsMaskIdx))
         rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
         rhsMaskParams = {k: v for k, v in zip(rhsMasks.index.names, rhsMask.name)}
@@ -394,7 +396,6 @@ if __name__ == '__main__':
         designFormula = lhsMaskParams['designFormula']
         if designFormula != 'NULL':
             pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
-            # pdb.set_trace()
             designMatrixExample = pt.fit_transform(exampleLhGroup)
             designInfo = designMatrixExample.design_info
             theseColumns = designInfo.column_names
@@ -410,6 +411,7 @@ if __name__ == '__main__':
         else:
             exogList = []
         # add ensemble to designDF?
+        #
         ensTemplate = lhsMaskParams['ensembleTemplate']
         selfTemplate = lhsMaskParams['selfTemplate']
         if (ensTemplate == 'NULL') and (selfTemplate == 'NULL') and (designFormula =='NULL'):
@@ -434,7 +436,11 @@ if __name__ == '__main__':
             gridSearcherDict1 = {}
             gsScoresDict1 = {}
             #
+            if DEBUGGING:
+                pdb.set_trace()
             for targetName in rhGroup.columns:
+                if (lhsMaskIdx, rhsMaskIdx, targetName) not in allTargetsDF.index:
+                    continue
                 targetIdx = allTargetsDF.loc[(lhsMaskIdx, rhsMaskIdx, targetName), 'targetIdx']
                 if (targetIdx // slurmGroupSize) != slurmTaskID:
                     print("targetIdx ({}) // slurmGroupSize = {}".format(targetIdx, targetIdx // slurmGroupSize))
@@ -491,7 +497,8 @@ if __name__ == '__main__':
                 del fullDesignList
                 gsKWA = deepcopy(gridSearchKWArgs)
                 #############
-                #  estimatorInstance.fit(fullDesignDF, targetDF)
+                if DEBUGGING:
+                    estimatorInstance.fit(fullDesignDF, targetDF)
                 ##############
                 cvScores, gridSearcherDict1[targetName], gsScoresDF = tdr.gridSearchHyperparameters(
                     fullDesignDF, targetDF,

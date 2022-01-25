@@ -182,16 +182,10 @@ if __name__ == '__main__':
         iteratorOpts = loadingMeta['iteratorOpts']
         binInterval = iteratorOpts['forceBinInterval'] if (iteratorOpts['forceBinInterval'] is not None) else rasterOpts['binInterval']
     #
-    histOptsForExportDict = {}
-    for hIdx, histOpts in enumerate(addHistoryTerms):
-        formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-        locals().update({'hto{}'.format(hIdx): formattedHistOpts})
-        histOptsForExportDict['hto{}'.format(hIdx)] = formattedHistOpts
-        # locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
-    # histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
-    # histOptsHtmlPath = os.path.join(
-    #     figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'histOpts'))
-    # histOptsForExportDF.to_html(histOptsHtmlPath)
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
+        locals().update({'enhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        locals().update({'exhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
     thisEnv = patsy.EvalEnvironment.capture()
 
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
@@ -204,7 +198,7 @@ if __name__ == '__main__':
     #
     lhsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsDF')
     lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
-    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
+    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets').xs(arguments['estimatorName'], level='regressorName')
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
     lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
     rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')

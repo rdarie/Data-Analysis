@@ -77,7 +77,7 @@ argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
         'winStart': '-800', 'winStop': '1000', 'limitPages': None,
-        'unitQuery': "chanName.isin(['position#0', 'position_x#0', 'position_y#0','velocity#0', 'velocity_x#0', 'velocity_y#0', 'amplitude#0', 'amplitude_raster#0', 'ins_td0#0', 'ins_td2#0'])",
+        'unitQuery': "chanName.isin(['position#0','velocity#0', 'amplitude#0', 'utah_rawAverage_0#0', 'ins_td0#0', 'ins_td2#0'])",
         # 'alignQuery': None,
         # 'alignQuery': "conditionUID == 2",
         'individualTraces': False, 'overlayStats': False,
@@ -141,9 +141,9 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_spectral_illustration_topo': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '800', 'limitPages': None,
+        'winStart': '-600', 'winStop': '1000', 'limitPages': None,
         'unitQuery': None,
-        # 'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
+        'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'yCoords', 'rowControl': '',

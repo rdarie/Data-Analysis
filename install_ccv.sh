@@ -15,7 +15,8 @@ RepoList=(\
 "kCSD-python" \
 "scaleogram" \
 "pywt" \
-"scikit-lego"
+"scikit-lego" \
+"statsmodels"
 )
 
 module load git/2.10.2

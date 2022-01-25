@@ -182,16 +182,12 @@ if __name__ == '__main__':
         iteratorOpts = loadingMeta['iteratorOpts']
         binInterval = iteratorOpts['forceBinInterval'] if (iteratorOpts['forceBinInterval'] is not None) else rasterOpts['binInterval']
     #
-    histOptsForExportDict = {}
-    for hIdx, histOpts in enumerate(addHistoryTerms):
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
         formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-        locals().update({'hto{}'.format(hIdx): formattedHistOpts})
-        histOptsForExportDict['hto{}'.format(hIdx)] = formattedHistOpts
-        # locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
-    histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
-    histOptsHtmlPath = os.path.join(
-        figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'histOpts'))
-    histOptsForExportDF.to_html(histOptsHtmlPath)
+        locals().update({'enhto{}'.format(hIdx): formattedHistOpts})
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
+        locals().update({'exhto{}'.format(hIdx): formattedHistOpts})
     thisEnv = patsy.EvalEnvironment.capture()
 
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
@@ -204,12 +200,15 @@ if __name__ == '__main__':
     #
     lhsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsDF')
     lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
-    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
+    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets').xs(arguments['estimatorName'], level='regressorName')
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
     rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
     lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
     modelsToTestDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'modelsToTest')
     #
+    lhsMasksPresent = allTargetsDF.index.get_level_values('lhsMaskIdx').unique()
+    modelsValidMask = (modelsToTestDF['testDesign'].isin(lhsMasksPresent)) & (modelsToTestDF['refDesign'].isin(lhsMasksPresent))
+    modelsToTestDF = modelsToTestDF.loc[modelsValidMask, :]
     stimConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'stimConditionLookup')
     kinConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'kinConditionLookup')
     ##
@@ -224,12 +223,14 @@ if __name__ == '__main__':
         scoresStack = None
         llDF = None
         aicDF = None
+        ccDF = None
         R2Per = None
     else:
         #
         scoresStackList = []
         llList = []
         aicList = []
+        ccList = []
         R2PerList = []
     #
     if processSlurmTaskCount is not None:
@@ -271,6 +272,11 @@ if __name__ == '__main__':
                     thisAic.reset_index(inplace=True)
                     print('these Aic, thisAic.shape = {}'.format(thisAic.shape))
 
+                    ##
+                    thisCC = pd.read_hdf(store,  'processedCC')
+                    thisCC.reset_index(inplace=True)
+                    print('these CC, thisCC.shape = {}'.format(thisCC.shape))
+
                     if memoryEfficientLoad:
                         if aicDF is None:
                             aicDF = thisAic
@@ -278,9 +284,16 @@ if __name__ == '__main__':
                             aicDF = aicDF.append(thisAic)
                     else:
                         aicList.append(thisAic)
+                    if memoryEfficientLoad:
+                        if ccDF is None:
+                            ccDF = thisCC
+                        else:
+                            ccDF = ccDF.append(thisCC)
+                    else:
+                        ccList.append(thisCC)
 
                     #
-                    thisR2Per = pd.read_hdf(store, 'processedR')
+                    thisR2Per = pd.read_hdf(store, 'processedR2')
                     if R2PerIndexNames is None:
                         R2PerIndexNames = thisR2Per.index.names
                     thisR2Per.reset_index(inplace=True)
@@ -315,7 +328,10 @@ if __name__ == '__main__':
     if not memoryEfficientLoad:
         aicDF = pd.concat(aicList, copy=False)
         del aicList
+        ccDF = pd.concat(ccList, copy=False)
+        del ccList
     aicDF.set_index(aicIndexNames, inplace=True)
+    ccDF.set_index(aicIndexNames, inplace=True)
     print('all predictions, predDF.shape = {}'.format(aicDF.shape))
     gc.collect()
     prf.print_memory_usage('done concatenating aic from .h5 array')
@@ -342,6 +358,7 @@ if __name__ == '__main__':
     estimatorsDict = {}
     gsScoresDict = {}
     nItersDict = {}
+    convergenceDict = {}
     for rowIdx, row in allTargetsDF.iterrows():
         lhsMaskIdx, rhsMaskIdx, targetName = row.name
         if processSlurmTaskCount is not None:
@@ -369,6 +386,15 @@ if __name__ == '__main__':
             thisEstimatorJB = pd.Series(thisEstimatorJBDict)
             thisEstimatorJB.index.name = 'fold'
             estimatorsDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = thisEstimatorJB
+            ####
+            convergenceInfo = pd.concat(
+                (
+                    thisEstimatorJB
+                    .apply(lambda x: x.regressor_.named_steps['regressor'].convergence_history)
+                    .to_dict()),
+                names=['fold', 'filler']
+                ).reset_index().drop(columns=['filler'])
+            convergenceDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = convergenceInfo
             #####
             gsScoresDict[(lhsMaskIdx, rhsMaskIdx, targetName)] = pd.read_hdf(
                 thisEstimatorPath, 'gs_estimators/lhsMask_{}/rhsMask_{}/{}'.format(
@@ -385,23 +411,28 @@ if __name__ == '__main__':
         except:
             pass
     ##
-    savingResults = False
+    savingResults = True
     prf.print_memory_usage('concatenating estimators from .h5 array')
     estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     del estimatorsDict
     prf.print_memory_usage('done concatenating estimators from .h5 array')
     gsScoresDF = pd.concat(gsScoresDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     gsScoresDF.drop(columns=['lhsMaskIdx', 'rhsMaskIdx'], inplace=True)
+    gsScoresDF.loc[:, 'cc'] = np.sqrt(gsScoresDF['score'])
     del gsScoresDict
     prf.print_memory_usage('done concatenating gs scores from h5 file')
     if len(nItersDict):
         nItersDF = pd.concat(nItersDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     else:
         nItersDF = None
+    if len(convergenceDict):
+        convergenceDF = pd.concat(convergenceDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
+    else:
+        convergenceDF = None
     #
     with pd.HDFStore(estimatorPath) as store:
         #
-        # coefDF = pd.read_hdf(store, 'coefficients')
+        coefDF = pd.read_hdf(store, 'coefficients')
         sourcePalette = pd.read_hdf(store, 'sourcePalette')
         termPalette = pd.read_hdf(store, 'termPalette')
         factorPalette = pd.read_hdf(store, 'factorPalette')
@@ -419,7 +450,6 @@ if __name__ == '__main__':
     for modelIdx, modelToTest in modelsToTestDF.iterrows():
         testDesign = modelToTest['testDesign']
         refDesign = modelToTest['refDesign']
-        ##
         theseFUDE = tdr.partialR2(llDF['ll'], refDesign=refDesign, testDesign=testDesign, designLevel='lhsMaskIdx')
         theseFUDEStats = tdr.correctedResampledPairedTTest(
             theseFUDE.xs('test', level='trialType'), y=0., groupBy=['target', 'electrode'], cvIterator=cvIterator)
@@ -456,8 +486,16 @@ if __name__ == '__main__':
         plotAIC.loc[group.index, 'dAIC'] = group['aic'] - group['aic'].min()
     scoresStack.sort_values(['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'trialType'], kind='mergesort', inplace=True)
     plotAIC.sort_values(['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'trialType'], kind='mergesort', inplace=True)
+    #
+    plotCC = ccDF.xs('all', level='electrode').reset_index()
+    plotCC.loc[:, 'rhsMaskIdx'] = plotCC['target'].map(scoresStack[['rhsMaskIdx', 'target']].drop_duplicates().set_index('target')['rhsMaskIdx'])
+    plotCC.sort_values(['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'trialType'], kind='mergesort', inplace=True)
+    #
     scoresStack.loc[:, 'aic'] = plotAIC['aic'].to_numpy()
     scoresStack.loc[:, 'dAIC'] = plotAIC['dAIC'].to_numpy()
+    scoresStack.loc[:, 'cc'] = plotCC['cc'].to_numpy()
+    if savingResults:
+        scoresStack.to_hdf(estimatorPath, 'processedScores')
 
     def drawUnityLine(g, ro, co, hu, dataSubset):
         emptySubset = (
@@ -622,31 +660,40 @@ if __name__ == '__main__':
                 assert (not thisDesignTypeMask.any())
                 thisDesignTypeMask = (
                         (plotScores['designFormula'] == 'NULL') &
+                        (plotScores['selftTemplate'] == 'NULL') &
                         (plotScores['ensembleTemplate'] != 'NULL')
                     )
                 plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleOnly'
                 thisDesignTypeMask = (
+                        (plotScores['designFormula'] == 'NULL') &
+                        (plotScores['selftTemplate'] != 'NULL') &
+                        (plotScores['ensembleTemplate'] == 'NULL')
+                    )
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'selfOnly'
+                thisDesignTypeMask = (
                         (plotScores['designFormula'] != 'NULL') &
+                        (plotScores['selftTemplate'] == 'NULL') &
                         (plotScores['ensembleTemplate'] == 'NULL')
                     )
                 plotScores.loc[thisDesignTypeMask, 'designType'] = 'exogenousOnly'
                 thisDesignTypeMask = (
                         (plotScores['designFormula'] != 'NULL') &
-                        (plotScores['ensembleTemplate'] != 'NULL')
+                        ((plotScores['selftTemplate'] != 'NULL') |
+                        (plotScores['ensembleTemplate'] != 'NULL'))
                     )
-                plotScores.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndExogenous'
+                plotScores.loc[thisDesignTypeMask, 'designType'] = 'exogenousAndEnsembleOrSelf'
                 #
                 trialTypesToPlot = ['test', 'train']
                 thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
                 g = sns.catplot(
                     data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
-                    y='score', hue='trialType',
+                    y='cc', hue='trialType',
                     x='fullDesignAsLabel',
                     col='target', row='designType',
                     hue_order=thisPalette.index.to_list(),
                     palette=thisPalette.to_dict(),
                     kind='box', height=height, aspect=aspect, sharey=False)
-                g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.suptitle('CC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
                 g.set_xticklabels(rotation=-30, ha='left')
                 g.tight_layout(pad=styleOpts['tight_layout.pad'])
                 pdf.savefig(bbox_inches='tight', pad_inches=0)
@@ -674,15 +721,17 @@ if __name__ == '__main__':
                 else:
                     plt.close()
                 #
-                trialTypesToPlot = ['test', 'train', 'work', 'validation']
+                trialTypesToPlot = ['test', 'train']
                 g = sns.catplot(
                     data=plotScores.loc[plotScores['trialType'].isin(trialTypesToPlot), :],
-                    y='score', hue='trialType',
+                    y='cc', hue='trialType',
                     x='fullDesignAsLabel', row='designType',
                     hue_order=thisPalette.index.to_list(),
                     palette=thisPalette.to_dict(),
-                    kind='box', height=height, aspect=aspect, sharey=False)
-                g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                    # kind='box',
+                    kind='violin', cut=0, inner='point',
+                    height=height, aspect=aspect, sharey=False)
+                g.suptitle('CC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
                 g.set_xticklabels(rotation=-30, ha='left')
                 g.tight_layout(pad=styleOpts['tight_layout.pad'])
                 pdf.savefig(bbox_inches='tight', pad_inches=0)
@@ -765,24 +814,58 @@ if __name__ == '__main__':
         gsScoresDF.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndExogenous'
         bestParamsDF.loc[:, 'designType'] = bestParamsDF['lhsMaskIdx'].map(gsScoresDF.loc[:, ['lhsMaskIdx', 'designType']].drop_duplicates().set_index('lhsMaskIdx')['designType'])
         # thisNIters
+        plotCoefDF = coefDF.to_frame(name='coef').reset_index()
+        plotCoefDF.loc[:, 'abs_coef'] = plotCoefDF['coef'].abs()
+        plotCoefDF.loc[:, 'xDummy'] = 0
+        g = sns.catplot(
+            y='abs_coef',
+            x='xDummy',
+            hue='factor', hue_order=plotCoefDF['factor'].unique(),
+            row='lhsMaskIdx', col='rhsMaskIdx',
+            height=height, aspect=aspect,
+            facet_kws=dict(sharey=False),
+            data=plotCoefDF.query('coef != 0'), kind='box'
+            )
+        g.suptitle('magnitude of coefficients')
+        g.tight_layout(pad=styleOpts['tight_layout.pad'])
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        if convergenceDF is not None:
+            plotConvDF = convergenceDF.reset_index()
+            g = sns.relplot(
+                y='cost', x='iter',
+                row='lhsMaskIdx', col='rhsMaskIdx',
+                hue='target',
+                data=plotConvDF, kind='line', errorbar='se',
+                )
+            g.suptitle('regression convergence')
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+        if nItersDF is not None:
+            plotNIters = nItersDF.to_frame(name='nIters').reset_index()
+            g = sns.displot(
+                data=plotNIters,
+                row='lhsMaskIdx', col='rhsMaskIdx',
+                x='nIters',
+                height=height, aspect=aspect,
+                facet_kws=dict(sharey=False),
+                kind='hist'
+                )
+            g.suptitle('number of iterations')
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
         for rhsMaskIdx in gsScoresDF['rhsMaskIdx'].unique():
-            if nItersDF is not None:
-                plotNIters = nItersDF.xs(rhsMaskIdx, level='rhsMaskIdx').to_frame(name='nIters').reset_index()
-                g = sns.displot(
-                    data=plotNIters,
-                    row='lhsMaskIdx',
-                    x='nIters',
-                    height=height, aspect=aspect,
-                    facet_kws=dict(sharey=False),
-                    kind='hist'
-                    )
-                g.suptitle('number of iterations (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
-                g.tight_layout(pad=styleOpts['tight_layout.pad'])
-                pdf.savefig(bbox_inches='tight', pad_inches=0)
-                if arguments['showFigures']:
-                    plt.show()
-                else:
-                    plt.close()
             # for rhsMaskIdx, plotScores in gsScoresDF.loc[~issueMask, :].groupby('rhsMaskIdx', sort=False):
             # for rhsMaskIdx, plotScores in gsScoresDF.groupby('rhsMaskIdx', sort=False):
             for hpN in hpNames:
@@ -793,7 +876,7 @@ if __name__ == '__main__':
                 #
                 thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
                 g = sns.relplot(
-                    y='score', x=hpN,
+                    y='cc', x=hpN,
                     row='designType',
                     hue='trialType',
                     data=plotScores, kind='line', errorbar='se',
@@ -802,8 +885,10 @@ if __name__ == '__main__':
                     height=height, aspect=aspect,
                     facet_kws=dict(sharex=False, sharey=False)
                     )
+                if (plotScores[hpN].abs().max() / plotScores[hpN].abs().min()) > 1e6:
+                    g.set(xscale='log')
                 # xLimsRel = [a.get_xlim() for a in g.axes.flat]
-                g.suptitle('R2 (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
+                g.suptitle('CC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
                 g.tight_layout(pad=styleOpts['tight_layout.pad'])
                 pdf.savefig(bbox_inches='tight', pad_inches=0)
                 if arguments['showFigures']:
@@ -822,7 +907,7 @@ if __name__ == '__main__':
                 g = sns.catplot(
                     data=plotScores,
                     row='designType',
-                    x=hpN, y='score',
+                    x=hpN, y='cc',
                     hue='trialType',
                     hue_order=thisPalette.index.to_list(),
                     palette=thisPalette.to_dict(),

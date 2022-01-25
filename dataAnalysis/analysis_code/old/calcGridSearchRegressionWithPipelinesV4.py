@@ -238,8 +238,10 @@ if __name__ == '__main__':
         return_train_score=True,
         refit=False
         )'''
-    for hIdx, histOpts in enumerate(addHistoryTerms):
-        locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
+        locals().update({'enhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        locals().update({'exhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
     thisEnv = patsy.EvalEnvironment.capture()
     #
     crossvalKWArgs['cv'] = cvIterator

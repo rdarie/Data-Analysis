@@ -78,7 +78,8 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': 1,
+        'lines.linewidth': .2,
+        'lines.markersize': .5,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -166,8 +167,10 @@ with open(loadingMetaPath, 'rb') as _f:
     iteratorOpts = loadingMeta['iteratorOpts']
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
 #
-for hIdx, histOpts in enumerate(addHistoryTerms):
-    locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+for hIdx, histOpts in enumerate(addEndogHistoryTerms):
+    locals().update({'enhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+for hIdx, histOpts in enumerate(addExogHistoryTerms):
+    locals().update({'exhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
 thisEnv = patsy.EvalEnvironment.capture()
 
 iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
@@ -181,7 +184,7 @@ designMatrixPath = estimatorMeta['designMatrixPath']
 #
 lhsDF = pd.read_hdf(designMatrixPath, 'lhsDF')
 lhsMasks = pd.read_hdf(designMatrixPath, 'featureMasks')
-allTargetsDF = pd.read_hdf(designMatrixPath, 'allTargets')
+allTargetsDF = pd.read_hdf(designMatrixPath, 'allTargets').xs(arguments['estimatorName'], level='regressorName')
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
 #
 lhsMasksInfo = pd.read_hdf(designMatrixPath, 'lhsMasksInfo')
@@ -509,6 +512,8 @@ trialTypePalette = pd.Series(
 iRPerFactorDict0 = {}
 iRPerTermDict0 = {}
 for lhsMaskIdx in range(lhsMasks.shape[0]):
+    if lhsMaskIdx not in allTargetsDF.index.get_level_values('lhsMaskIdx'):
+        continue
     lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
     lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
     designFormula = lhsMaskParams['designFormula']
@@ -756,7 +761,7 @@ if savingResults:
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
 with PdfPages(pdfPath) as pdf:
-    height, width = 2, 4
+    height, width = 1, 1.5
     aspect = width / height
     for (lhsMaskIdx, designFormula, rhsMaskIdx), thisIRPerTerm in iRPerTerm.groupby(
             ['lhsMaskIdx', 'design', 'rhsMaskIdx']):
@@ -777,7 +782,7 @@ with PdfPages(pdfPath) as pdf:
         selfTemplate = lhsMaskParams['selfTemplate']
         if selfTemplate != 'NULL':
             selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
-            histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+            histLens.append(templateHistOptsDict[selfTemplate]['historyLen'])
         tBins = thisIRPerTerm.index.get_level_values('bin')
         kernelMask = (tBins >= 0) & (tBins <= max(histLens))
         plotDF = thisIRPerTerm.loc[kernelMask, :].stack().to_frame(name='signal').reset_index()
@@ -787,10 +792,11 @@ with PdfPages(pdfPath) as pdf:
         theseSources = plotDF['term'].map(termPalette.loc[:, ['term', 'source']].set_index('term')['source'])
         plotDF.loc[:, 'termType'] = plotDF['term'].map(termPalette.reset_index().loc[:, ['term', 'type']].set_index('term')['type'])
         plotDF.loc[plotDF['target'] == theseSources, 'termType'] = 'self'
+        nCols = int(np.sqrt(plotDF['target'].unique().shape[0]))
         g = sns.relplot(
             # row='kinCondition', row_order=kinOrder,
             # col='stimCondition', col_order=stimOrder,
-            row='target',
+            col='target', col_wrap=nCols,
             x='bin', y='signal', hue='term',
             hue_order=thisTermPalette['term'].to_list(),
             palette=thisTermPalette.loc[:, ['term', 'color']].set_index('term')['color'].to_dict(),

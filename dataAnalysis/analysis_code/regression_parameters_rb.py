@@ -2,21 +2,42 @@
 import dataAnalysis.custom_transformers.tdr as tdr
 import pdb
 
+validTargetLhsMaskIdx = {
+    'ols_select_baseline': [0, 1, 2, 3,],
+    'ols2_select2_baseline': [4, 5, 6],
+    'ols_select_spectral_baseline': [0, 1, 2, 3,],
+    'ols2_select2_spectral_baseline': [4, 5, 6]
+}
+
 processSlurmTaskCountPLS = 3
 processSlurmTaskCount = 46
-processSlurmTaskCountTransferFunctions = 48
+processSlurmTaskCountTransferFunctions = 46
 joblibBackendArgs = dict(
     backend='loky',
     n_jobs=-1
     )
-addHistoryTerms = [
-    # hto0
+addEndogHistoryTerms = [
+    # enhto0
     {
         'nb': 5, 'logBasis': True,
         'dt': None,
         'historyLen': 300e-3,
         'timeDelay': 100e-3,
-        'b': 10e-3, 'useOrtho': True,
+        'b': 25e-3, 'useOrtho': True,
+        'normalize': True, 'groupBy': 'trialUID',
+        'zflag': False,
+        'causalShift': True, 'causalFill': True,
+        'addInputToOutput': False, 'verbose': 0,
+        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
+    ]
+addExogHistoryTerms = [
+    # exhto0
+    {
+        'nb': 5, 'logBasis': True,
+        'dt': None,
+        'historyLen': 400e-3,
+        'timeDelay': 0,
+        'b': 25e-3, 'useOrtho': True,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,
@@ -27,16 +48,20 @@ addHistoryTerms = [
 regressionColumnsToUse = [
     # 'velocity_abs',
     'velocity_x', 'velocity_y',
+    # 'velocity',
     # 'velocity_x_abs', 'velocity_y_abs',
-    'position_x', 'position_y',
+    # 'position_x', 'position_y',
+    # 'position',
     'amplitude', 'electrode', 'RateInHz',
     ]
 regressionColumnRenamer = {
-    'velocity_abs': 'v', 'amplitude': 'a',
+    'amplitude': 'a',
     'electrode': 'e', 'RateInHz': 'r',
+    'position': 'p', 'velocity': 'v',
     'velocity_x': 'vx', 'velocity_y': 'vy',
     'position_x': 'px', 'position_y': 'py',
-    # 'velocity_x_abs': 'vxa', 'velocity_y_abs': 'vya',
+    'velocity_abs': 'absv',
+    'velocity_x_abs': 'absvx', 'velocity_y_abs': 'absvy',
     }
 
 def iWrap(x):
@@ -70,83 +95,87 @@ def absWrap(x):
     return('abv({})'.format(x))
 
 designFormulaTemplates = [
-    '{vx} + {vy} + {px} + {py} + {a} + {r} - 1',
-    '{vx} + {vy} + {px} + {py} - 1',
+    '{vx} + {vy} + {a} + {r} - 1',
+    '{vx} + {vy} - 1',
     '{a} + {r} - 1',
     ]
 
-lOfDesignFormulas = []
 #
-masterExogFormulas = []
-masterExogLookup = {}
 # masterExogFormulas and masterExogLookup are used
 # relate design formulas that are included in one another,
 # to avoid re-computing terms from convolution
-lOfHistTemplates = []
+masterExogFormulas = []
+masterExogLookup = {}
+#
+lOfDesignFormulas = []
 sourceTermDict = {}
 sourceHistOptsDict = {}
 designHistOptsDict = {}
-templateHistOptsDict = {}
 designIsLinear = {}
 formulasShortHand = {}
 #
-lOfEndogAndExogTemplates = []
 #
-for lagSpecIdx in range(len(addHistoryTerms)):
-    lagSpec = 'hto{}'.format(lagSpecIdx)
+for lagSpecIdx in range(len(addExogHistoryTerms)):
+    lagSpec = 'exhto{}'.format(lagSpecIdx)
     wrapperFun = genRcbWrap(lagSpec)
     elecWrapperFun = genElecRcbWrap(lagSpec)
     laggedModels = {}
-    for source in ['vx', 'vy', 'px', 'py', 'vxa', 'vya']:
+    for source in ['vx', 'vy', 'v', 'absvx', 'absvy', 'p']:
         laggedModels[source] = wrapperFun(source)
         sourceTermDict[wrapperFun(source)] = source
-        sourceHistOptsDict[wrapperFun(source).replace(' ', '')] = addHistoryTerms[lagSpecIdx]
+        sourceHistOptsDict[wrapperFun(source).replace(' ', '')] = addExogHistoryTerms[lagSpecIdx]
     for source in [
-        'a', 'vx*a', 'vy*a', 'vxa*a', 'vya*a',
-        'r', 'vx*r', 'vy*r', 'vxa*r', 'vya*r',
-        'a', 'px*a', 'py*a', 'pxa*a', 'pya*a',
-        'r', 'px*r', 'py*r', 'pxa*r', 'pya*r',
-        'a*r', 'vx*a*r', 'vy*a*r', 'vxa*a*r', 'vya*a*r',
-        'a*r', 'pvx*a*r', 'py*a*r', 'pxa*a*r', 'pya*a*r',]:
+        'a', 'vx*a', 'vy*a',
+        'r', 'vx*r', 'vy*r',
+        'a*r', 'vx*a*r', 'vy*a*r',]:
         laggedModels[source] = elecWrapperFun(source)
         sourceTermDict[elecWrapperFun(source)] = source
-        sourceHistOptsDict[elecWrapperFun(source).replace(' ', '')] = addHistoryTerms[lagSpecIdx]
+        sourceHistOptsDict[elecWrapperFun(source).replace(' ', '')] = addExogHistoryTerms[lagSpecIdx]
     #
     theseFormulas = [dft.format(**laggedModels) for dft in designFormulaTemplates]
     formulasShortHand.update({
         dft.format(**laggedModels): '({}, **{})'.format(dft, lagSpec)
         for dft in designFormulaTemplates})
-    for fIdx in range(1):
+    for fIdx in range(2):
         designIsLinear.update({
             theseFormulas[fIdx]: True})
     masterExogFormulas.append(theseFormulas[0])
     for tf in theseFormulas:
         masterExogLookup[tf] = theseFormulas[0]
     lOfDesignFormulas += theseFormulas
-    histTemplate = 'rcb({}, **{})'.format('{}', lagSpec)
-    lOfHistTemplates.append(histTemplate)
     designHistOptsDict.update({
-        thisForm: addHistoryTerms[lagSpecIdx]
+        thisForm: addExogHistoryTerms[lagSpecIdx]
         for thisForm in theseFormulas})
-    templateHistOptsDict[histTemplate] = addHistoryTerms[lagSpecIdx]
-    for exogFormula in ['NULL'] + theseFormulas:
-        # for endogFormula in ['NULL', histTemplate]:
-        for endogFormula in ['NULL']:
-            if not ((exogFormula == 'NULL') and (endogFormula == 'NULL')):
-                lOfEndogAndExogTemplates.append((exogFormula, endogFormula, endogFormula,))
 #
 lOfDesignFormulas.append('NULL')
-lOfHistTemplates.append('NULL')
 formulasShortHand['NULL'] = 'NULL'
 designIsLinear['NULL'] = True
 #
-lOfEnsembleTemplates = [
-    (hT, hT) for hT in lOfHistTemplates
-    ]
+templateHistOptsDict = {}
+lOfHistTemplates = []
+lOfEndogAndExogTemplates = []
+
+for lagSpecIdx in range(len(addEndogHistoryTerms)):
+    lagSpec = 'enhto{}'.format(lagSpecIdx)
+    wrapperFun = genRcbWrap(lagSpec)
+    histTemplate = wrapperFun('{}')
+    lOfHistTemplates.append(histTemplate)
+    templateHistOptsDict[histTemplate] = addEndogHistoryTerms[lagSpecIdx]
+lOfHistTemplates.append('NULL')
 #
+# exog, self, ensemble
+lOfEndogAndExogTemplates = [
+    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[1],), # 0: full exog
+    (lOfDesignFormulas[1], lOfHistTemplates[1], lOfHistTemplates[1],), # 1: v only
+    (lOfDesignFormulas[2], lOfHistTemplates[1], lOfHistTemplates[1],), # 2: a r only
+    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[0],), # 3: full exog and self
+    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[1],), # 4: full exog and self and ensemble
+    (lOfDesignFormulas[1], lOfHistTemplates[1], lOfHistTemplates[1],), # 5: v only and self and ensemble
+    (lOfDesignFormulas[2], lOfHistTemplates[1], lOfHistTemplates[1],), # 6: a r only exog and self and ensemble
+]
 lhsMasksOfInterest = {
-    'plotPredictions': [0],
-    'varVsEnsemble': [2]
+    'plotPredictions': [0, 4],
+    'varVsEnsemble': [0]
     }
 # 
 burnInPeriod = 400e-3

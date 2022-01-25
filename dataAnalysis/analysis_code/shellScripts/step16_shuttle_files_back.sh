@@ -80,7 +80,7 @@ WINDOW="XL"
 KEYPROMPT=""
 # exps=(exp201901251000 exp201901261000 exp201901271000 exp201902031100 exp201902041100 exp201902051100) 
 #  # exps=(exp202101201100 exp202101211100 exp202101221100 exp202101251100 exp202101271100 exp202101281100 exp202102021100)
-exps=(exp202101251100)
+exps=(exp202101211100)
 for EXP in "${exps[@]}"
 do
   echo "step 16, restore from processed, on $EXP"
@@ -109,9 +109,9 @@ do
   # 
   # # after step 4
   # 
-  # #BLOCK_ID_NO="0*"
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_spectral_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  BLOCK_ID_NO="0*"
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_spectral_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # 
   # #BLOCK_ID_NO="_*"
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_na_*.pickle" --fromDataToScratch --filesIncluded ${KEYPROMPT}
@@ -155,7 +155,7 @@ do
   # #
   # #after step 11
   # #
-  # BLOCK_ID_NO="0*"
+  BLOCK_ID_NO="0*"
   # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_scaled_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_spectral_scaled_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_baseline_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
@@ -186,7 +186,7 @@ do
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_mahal_ledoit_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rauc_iterator_*.pickle" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_covarianceMatrixCalc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_rauc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_rauc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #
   # misc
   # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rig_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}

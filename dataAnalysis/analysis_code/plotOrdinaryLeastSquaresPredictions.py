@@ -183,11 +183,14 @@ if __name__ == '__main__':
         dt = binInterval
     #
     histOptsForExportDict = {}
-    for hIdx, histOpts in enumerate(addHistoryTerms):
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
         formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-        locals().update({'hto{}'.format(hIdx): formattedHistOpts})
-        histOptsForExportDict['hto{}'.format(hIdx)] = formattedHistOpts
-        # locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+        locals().update({'enhto{}'.format(hIdx): formattedHistOpts})
+        histOptsForExportDict['enhto{}'.format(hIdx)] = formattedHistOpts
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
+        locals().update({'exhto{}'.format(hIdx): formattedHistOpts})
+        histOptsForExportDict['exhto{}'.format(hIdx)] = formattedHistOpts
     thisEnv = patsy.EvalEnvironment.capture()
 
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
@@ -200,7 +203,7 @@ if __name__ == '__main__':
     #
     lhsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsDF')
     lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
-    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
+    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets').xs(arguments['estimatorName'], level='regressorName')
     allTargetsPLS = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargetsPLS')
     allTargetsPLS.set_index(['lhsMaskIdx', 'rhsMaskIdx'], inplace=True)
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
@@ -258,7 +261,7 @@ if __name__ == '__main__':
                     else:
                         predList.append(thisPred)
                     ##
-                    thisR2Per = pd.read_hdf(store, 'processedR')
+                    thisR2Per = pd.read_hdf(store, 'processedR2')
                     if R2PerIndexNames is None:
                         R2PerIndexNames = thisR2Per.index.names
                     thisR2Per.reset_index(inplace=True)

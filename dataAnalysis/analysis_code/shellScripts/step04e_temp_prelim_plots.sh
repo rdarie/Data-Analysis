@@ -38,10 +38,10 @@ do
   ITERATOR="rb"
   #
   OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER}"
-  python -u './plotSignalDataFrameV2.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName="rig" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_illustration" --verbose=1 --selectionName="laplace_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  #
-  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_illustration_topo" --verbose=1 --selectionName="laplace_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_illustration_topo" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  # python -u './plotSignalDataFrameV2.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName="rig" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_illustration" --verbose=1 --selectionName="laplace_baseline" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_illustration" --verbose=1 --selectionName="laplace_spectral_baseline" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  # ##
+  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_illustration_topo" --verbose=1 --selectionName="laplace_baseline" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_illustration_topo" --verbose=1 --selectionName="laplace_spectral_baseline" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
 done

@@ -137,15 +137,14 @@ if __name__ == '__main__':
         binInterval = iteratorOpts['forceBinInterval'] if (iteratorOpts['forceBinInterval'] is not None) else rasterOpts['binInterval']
     #
     histOptsForExportDict = {}
-    for hIdx, histOpts in enumerate(addHistoryTerms):
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
         formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-        locals().update({'hto{}'.format(hIdx): formattedHistOpts})
-        histOptsForExportDict['hto{}'.format(hIdx)] = formattedHistOpts
-        # locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
-    # histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
-    # histOptsHtmlPath = os.path.join(
-    #     figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'histOpts'))
-    # histOptsForExportDF.to_html(histOptsHtmlPath)
+        locals().update({'enhto{}'.format(hIdx): formattedHistOpts})
+        histOptsForExportDict['enhto{}'.format(hIdx)] = formattedHistOpts
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
+        locals().update({'exhto{}'.format(hIdx): formattedHistOpts})
+        histOptsForExportDict['exhto{}'.format(hIdx)] = formattedHistOpts
     thisEnv = patsy.EvalEnvironment.capture()
 
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
@@ -159,7 +158,7 @@ if __name__ == '__main__':
     #
     lhsDF = pd.read_hdf(designMatrixPath, 'lhsDF')
     lhsMasks = pd.read_hdf(designMatrixPath, 'featureMasks')
-    allTargetsDF = pd.read_hdf(designMatrixPath, 'allTargets')
+    allTargetsDF = pd.read_hdf(designMatrixPath, 'allTargets').xs(arguments['estimatorName'], level='regressorName')
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
     #
     lhsMasksInfo = pd.read_hdf(designMatrixPath, 'lhsMasksInfo')
@@ -185,12 +184,14 @@ if __name__ == '__main__':
         slurmTaskMin = 0
     savingResults = True
     ################
-    # savingResults = False
-    # slurmTaskID = 9
-    # slurmTaskCount = processSlurmTaskCount
-    # slurmTaskMin = 0
-    # slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
-    # estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
+    DEBUGGING = False
+    if DEBUGGING:
+        savingResults = False
+        slurmTaskID = 9
+        slurmTaskCount = processSlurmTaskCount
+        slurmTaskMin = 0
+        slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / slurmTaskCount))
+        estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
     ################ collect estimators and scores
     estimatorsDict = {}
     scoresDict = {}
@@ -324,6 +325,8 @@ if __name__ == '__main__':
                 selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
             ####
             for targetName in rhGroup.columns:
+                if (lhsMaskIdx, rhsMaskIdx, targetName) not in allTargetsDF.index:
+                    continue
                 targetIdx = allTargetsDF.loc[(lhsMaskIdx, rhsMaskIdx, targetName), 'targetIdx']
                 if (targetIdx // slurmGroupSize) != slurmTaskID:
                     print("targetIdx ({}) // slurmGroupSize = {}".format(targetIdx, targetIdx // slurmGroupSize))
@@ -501,6 +504,7 @@ if __name__ == '__main__':
         scoresStack.to_hdf(estimatorPath, 'processedCVScores')
     llDict1 = {}
     aicDict1 = {}
+    ccDict1 = {}
     for scoreName, targetScores in scoresStack.groupby(['lhsMaskIdx', 'target', 'fold']):
         print('Calculating scores ({})'.format(scoreName))
         lhsMaskIdx, targetName, fold = scoreName
@@ -509,9 +513,9 @@ if __name__ == '__main__':
         regressor = estimator.regressor_.steps[-1][1]
         K = regressor.results_.df_model
         thesePred = predDF.xs(targetName, level='target').xs(lhsMaskIdx, level='lhsMaskIdx').xs(fold, level='fold')
-        # pdb.set_trace()
         llDict2 = {}
         aicDict2 = {}
+        ccDict2 = {}
         if hasattr(regressor, 'results_'):
             probaFamily = regressor.results_.family
         else:
@@ -533,10 +537,15 @@ if __name__ == '__main__':
             llDict3['llFull'] = probaFamily.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
             llDict2[('all', trialType)] = pd.Series(llDict3)
             aicDict2[('all', trialType)] = 2 * K - 2 * llDict3['llFull']
+            ccDict2[('all', trialType)] = np.corrcoef(
+                predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())[0][1]
         llDict1[(lhsMaskIdx, designFormula, targetName, fold)] = pd.concat(llDict2, names=['electrode', 'trialType', 'llType'])
         aicSrs = pd.Series(aicDict2)
         aicSrs.index.names = ['electrode', 'trialType']
         aicDict1[(lhsMaskIdx, designFormula, targetName, fold)] = aicSrs
+        ccSrs = pd.Series(ccDict2)
+        ccSrs.index.names = ['electrode', 'trialType']
+        ccDict1[(lhsMaskIdx, designFormula, targetName, fold)] = ccSrs
     llDF = pd.concat(
         llDict1, names=['lhsMaskIdx', 'design', 'target', 'fold', 'electrode', 'trialType', 'llType']).to_frame(name='ll')
     llDF.loc[:, 'fullFormulaDescr'] = llDF.reset_index()['lhsMaskIdx'].map(lhsMasksInfo['fullFormulaDescr']).to_numpy()
@@ -549,6 +558,12 @@ if __name__ == '__main__':
     aicDF.set_index('fullFormulaDescr', append=True, inplace=True)
     if savingResults:
         aicDF.to_hdf(estimatorPath, 'processedAIC')
+    ccDF = pd.concat(
+        ccDict1, names=['lhsMaskIdx', 'design', 'target', 'fold', 'electrode', 'trialType']).to_frame(name='cc')
+    ccDF.loc[:, 'fullFormulaDescr'] = ccDF.reset_index()['lhsMaskIdx'].map(lhsMasksInfo['fullFormulaDescr']).to_numpy()
+    ccDF.set_index('fullFormulaDescr', append=True, inplace=True)
+    if savingResults:
+        ccDF.to_hdf(estimatorPath, 'processedCC')
     #
     R2Per = llDF['ll'].groupby(['lhsMaskIdx', 'design', 'target', 'electrode', 'fold', 'trialType']).apply(
         tdr.getR2).to_frame(name='score')
@@ -556,6 +571,14 @@ if __name__ == '__main__':
     R2Per.set_index('fullFormulaDescr', append=True, inplace=True)
     if savingResults:
         R2Per.to_hdf(estimatorPath, 'processedR2')
-        np.sqrt(R2Per).to_hdf(estimatorPath, 'processedR')
     print('Loaded and saved scores and partial scores')
+    # sanity check that all the scoring methods are equivalent
+    # if True:
+    #     trainR2 = scoresStack.loc[scoresStack['trialType'] == 'train', 'score'].to_numpy()
+    #     trainR2FromLL = R2Per.xs('train', level='trialType').xs('all', level='electrode')['score'].to_numpy()
+    #     trainCC = ccDF.xs('train', level='trialType')['cc'].to_numpy()
+    #     fig, ax = plt.subplots()
+    #     ax.plot(np.sqrt(trainR2) - trainCC)
+    #     plt.show()
+
     print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

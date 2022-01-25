@@ -86,8 +86,8 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': 1,
-        'lines.markersize': 2.4,
+        'lines.linewidth': .2,
+        'lines.markersize': .4,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -176,16 +176,10 @@ if __name__ == '__main__':
         iteratorOpts = loadingMeta['iteratorOpts']
         binInterval = iteratorOpts['forceBinInterval'] if (iteratorOpts['forceBinInterval'] is not None) else rasterOpts['binInterval']
     #
-    histOptsForExportDict = {}
-    for hIdx, histOpts in enumerate(addHistoryTerms):
-        formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
-        locals().update({'hto{}'.format(hIdx): formattedHistOpts})
-        histOptsForExportDict['hto{}'.format(hIdx)] = formattedHistOpts
-        # locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
-    # histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
-    # histOptsHtmlPath = os.path.join(
-    #     figureOutputFolder, '{}_{}.html'.format(fullEstimatorName, 'histOpts'))
-    # histOptsForExportDF.to_html(histOptsHtmlPath)
+    for hIdx, histOpts in enumerate(addEndogHistoryTerms):
+        locals().update({'enhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+    for hIdx, histOpts in enumerate(addExogHistoryTerms):
+        locals().update({'exhto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
     thisEnv = patsy.EvalEnvironment.capture()
 
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
@@ -198,7 +192,7 @@ if __name__ == '__main__':
     #
     lhsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsDF')
     lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
-    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
+    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets').xs(arguments['estimatorName'], level='regressorName')
     # allTargetsPLS = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargetsPLS')
     # allTargetsPLS.set_index(['lhsMaskIdx', 'rhsMaskIdx'], inplace=True)
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
@@ -210,6 +204,7 @@ if __name__ == '__main__':
     stimConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'stimConditionLookup')
     kinConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'kinConditionLookup')
     ################ collect estimators and scores
+    scoresStack = pd.read_hdf(estimatorPath, 'processedScores')
     #
     trialTypeToPlot = 'test'
     #
@@ -220,10 +215,12 @@ if __name__ == '__main__':
     if memoryEfficientLoad:
         predDF = None
         R2Per = None
+        ccDF = None
     else:
         # predDF = None
         predList = []
         R2PerList = []
+        ccList = []
     #
     if processSlurmTaskCount is not None:
         slurmGroupSize = int(np.ceil(allTargetsDF.shape[0] / processSlurmTaskCount))
@@ -256,22 +253,33 @@ if __name__ == '__main__':
                     else:
                         predList.append(thisPred)
                     ##
-                    thisR2Per = pd.read_hdf(store, 'processedR2')
-                    if R2PerIndexNames is None:
-                        R2PerIndexNames = thisR2Per.index.names
-                    thisR2Per.reset_index(inplace=True)
-                    maskForPlotScore = (
-                            (thisR2Per['lhsMaskIdx'].isin(lhsMasksOfInterest['plotPredictions'])) &
-                            (thisR2Per['trialType'] == trialTypeToPlot)
-                        )
-                    print('these R2, thisR2.shape = {}'.format(thisR2Per.shape))
-                    if memoryEfficientLoad:
-                        if R2Per is None:
-                            R2Per = thisR2Per
-                        else:
-                            R2Per = R2Per.append(thisR2Per)
-                    else:
-                        R2PerList.append(thisR2Per)
+                    ## ## thisR2Per = pd.read_hdf(store, 'processedR2')
+                    ## ## if R2PerIndexNames is None:
+                    ## ##     R2PerIndexNames = thisR2Per.index.names
+                    ## ## thisR2Per.reset_index(inplace=True)
+                    ## ## # maskForPlotScore = (
+                    ## ## #         (thisR2Per['lhsMaskIdx'].isin(lhsMasksOfInterest['plotPredictions'])) &
+                    ## ## #         (thisR2Per['trialType'] == trialTypeToPlot)
+                    ## ## #     )
+                    ## ## print('these R2, thisR2.shape = {}'.format(thisR2Per.shape))
+                    ## ## if memoryEfficientLoad:
+                    ## ##     if R2Per is None:
+                    ## ##         R2Per = thisR2Per
+                    ## ##     else:
+                    ## ##         R2Per = R2Per.append(thisR2Per)
+                    ## ## else:
+                    ## ##     R2PerList.append(thisR2Per)
+                    ## ## ####
+                    ## ## thisCC = pd.read_hdf(store,  'processedCC')
+                    ## ## thisCC.reset_index(inplace=True)
+                    ## ## print('these CC, thisCC.shape = {}'.format(thisCC.shape))
+                    ## ## if memoryEfficientLoad:
+                    ## ##     if ccDF is None:
+                    ## ##         ccDF = thisCC
+                    ## ##     else:
+                    ## ##         ccDF = ccDF.append(thisCC)
+                    ## ## else:
+                    ## ##     ccList.append(thisCC)
     #  else:
     #      print('Loading predictions from {}'.format(estimatorPath))
     #      thisPred = pd.read_hdf(estimatorPath, 'predictions')
@@ -286,16 +294,26 @@ if __name__ == '__main__':
     print('all predictions, predDF.shape = {}'.format(predDF.shape))
     gc.collect()
     prf.print_memory_usage('done concatenating predictions from .h5 array')
-    ###
-    prf.print_memory_usage('concatenating R2 from .h5 array')
-    gc.collect()
-    if not memoryEfficientLoad:
-        R2Per = pd.concat(R2PerList, copy=False)
-        del R2PerList
-    R2Per.set_index(R2PerIndexNames, inplace=True)
-    print('all predictions, R2PerDF.shape = {}'.format(R2Per.shape))
-    gc.collect()
-    prf.print_memory_usage('done concatenating R2 from .h5 array')
+    ## ## ###
+    ## ## prf.print_memory_usage('concatenating R2 from .h5 array')
+    ## ## gc.collect()
+    ## ## if not memoryEfficientLoad:
+    ## ##     R2Per = pd.concat(R2PerList, copy=False)
+    ## ##     del R2PerList
+    ## ## R2Per.set_index(R2PerIndexNames, inplace=True)
+    ## ## print('all predictions, R2PerDF.shape = {}'.format(R2Per.shape))
+    ## ## gc.collect()
+    ## ## prf.print_memory_usage('done concatenating R2 from .h5 array')
+    ## ## if not memoryEfficientLoad:
+    ## ##     ccDF = pd.concat(ccList, copy=False)
+    ## ##     del ccList
+    ## ## pdb.set_trace()
+    ## ## ccDF.sort_values(
+    ## ##     ['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'trialType'],
+    ## ##     kind='mergesort', inplace=True)
+    # ccDF.set_index(R2PerIndexNames, inplace=True)
+    ## ## gc.collect()
+    ## ## prf.print_memory_usage('done concatenating CC from .h5 array')
     #
     estimatorsDict = {}
     # scoresDict = {}
@@ -341,18 +359,18 @@ if __name__ == '__main__':
             .reset_index(drop=True)[['rhsMaskIdx', 'target']]
             .drop_duplicates().set_index('target')['rhsMaskIdx']
         )
-    scoresFromLL = R2Per.xs('all', level='electrode').reset_index()
-    scoresFromLL.loc[:, 'rhsMaskIdx'] = scoresFromLL['target'].map(targetRHSLookup)
-    scoresFromLL.sort_values(
-        ['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'trialType'],
-        kind='mergesort', inplace=True)
-    scoresFromLL.loc[:, 'fullFormulaDescr'] = scoresFromLL['lhsMaskIdx'].map(
+    ## ## scoresStack = R2Per.xs('all', level='electrode').reset_index()
+    ## ## scoresStack.loc[:, 'rhsMaskIdx'] = scoresStack['target'].map(targetRHSLookup)
+    ## ## scoresStack.sort_values(
+    ## ##     ['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'trialType'],
+    ## ##     kind='mergesort', inplace=True)
+    scoresStack.loc[:, 'fullFormulaDescr'] = scoresStack['lhsMaskIdx'].map(
         lhsMasksInfo['fullFormulaDescr']).to_numpy()
-    scoresFromLL.loc[:, 'fullFormulaAsLabel'] = scoresFromLL['fullFormulaDescr'].apply(lambda x: x.replace(' + ', ' +\n'))
+    scoresStack.loc[:, 'fullFormulaAsLabel'] = scoresStack['fullFormulaDescr'].apply(lambda x: x.replace(' + ', ' +\n'))
     featsToPlot = (
-        scoresFromLL.loc[scoresFromLL['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmax(),
-        scoresFromLL.loc[scoresFromLL['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmin())
-    #
+        scoresStack.loc[scoresStack['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmax(),
+        scoresStack.loc[scoresStack['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmin())
+    scoresStack.loc[:, 'score'] = np.sqrt(scoresStack['score'])
     height, width = 2, 4
     aspect = width / height
     commonOpts = dict(
@@ -375,9 +393,9 @@ if __name__ == '__main__':
             if not (nmLk0['lhsMaskIdx'] in lhsMasksOfInterest['plotPredictions']):
                 continue
             scoreMasks = [
-                scoresFromLL[cN] == nmLk0[cN]
+                scoresStack[cN] == nmLk0[cN]
                 for cN in groupPagesBy]
-            plotScores = scoresFromLL.loc[np.logical_and.reduce(scoreMasks), :]
+            plotScores = scoresStack.loc[np.logical_and.reduce(scoreMasks), :]
             thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
             g = sns.catplot(
                 data=plotScores, hue='trialType',
@@ -385,9 +403,9 @@ if __name__ == '__main__':
                 hue_order=thisPalette.index.to_list(),
                 palette=thisPalette.to_dict(),
                 height=height, aspect=aspect,
-                kind='box')
+                kind='box', whis=np.inf)
             g.set_xticklabels(rotation=-30, ha='left')
-            g.suptitle('R^2 of model {fullFormulaDescr}'.format(**nmLk0))
+            g.suptitle('CC of model {fullFormulaDescr}'.format(**nmLk0))
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:

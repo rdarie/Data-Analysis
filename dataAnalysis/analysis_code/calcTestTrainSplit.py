@@ -194,7 +194,7 @@ if theseIteratorOpts['forceBinInterval'] is not None:
     alignedAsigsKWargs['decimate'] = int(theseIteratorOpts['forceBinInterval'] / binOpts['binInterval'])
     print('Set alignedAsigsKWargs[decimate] to {}'.format(alignedAsigsKWargs['decimate']))
     if 'forceRollingWindow' in theseIteratorOpts:
-        alignedAsigsKWargs['rollingWindow'] = theseIteratorOpts['forceRollingWindow']
+        alignedAsigsKWargs['rollingWindow'] = int(theseIteratorOpts['forceRollingWindow'] / binOpts['binInterval'])
     else:
         alignedAsigsKWargs['rollingWindow'] = alignedAsigsKWargs['decimate']
     print('Set alignedAsigsKWargs[rollingWindow] to {}'.format(alignedAsigsKWargs['rollingWindow']))
