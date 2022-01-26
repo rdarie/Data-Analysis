@@ -150,6 +150,7 @@ for segIdx in range(nSeg):
         prf.print_memory_usage('Loading {}'.format(triggeredPath))
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
+    # pdb.set_trace()
     print('dataDF.index.names = {}'.format(dataDF.index.names))
     print('dataDF.columns = {}'.format(dataDF.columns.to_frame().reset_index(drop=True)))
     #

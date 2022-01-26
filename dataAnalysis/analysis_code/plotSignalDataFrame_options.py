@@ -128,9 +128,9 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_illustration_topo': {
         'recalcStats': True,
-        'winStart': '-600', 'winStop': '1000', 'limitPages': None,
+        'winStart': '-1000', 'winStop': '1000', 'limitPages': None,
         'unitQuery': None,
-        # 'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
+        'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'yCoords', 'rowControl': '',
@@ -141,7 +141,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_spectral_illustration_topo': {
         'recalcStats': True,
-        'winStart': '-600', 'winStop': '1000', 'limitPages': None,
+        'winStart': '-1000', 'winStop': '1000', 'limitPages': None,
         'unitQuery': None,
         'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
@@ -430,7 +430,7 @@ plotProcFunsLookup = {
         # asp.genTitleChanger(titleLabelLookup)
         ],
     'laplace_spectral_illustration_topo': [
-        shadeAUCEpochsPerFacet,
+        # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genLegendRounder(decimals=2),
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
@@ -525,16 +525,16 @@ relPlotKWArgsLookup = {
         'errorbar': 'se'
     },
     'laplace_illustration_topo': {
-        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'linewidth': 2., 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'facet_kws': {'sharey': True},
-        'errorbar': 'se'
+        'facet_kws': {'sharey': False},
+        'errorbar': None  # 'se'
     },
     'laplace_spectral_illustration_topo': {
-        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'linewidth': 2., 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'facet_kws': {'sharey': True},
-        'errorbar': 'se'
+        'facet_kws': {'sharey': False},
+        'errorbar': None  # 'se'
     },
     'factor_illustration': {
         'linewidth': .75, 'height': 2, 'aspect': 1.5,

@@ -13,7 +13,7 @@ Options:
     --plotting                                 load from raw, or regular? [default: False]
     --showFigures                              load from raw, or regular? [default: False]
     --debugging                                load from raw, or regular? [default: False]
-    --maxNumFeatures=maxNumFeatures            load from raw, or regular? [default: 500]
+    --maxNumFeatures=maxNumFeatures            load from raw, or regular? [default: 1000]
     --verbose=verbose                          print diagnostics? [default: 0]
     --datasetNameRhs=datasetNameRhs            which trig_ block to pull [default: Block]
     --selectionNameRhs=selectionNameRhs        how to restrict channels? [default: fr_sqrt]

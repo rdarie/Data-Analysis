@@ -10,7 +10,7 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 OUTLIERMASK="--maskOutlierBlocks"
 # OUTLIERMASK=""
 
-TIMEWINDOWOPTS="--winStart=-700 --winStop=1000"
+TIMEWINDOWOPTS="--winStart=-900 --winStop=1200"
 #
 ALIGNQUERYTERM="stimOn"
 # ALIGNQUERYTERM="stimOnHighRate"

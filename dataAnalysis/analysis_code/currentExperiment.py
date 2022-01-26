@@ -708,7 +708,7 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 20e-3,
+            'forceBinInterval': 50e-3,
             'forceRollingWindow': 100e-3,
             # 'procFun': {
             #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
@@ -719,15 +719,15 @@ def parseAnalysisOptions(
             'controlProportion': None,
             'maskEachFreqBand': False,
             'cvKWArgs': dict(
-                n_splits=5,
+                n_splits=10,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': 'stoppingOrStimOff',
-                'winStart': -0.6,  # start 0.2 ( + .15 burn in period) before whatever the query was
-                'winStop': 0.2  # stop .1 sec after startingOrStimOn
+                'winStart': -0.7,  # start 0.2 ( + .15 burn in period) before whatever the query was
+                'winStop': 0.4  # stop .1 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
                 'alignQuery': None,

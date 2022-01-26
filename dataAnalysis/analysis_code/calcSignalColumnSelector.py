@@ -176,13 +176,12 @@ if __name__ == '__main__':
             estimatorsSubFolder,
             referenceRegressionName + '.h5'
             )
-        # pdb.set_trace()
         referenceScores = pd.read_hdf(referenceRegressionPath, 'processedScores')
         referenceTrainMask = (referenceScores['trialType'] == 'train')
         trainCCDF = referenceScores.loc[referenceTrainMask, ['target', 'cc']].groupby('target').mean()
         listOfTargetNames = trainCCDF.sort_values('cc', ascending=False, kind='mergesort').index.to_list()
         listOfColumns = [cN for cN in dataDF.columns if cN[0] in listOfTargetNames[:16]]
-    if arguments['selectMethod'] == 'decimateSpace':
+    elif arguments['selectMethod'] == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
         keepX = np.unique(featureInfo['xCoords'])[::3]
         keepY = np.unique(featureInfo['yCoords'])[::3]
@@ -206,7 +205,7 @@ if __name__ == '__main__':
         print('Choosing top 16 features from statsRankingDF')
         listOfColumns = [cN for cN in dataDF.columns.to_list() if cN in statsRankingDF.index[:16]]
     #
-    excludeFreqBands = ['alpha', 'spb']
+    excludeFreqBands = []
     listOfColumns = [cN for cN in listOfColumns if cN[4] not in excludeFreqBands]
     selectedColumnsStr = '\n'.join(['{}'.format(cN) for cN in listOfColumns])
     print('Selecting {} columns:\n{}\n'.format(len(listOfColumns), selectedColumnsStr))
@@ -235,7 +234,6 @@ if __name__ == '__main__':
                 ('averager', tdr.DataFrameBinTrimmer(burnInPeriod=burnInPeriod)),
                 ('dim_red', estimatorClass(**estimatorKWArgs))])
             for foldIdx in range(cvIterator.n_splits + 1)}
-        # pdb.set_trace()
         for foldIdx, selector in cvScores.items():
             selector.fit(dataGroup)
         cvScoresDF = pd.Series(cvScores).to_frame(name='estimator')

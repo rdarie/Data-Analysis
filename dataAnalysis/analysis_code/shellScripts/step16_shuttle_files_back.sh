@@ -109,8 +109,8 @@ do
   # 
   # # after step 4
   # 
-  BLOCK_ID_NO="0*"
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # BLOCK_ID_NO="0*"
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_spectral_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # 
   # #BLOCK_ID_NO="_*"
@@ -155,7 +155,7 @@ do
   # #
   # #after step 11
   # #
-  BLOCK_ID_NO="0*"
+  # BLOCK_ID_NO="0*"
   # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_scaled_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_spectral_scaled_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_baseline_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
@@ -184,16 +184,16 @@ do
   # #  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="mahal_ledoit_*_${ITER}_*.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #done
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_mahal_ledoit_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rauc_iterator_*.pickle" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rauc_iterator_*.pickle" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_covarianceMatrixCalc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_rauc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_rauc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #
   # misc
-  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rig_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.csv" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_epochs.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rig_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.csv" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_epochs.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_*viewable.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # 

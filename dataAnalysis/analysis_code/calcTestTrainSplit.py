@@ -223,6 +223,7 @@ if (not arguments['loadFromFrames']):
         except Exception:
             traceback.print_exc()
             continue
+        # pdb.set_trace()
         # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         if theseIteratorOpts['calcTimeROI']:
             if arguments['controlSet']:

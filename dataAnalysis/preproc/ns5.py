@@ -1011,8 +1011,8 @@ def unitSpikeTrainWaveformsToDF(
                         window=rollingWindow,
                         win_type='hann',
                         # win_type='gaussian',
-                        center=False)
-                    .mean(sym=False).T)  # std=halfRollingWin
+                        center=True)
+                    .mean(sym=True).T)  # std=halfRollingWin
             else:  # rollingWindow is None
                 halfRollingWin = 0
                 seekIdx = slice(None, None, decimate)
@@ -1038,8 +1038,8 @@ def unitSpikeTrainWaveformsToDF(
                     window=lag[1],
                     win_type='hann',
                     # win_type='gaussian',
-                    center=False)
-                .mean(sym=False).T)  # std=halfRollingWin
+                    center=True)
+                .mean(sym=True).T)  # std=halfRollingWin
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
                     shiftedWaveform.iloc[:, seekIdx].copy())

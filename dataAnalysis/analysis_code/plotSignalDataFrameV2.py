@@ -87,8 +87,8 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': .5,
-        'lines.markersize': 2.5,
+        'lines.linewidth': .4,
+        'lines.markersize': .8,
         'patch.linewidth': .5,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
@@ -119,13 +119,13 @@ snsRCParams = {
         "ytick.direction": 'in',
     }
 mplRCParams = {
-    'figure.titlesize': 7,
+    'figure.titlesize': 14,
     'font.family': "Nimbus Sans",
     'pdf.fonttype': 42,
     'ps.fonttype': 42,
     }
 sns.set(
-    context='talk', style='whitegrid',
+    context='talk', style='white',
     palette='dark', font='sans-serif',
     font_scale=2, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():

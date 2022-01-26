@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J s03a_assemble_normalize_2019
+#SBATCH -J s03a_assemble_normalize_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/s03a_assemble_normalize_2019.out
-#SBATCH -e ../../batch_logs/s03a_assemble_normalize_2019.out
+#SBATCH -o ../../batch_logs/s03a_assemble_normalize_202101_21.out
+#SBATCH -e ../../batch_logs/s03a_assemble_normalize_202101_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,7 +28,7 @@
 
 # exps=(201902_03 201902_04 201902_05)
 # exps=(201901_25 201901_26 201901_27 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(201902_03 201902_04 201902_05)
+exps=(202101_21)
 for A in "${exps[@]}"
 do
   echo "step 03 assemble plot normalize, on $A"
@@ -38,13 +38,13 @@ do
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   ITERATOR="pa"
   #
-  python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
+  # python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
   #
   COMMONOPTS=" --iteratorSuffix=${ITERATOR} --loadFromFrames --exp=${EXP} ${WINDOW} ${ALIGNQUERY} ${ANALYSISFOLDER} ${ALIGNFOLDER} ${BLOCKSELECTOR} --plotting --verbose=2"
-  python -u './assembleDataFrames.py' --resetHDF --inputBlockSuffix="lfp" --selectionName="lfp" $COMMONOPTS
-  python -u './assembleDataFrames.py' --inputBlockSuffix="laplace" --selectionName="laplace" $COMMONOPTS
-  python -u './assembleDataFrames.py' --inputBlockSuffix="laplace_spectral" --selectionName="laplace_spectral" $COMMONOPTS
-  python -u './assembleDataFrames.py' --inputBlockSuffix='rig' --selectionName='rig' $COMMONOPTS
+  # python -u './assembleDataFrames.py' --resetHDF --inputBlockSuffix="lfp" --selectionName="lfp" $COMMONOPTS
+  # python -u './assembleDataFrames.py' --inputBlockSuffix="laplace" --selectionName="laplace" $COMMONOPTS
+  # python -u './assembleDataFrames.py' --inputBlockSuffix="laplace_spectral" --selectionName="laplace_spectral" $COMMONOPTS
+  # python -u './assembleDataFrames.py' --inputBlockSuffix='rig' --selectionName='rig' $COMMONOPTS
   #
   source ./shellScripts/calc_aligned_motion_preamble.sh
   #

@@ -231,6 +231,7 @@ if __name__ == "__main__":
     ###
     if arguments['plotting']:
         pdfPath = os.path.join(figureFolder, blockBaseName + 'wavelets.pdf')
+        print('Saving wavelet report to: {}'.format(pdfPath))
         waveletReportPDF = PdfPages(pdfPath)
     for fBIdx, fBName in enumerate(freqBandsDict['name']):
         bandwidth = (freqBandsDict['hBound'][fBIdx] - freqBandsDict['lBound'][fBIdx]) / 6  # Hz
@@ -290,11 +291,12 @@ if __name__ == "__main__":
     # trim edges based on largest kernel size (to 100s of msec)
     spectralDF.columns = spectralDF.columns.astype(float)
     trimEdgesBy = np.ceil(waveletDF['kernelDuration'].max() / 2 * 1e1) / 1e1
+    print('Trimming edges by {}'.format(trimEdgesBy))
     trimMask = (
         (spectralDF.columns >= (spectralDF.columns[0] + trimEdgesBy)) &
         (spectralDF.columns < (spectralDF.columns[-1] - trimEdgesBy)))
     spectralDF = spectralDF.loc[:, trimMask]
-    #
+    # pdb.set_trace()
     tBins = np.unique(spectralDF.columns.get_level_values('bin'))
     featNames = spectralDF.index.get_level_values('feature')
     featNamesClean = featNames.str.replace('#0', '')

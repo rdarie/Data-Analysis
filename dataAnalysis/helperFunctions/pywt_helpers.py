@@ -110,26 +110,36 @@ def plotKernels(
     figsDict = {'psi': (fig_psi, ax_psi)}
     fig, axes = plt.subplots(len(scales), 2, figsize=(12, 6))
     for n, scale in enumerate(scales):
-        # altj = np.linspace(x[0], x[-1], int(scale * width + 1))
-        # filt = filt_fun(altj)
-        #
-        # the scale parameter corresponds to downsampling the "mother wavelet", int_psi
-        # the size of the convolution kernel is len(j) * dt = (scale * width + 1) * dt
-        j = np.floor(
-            np.arange(scale * width + 1) / (scale * step))
-        # np.diff(np.arange(scale * width + 1) / (scale * step))
-        assert (scale * step) < 1 # otherwise we fail to downsample int_psi
-        if np.max(j) >= np.size(int_psi):
-            j = np.delete(j, np.where((j >= np.size(int_psi)))[0])
-        j = j.astype(np.int)
-        if verbose:
-            print('downsampling mother wavelet by:')
-            print('{} samples'.format(np.unique(np.diff(j))))
-        #
-        # discrete samples of the integrated wavelet
-        # filt = int_psi[j][::-1]
-        filt = int_psi[j]
-        filt_normalized = int_psi_normalized[j]
+        ## ## assert (scale * step) < 1 # otherwise we fail to downsample int_psi
+        ## ## # altj = np.linspace(x[0], x[-1], int(scale * width + 1))
+        ## ## # filt = filt_fun(altj)
+        ## ## #
+        ## ## # the scale parameter corresponds to downsampling the "mother wavelet", int_psi
+        ## ## # the size of the convolution kernel is len(j) * dt = (scale * width + 1) * dt
+        ## ## j = np.floor(
+        ## ##     np.arange(scale * width + 1) / (scale * step))
+        ## ## # np.diff(np.arange(scale * width + 1) / (scale * step))
+        ## ## if np.max(j) >= np.size(int_psi):
+        ## ##     j = np.delete(j, np.where((j >= np.size(int_psi)))[0])
+        ## ## j = j.astype(np.int)
+        ## ## if verbose:
+        ## ##     print('downsampling mother wavelet by:')
+        ## ##     print('{} samples'.format(np.unique(np.diff(j))))
+        ## ## #
+        ## ## # discrete samples of the integrated wavelet
+        ## ## # filt = int_psi[j][::-1]
+        ## ## filt = int_psi[j]
+        ## ## filt_normalized = int_psi_normalized[j]
+        ####### new way with interpolation
+        # Determine scale-dependent sampling instants
+        step = 1.0 / scale
+        xs = np.arange(x[0], x[-1] + 0.01 * step, step)
+        if xs[-1] > x[-1]:
+            xs = xs[:-1]
+        # Approximate values by linear interpolation
+        filt = np.interp(xs, x, int_psi)
+        filt_normalized = np.interp(xs, x, int_psi_normalized)
+        ####### new way with interpolation
         # filt = int_psi
         #
         # The CWT consists of convolution of filt with the signal at this scale
