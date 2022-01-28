@@ -3,15 +3,15 @@ import dataAnalysis.custom_transformers.tdr as tdr
 import pdb
 
 validTargetLhsMaskIdx = {
-    'ols_select_scaled': [0, 1, 2, 3,],
-    'ols2_select2_scaled': [4, 5, 6],
-    'ols_select_spectral_scaled': [0, 1, 2, 3,],
-    'ols2_select2_spectral_scaled': [4, 5, 6]
+    'ols_select_baseline': [0, 1, 2, 3, 4, 5],
+    'ols2_select2_baseline': [6, 7, 8, 9],
+    'ols_select_spectral_baseline': [0, 1, 2, 3, 4, 5],
+    'ols2_select2_spectral_baseline': [6, 7, 8, 9]
 }
 
 processSlurmTaskCountPLS = 3
-processSlurmTaskCount = 46
-processSlurmTaskCountTransferFunctions = 46
+processSlurmTaskCount = 23
+processSlurmTaskCountTransferFunctions = 23
 joblibBackendArgs = dict(
     backend='loky',
     n_jobs=-1
@@ -21,9 +21,9 @@ addEndogHistoryTerms = [
     {
         'nb': 3, 'logBasis': True,
         'dt': None,
-        'historyLen': 600e-3,
-        'timeDelay': 0.,
-        'b': 50e-3, 'useOrtho': True,
+        'historyLen': 350e-3,
+        'timeDelay': 50e-3,
+        'b': 100e-3, 'useOrtho': True,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,
@@ -35,7 +35,7 @@ addExogHistoryTerms = [
     {
         'nb': 3, 'logBasis': True,
         'dt': None,
-        'historyLen': 600e-3,
+        'historyLen': 400e-3,
         'timeDelay': 0.,
         'b': 50e-3, 'useOrtho': True,
         'normalize': True, 'groupBy': 'trialUID',
@@ -46,8 +46,9 @@ addExogHistoryTerms = [
     ]
 
 regressionColumnsToUse = [
-    # 'velocity_abs',
+    'velocity_abs',
     'velocity_x', 'velocity_y',
+    # 'acceleration_xy',
     # 'velocity',
     # 'velocity_x_abs', 'velocity_y_abs',
     # 'position_x', 'position_y',
@@ -60,6 +61,7 @@ regressionColumnRenamer = {
     'position': 'p', 'velocity': 'v',
     'velocity_x': 'vx', 'velocity_y': 'vy',
     'position_x': 'px', 'position_y': 'py',
+    'acceleration_xy': 'accxy',
     'velocity_abs': 'absv',
     'velocity_x_abs': 'absvx', 'velocity_y_abs': 'absvy',
     }
@@ -95,9 +97,10 @@ def absWrap(x):
     return('abv({})'.format(x))
 
 designFormulaTemplates = [
-    '{vx} + {vy} + {a} + {r} - 1',
-    '{vx} + {vy} - 1',
+    '{vx} + {vy} + {absv} + {a} + {r} - 1',
+    '{vx} + {vy} + {absv} - 1',
     '{a} + {r} - 1',
+    '{vx} + {vy} + {a} + {r} - 1',
     ]
 
 #
@@ -120,14 +123,14 @@ for lagSpecIdx in range(len(addExogHistoryTerms)):
     wrapperFun = genRcbWrap(lagSpec)
     elecWrapperFun = genElecRcbWrap(lagSpec)
     laggedModels = {}
-    for source in ['vx', 'vy', 'v', 'absvx', 'absvy', 'p']:
+    for source in ['vx', 'vy', 'accxy', 'absv']:
         laggedModels[source] = wrapperFun(source)
         sourceTermDict[wrapperFun(source)] = source
         sourceHistOptsDict[wrapperFun(source).replace(' ', '')] = addExogHistoryTerms[lagSpecIdx]
     for source in [
-        'a', 'vx*a', 'vy*a',
-        'r', 'vx*r', 'vy*r',
-        'a*r', 'vx*a*r', 'vy*a*r',]:
+        'a', 'vx*a', 'vy*a', 'accxy*a', 'absv*a',
+        'r', 'vx*r', 'vy*r', 'accxy*r', 'absv*r',
+        'a*r', 'vx*a*r', 'vy*a*r', 'accxy*a*r', 'absv*a*r',]:
         laggedModels[source] = elecWrapperFun(source)
         sourceTermDict[elecWrapperFun(source)] = source
         sourceHistOptsDict[elecWrapperFun(source).replace(' ', '')] = addExogHistoryTerms[lagSpecIdx]
@@ -136,7 +139,7 @@ for lagSpecIdx in range(len(addExogHistoryTerms)):
     formulasShortHand.update({
         dft.format(**laggedModels): '({}, **{})'.format(dft, lagSpec)
         for dft in designFormulaTemplates})
-    for fIdx in range(2):
+    for fIdx in range(len(theseFormulas)):
         designIsLinear.update({
             theseFormulas[fIdx]: True})
     masterExogFormulas.append(theseFormulas[0])
@@ -168,17 +171,106 @@ lOfEndogAndExogTemplates = [
     (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[1],), # 0: full exog
     (lOfDesignFormulas[1], lOfHistTemplates[1], lOfHistTemplates[1],), # 1: v only
     (lOfDesignFormulas[2], lOfHistTemplates[1], lOfHistTemplates[1],), # 2: a r only
-    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[0],), # 3: full exog and self
-    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[1],), # 4: full exog and self and ensemble
-    (lOfDesignFormulas[1], lOfHistTemplates[1], lOfHistTemplates[1],), # 5: v only and self and ensemble
-    (lOfDesignFormulas[2], lOfHistTemplates[1], lOfHistTemplates[1],), # 6: a r only exog and self and ensemble
+    (lOfDesignFormulas[3], lOfHistTemplates[1], lOfHistTemplates[1],), # 3: missing absv
+    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[0],), # 4: full exog and self
+    (lOfDesignFormulas[4], lOfHistTemplates[1], lOfHistTemplates[0],), # 5: self only
+    #
+    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[1],), # 6: full exog and self and ensemble
+    (lOfDesignFormulas[0], lOfHistTemplates[0], lOfHistTemplates[1],), # 7: full exog and ensemble
+    (lOfDesignFormulas[1], lOfHistTemplates[1], lOfHistTemplates[1],), # 8: v only and self and ensemble
+    (lOfDesignFormulas[2], lOfHistTemplates[1], lOfHistTemplates[1],), # 9: a r only exog and self and ensemble
 ]
 lhsMasksOfInterest = {
     'plotPredictions': [0, 4],
-    'varVsEnsemble': [0]
+    'varVsEnsemble': [0, 4]
     }
-# 
-burnInPeriod = 600e-3
+# ######
+################ define model comparisons
+# "test" should be the "bigger" model (we are adding coefficients and asking whether they improved performance
+modelsToTestStr = '''
+modelsToTest = []
+modelsToTest.append({
+    'testDesign': 0,
+    'refDesign': 1,
+    'testCaption': 'v + a + r',
+    'refCaption': 'v',
+    'captionStr': 'partial R2 of adding terms for A+R to V',
+    'testType': 'ARTerms',
+    'testHasEnsembleHistory': (lhsMasksInfo.loc[0, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[0, 'ensembleTemplate'] != 'NULL'),
+    'lagSpec': lhsMasksInfo.loc[0, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 0,
+    'refDesign': 2,
+    'testCaption': 'v + a + r',
+    'refCaption': 'a + r',
+    'captionStr': 'partial R2 of adding terms for V to A+R',
+    'testType': 'VTerms',
+    'testHasEnsembleHistory': (lhsMasksInfo.loc[0, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[0, 'ensembleTemplate'] != 'NULL'),
+    'lagSpec': lhsMasksInfo.loc[0, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 0,
+    'refDesign': 3,
+    'testCaption': 'v + a + r',
+    'refCaption': 'vxvy + a + r',
+    'captionStr': 'partial R2 of adding terms for abs(V) to V+A+R',
+    'testType': 'absVTerms',
+    'testHasEnsembleHistory': (lhsMasksInfo.loc[0, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[0, 'ensembleTemplate'] != 'NULL'),
+    'lagSpec': lhsMasksInfo.loc[0, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 4,
+    'refDesign': 5,
+    'testCaption': 'v + a + r + self',
+    'refCaption': 'self',
+    'captionStr': 'partial R2 of adding terms for V+A+R to V+A+R+self',
+    'testType': 'VARTerms',
+    'testHasEnsembleHistory': (lhsMasksInfo.loc[4, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[4, 'ensembleTemplate'] != 'NULL'),
+    'lagSpec': lhsMasksInfo.loc[4, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 4,
+    'refDesign': 0,
+    'testCaption': 'v + a + r + self',
+    'refCaption': 'v + a + r',
+    'captionStr': 'partial R2 of adding terms for self to V+A+R+self',
+    'testType': 'selfTerms',
+    'testHasEnsembleHistory': (lhsMasksInfo.loc[4, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[4, 'ensembleTemplate'] != 'NULL'),
+    'lagSpec': lhsMasksInfo.loc[4, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 6,
+    'refDesign': 8,
+    'testCaption': 'v + a + r + self + ensemble',
+    'refCaption': 'v + self + ensemble',
+    'captionStr': 'partial R2 of adding terms for A+R to V+A+R+Ens',
+    'testType': 'AREnsTerms',
+    'testHasEnsembleHistory': (lhsMasksInfo.loc[6, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[6, 'ensembleTemplate'] != 'NULL'),
+    'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 6,
+    'refDesign': 9,
+    'testCaption': 'v + a + r + self + ensemble',
+    'refCaption': 'a + r + self + ensemble',
+    'captionStr': 'partial R2 of adding terms for V to V+A+R+Ens',
+    'testType': 'VEnsTerms',
+    'testHasEnsembleHistory': (lhsMasksInfo.loc[6, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[6, 'ensembleTemplate'] != 'NULL'),
+    'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 6,
+    'refDesign': 7,
+    'testCaption': 'v + a + r + self + ensemble',
+    'refCaption': 'v + a + r + ensemble',
+    'captionStr': 'partial R2 of adding terms for self to V+A+R+Ens',
+    'testType': 'selfEnsTerms',
+    'testHasEnsembleHistory': (lhsMasksInfo.loc[6, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[6, 'ensembleTemplate'] != 'NULL'),
+    'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
+    })
+    '''
+burnInPeriod = 400e-3
 #
 def getHistoryOpts(hTDict, iteratorOpts, rasterOpts):
     binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']

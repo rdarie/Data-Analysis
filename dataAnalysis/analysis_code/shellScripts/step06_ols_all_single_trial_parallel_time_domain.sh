@@ -23,7 +23,7 @@
 #SBATCH --account=carney-dborton-condo
 #SBATCH --export=CCV_HEADLESS=1
 # Request custom resources
-#SBATCH --array=0-45
+#SBATCH --array=0-22
 
 # exps=(201901_27 201902_03 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 exps=(202101_21)
@@ -37,11 +37,11 @@ do
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   ITERATOR="rb"
   WINDOWTERM="XL"
-  SUFFIX="_scaled"
+  SUFFIX="_baseline"
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
   DIMRED="select"
-  # ols_select_scaled
+  # ols_select_baseline
   ESTIMATOR="ols_${DIMRED}${SUFFIX}"
   python -u './calcGridSearchRegressionWithPipelinesV5.py' --transformerNameRhs="${DIMRED}" --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=5
   python -u './calcOrdinaryLeastSquaresPredictionsLite.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting

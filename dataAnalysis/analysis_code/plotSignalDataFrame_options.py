@@ -77,7 +77,7 @@ argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
         'winStart': '-800', 'winStop': '1000', 'limitPages': None,
-        'unitQuery': "chanName.isin(['position#0','velocity#0', 'amplitude#0', 'utah_rawAverage_0#0', 'ins_td0#0', 'ins_td2#0'])",
+        'unitQuery': "chanName.isin(['position#0','velocity_x#0','velocity_y#0', 'amplitude#0', 'utah_rawAverage_0#0', 'ins_td0#0', 'ins_td2#0'])",
         # 'alignQuery': None,
         # 'alignQuery': "conditionUID == 2",
         'individualTraces': False, 'overlayStats': False,

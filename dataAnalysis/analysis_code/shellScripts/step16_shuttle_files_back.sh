@@ -80,7 +80,7 @@ WINDOW="XL"
 KEYPROMPT=""
 # exps=(exp201901251000 exp201901261000 exp201901271000 exp201902031100 exp201902041100 exp201902051100) 
 #  # exps=(exp202101201100 exp202101211100 exp202101221100 exp202101251100 exp202101271100 exp202101281100 exp202102021100)
-exps=(exp202101211100)
+exps=(exp202101271100)
 for EXP in "${exps[@]}"
 do
   echo "step 16, restore from processed, on $EXP"
@@ -89,11 +89,11 @@ do
   #
   # after step 1
   # #
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_chunkingInfo.json' --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_synchFun.json' --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_chunkingInfo.json' --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*_synchFun.json' --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Session*.nix' --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins.nix' --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # ## #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_analyze.nix' --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #
   # after step 2
@@ -109,8 +109,8 @@ do
   # 
   # # after step 4
   # 
-  # BLOCK_ID_NO="0*"
-  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  BLOCK_ID_NO="0*"
+  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_laplace_spectral_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # 
   # #BLOCK_ID_NO="_*"
@@ -184,12 +184,12 @@ do
   # #  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="mahal_ledoit_*_${ITER}_*.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #done
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_mahal_ledoit_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rauc_iterator_*.pickle" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rauc_iterator_*.pickle" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_covarianceMatrixCalc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_rauc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="*_rauc.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   # #
   # misc
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rig_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_rig_${WINDOW}.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.nix" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.h5" --fromDataToScratch --filesIncluded ${KEYPROMPT}
   python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${WINDOW}_outliers.csv" --fromDataToScratch --filesIncluded ${KEYPROMPT}

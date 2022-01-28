@@ -117,7 +117,7 @@ snsRCParams = {
         "ytick.direction": 'in',
     }
 mplRCParams = {
-    'figure.titlesize': 7
+    'figure.titlesize': 9
     }
 styleOpts = {
     'legend.lw': 2,
@@ -239,8 +239,8 @@ if __name__ == '__main__':
                 thisPred.reset_index(inplace=True)
                 maskForPlot = (
                     (thisPred['lhsMaskIdx'].isin(lhsMasksOfInterest['plotPredictions'])) &
-                    (thisPred['trialType'] == trialTypeToPlot) # &
-                    #(thisPred['trialRateInHz'] > 50)
+                    (thisPred['trialType'] == trialTypeToPlot) &
+                    (thisPred['trialRateInHz'] != 50)
                     )
                 if maskForPlot.any():
                     thisPred = thisPred.loc[maskForPlot, :]
@@ -367,11 +367,15 @@ if __name__ == '__main__':
     scoresStack.loc[:, 'fullFormulaDescr'] = scoresStack['lhsMaskIdx'].map(
         lhsMasksInfo['fullFormulaDescr']).to_numpy()
     scoresStack.loc[:, 'fullFormulaAsLabel'] = scoresStack['fullFormulaDescr'].apply(lambda x: x.replace(' + ', ' +\n'))
-    featsToPlot = (
-        scoresStack.loc[scoresStack['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmax(),
-        scoresStack.loc[scoresStack['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmin())
-    scoresStack.loc[:, 'score'] = np.sqrt(scoresStack['score'])
-    height, width = 2, 4
+    # pdb.set_trace()
+    rankingMask = (~scoresStack['fullDesign'].str.contains('self')) & (scoresStack['trialType'] == 'test')
+    scoreRanking = scoresStack.loc[rankingMask, :].groupby('target').mean()['cc'].sort_values()
+    featsToPlot = [scoreRanking.index[j] for j in [0, -2, -1]]
+    # featsToPlot = (
+    #     scoresStack.loc[scoresStack['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmax(),
+    #     scoresStack.loc[scoresStack['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmin())
+    # scoresStack.loc[:, 'score'] = np.sqrt(scoresStack['score'])
+    height, width = 1.5, 3
     aspect = width / height
     commonOpts = dict(
         )
@@ -390,6 +394,7 @@ if __name__ == '__main__':
             nmLk0 = {key: value for key, value in zip(groupPagesBy, name0)}  # name lookup
             nmLk0['design'] = lhsMasksInfo.loc[nmLk0['lhsMaskIdx'], 'designFormula']
             nmLk0['fullFormulaDescr'] = lhsMasksInfo.loc[nmLk0['lhsMaskIdx'], 'fullFormulaDescr']
+            nmLk0['fullFormulaAsLabel'] = nmLk0['fullFormulaDescr'].replace(' + ', ' +\n')
             if not (nmLk0['lhsMaskIdx'] in lhsMasksOfInterest['plotPredictions']):
                 continue
             scoreMasks = [
@@ -399,13 +404,13 @@ if __name__ == '__main__':
             thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
             g = sns.catplot(
                 data=plotScores, hue='trialType',
-                x='target', y='score',
+                x='target', y='cc',
                 hue_order=thisPalette.index.to_list(),
                 palette=thisPalette.to_dict(),
-                height=height, aspect=aspect,
+                height=3, aspect=aspect,
                 kind='box', whis=np.inf)
             g.set_xticklabels(rotation=-30, ha='left')
-            g.suptitle('CC of model {fullFormulaDescr}'.format(**nmLk0))
+            g.suptitle('CC of model\n{fullFormulaAsLabel}'.format(**nmLk0))
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:
@@ -416,12 +421,10 @@ if __name__ == '__main__':
             for name1, predGroup1 in predGroup0.groupby(groupSubPagesBy):
                 nmLk1 = {key: value for key, value in zip(groupSubPagesBy, name1)}  # name lookup
                 nmLk0.update(nmLk1)
+                # pdb.set_trace()
+                nmLk0['averageCC'] = scoreRanking[nmLk0['target']]
                 if not (nmLk0['target'] in featsToPlot):
                     continue
-                # if nmLk0['trialType'] != trialTypeToPlot:
-                #     continue
-                # if nmLk0['trialRateInHz'] < 100:
-                #     continue
                 plotDF = predGroup1.stack().to_frame(name='signal').reset_index()
                 plotDF.loc[:, 'predType'] = 'component'
                 plotDF.loc[plotDF['term'] == 'ground_truth', 'predType'] = 'ground_truth'
@@ -452,8 +455,7 @@ if __name__ == '__main__':
                         facet_kws=dict(margin_titles=True),
                         )
                     g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
-                    titleText = 'model {fullFormulaDescr}\n{target}, electrode {electrode} rate {trialRateInHz} Hz ({trialType})'.format(
-                        **nmLk0)
+                    titleText = 'model {fullFormulaAsLabel}\n{target} (ave. CC: {averageCC:.2f}), electrode {electrode} rate {trialRateInHz} Hz ({trialType})'.format(**nmLk0)
                     print('Saving plot of {}...'.format(titleText))
                     g.suptitle(titleText)
                     asp.reformatFacetGridLegend(

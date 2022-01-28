@@ -171,15 +171,16 @@ if __name__ == '__main__':
     #     ('utah96', 0, 0.0, 8.0, 'NA', 'NA')
     #     ]
     if arguments['selectMethod'] == 'fromRegression':
-        referenceRegressionName = 'ols_select_baseline_{}'.format(datasetName)
+        referenceRegressionName = 'ols_select_scaled_{}'.format(datasetName)
         referenceRegressionPath = os.path.join(
             estimatorsSubFolder,
             referenceRegressionName + '.h5'
             )
         referenceScores = pd.read_hdf(referenceRegressionPath, 'processedScores')
-        referenceTrainMask = (referenceScores['trialType'] == 'train')
-        trainCCDF = referenceScores.loc[referenceTrainMask, ['target', 'cc']].groupby('target').mean()
-        listOfTargetNames = trainCCDF.sort_values('cc', ascending=False, kind='mergesort').index.to_list()
+        referenceTestMask = (referenceScores['trialType'] == 'test') & (referenceScores['lhsMaskIdx'] == 0)
+        testCCDF = referenceScores.loc[referenceTestMask, ['target', 'cc']].groupby('target').mean()
+        testCCDF.sort_values('cc', ascending=False, kind='mergesort', inplace=True)
+        listOfTargetNames = testCCDF.index.to_list()
         listOfColumns = [cN for cN in dataDF.columns if cN[0] in listOfTargetNames[:16]]
     elif arguments['selectMethod'] == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)

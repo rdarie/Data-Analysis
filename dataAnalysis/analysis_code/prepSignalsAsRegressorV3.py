@@ -241,42 +241,48 @@ if __name__ == '__main__':
     #     lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].abs()
     # if ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
     #     lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].abs()
-    if ('position', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
-        posSrs = lhsDF[('position', 0, 'NA', 'NA', 'NA', 'NA')].copy()
-        lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')] = np.cos(np.radians(posSrs * 100.))
-        lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')] = np.sin(np.radians(posSrs * 100))
-        lhsDF.loc[:, ('position', 0, 'NA', 'NA', 'NA', 'NA')] = posSrs / posSrs.abs().max()
-        if ('velocity', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
-            velDF = lhsDF[('velocity', 0, 'NA', 'NA', 'NA', 'NA')].copy()
-            velDF = velDF / velDF.abs().max()
-            lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')] = (-1) * np.sin(np.radians(posSrs * 100)) * velDF
-            lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')] = np.cos(np.radians(posSrs * 100.)) * velDF
-            lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].abs()
-            lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].abs()
-            lhsDF.loc[:, ('velocity', 0, 'NA', 'NA', 'NA', 'NA')] = velDF
-        if False:
-            fig, ax = plt.subplots(2, 1, sharex=True)
-            plotPosSrs = posSrs / posSrs.abs().max()
-            ax[0].plot(plotPosSrs.to_numpy())
-            ax[0].plot(velDF.to_numpy())
-            ax[1].plot(lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
-            ax[1].plot(lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
-            ax[1].plot(lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
-            ax[1].plot(lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+    # #if ('position', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+    # #    posSrs = lhsDF[('position', 0, 'NA', 'NA', 'NA', 'NA')].copy()
+    # #    lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')] = np.cos(np.radians(posSrs * 100.))
+    # #    lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')] = np.sin(np.radians(posSrs * 100))
+    # #    lhsDF.loc[:, ('position', 0, 'NA', 'NA', 'NA', 'NA')] = posSrs / posSrs.abs().max()
+    # #    if ('velocity', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+    # #        velDF = lhsDF[('velocity', 0, 'NA', 'NA', 'NA', 'NA')].copy()
+    # #        velDF = velDF / velDF.abs().max()
+    # #        xVelDF = (-1) * np.sin(np.radians(posSrs * 100)) * velDF
+    # #        yVelDF = np.cos(np.radians(posSrs * 100.)) * velDF
+    # #        lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')] = xVelDF.copy()
+    # #        lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')] = yVelDF.copy()
+    # #        lhsDF.loc[:, ('acceleration_xy', 0, 'NA', 'NA', 'NA', 'NA')] = np.sqrt(
+    # #            xVelDF.diff().fillna(0).to_numpy() ** 2 +
+    # #            yVelDF.diff().fillna(0).to_numpy() ** 2)
+    # #        # lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = xVelDF.abs()
+    # #        # lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = yVelDF.abs()
+    # #        # lhsDF.loc[:, ('velocity', 0, 'NA', 'NA', 'NA', 'NA')] = velDF.copy()
+    # #    if False:
+    # #        fig, ax = plt.subplots(2, 1, sharex=True)
+    # #        plotPosSrs = posSrs / posSrs.abs().max()
+    # #        ax[0].plot(plotPosSrs.to_numpy())
+    # #        ax[0].plot(velDF.to_numpy())
+    # #        ax[1].plot(lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+    # #        ax[1].plot(lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+    # #        ax[1].plot(lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+    # #        ax[1].plot(lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
     transformersLookup = {
         # 'forceMagnitude': MinMaxScaler(feature_range=(0., 1)),
         # 'forceMagnitude_prime': MinMaxScaler(feature_range=(-1., 1)),
-        'amplitude': MinMaxScaler(feature_range=(0., 1)),
-        'amplitude_raster': MinMaxScaler(feature_range=(0., 1)),
+        'amplitude': MinMaxScaler(feature_range=(0., 1.)),
+        'amplitude_raster': MinMaxScaler(feature_range=(0., 1.)),
         'RateInHz': MinMaxScaler(feature_range=(0., .5)),
+        # 'acceleration_xy': MinMaxScaler(feature_range=(0., 1.)),
         # 'velocity': MinMaxScaler(feature_range=(-1., 1.)),
-        # 'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
-        # 'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
+        'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
+        'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
         # 'position_x': MinMaxScaler(feature_range=(0., 1.)),
         # 'position_y': MinMaxScaler(feature_range=(0., 1.)),
         # 'velocity_x_abs': MinMaxScaler(feature_range=(0., 1.)),
         # 'velocity_y_abs': MinMaxScaler(feature_range=(0., 1.)),
-        # 'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
+        'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
         }
     lOfTransformers = []
     for cN in lhsDF.columns:
@@ -297,7 +303,7 @@ if __name__ == '__main__':
     lhsDF.columns = lhsDF.columns.get_level_values('feature')
     print('Saving left hand side DF to {}\\lhsDF...\n lhs columns are:\n{}'.format(
         designMatrixPath, lhsDF.columns
-    ))
+        ))
     if arguments['takeDerivative']:
         pdb.set_trace()
     if os.path.exists(designMatrixPath):
@@ -494,6 +500,9 @@ if __name__ == '__main__':
             elif row['ensembleTemplate'] in templateHistOptsDict:
                 theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
                 lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+            elif row['selfTemplate'] in templateHistOptsDict:
+                theseHistOpts = templateHistOptsDict[row['selfTemplate']]
+                lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
             else:
                 lhsMasksInfo.loc[rowIdx, key] = 'NULL'
     # lhsMasksInfo.loc[:, 'lagSpec'] = np.nan
@@ -537,159 +546,7 @@ if __name__ == '__main__':
     #
     stimConditionLookup.to_hdf(designMatrixPath, 'stimConditionLookup')
     kinConditionLookup.to_hdf(designMatrixPath, 'kinConditionLookup')
-    #####
-    ################ define model comparisons
-    # "test" should be the "bigger" model (we are adding coefficients and asking whether they improved performance
-    modelsToTest = []
-    ######### backup of version from comparing 56 models
-    '''
-    for lhsMaskIdx in [1, 2, 20, 21, 39, 40]:
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx + 2,
-            'testCaption': 'v + a + r + va + vr + ar (+ var)',
-            'refCaption': 'v + a + r + va + vr + ar',
-            'captionStr': 'partial R2 of adding second order interaction terms',
-            'testType': 'secondOrderInteractions',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })
-    for lhsMaskIdx in [3, 4, 22, 23, 41, 42]:
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx + 2,
-            'testCaption': 'v + a + r + va + vr (+ ar)',
-            'refCaption': 'v + a + r + va + vr',
-            'captionStr': 'partial R2 of adding the AR interaction term',
-            'testType': 'ARInteractions',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx + 4,
-            'testCaption': 'v + a + r (+ va + vr) + ar',
-            'refCaption': 'v + a + r + ar',
-            'captionStr': 'partial R2 of adding the VR and VA interaction terms',
-            'testType': 'VAVRInteractions',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })
-    for lhsMaskIdx in [9, 10, 28, 29, 47, 48]:
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx + 8,
-            'testCaption': 'v + (a + r)',
-            'refCaption': 'v',
-            'captionStr': 'partial R2 of adding terms for A and R',
-            'testType': 'ARTerms',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx + 6,
-            'testCaption': '(v +) a + r',
-            'refCaption': 'a + r',
-            'captionStr': 'partial R2 of adding terms for V',
-            'testType': 'VTerms',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })
-    for lhsMaskIdx in [10, 29, 48]:
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx - 1,
-            'testCaption': 'v + a + r (+ ensemble_history)',
-            'refCaption': 'v + a + r',
-            'captionStr': 'partial R2 of adding terms for signal ensemble history to V+A+R',
-            'testType': 'ensembleTerms',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx - 10,
-            'testCaption': '(v + a + r +) ensemble_history',
-            'refCaption': 'ensemble_history',
-            'captionStr': 'partial R2 of adding terms for V+A+R to ensemble history',
-            'testType': 'VARNoEnsembleTerms',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })'''
-    '''
-    for lhsMaskIdx in lhsMasksOfInterest['varVsEnsemble']:
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx - 1,
-            'testCaption': 'v + a + r (+ ensemble_history)',
-            'refCaption': 'v + a + r',
-            'captionStr': 'partial R2 of adding terms for signal ensemble history to V+A+R',
-            'testType': 'ensembleTerms',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-            })
-        modelsToTest.append({
-            'testDesign': lhsMaskIdx,
-            'refDesign': lhsMaskIdx - 2,
-            'testCaption': '(v + a + r +) ensemble_history',
-            'refCaption': 'ensemble_history',
-            'captionStr': 'partial R2 of adding terms for V+A+R to ensemble history',
-            'testType': 'VARNoEnsembleTerms',
-            'testHasEnsembleHistory': lhsMasksInfo.loc[lhsMaskIdx, 'selfTemplate'] != 'NULL',
-            'lagSpec': lhsMasksInfo.loc[lhsMaskIdx, 'lagSpec'],
-        })
-        '''
-    modelsToTest.append({
-        'testDesign': 0,
-        'refDesign': 1,
-        'testCaption': 'v + a + r',
-        'refCaption': 'v',
-        'captionStr': 'partial R2 of adding terms for A+R to V',
-        'testType': 'ARTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[0, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[0, 'lagSpec'],
-        })
-    modelsToTest.append({
-        'testDesign': 0,
-        'refDesign': 2,
-        'testCaption': 'v + a + r',
-        'refCaption': 'a + r',
-        'captionStr': 'partial R2 of adding terms for V to A+R',
-        'testType': 'VTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[0, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[0, 'lagSpec'],
-        })
-    modelsToTest.append({
-        'testDesign': 3,
-        'refDesign': 0,
-        'testCaption': 'v + a + r + self',
-        'refCaption': 'v + a + r',
-        'captionStr': 'partial R2 of adding terms for self to V+A+R',
-        'testType': 'selfTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[3, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[3, 'lagSpec'],
-        })
-    modelsToTest.append({
-        'testDesign': 5,
-        'refDesign': 4,
-        'testCaption': 'v + a + r + ensemble',
-        'refCaption': 'v + ensemble',
-        'captionStr': 'partial R2 of adding terms for A+R to V+A+R+Ens',
-        'testType': 'AREnsTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[4, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[4, 'lagSpec'],
-        })
-    modelsToTest.append({
-        'testDesign': 6,
-        'refDesign': 4,
-        'testCaption': 'v + a + r + ensemble',
-        'refCaption': 'a + r + ensemble',
-        'captionStr': 'partial R2 of adding terms for V to V+A+R+Ens',
-        'testType': 'VEnsTerms',
-        'testHasEnsembleHistory': lhsMasksInfo.loc[4, 'selfTemplate'] != 'NULL',
-        'lagSpec': lhsMasksInfo.loc[4, 'lagSpec'],
-        })
+    exec(modelsToTestStr)
     modelsToTestDF = pd.DataFrame(modelsToTest)
     modelsToTestDF.to_hdf(designMatrixPath, 'modelsToTest')
     print('\n' + '#' * 50 + '\n{}\nComplete.\n'.format(__file__) + '#' * 50 + '\n')

@@ -301,21 +301,38 @@ def unitSpikeTrainArrayAnnToDF(
         spiketrains = spikeTrainContainer.spiketrains
     elif isinstance(spikeTrainContainer, list):
         spiketrains = spikeTrainContainer
+    doNotFillList = ['segment', 'originalIndex', 't', 'feature', 'bin']
     fullAnnotationsDict = {}
     for segIdx, st in enumerate(spiketrains):
         theseAnnDF = pd.DataFrame(st.array_annotations)
-        theseAnnDF['t'] = st.times.magnitude
+        theseAnnDF.loc[:, 't'] = st.times.magnitude
+        if columnNames is not None:
+            fieldsNeedFiller = [
+                mdn
+                for mdn in columnNames
+                if (mdn not in doNotFillList) and (mdn not in theseAnnDF.columns)]
+            for mdName in fieldsNeedFiller:
+                if mdName in st.annotations:
+                    theseAnnDF.loc[:, mdName] = st.annotations[mdName]
+                elif mdName == 'parentFeature':
+                    theseAnnDF.loc[:, mdName] = childBaseName(st.name, 'seg')
+                else:
+                    theseAnnDF.loc[:, mdName] = metaFillerLookup[mdName]
         fullAnnotationsDict.update({segIdx: theseAnnDF})
     annotationsDF = pd.concat(
         fullAnnotationsDict, names=['segment', 'index'], sort=True)
-    if columnNames is not None:
-        doNotFillList = ['segment', 'originalIndex', 't', 'feature', 'bin']
-        fieldsNeedFiller = [
-            mdn
-            for mdn in columnNames
-            if (mdn not in doNotFillList) and (mdn not in annotationsDF.columns)]
-        for mdName in fieldsNeedFiller:
-            annotationsDF.loc[:, mdName] = metaFillerLookup[mdName]
+    # # if columnNames is not None:
+    # #     fieldsNeedFiller = [
+    # #         mdn
+    # #         for mdn in columnNames
+    # #         if (mdn not in doNotFillList) and (mdn not in annotationsDF.columns)]
+    # #     for mdName in fieldsNeedFiller:
+    # #         #
+    # #         # if mdName == 'parentFeature':
+    # #         #     annotationsDF.loc[:, mdName] = annotationsDF.loc[:, 'feature']
+    # #         # else:
+    # #         #     annotationsDF.loc[:, mdName] = metaFillerLookup[mdName]
+    # #         annotationsDF.loc[:, mdName] = metaFillerLookup[mdName]
     return annotationsDF
 
 
@@ -877,20 +894,21 @@ def unitSpikeTrainWaveformsToDF(
     #
     waveformsList = []
     #
+    getMetaDataWorking = deepcopy(getMetaData)
     if getFeatureMetaData is not None:
-        if isinstance(getMetaData, Iterable):
+        if isinstance(getMetaDataWorking, Iterable):
             for annName in getFeatureMetaData:
-                if annName not in getMetaData:
-                    getMetaData.append(annName)
-        elif not(getMetaData):
-            getMetaData = getFeatureMetaData
+                if annName not in getMetaDataWorking:
+                    getMetaDataWorking.append(annName)
+        elif not(getMetaDataWorking):
+            getMetaDataWorking = deepcopy(getFeatureMetaData)
     for segIdx, stIn in enumerate(uniqueSpiketrains):
         if verbose:
             print('extracting spiketrain from {}'.format(stIn.segment))
         #  make sure is not a proxyObj
         if isinstance(stIn, SpikeTrainProxy):
             st = loadStProxy(stIn)
-            if (getMetaData) or (dataQuery is not None):
+            if (getMetaDataWorking) or (dataQuery is not None):
                 # if there's a query, get metadata temporarily to resolve it
                 st = loadObjArrayAnn(st)
         else:
@@ -925,14 +943,14 @@ def unitSpikeTrainWaveformsToDF(
             wfDF = procFun(wfDF, st)
         idxLabels = ['segment', 'originalIndex', 't']
         wfDF.loc[:, 't'] = np.asarray(st.times.magnitude)
-        if (getMetaData) or (dataQuery is not None):
+        if (getMetaDataWorking) or (dataQuery is not None):
             # if there's a query, get metadata temporarily to resolve it
             annDict = {}
             for k, values in st.array_annotations.items():
-                if isinstance(getMetaData, Iterable):
+                if isinstance(getMetaDataWorking, Iterable):
                     # if selecting metadata fields, check that
                     # the key is in the provided list
-                    if k not in getMetaData:
+                    if k not in getMetaDataWorking:
                         continue
                 if isinstance(values[0], str):
                     v = np.asarray(values, dtype='str')
@@ -948,24 +966,27 @@ def unitSpikeTrainWaveformsToDF(
                 )
             annDF = pd.DataFrame(annDict)
             for k, value in st.annotations.items():
-                if isinstance(getMetaData, Iterable):
+                if isinstance(getMetaDataWorking, Iterable):
                     # if selecting metadata fields, check that
                     # the key is in the provided list
-                    if k not in getMetaData:
+                    if k not in getMetaDataWorking:
                         continue
                 if k not in skipAnnNames:
                     annDF.loc[:, k] = value
             #
-            if isinstance(getMetaData, Iterable):
+            if isinstance(getMetaDataWorking, Iterable):
                 doNotFillList = idxLabels + ['feature', 'bin']
                 fieldsNeedFiller = [
                     mdn
-                    for mdn in getMetaData
+                    for mdn in getMetaDataWorking
                     if (mdn not in doNotFillList) and (mdn not in annDF.columns)]
                 for mdName in fieldsNeedFiller:
-                    annDF.loc[:, mdName] = metaFillerLookup[mdName]
+                    if mdName == 'parentFeature':
+                        annDF.loc[:, mdName] = childBaseName(st.name, 'seg')
+                    else:
+                        annDF.loc[:, mdName] = metaFillerLookup[mdName]
             annColumns = annDF.columns.to_list()
-            if getMetaData:
+            if getMetaDataWorking:
                 for annNm in annColumns:
                     if annNm not in idxLabels:
                         idxLabels.append(annNm)
@@ -979,7 +1000,7 @@ def unitSpikeTrainWaveformsToDF(
         spikeDF.columns.name = 'bin'
         if dataQuery is not None:
             spikeDF.query(dataQuery, inplace=True)
-            if not getMetaData:
+            if not getMetaDataWorking:
                 spikeDF.drop(columns=annColumns, inplace=True)
         waveformsList.append(spikeDF)
     #
@@ -1049,6 +1070,7 @@ def unitSpikeTrainWaveformsToDF(
     # plt.plot(shiftedWaveform.columns, shiftedWaveform.mean()); plt.show()
     stackedMetaDF = pd.concat(laggedMetaDict, names=['feature', 'lag', 'originalDummy']).reset_index().drop(columns=['originalDummy'])
     # e.g. getFeatureMetaData = ['freqBandName', 'parentFeature']
+    # pdb.set_trace()
     if getFeatureMetaData is not None:
         featureMetaDF = stackedMetaDF.loc[:, ['feature', 'lag'] + getFeatureMetaData].drop_duplicates().reset_index(drop=True)
     else:

@@ -629,6 +629,10 @@ def calcBlockAnalysisWrapper():
             tdInterp[ 'seg0_position_y'] * (-1) * (tdInterp['seg0_velocity'].astype(float) * 3e2))
         tdInterp.loc[:, 'seg0_velocity_y'] = (
             tdInterp[ 'seg0_position_x'] * (tdInterp['seg0_velocity'].astype(float) * 3e2))
+        tdInterp.loc[:, 'seg0_acceleration_xy'] = np.sqrt(
+            tdInterp[ 'seg0_velocity_x'].diff().fillna(0).to_numpy() ** 2 +
+            tdInterp[ 'seg0_velocity_y'].diff().fillna(0).to_numpy() ** 2)
+        tdInterp.loc[:, 'seg0_position_x'] = tdInterp['seg0_position_x'] - 1. # recenter so that 0 rads -> x, y = 0, 0
     concatList = [tdInterp]
     #
     if not arguments['rigOnly']:

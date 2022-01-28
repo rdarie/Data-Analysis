@@ -555,7 +555,7 @@ if __name__ == '__main__':
             figureOutputFolder,
             '{}_{}.pdf'.format(fullEstimatorName, 'partial_scores'))
         with PdfPages(pdfPath) as pdf:
-            height, width = 1, 1
+            height, width = 2, 2
             aspect = width / height
             # maskSecondOrderTests = modelsToTestDF['testType'] == 'secondOrderInteractions'
             for testTypeName, modelsToTestGroup in modelsToTestDF.groupby('testType'):
@@ -593,7 +593,8 @@ if __name__ == '__main__':
                     hue_order=thisPalette.index.to_list(),
                     palette=thisPalette.to_dict(),
                     height=height, aspect=aspect,
-                    sharey=True
+                    sharey=True,
+                    whis=np.inf,
                     )
                 g.set_xticklabels(rotation=30, ha='right')
                 g.set_titles(template="data subset: {col_name}")
@@ -663,7 +664,8 @@ if __name__ == '__main__':
             plotScores.loc[:, 'designType'] = ''
             thisDesignTypeMask = (
                     (plotScores['designFormula'] == 'NULL') &
-                    (plotScores['ensembleTemplate'] == 'NULL')
+                    (plotScores['ensembleTemplate'] == 'NULL') &
+                    (plotScores['selfTemplate'] == 'NULL')
                 )
             assert (not thisDesignTypeMask.any())
             thisDesignTypeMask = (
@@ -700,7 +702,8 @@ if __name__ == '__main__':
                 col='freqBandName', row='designType',
                 hue_order=thisPalette.index.to_list(),
                 palette=thisPalette.to_dict(),
-                kind='box', height=height, aspect=aspect, sharey=True)
+                kind='box', height=height, aspect=aspect, sharey=True,
+                whis=np.inf,)
             # g.suptitle('CC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
             g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
             g.suptitle('CC')
@@ -721,6 +724,7 @@ if __name__ == '__main__':
                 col='freqBandName', row='designType',
                 hue_order=thisPalette.index.to_list(),
                 palette=thisPalette.to_dict(),
+                whis=np.inf,
                 kind='box', height=height, aspect=aspect, sharey=True)
             # g.suptitle('AIC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
             g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
@@ -743,7 +747,7 @@ if __name__ == '__main__':
                 # kind='box',
                 kind='violin', cut=0, inner='point',
                 height=height, aspect=aspect, sharey=True)
-            g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
+            g.set_titles(template="{row_var}\n{row_name}")
             # g.suptitle('CC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
             g.suptitle('CC')
             g.set_xticklabels(rotation=-30, ha='left')
@@ -760,8 +764,9 @@ if __name__ == '__main__':
                 x='fullDesignAsLabel', row='designType',
                 hue_order=thisPalette.index.to_list(),
                 palette=thisPalette.to_dict(),
+                whis=np.inf,
                 kind='box', height=height, aspect=aspect, sharey=True)
-            g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
+            g.set_titles(template="{row_var}\n{row_name}")
             # g.suptitle('AIC (freqBand: {})'.format(rhsMasksInfo.iloc[rhsMaskIdx, :]['freqBandName']))
             g.suptitle('AIC')
             g.set_xticklabels(rotation=-30, ha='left')
@@ -803,14 +808,15 @@ if __name__ == '__main__':
             bestParamsDict[gsName] = pd.Series({k: v for k, v in zip(hpNames, maxIdx)})
         bestParamsDF = pd.concat(bestParamsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'fold', 'target'], axis='columns').T.reset_index()
         #
-        for annotationName in ['historyLen', 'designFormula', 'ensembleTemplate']:
+        for annotationName in ['historyLen', 'designFormula', 'ensembleTemplate', 'selfTemplate']:
             gsScoresDF.loc[:, annotationName] = gsScoresDF['lhsMaskIdx'].map(lhsMasksInfo[annotationName])
             bestParamsDF.loc[:, annotationName] = bestParamsDF['lhsMaskIdx'].map(lhsMasksInfo[annotationName])
         #
         gsScoresDF.loc[:, 'designType'] = ''
         thisDesignTypeMask = (
                 (gsScoresDF['designFormula'] == 'NULL') &
-                (gsScoresDF['ensembleTemplate'] == 'NULL')
+                (gsScoresDF['ensembleTemplate'] == 'NULL') &
+                (gsScoresDF['selfTemplate'] == 'NULL')
             )
         assert (not thisDesignTypeMask.any())
         thisDesignTypeMask = (
@@ -840,7 +846,9 @@ if __name__ == '__main__':
             row='lhsMaskIdx', col='rhsMaskIdx',
             height=height, aspect=aspect,
             facet_kws=dict(sharey=False),
-            data=plotCoefDF.query('coef != 0'), kind='box'
+            whis=np.inf,
+            data=plotCoefDF.query('coef != 0'), kind='box',
+            legend=False
             )
         g.suptitle('magnitude of coefficients')
         g.tight_layout(pad=styleOpts['tight_layout.pad'])

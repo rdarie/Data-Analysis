@@ -146,7 +146,9 @@ def calcTransferFunctionFromLeastSquares():
     #
     lhsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsDF')
     lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
-    allTargetsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets').xs(arguments['estimatorName'], level='regressorName')
+    allTargetsDF = (
+        pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
+        .xs(arguments['estimatorName'], level='regressorName'))
     rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
     rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
     lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
@@ -159,7 +161,8 @@ def calcTransferFunctionFromLeastSquares():
     trialTypePalette = pd.read_hdf(estimatorPath, 'trialTypePalette')
     ####
     # prep rhs dataframes
-    '''histDesignInfoDict = {}
+    '''
+    histDesignInfoDict = {}
     histImpulseDict = {}
     histSourceTermDict = {}
     for rhsMaskIdx in range(rhsMasks.shape[0]):
@@ -225,7 +228,8 @@ def calcTransferFunctionFromLeastSquares():
         columns=['designInfo'])
     histDesignInfoDF.index = pd.MultiIndex.from_tuples(
         [key for key, value in histDesignInfoDict.items()],
-        names=['rhsMaskIdx', 'ensTemplate'])'''
+        names=['rhsMaskIdx', 'ensTemplate'])
+    '''
     ###
     iRGroupNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'fold']
     nTFsToProcess = iRPerTerm.groupby(iRGroupNames).ngroups
@@ -310,15 +314,18 @@ def calcTransferFunctionFromLeastSquares():
             exogNames0 = iRWorkingCopy.columns.map(termPalette.xs('exog', level='type').loc[:, ['source', 'term']].set_index('term')['source']).to_series()
             exogNames = exogNames0.dropna().to_list()
             if designFormula != 'NULL':
-                histLens = [designHistOptsDict[designFormula]['historyLen']]
+                thisHistLen = designHistOptsDict[designFormula]['historyLen'] + designHistOptsDict[designFormula]['timeDelay']
+                histLens = [histLens]
             else:
                 histLens = []
             ensTemplate = lhsMaskParams['ensembleTemplate']
             selfTemplate = lhsMaskParams['selfTemplate']
             if ensTemplate != 'NULL':
-                histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+                thisHistLen = templateHistOptsDict[ensTemplate]['historyLen'] + templateHistOptsDict[ensTemplate]['timeDelay']
+                histLens.append(thisHistLen)
             if selfTemplate != 'NULL':
-                histLens.append(templateHistOptsDict[ensTemplate]['historyLen'])
+                thisHistLen = templateHistOptsDict[selfTemplate]['historyLen'] + templateHistOptsDict[selfTemplate]['timeDelay']
+                histLens.append(thisHistLen)
             iRWorkingCopy.rename(columns=termPalette.loc[:, ['source', 'term']].set_index('term')['source'], inplace=True)
             # if either ensemble or self are NULL, fill with zeros:
             endogNames = iRWorkingCopy.index.get_level_values('target').unique().to_list()
@@ -428,7 +435,7 @@ def calcTransferFunctionFromLeastSquares():
     return
 
 if __name__ == "__main__":
-    runProfiler = True
+    runProfiler = False
     if runProfiler:
         nameSuffix = os.environ.get('SLURM_ARRAY_TASK_ID')
         prf.profileFunction(

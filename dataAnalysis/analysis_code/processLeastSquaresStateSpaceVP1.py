@@ -73,7 +73,7 @@ dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
         'lines.linewidth': .5,
-        'lines.markersize': 2.5,
+        'lines.markersize': 1.,
         'patch.linewidth': .5,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
@@ -216,7 +216,7 @@ if processSlurmTaskCountTransferFunctions is not None:
             DList.append(pd.read_hdf(thisEstimatorPath, 'D'))
             HList.append(pd.read_hdf(thisEstimatorPath, 'H'))
             eigList.append(pd.read_hdf(thisEstimatorPath, 'eigenvalues'))
-            print('oaded state transition froomn {}'.format(thisEstimatorPath))
+            print('Loaded state transition matrices from {}'.format(thisEstimatorPath))
         except Exception:
             traceback.print_exc()
     ADF = pd.concat(AList)
@@ -320,14 +320,16 @@ with PdfPages(pdfPath) as pdf:
         #
         fig, ax = plt.subplots(2, 1, figsize=(2, 1.5))
         commonOpts = dict(element='step', stat="probability")
+        maskForHist = (eigGroup['tau'] > 0) & (~np.isinf(eigGroup['tau']))
+        eigGroupForHist = eigGroup.loc[maskForHist, :]
         sns.histplot(
-            x='tau', data=eigGroup.query('tau > 0'),
+            x='tau', data=eigGroupForHist,
             ax=ax[0], color=eigValPalette['oscillatory decay'], **commonOpts)
         sns.histplot(
             x='chi', data=eigGroup, ax=ax[1],
             color=eigValPalette['pure decay'], **commonOpts)
         ax[0].set_xlabel('Oscillation period (sec)')
-        ax[0].set_xlim(eigGroup.query('tau > 0')['tau'].quantile([0, .85]).to_list())
+        ax[0].set_xlim(eigGroupForHist['tau'].quantile([0, .85]).to_list())
         ax[1].set_xlabel('Decay time constant (sec)')
         ax[1].set_xlim(eigGroup['chi'].quantile([0, .99]).to_list())
         sns.despine(fig)
@@ -368,33 +370,33 @@ with PdfPages(pdfPath) as pdf:
             for outIdx in range(sys.noutputs):
                 ax[inpIdx, outIdx].semilogy(f, mag[outIdx, inpIdx, :])
         '''
-pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'OKID_ERA'))
-with PdfPages(pdfPath) as pdf:
-    for name, thisH in HDF.groupby(['lhsMaskIdx', 'design', 'rhsMaskIdx']):
-        lhsMaskIdx, designFormula, rhsMaskIdx = name
-        # lhsMasksInfo.loc[lhsMaskIdx, :]
-        nLags = int(lhsMasksInfo.loc[lhsMaskIdx, 'historyLen'] / binInterval)
-        plotH = thisH.xs(lastFoldIdx, level='fold').dropna(axis='columns')
-        u, s, vh = np.linalg.svd(plotH, full_matrices=False)
-        optThresh = tdr.optimalSVDThreshold(plotH) * np.median(s[:int(nLags)])
-        optNDim = (s > optThresh).sum()
-        stateSpaceNDim = min(optNDim, u.shape[0])
-        fig, ax = plt.subplots(figsize=(3, 2))
-        ax.plot(s)
-        ax.set_title('singular values of Hankel matrix (ERA)\n{}'.format(lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']))
-        ax.set_ylabel('s')
-        ax.axvline(stateSpaceNDim, c='b', label='state space model order: {}'.format(stateSpaceNDim))
-        ax.axvline(nLags, c='g', label='AR(p) order: {}'.format(nLags))
-        ax.set_xlabel('Count')
-        ax.set_xlim([-1, stateSpaceNDim * 10])
-        ax.legend()
-        pdf.savefig(bbox_inches='tight', pad_inches=0)
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
-        print('Saving to {}'.format(pdfPath))
+# ## pdfPath = os.path.join(
+# ##     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'OKID_ERA'))
+# ## with PdfPages(pdfPath) as pdf:
+# ##     for name, thisH in HDF.groupby(['lhsMaskIdx', 'design', 'rhsMaskIdx']):
+# ##         lhsMaskIdx, designFormula, rhsMaskIdx = name
+# ##         # lhsMasksInfo.loc[lhsMaskIdx, :]
+# ##         nLags = int(lhsMasksInfo.loc[lhsMaskIdx, 'historyLen'] / binInterval)
+# ##         plotH = thisH.xs(lastFoldIdx, level='fold').dropna(axis='columns')
+# ##         u, s, vh = np.linalg.svd(plotH, full_matrices=False)
+# ##         optThresh = tdr.optimalSVDThreshold(plotH) * np.median(s[:int(nLags)])
+# ##         optNDim = (s > optThresh).sum()
+# ##         stateSpaceNDim = min(optNDim, u.shape[0])
+# ##         fig, ax = plt.subplots(figsize=(3, 2))
+# ##         ax.plot(s)
+# ##         ax.set_title('singular values of Hankel matrix (ERA)\n{}'.format(lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']))
+# ##         ax.set_ylabel('s')
+# ##         ax.axvline(stateSpaceNDim, c='b', label='state space model order: {}'.format(stateSpaceNDim))
+# ##         ax.axvline(nLags, c='g', label='AR(p) order: {}'.format(nLags))
+# ##         ax.set_xlabel('Count')
+# ##         ax.set_xlim([-1, stateSpaceNDim * 10])
+# ##         ax.legend()
+# ##         pdf.savefig(bbox_inches='tight', pad_inches=0)
+# ##         if arguments['showFigures']:
+# ##             plt.show()
+# ##         else:
+# ##             plt.close()
+# ##         print('Saving to {}'.format(pdfPath))
 
 #
 '''pdfPath = os.path.join(

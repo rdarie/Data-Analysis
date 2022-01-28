@@ -268,6 +268,7 @@ spikeTrainMeta.update({
     't_start': trialTimes[0] * pq.s,
     't_stop': trialTimes[-1] * pq.s,
     })
+# pdb.set_trace()
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
     alignedFeaturesDF, spikeTrainMeta=spikeTrainMeta,
     matchSamplingRate=False, verbose=arguments['verbose'])

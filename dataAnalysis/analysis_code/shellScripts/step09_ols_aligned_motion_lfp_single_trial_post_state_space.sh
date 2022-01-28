@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=250G
 
 # Specify a job name:
-#SBATCH -J s09_regression_state_space_sta_202101_20
+#SBATCH -J s09_regression_state_space_stb_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s09_regression_state_space_sta_202101_20.out
-#SBATCH -e ../../batch_logs/regression/s09_regression_state_space_sta_202101_20.out
+#SBATCH -o ../../batch_logs/regression/s09_regression_state_space_stb_202101_21.out
+#SBATCH -e ../../batch_logs/regression/s09_regression_state_space_stb_202101_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -26,7 +26,7 @@
 
 #  SLURM_ARRAY_TASK_ID=2
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_20)
+exps=(202101_21)
 for A in "${exps[@]}"
 do
   echo "step 09 state space parameters, on $A"
@@ -36,7 +36,7 @@ do
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   #
-  ITERATOR="ra"
+  ITERATOR="rb"
   WINDOWTERM="XL"
   SUFFIX="_scaled"
   #

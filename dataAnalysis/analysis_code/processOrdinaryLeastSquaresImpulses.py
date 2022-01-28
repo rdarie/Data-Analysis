@@ -424,10 +424,10 @@ if pickingColors:
     for tIdx, tN in enumerate(primaryPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
 rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 1, 1, 1, 1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
+    primaryPalette.iloc[[1, 1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
     columns=['r', 'g', 'b'],
     index=[
-        'vx', 'vxa', 'vy', 'vya', 'px', 'py', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
+        'vx', 'vy', 'absv', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
 hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
 # hls.loc['v*r', :] = hls.loc[['v', 'r'], :].mean()
