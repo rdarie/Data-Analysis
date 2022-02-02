@@ -171,17 +171,20 @@ if __name__ == '__main__':
     #     ('utah96', 0, 0.0, 8.0, 'NA', 'NA')
     #     ]
     if arguments['selectMethod'] == 'fromRegression':
-        referenceRegressionName = 'ols_select_scaled_{}'.format(datasetName)
+        referenceRegressionName = 'ols_select_{}_{}'.format(arguments['selectionName'].replace('laplace_', ''), datasetName)
         referenceRegressionPath = os.path.join(
             estimatorsSubFolder,
             referenceRegressionName + '.h5'
             )
         referenceScores = pd.read_hdf(referenceRegressionPath, 'processedScores')
+        targetInfo = dataDF.columns.to_frame().reset_index(drop=True)
+        parentLookup = targetInfo.loc[:, ['feature', 'parentFeature']].set_index('feature')['parentFeature']
+        referenceScores.loc[:, 'targetParentFeature'] = referenceScores['target'].map(parentLookup)
         referenceTestMask = (referenceScores['trialType'] == 'test') & (referenceScores['lhsMaskIdx'] == 0)
-        testCCDF = referenceScores.loc[referenceTestMask, ['target', 'cc']].groupby('target').mean()
+        testCCDF = referenceScores.loc[referenceTestMask, ['targetParentFeature', 'cc']].groupby('targetParentFeature').median()
         testCCDF.sort_values('cc', ascending=False, kind='mergesort', inplace=True)
-        listOfTargetNames = testCCDF.index.to_list()
-        listOfColumns = [cN for cN in dataDF.columns if cN[0] in listOfTargetNames[:16]]
+        listOfParentNames = testCCDF.dropna().index.to_list()[:8]
+        listOfColumns = [cN for cN in dataDF.columns if cN[-1] in listOfParentNames]
     elif arguments['selectMethod'] == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
         keepX = np.unique(featureInfo['xCoords'])[::3]

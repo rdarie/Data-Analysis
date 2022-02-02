@@ -569,7 +569,8 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 2e-3,
+            'forceBinInterval': 10e-3,
+            'forceRollingWindow': 50e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -596,7 +597,8 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 2e-3,
+            'forceBinInterval': 10e-3,
+            'forceRollingWindow': 50e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -623,7 +625,8 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 2e-3,
+            'forceBinInterval': 10e-3,
+            'forceRollingWindow': 50e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -650,7 +653,8 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 2e-3,
+            'forceBinInterval': 10e-3,
+            'forceRollingWindow': 50e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -677,7 +681,7 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 20e-3,
+            'forceBinInterval': 50e-3,
             'forceRollingWindow': 100e-3,
             # 'procFun': {
             #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
@@ -688,14 +692,14 @@ def parseAnalysisOptions(
             'controlProportion': None,
             'maskEachFreqBand': False,
             'cvKWArgs': dict(
-                n_splits=10,
+                n_splits=5,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': 'stoppingOrStimOff',
-                'winStart': -0.7,  # start 0.2 ( + .15 burn in period) before whatever the query was
+                'winStart': -0.8,  # start 0.2 ( + .15 burn in period) before whatever the query was
                 'winStop': 0.2  # stop .1 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
@@ -761,6 +765,38 @@ def parseAnalysisOptions(
                 'alignQuery': 'startingOrStimOn',
                 'winStart': -0.6,  # start 0.6 before whatever the query was
                 'winStop': 1.2  # stop .6 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
+        # perimovement, any stim, for plotting
+        'pb': {
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': None, # 2e-4,
+            'postLoadProcFun': {
+                'lfp': 'hf_hampel.defaultSpiketrainHampel'
+            },
+            # # #'procFun': {
+            # # #    'laplace': 'ash.genDetrender(timeWindow=[-0.6, -0.3], useMean=True)',
+            # # #    'laplace_spectral': 'ash.genDetrender(timeWindow=[-0.6, -0.3], useMean=True)',
+            # # #    },
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=2,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -0.2,  # start 0.6 before whatever the query was
+                'winStop': .4  # stop .6 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
                 'alignQuery': None,

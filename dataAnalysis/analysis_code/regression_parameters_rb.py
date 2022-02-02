@@ -4,9 +4,9 @@ import pdb
 
 validTargetLhsMaskIdx = {
     'ols_select_baseline': [0, 1, 2, 3, 4, 5],
-    'ols2_select2_baseline': [6, 7, 8, 9],
+    'ols2_select2_baseline': [6, 7, 8, 9, 10],
     'ols_select_spectral_baseline': [0, 1, 2, 3, 4, 5],
-    'ols2_select2_spectral_baseline': [6, 7, 8, 9]
+    'ols2_select2_spectral_baseline': [6, 7, 8, 9, 10]
 }
 
 processSlurmTaskCountPLS = 3
@@ -19,11 +19,11 @@ joblibBackendArgs = dict(
 addEndogHistoryTerms = [
     # enhto0
     {
-        'nb': 3, 'logBasis': True,
+        'nb': 5, 'logBasis': True,
         'dt': None,
         'historyLen': 350e-3,
         'timeDelay': 50e-3,
-        'b': 100e-3, 'useOrtho': True,
+        'b': 50e-3, 'useOrtho': True,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': True, 'causalFill': True,
@@ -33,7 +33,7 @@ addEndogHistoryTerms = [
 addExogHistoryTerms = [
     # exhto0
     {
-        'nb': 3, 'logBasis': True,
+        'nb': 5, 'logBasis': True,
         'dt': None,
         'historyLen': 400e-3,
         'timeDelay': 0.,
@@ -166,23 +166,24 @@ for lagSpecIdx in range(len(addEndogHistoryTerms)):
     templateHistOptsDict[histTemplate] = addEndogHistoryTerms[lagSpecIdx]
 lOfHistTemplates.append('NULL')
 #
-# exog, self, ensemble
+# exog, ensemble, self
 lOfEndogAndExogTemplates = [
-    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[1],), # 0: full exog
-    (lOfDesignFormulas[1], lOfHistTemplates[1], lOfHistTemplates[1],), # 1: v only
-    (lOfDesignFormulas[2], lOfHistTemplates[1], lOfHistTemplates[1],), # 2: a r only
-    (lOfDesignFormulas[3], lOfHistTemplates[1], lOfHistTemplates[1],), # 3: missing absv
-    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[0],), # 4: full exog and self
-    (lOfDesignFormulas[4], lOfHistTemplates[1], lOfHistTemplates[0],), # 5: self only
+    (lOfDesignFormulas[0],  lOfHistTemplates[-1], lOfHistTemplates[-1],), # 0: full exog
+    (lOfDesignFormulas[1],  lOfHistTemplates[-1], lOfHistTemplates[-1],), # 1: v only
+    (lOfDesignFormulas[2],  lOfHistTemplates[-1], lOfHistTemplates[-1],), # 2: a r only
+    (lOfDesignFormulas[3],  lOfHistTemplates[-1], lOfHistTemplates[-1],), # 3: missing absv
+    (lOfDesignFormulas[0],  lOfHistTemplates[-1], lOfHistTemplates[0],), # 4: full exog and self
+    (lOfDesignFormulas[-1], lOfHistTemplates[-1], lOfHistTemplates[0],), # 5: self only
     #
-    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[1],), # 6: full exog and self and ensemble
-    (lOfDesignFormulas[0], lOfHistTemplates[0], lOfHistTemplates[1],), # 7: full exog and ensemble
-    (lOfDesignFormulas[1], lOfHistTemplates[1], lOfHistTemplates[1],), # 8: v only and self and ensemble
-    (lOfDesignFormulas[2], lOfHistTemplates[1], lOfHistTemplates[1],), # 9: a r only exog and self and ensemble
+    (lOfDesignFormulas[0], lOfHistTemplates[0],  lOfHistTemplates[0],), # 6: full exog and self and ensemble
+    (lOfDesignFormulas[0], lOfHistTemplates[0],  lOfHistTemplates[-1],), # 7: full exog and ensemble
+    (lOfDesignFormulas[0], lOfHistTemplates[-1], lOfHistTemplates[0],), # 8: full exog and self
+    (lOfDesignFormulas[1], lOfHistTemplates[0],  lOfHistTemplates[0],), # 9: v only and self and ensemble
+    (lOfDesignFormulas[2], lOfHistTemplates[0],  lOfHistTemplates[0],), # 10: a r only exog and self and ensemble
 ]
 lhsMasksOfInterest = {
-    'plotPredictions': [0, 4],
-    'varVsEnsemble': [0, 4]
+    'plotPredictions': [0, 4, 6],
+    'varVsEnsemble': [0, 4, 6]
     }
 # ######
 ################ define model comparisons
@@ -225,7 +226,7 @@ modelsToTest.append({
     'testCaption': 'v + a + r + self',
     'refCaption': 'self',
     'captionStr': 'partial R2 of adding terms for V+A+R to V+A+R+self',
-    'testType': 'VARTerms',
+    'testType': 'exogVSExogAndSelf',
     'testHasEnsembleHistory': (lhsMasksInfo.loc[4, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[4, 'ensembleTemplate'] != 'NULL'),
     'lagSpec': lhsMasksInfo.loc[4, 'lagSpec'],
     })
@@ -235,38 +236,48 @@ modelsToTest.append({
     'testCaption': 'v + a + r + self',
     'refCaption': 'v + a + r',
     'captionStr': 'partial R2 of adding terms for self to V+A+R+self',
-    'testType': 'selfTerms',
+    'testType': 'selfVSExogAndSelf',
     'testHasEnsembleHistory': (lhsMasksInfo.loc[4, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[4, 'ensembleTemplate'] != 'NULL'),
     'lagSpec': lhsMasksInfo.loc[4, 'lagSpec'],
-    })
-modelsToTest.append({
-    'testDesign': 6,
-    'refDesign': 8,
-    'testCaption': 'v + a + r + self + ensemble',
-    'refCaption': 'v + self + ensemble',
-    'captionStr': 'partial R2 of adding terms for A+R to V+A+R+Ens',
-    'testType': 'AREnsTerms',
-    'testHasEnsembleHistory': (lhsMasksInfo.loc[6, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[6, 'ensembleTemplate'] != 'NULL'),
-    'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
-    })
-modelsToTest.append({
-    'testDesign': 6,
-    'refDesign': 9,
-    'testCaption': 'v + a + r + self + ensemble',
-    'refCaption': 'a + r + self + ensemble',
-    'captionStr': 'partial R2 of adding terms for V to V+A+R+Ens',
-    'testType': 'VEnsTerms',
-    'testHasEnsembleHistory': (lhsMasksInfo.loc[6, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[6, 'ensembleTemplate'] != 'NULL'),
-    'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
     })
 modelsToTest.append({
     'testDesign': 6,
     'refDesign': 7,
     'testCaption': 'v + a + r + self + ensemble',
     'refCaption': 'v + a + r + ensemble',
-    'captionStr': 'partial R2 of adding terms for self to V+A+R+Ens',
-    'testType': 'selfEnsTerms',
-    'testHasEnsembleHistory': (lhsMasksInfo.loc[6, 'selfTemplate'] != 'NULL') | (lhsMasksInfo.loc[6, 'ensembleTemplate'] != 'NULL'),
+    'captionStr': 'partial R2 of adding terms for self to V+A+R+self+ens',
+    'testType': 'selfVSFull',
+    'testHasEnsembleHistory': True,
+    'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 6,
+    'refDesign': 8,
+    'testCaption': 'v + a + r + self + ensemble',
+    'refCaption': 'v + a + r + self',
+    'captionStr': 'partial R2 of adding terms for ens to V+A+R+self+ens',
+    'testType': 'ensVSFull',
+    'testHasEnsembleHistory': True,
+    'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 6,
+    'refDesign': 9,
+    'testCaption': 'v + a + r + self + ensemble',
+    'refCaption': 'v + self + ensemble',
+    'captionStr': 'partial R2 of adding terms for A+R to V+A+R+self+ens',
+    'testType': 'arVSFull',
+    'testHasEnsembleHistory': True,
+    'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 6,
+    'refDesign': 10,
+    'testCaption': 'v + a + r + self + ensemble',
+    'refCaption': 'a + r + self + ensemble',
+    'captionStr': 'partial R2 of adding terms for V to V+A+R+self+ens',
+    'testType': 'vVSFull',
+    'testHasEnsembleHistory': True,
     'lagSpec': lhsMasksInfo.loc[6, 'lagSpec'],
     })
     '''

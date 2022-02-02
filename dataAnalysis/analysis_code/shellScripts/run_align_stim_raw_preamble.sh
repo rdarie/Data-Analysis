@@ -3,8 +3,8 @@
 
 LAZINESS="--lazy"
 
-WINDOW="--window=XS"
-
+WINDOWTERM="XXS"
+WINDOW="--window=${WINDOWTERM}"
 ANALYSISFOLDER="--analysisName=fullRes"
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"

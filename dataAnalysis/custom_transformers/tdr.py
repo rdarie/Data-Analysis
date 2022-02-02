@@ -1,17 +1,17 @@
 from sklearn.base import TransformerMixin, BaseEstimator, RegressorMixin
-from sklearn.decomposition import PCA
+# from sklearn.decomposition import PCA
 from sklearn.model_selection import (
     cross_val_score, cross_validate,
     GridSearchCV, StratifiedKFold, StratifiedShuffleSplit)
-from imblearn.over_sampling import RandomOverSampler
-from sklearn.model_selection._split import _BaseKFold
-from sklearn.metrics import make_scorer
+# from imblearn.over_sampling import RandomOverSampler
+# from sklearn.model_selection._split import _BaseKFold
+# from sklearn.metrics import make_scorer
 from sklearn.base import clone
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, PowerTransformer
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance, MinCovDet
 from sklearn.linear_model import ElasticNet, ElasticNetCV
 from sklearn.pipeline import make_pipeline, Pipeline
-from sklearn.svm import LinearSVR
+# from sklearn.svm import LinearSVR
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -27,6 +27,7 @@ import joblib as jb
 from joblib import Parallel, parallel_backend, delayed
 from copy import copy, deepcopy
 import statsmodels
+import warnings
 from patsy import (
     ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
     EvalFactor, LookupFactor, demo_data, dmatrix, dmatrices)
@@ -1922,6 +1923,9 @@ class SMWrapper(BaseEstimator, RegressorMixin):
         if self.start_params is not None:
             if isinstance(self.start_params, float):
                 self.start_params = self.start_params * np.ones(XX.shape[1])
+            elif self.start_params == 'rand':
+                rngNorm = np.random.default_rng()
+                self.start_params = rngNorm.standard_normal(XX.shape[1])
         regular_opts = {}
         for key in dir(self):
             if key in ['alpha', 'L1_wt', 'refit', 'check_step', 'start_params']:
@@ -1932,16 +1936,18 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             if key in ['maxiter', 'tol', 'disp']:
                 if getattr(self, key) is not None:
                     fit_opts.update({key: getattr(self, key)})
-        if not len(regular_opts.keys()):
-            self.results_ = self.model_.fit(**fit_opts)
-        else:
-            if 'tol' in fit_opts:
-                tol = fit_opts.pop('tol')
-                fit_opts['cnvrg_tol'] = tol
-            if 'disp' in fit_opts:
-                fit_opts.pop('disp')
-            self.results_ = self.model_.fit_regularized(
-                **regular_opts, **fit_opts)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if not len(regular_opts.keys()):
+                self.results_ = self.model_.fit(**fit_opts)
+            else:
+                if 'tol' in fit_opts:
+                    tol = fit_opts.pop('tol')
+                    fit_opts['cnvrg_tol'] = tol
+                if 'disp' in fit_opts:
+                    fit_opts.pop('disp')
+                self.results_ = self.model_.fit_regularized(
+                    **regular_opts, **fit_opts)
         self.coef_ = self.results_.params
         # print(self.results_.fit_history)
         self.n_iter_ = self.results_.fit_history['iteration']

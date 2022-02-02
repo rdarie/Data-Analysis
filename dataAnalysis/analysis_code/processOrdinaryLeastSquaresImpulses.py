@@ -78,8 +78,8 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': .2,
-        'lines.markersize': .5,
+        'lines.linewidth': 1.,
+        'lines.markersize': 1.,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -109,7 +109,7 @@ snsRCParams = {
         "ytick.direction": 'in',
     }
 mplRCParams = {
-    'figure.titlesize': 7
+    'figure.titlesize': 10
     }
 styleOpts = {
     'legend.lw': 2,
@@ -117,7 +117,7 @@ styleOpts = {
     'panel_heading.pad': 0.
     }
 sns.set(
-    context='paper', style='whitegrid',
+    context='paper', style='white',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
@@ -757,11 +757,11 @@ if savingResults:
     trialTypePalette.to_hdf(estimatorPath, 'trialTypePalette')
     predictionLineStyleDF.to_hdf(estimatorPath, 'termLineStyleDF')
     #
-
+# expDateTimePathStr
 pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
+    figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'impulse_responses'))
 with PdfPages(pdfPath) as pdf:
-    height, width = 1, 1.5
+    height, width = .5, .5
     aspect = width / height
     for (lhsMaskIdx, designFormula, rhsMaskIdx), thisIRPerTerm in iRPerTerm.groupby(
             ['lhsMaskIdx', 'design', 'rhsMaskIdx']):

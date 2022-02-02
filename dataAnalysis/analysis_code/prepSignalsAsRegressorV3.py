@@ -218,335 +218,403 @@ if __name__ == '__main__':
                     plt.show()
                 else:
                     plt.close()
-    ###
-    if arguments['plotting']:
-        histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
-        histOptsHtmlPath = os.path.join(
-            figureOutputFolder, '{}_{}.html'.format(designMatrixDatasetName, 'histOpts'))
-        histOptsForExportDF.to_html(histOptsHtmlPath)
-    #
-    trialInfoLhs = lhsDF.index.to_frame().reset_index(drop=True)
-    trialInfoRhs = rhsDF.index.to_frame().reset_index(drop=True)
-    checkSameMeta = stimulusConditionNames + ['bin', 'trialUID', 'conditionUID']
-    assert (trialInfoRhs.loc[:, checkSameMeta] == trialInfoLhs.loc[:, checkSameMeta]).all().all()
-    trialInfo = trialInfoLhs
-    #
-    lhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
-    rhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
-    if arguments['takeDerivative']:
-        pdb.set_trace()
-    ##################### end of data loading
-    ## scale external covariates
-    # if ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
-    #     lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].abs()
-    # if ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
-    #     lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].abs()
-    # #if ('position', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
-    # #    posSrs = lhsDF[('position', 0, 'NA', 'NA', 'NA', 'NA')].copy()
-    # #    lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')] = np.cos(np.radians(posSrs * 100.))
-    # #    lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')] = np.sin(np.radians(posSrs * 100))
-    # #    lhsDF.loc[:, ('position', 0, 'NA', 'NA', 'NA', 'NA')] = posSrs / posSrs.abs().max()
-    # #    if ('velocity', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
-    # #        velDF = lhsDF[('velocity', 0, 'NA', 'NA', 'NA', 'NA')].copy()
-    # #        velDF = velDF / velDF.abs().max()
-    # #        xVelDF = (-1) * np.sin(np.radians(posSrs * 100)) * velDF
-    # #        yVelDF = np.cos(np.radians(posSrs * 100.)) * velDF
-    # #        lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')] = xVelDF.copy()
-    # #        lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')] = yVelDF.copy()
-    # #        lhsDF.loc[:, ('acceleration_xy', 0, 'NA', 'NA', 'NA', 'NA')] = np.sqrt(
-    # #            xVelDF.diff().fillna(0).to_numpy() ** 2 +
-    # #            yVelDF.diff().fillna(0).to_numpy() ** 2)
-    # #        # lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = xVelDF.abs()
-    # #        # lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = yVelDF.abs()
-    # #        # lhsDF.loc[:, ('velocity', 0, 'NA', 'NA', 'NA', 'NA')] = velDF.copy()
-    # #    if False:
-    # #        fig, ax = plt.subplots(2, 1, sharex=True)
-    # #        plotPosSrs = posSrs / posSrs.abs().max()
-    # #        ax[0].plot(plotPosSrs.to_numpy())
-    # #        ax[0].plot(velDF.to_numpy())
-    # #        ax[1].plot(lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
-    # #        ax[1].plot(lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
-    # #        ax[1].plot(lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
-    # #        ax[1].plot(lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
-    transformersLookup = {
-        # 'forceMagnitude': MinMaxScaler(feature_range=(0., 1)),
-        # 'forceMagnitude_prime': MinMaxScaler(feature_range=(-1., 1)),
-        'amplitude': MinMaxScaler(feature_range=(0., 1.)),
-        'amplitude_raster': MinMaxScaler(feature_range=(0., 1.)),
-        'RateInHz': MinMaxScaler(feature_range=(0., .5)),
-        # 'acceleration_xy': MinMaxScaler(feature_range=(0., 1.)),
-        # 'velocity': MinMaxScaler(feature_range=(-1., 1.)),
-        'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
-        'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
-        # 'position_x': MinMaxScaler(feature_range=(0., 1.)),
-        # 'position_y': MinMaxScaler(feature_range=(0., 1.)),
-        # 'velocity_x_abs': MinMaxScaler(feature_range=(0., 1.)),
-        # 'velocity_y_abs': MinMaxScaler(feature_range=(0., 1.)),
-        'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
-        }
-    lOfTransformers = []
-    for cN in lhsDF.columns:
-        if cN[0] not in transformersLookup:
-            lOfTransformers.append(([cN], None,))
-        else:
-            lOfTransformers.append(([cN], transformersLookup[cN[0]],))
-    lhsScaler = DataFrameMapper(lOfTransformers, input_df=True, )
-    lhsScaler.fit(lhsDF)
-    lhsDF = pd.DataFrame(
-        lhsScaler.transform(lhsDF), index=lhsDF.index, columns=lhsDF.columns)
-    regressorsFromMetadata = ['electrode']
-    columnAdder = tdr.DataFrameMetaDataToColumns(addColumns=regressorsFromMetadata)
-    lhsDF = columnAdder.fit_transform(lhsDF)
-    keepMask = lhsDF.columns.get_level_values('feature').isin(regressionColumnsToUse)
-    lhsDF = lhsDF.loc[:, keepMask]
-    lhsDF.rename(columns=regressionColumnRenamer, level='feature', inplace=True)
-    lhsDF.columns = lhsDF.columns.get_level_values('feature')
-    print('Saving left hand side DF to {}\\lhsDF...\n lhs columns are:\n{}'.format(
-        designMatrixPath, lhsDF.columns
-        ))
-    if arguments['takeDerivative']:
-        pdb.set_trace()
-    if os.path.exists(designMatrixPath):
-        print('\n{}\nAlready Exists. Removing.'.format(designMatrixPath))
-        os.remove(designMatrixPath)
-    lhsDF.to_hdf(designMatrixPath, 'lhsDF', mode='a')
-    ######## make lhs masks
-    maskList = []
-    attrNames = ['feature', 'lag', 'designFormula', 'ensembleTemplate', 'selfTemplate']
-    #
-    for designFormula, ensembleTemplate, selfTemplate in lOfEndogAndExogTemplates:
-        if (ensembleTemplate == 'NULL') and (selfTemplate == 'NULL') and (designFormula == 'NULL'):
-                continue
-        attrValues = ['all', 0, designFormula, ensembleTemplate, selfTemplate]
-        thisMask = pd.Series(
-            True,
-            index=lhsDF.columns).to_frame()
-        thisMask.columns = pd.MultiIndex.from_tuples(
-            (attrValues,), names=attrNames)
-        maskList.append(thisMask.T)
-    lhsMasks = pd.concat(maskList)
-    maskParams = [
-        {k: v for k, v in zip(lhsMasks.index.names, idxItem)}
-        for idxItem in lhsMasks.index
-        ]
-    maskParamsStr = [
-        '{}'.format(idxItem).replace("'", '')
-        for idxItem in maskParams]
-    lhsMasks.loc[:, 'maskName'] = maskParamsStr
-    lhsMasks.set_index('maskName', append=True, inplace=True)
-    lhsMasks.to_hdf(
-        designMatrixPath, 'featureMasks', mode='a')
-    ##
-    # prep rhs dataframes
-    # histDesignDict = {}
-    thisEnv = patsy.EvalEnvironment.capture()
-    targetsList = []
-    histSourceTermDict = {}
-    histSourceFactorDict = {}
-    for rhsMaskIdx in range(rhsMasks.shape[0]):
-        prf.print_memory_usage('Prepping RHS on rhsRow {}'.format(rhsMaskIdx))
-        rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
-        rhsMaskParams = {k: v for k, v in zip(rhsMasks.index.names, rhsMask.name)}
-        rhGroup = rhsDF.loc[:, rhsMask].copy()
-        # transform to PCs
-        if workingPipelinesRhs is not None:
-            transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
-            rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
-            rhTransformedColumns = transformedRhsDF.columns[
-                transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
-            rhGroup = pd.DataFrame(
-                rhsPipelineMinusAverager.transform(rhGroup),
-                index=rhsDF.index, columns=rhTransformedColumns)
-        rhGroup.columns = rhGroup.columns.get_level_values('feature')
-        #####################
-        theseMaxNumFeatures = min(rhGroup.shape[1], int(arguments['maxNumFeatures']))
-        print('Restricting target group to its first {} features'.format(theseMaxNumFeatures))
-        rhGroup = rhGroup.iloc[:, :theseMaxNumFeatures]
-        #####################
-        rhGroup.to_hdf(designMatrixPath, 'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
-        targetsList.append(pd.Series(rhGroup.columns).to_frame(name='target'))
-        targetsList[-1].loc[:, 'rhsMaskIdx'] = rhsMaskIdx
+        ###
+        if arguments['plotting']:
+            histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
+            histOptsHtmlPath = os.path.join(
+                figureOutputFolder, '{}_{}.html'.format(designMatrixDatasetName, 'histOpts'))
+            histOptsForExportDF.to_html(histOptsHtmlPath)
         #
-        for templateIdx, ensTemplate in enumerate(lOfHistTemplates):
-            if ensTemplate != 'NULL':
-                ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
-                ensFormula += ' - 1'
-                prf.print_memory_usage('Calculating history terms as {}'.format(ensFormula))
-                ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
-                exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
-                ensPt.fit(exampleRhGroup)
-                ensDesignMatrix = ensPt.transform(rhGroup)
-                ensDesignInfo = ensDesignMatrix.design_info
-                thisHistDesign = (
-                    pd.DataFrame(
-                        ensDesignMatrix,
-                        index=rhGroup.index,
-                        columns=ensDesignInfo.column_names))
-                thisHistDesign.columns.name = 'factor'
-                histSourceTermDict.update({ensTemplate.format(cN): cN for cN in rhGroup.columns})
-                for key, sl in ensDesignInfo.term_name_slices.items():
-                    histSourceFactorDict.update({cN: key for cN in ensDesignInfo.column_names[sl]})
-                featureInfo = thisHistDesign.columns.to_frame().reset_index(drop=True)
-                featureInfo.loc[:, 'term'] = featureInfo['factor'].map(histSourceFactorDict)
-                featureInfo.loc[:, 'source'] = featureInfo['term'].map(histSourceTermDict)
-                thisHistDesign.to_hdf(designMatrixPath, 'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
-                featureInfo.to_hdf(designMatrixPath, 'histDesigns/rhsMask_{}/term_lookup_{}'.format(rhsMaskIdx, templateIdx))
-    del rhsDF
-    ###
-    allTargetsDict1 = {}
-    for regressorName, lhsIndices in validTargetLhsMaskIdx.items():
-        allTargetsDict2 = {}
-        for lhsMaskIdx in lhsIndices:
-            allTargetsDict2[lhsMaskIdx] = pd.concat(targetsList)
-            # allTargetsList[-1].loc[:, 'lhsMaskIdx'] = lhsMaskIdx
-        allTargetsDict1[regressorName] = pd.concat(allTargetsDict2, names=['lhsMaskIdx', 'targetIdx']).reset_index()
-        allTargetsDict1[regressorName].loc[:, 'targetIdx'] = np.arange(allTargetsDict1[regressorName].shape[0])
-    allTargetsDF = pd.concat(allTargetsDict1, names=['regressorName', 'index']).reset_index()
-    allTargetsDF.drop(columns=['index'], inplace=True)
-    allTargetsDF.set_index(['regressorName', 'lhsMaskIdx', 'rhsMaskIdx', 'target'], inplace=True)
-    print('Saving list of all targets to {}'.format(designMatrixPath))
-    allTargetsDF.to_hdf(designMatrixPath, 'allTargets')
-    htmlPath = os.path.join(figureOutputFolder, '{}.html'.format(designMatrixDatasetName))
-    allTargetsDF.to_html(htmlPath)
-    ###
-    savePLS = False
-    if savePLS:
-        allTargetsPLS = allTargetsDF.reset_index().drop(['target', 'targetIdx'], axis='columns').drop_duplicates(subset=['lhsMaskIdx', 'rhsMaskIdx']).reset_index(drop=True)
-        allTargetsPLS.loc[:, 'targetIdx'] = range(allTargetsPLS.shape[0])
-        print('Saving list of all pls targets to {}'.format(designMatrixPath))
-        allTargetsPLS.to_hdf(designMatrixPath, 'allTargetsPLS')
-        htmlPathPLS = os.path.join(figureOutputFolder, '{}_pls.html'.format(designMatrixDatasetName))
-        allTargetsPLS.to_html(htmlPathPLS)
-    # prep lhs dataframes
-    if False:
-        fig, ax = plt.subplots(2, 1, sharex=True)
-        plotPosSrs = posSrs / posSrs.abs().max()
-        ax[0].plot(plotPosSrs.to_numpy())
-        ax[0].plot(velDF.to_numpy())
-        ax[1].plot(lhsDF['px'].to_numpy())
-        ax[1].plot(lhsDF['py'].to_numpy())
-        ax[1].plot(lhsDF['vx'].to_numpy())
-        ax[1].plot(lhsDF['vy'].to_numpy())
-    sourceFactorDict = {}
-    for parentFormulaIdx, parentFormula in enumerate(masterExogFormulas):
-        prf.print_memory_usage('calculating exog terms for: {}'.format(parentFormula))
-        pt = PatsyTransformer(parentFormula, eval_env=thisEnv, return_type="matrix")
-        exampleLhGroup = lhsDF.loc[lhsDF.index.get_level_values('conditionUID') == 0, :]
-        pt.fit(exampleLhGroup)
-        designMatrix = pt.transform(lhsDF)
-        designInfo = designMatrix.design_info
-        designDF = (
-            pd.DataFrame(
-                designMatrix,
-                index=lhsDF.index,
-                columns=designInfo.column_names))
-        designDF.columns.name = 'factor'
-        for key, sl in designInfo.term_name_slices.items():
-            sourceFactorDict.update({cN: key for cN in designInfo.column_names[sl]})
-        designDF.to_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
-        featureInfo = designDF.columns.to_frame().reset_index(drop=True)
-        featureInfo.loc[:, 'term'] = featureInfo['factor'].map(sourceFactorDict)
-        featureInfo.loc[:, 'source'] = featureInfo['term'].map(sourceTermDict)
-        featureInfo.to_hdf(designMatrixPath, 'designs/exogParents/term_lookup_{}'.format(parentFormulaIdx))
-    # pdb.set_trace()
-    # plt.plot(lhsDF.loc[:, ['px', 'py', 'vx', 'vy']].to_numpy()); plt.show()
-    # plt.plot(lhsDF.loc[:, ['p', 'v']].to_numpy()); plt.show()
-    # plt.plot(designDF.to_numpy()); plt.show()
-    '''
-    for formulaIdx, designFormula in enumerate(lOfDesignFormulas):
-        if designFormula != 'NULL':
-            prf.print_memory_usage('Looking up exog terms for: {}'.format(designFormula))
-            parentFormula = masterExogLookup[designFormula]
-            parentFormulaIdx = masterExogFormulas.index(parentFormula)
-            pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
-            exampleLhGroup = lhsDF.loc[lhsDF.index.get_level_values('conditionUID') == 0, :]
+        trialInfoLhs = lhsDF.index.to_frame().reset_index(drop=True)
+        trialInfoRhs = rhsDF.index.to_frame().reset_index(drop=True)
+        checkSameMeta = stimulusConditionNames + ['bin', 'trialUID', 'conditionUID']
+        assert (trialInfoRhs.loc[:, checkSameMeta] == trialInfoLhs.loc[:, checkSameMeta]).all().all()
+        trialInfo = trialInfoLhs
+        #
+        lhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
+        rhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
+        if arguments['takeDerivative']:
+            pdb.set_trace()
+        ##################### end of data loading
+        ## scale external covariates
+        # if ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+        #     lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].abs()
+        # if ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+        #     lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = lhsDF[('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].abs()
+        # #if ('position', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+        # #    posSrs = lhsDF[('position', 0, 'NA', 'NA', 'NA', 'NA')].copy()
+        # #    lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')] = np.cos(np.radians(posSrs * 100.))
+        # #    lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')] = np.sin(np.radians(posSrs * 100))
+        # #    lhsDF.loc[:, ('position', 0, 'NA', 'NA', 'NA', 'NA')] = posSrs / posSrs.abs().max()
+        # #    if ('velocity', 0, 'NA', 'NA', 'NA', 'NA') in lhsDF.columns:
+        # #        velDF = lhsDF[('velocity', 0, 'NA', 'NA', 'NA', 'NA')].copy()
+        # #        velDF = velDF / velDF.abs().max()
+        # #        xVelDF = (-1) * np.sin(np.radians(posSrs * 100)) * velDF
+        # #        yVelDF = np.cos(np.radians(posSrs * 100.)) * velDF
+        # #        lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')] = xVelDF.copy()
+        # #        lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')] = yVelDF.copy()
+        # #        lhsDF.loc[:, ('acceleration_xy', 0, 'NA', 'NA', 'NA', 'NA')] = np.sqrt(
+        # #            xVelDF.diff().fillna(0).to_numpy() ** 2 +
+        # #            yVelDF.diff().fillna(0).to_numpy() ** 2)
+        # #        # lhsDF.loc[:, ('velocity_x_abs', 0, 'NA', 'NA', 'NA', 'NA')] = xVelDF.abs()
+        # #        # lhsDF.loc[:, ('velocity_y_abs', 0, 'NA', 'NA', 'NA', 'NA')] = yVelDF.abs()
+        # #        # lhsDF.loc[:, ('velocity', 0, 'NA', 'NA', 'NA', 'NA')] = velDF.copy()
+        # #    if False:
+        # #        fig, ax = plt.subplots(2, 1, sharex=True)
+        # #        plotPosSrs = posSrs / posSrs.abs().max()
+        # #        ax[0].plot(plotPosSrs.to_numpy())
+        # #        ax[0].plot(velDF.to_numpy())
+        # #        ax[1].plot(lhsDF.loc[:, ('position_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+        # #        ax[1].plot(lhsDF.loc[:, ('position_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+        # #        ax[1].plot(lhsDF.loc[:, ('velocity_x', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+        # #        ax[1].plot(lhsDF.loc[:, ('velocity_y', 0, 'NA', 'NA', 'NA', 'NA')].to_numpy())
+        transformersLookup = {
+            # 'forceMagnitude': MinMaxScaler(feature_range=(0., 1)),
+            # 'forceMagnitude_prime': MinMaxScaler(feature_range=(-1., 1)),
+            'amplitude': MinMaxScaler(feature_range=(0., 1.)),
+            'amplitude_raster': MinMaxScaler(feature_range=(0., 1.)),
+            'RateInHz': MinMaxScaler(feature_range=(0., .5)),
+            # 'acceleration_xy': MinMaxScaler(feature_range=(0., 1.)),
+            # 'velocity': MinMaxScaler(feature_range=(-1., 1.)),
+            'velocity_x': MinMaxScaler(feature_range=(-1., 1.)),
+            'velocity_y': MinMaxScaler(feature_range=(-1., 1.)),
+            # 'position_x': MinMaxScaler(feature_range=(0., 1.)),
+            # 'position_y': MinMaxScaler(feature_range=(0., 1.)),
+            # 'velocity_x_abs': MinMaxScaler(feature_range=(0., 1.)),
+            # 'velocity_y_abs': MinMaxScaler(feature_range=(0., 1.)),
+            'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
+            }
+        lOfTransformers = []
+        for cN in lhsDF.columns:
+            if cN[0] not in transformersLookup:
+                lOfTransformers.append(([cN], None,))
+            else:
+                lOfTransformers.append(([cN], transformersLookup[cN[0]],))
+        lhsScaler = DataFrameMapper(lOfTransformers, input_df=True, )
+        lhsScaler.fit(lhsDF)
+        lhsDF = pd.DataFrame(
+            lhsScaler.transform(lhsDF), index=lhsDF.index, columns=lhsDF.columns)
+        regressorsFromMetadata = ['electrode']
+        columnAdder = tdr.DataFrameMetaDataToColumns(addColumns=regressorsFromMetadata)
+        lhsDF = columnAdder.fit_transform(lhsDF)
+        keepMask = lhsDF.columns.get_level_values('feature').isin(regressionColumnsToUse)
+        lhsDF = lhsDF.loc[:, keepMask]
+        lhsDF.rename(columns=regressionColumnRenamer, level='feature', inplace=True)
+        lhsDF.columns = lhsDF.columns.get_level_values('feature')
+        print('Saving left hand side DF to {}\\lhsDF...\n lhs columns are:\n{}'.format(
+            designMatrixPath, lhsDF.columns
+            ))
+        if arguments['takeDerivative']:
+            pdb.set_trace()
+        if os.path.exists(designMatrixPath):
+            print('\n{}\nAlready Exists. Removing.'.format(designMatrixPath))
+            os.remove(designMatrixPath)
+        lhsDF.to_hdf(designMatrixPath, 'lhsDF', mode='a')
+        if arguments['plotting']:
+            # pdb.set_trace()
+            g = sns.displot(data=lhsDF, kind='ecdf')
+            g.set(yscale='log')
+            g.suptitle('Exog regressors scale')
+            pdf.savefig(
+                bbox_inches='tight',
+                )
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+        ######## make lhs masks
+        maskList = []
+        attrNames = ['feature', 'lag', 'designFormula', 'ensembleTemplate', 'selfTemplate']
+        #
+        for designFormula, ensembleTemplate, selfTemplate in lOfEndogAndExogTemplates:
+            if (ensembleTemplate == 'NULL') and (selfTemplate == 'NULL') and (designFormula == 'NULL'):
+                    continue
+            attrValues = ['all', 0, designFormula, ensembleTemplate, selfTemplate]
+            thisMask = pd.Series(
+                True,
+                index=lhsDF.columns).to_frame()
+            thisMask.columns = pd.MultiIndex.from_tuples(
+                (attrValues,), names=attrNames)
+            maskList.append(thisMask.T)
+        lhsMasks = pd.concat(maskList)
+        maskParams = [
+            {k: v for k, v in zip(lhsMasks.index.names, idxItem)}
+            for idxItem in lhsMasks.index
+            ]
+        maskParamsStr = [
+            '{}'.format(idxItem).replace("'", '')
+            for idxItem in maskParams]
+        lhsMasks.loc[:, 'maskName'] = maskParamsStr
+        lhsMasks.set_index('maskName', append=True, inplace=True)
+        lhsMasks.to_hdf(
+            designMatrixPath, 'featureMasks', mode='a')
+        ##
+        # prep rhs dataframes
+        # histDesignDict = {}
+        thisEnv = patsy.EvalEnvironment.capture()
+        targetsList = []
+        histSourceTermDict = {}
+        histSourceFactorDict = {}
+        for rhsMaskIdx in range(rhsMasks.shape[0]):
+            prf.print_memory_usage('Prepping RHS on rhsRow {}'.format(rhsMaskIdx))
+            rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
+            rhsMaskParams = {k: v for k, v in zip(rhsMasks.index.names, rhsMask.name)}
+            rhGroup = rhsDF.loc[:, rhsMask].copy()
+            # transform to PCs
+            if workingPipelinesRhs is not None:
+                transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
+                rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
+                rhTransformedColumns = transformedRhsDF.columns[
+                    transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
+                rhGroup = pd.DataFrame(
+                    rhsPipelineMinusAverager.transform(rhGroup),
+                    index=rhsDF.index, columns=rhTransformedColumns)
+            rhGroup.columns = rhGroup.columns.get_level_values('feature')
+            #####################
+            theseMaxNumFeatures = min(rhGroup.shape[1], int(arguments['maxNumFeatures']))
+            print('Restricting target group to its first {} features'.format(theseMaxNumFeatures))
+            rhGroup = rhGroup.iloc[:, :theseMaxNumFeatures]
+            #####################
+            rhGroup.to_hdf(designMatrixPath, 'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
+            targetsList.append(pd.Series(rhGroup.columns).to_frame(name='target'))
+            targetsList[-1].loc[:, 'rhsMaskIdx'] = rhsMaskIdx
             #
-            designMatrixExample = pt.fit_transform(exampleLhGroup)
-            designInfo = designMatrixExample.design_info
-            theseColumns = designInfo.column_names
-            designDF = pd.read_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
-            designDF = designDF.loc[:, theseColumns]
+            for templateIdx, ensTemplate in enumerate(lOfHistTemplates):
+                if ensTemplate != 'NULL':
+                    ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
+                    ensFormula += ' - 1'
+                    prf.print_memory_usage('Calculating history terms as {}'.format(ensFormula))
+                    ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
+                    exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+                    ensPt.fit(exampleRhGroup)
+                    ensDesignMatrix = ensPt.transform(rhGroup)
+                    ensDesignInfo = ensDesignMatrix.design_info
+                    thisHistDesign = (
+                        pd.DataFrame(
+                            ensDesignMatrix,
+                            index=rhGroup.index,
+                            columns=ensDesignInfo.column_names))
+                    thisHistDesign.columns.name = 'factor'
+                    histSourceTermDict.update({ensTemplate.format(cN): cN for cN in rhGroup.columns})
+                    for key, sl in ensDesignInfo.term_name_slices.items():
+                        histSourceFactorDict.update({cN: key for cN in ensDesignInfo.column_names[sl]})
+                    featureInfo = thisHistDesign.columns.to_frame().reset_index(drop=True)
+                    featureInfo.loc[:, 'term'] = featureInfo['factor'].map(histSourceFactorDict)
+                    featureInfo.loc[:, 'source'] = featureInfo['term'].map(histSourceTermDict)
+                    thisHistDesign.to_hdf(designMatrixPath, 'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
+                    featureInfo.to_hdf(designMatrixPath, 'histDesigns/rhsMask_{}/term_lookup_{}'.format(rhsMaskIdx, templateIdx))
+        del rhsDF
+        ###
+        allTargetsDict1 = {}
+        for regressorName, lhsIndices in validTargetLhsMaskIdx.items():
+            allTargetsDict2 = {}
+            for lhsMaskIdx in lhsIndices:
+                allTargetsDict2[lhsMaskIdx] = pd.concat(targetsList)
+                # allTargetsList[-1].loc[:, 'lhsMaskIdx'] = lhsMaskIdx
+            allTargetsDict1[regressorName] = pd.concat(allTargetsDict2, names=['lhsMaskIdx', 'targetIdx']).reset_index()
+            allTargetsDict1[regressorName].loc[:, 'targetIdx'] = np.arange(allTargetsDict1[regressorName].shape[0])
+        allTargetsDF = pd.concat(allTargetsDict1, names=['regressorName', 'index']).reset_index()
+        allTargetsDF.drop(columns=['index'], inplace=True)
+        allTargetsDF.set_index(['regressorName', 'lhsMaskIdx', 'rhsMaskIdx', 'target'], inplace=True)
+        print('Saving list of all targets to {}'.format(designMatrixPath))
+        allTargetsDF.to_hdf(designMatrixPath, 'allTargets')
+        htmlPath = os.path.join(figureOutputFolder, '{}.html'.format(designMatrixDatasetName))
+        allTargetsDF.to_html(htmlPath)
+        ###
+        savePLS = False
+        if savePLS:
+            allTargetsPLS = allTargetsDF.reset_index().drop(['target', 'targetIdx'], axis='columns').drop_duplicates(subset=['lhsMaskIdx', 'rhsMaskIdx']).reset_index(drop=True)
+            allTargetsPLS.loc[:, 'targetIdx'] = range(allTargetsPLS.shape[0])
+            print('Saving list of all pls targets to {}'.format(designMatrixPath))
+            allTargetsPLS.to_hdf(designMatrixPath, 'allTargetsPLS')
+            htmlPathPLS = os.path.join(figureOutputFolder, '{}_pls.html'.format(designMatrixDatasetName))
+            allTargetsPLS.to_html(htmlPathPLS)
+        # prep lhs dataframes
+        if False:
+            fig, ax = plt.subplots(2, 1, sharex=True)
+            plotPosSrs = posSrs / posSrs.abs().max()
+            ax[0].plot(plotPosSrs.to_numpy())
+            ax[0].plot(velDF.to_numpy())
+            ax[1].plot(lhsDF['px'].to_numpy())
+            ax[1].plot(lhsDF['py'].to_numpy())
+            ax[1].plot(lhsDF['vx'].to_numpy())
+            ax[1].plot(lhsDF['vy'].to_numpy())
+        sourceFactorDict = {}
+        for parentFormulaIdx, parentFormula in enumerate(masterExogFormulas):
+            prf.print_memory_usage('calculating exog terms for: {}'.format(parentFormula))
+            pt = PatsyTransformer(parentFormula, eval_env=thisEnv, return_type="matrix")
+            exampleLhGroup = lhsDF.loc[lhsDF.index.get_level_values('conditionUID') == 0, :]
+            pt.fit(exampleLhGroup)
+            designMatrix = pt.transform(lhsDF)
+            designInfo = designMatrix.design_info
+            designDF = (
+                pd.DataFrame(
+                    designMatrix,
+                    index=lhsDF.index,
+                    columns=designInfo.column_names))
+            designDF.columns.name = 'factor'
+            for key, sl in designInfo.term_name_slices.items():
+                sourceFactorDict.update({cN: key for cN in designInfo.column_names[sl]})
+            designDF.to_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
             featureInfo = designDF.columns.to_frame().reset_index(drop=True)
             featureInfo.loc[:, 'term'] = featureInfo['factor'].map(sourceFactorDict)
             featureInfo.loc[:, 'source'] = featureInfo['term'].map(sourceTermDict)
-            # pdb.set_trace()
-            designDF.to_hdf(designMatrixPath, 'designs/formula_{}'.format(formulaIdx))
-            featureInfo.to_hdf(designMatrixPath, 'designs/term_lookup_{}'.format(formulaIdx))
-            print('Saved designs/term_lookup_{}'.format(formulaIdx))
-    '''
-    ###################################################################################################################
-    #
-    '''
-    lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
-    lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
-    lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
-    lhsMasksInfo.loc[:, 'designFormulaShortHand'] = lhsMasksInfo['designFormula'].apply(lambda x: formulasShortHand[x])
-    lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormulaShortHand', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
-    '''
-    rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
-    rhsMasksInfo.to_hdf(designMatrixPath, 'rhsMasksInfo')
-    ###
-    lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
-    lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
-    lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
-    lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormula', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(
-        lambda x: ' + '.join(x), axis='columns')
-    for key in ['nb', 'logBasis', 'historyLen', 'useOrtho', 'normalize', 'addInputToOutput']:
-        # lhsMasksInfo.loc[:, key] = np.nan
+            featureInfo.to_hdf(designMatrixPath, 'designs/exogParents/term_lookup_{}'.format(parentFormulaIdx))
+        # plt.plot(lhsDF.loc[:, ['px', 'py', 'vx', 'vy']].to_numpy()); plt.show()
+        # plt.plot(lhsDF.loc[:, ['p', 'v']].to_numpy()); plt.show()
+        # plt.plot(designDF.to_numpy()); plt.show()
+        '''
+        for formulaIdx, designFormula in enumerate(lOfDesignFormulas):
+            if designFormula != 'NULL':
+                prf.print_memory_usage('Looking up exog terms for: {}'.format(designFormula))
+                parentFormula = masterExogLookup[designFormula]
+                parentFormulaIdx = masterExogFormulas.index(parentFormula)
+                pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
+                exampleLhGroup = lhsDF.loc[lhsDF.index.get_level_values('conditionUID') == 0, :]
+                #
+                designMatrixExample = pt.fit_transform(exampleLhGroup)
+                designInfo = designMatrixExample.design_info
+                theseColumns = designInfo.column_names
+                designDF = pd.read_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))
+                designDF = designDF.loc[:, theseColumns]
+                featureInfo = designDF.columns.to_frame().reset_index(drop=True)
+                featureInfo.loc[:, 'term'] = featureInfo['factor'].map(sourceFactorDict)
+                featureInfo.loc[:, 'source'] = featureInfo['term'].map(sourceTermDict)
+                # pdb.set_trace()
+                designDF.to_hdf(designMatrixPath, 'designs/formula_{}'.format(formulaIdx))
+                featureInfo.to_hdf(designMatrixPath, 'designs/term_lookup_{}'.format(formulaIdx))
+                print('Saved designs/term_lookup_{}'.format(formulaIdx))
+        '''
+        ###################################################################################################################
+        #
+        '''
+        lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
+        lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
+        lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
+        lhsMasksInfo.loc[:, 'designFormulaShortHand'] = lhsMasksInfo['designFormula'].apply(lambda x: formulasShortHand[x])
+        lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormulaShortHand', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(lambda x: ' + '.join(x), axis='columns')
+        '''
+        rhsMasksInfo = rhsMasks.index.to_frame().reset_index(drop=True)
+        rhsMasksInfo.to_hdf(designMatrixPath, 'rhsMasksInfo')
+        ###
+        lhsMasksInfo = lhsMasks.index.to_frame().reset_index(drop=True)
+        lhsMasksInfo.loc[:, 'ensembleFormulaDescr'] = lhsMasksInfo['ensembleTemplate'].apply(lambda x: x.format('ensemble'))
+        lhsMasksInfo.loc[:, 'selfFormulaDescr'] = lhsMasksInfo['selfTemplate'].apply(lambda x: x.format('self'))
+        lhsMasksInfo.loc[:, 'fullFormulaDescr'] = lhsMasksInfo.loc[:, ['designFormula', 'ensembleFormulaDescr', 'selfFormulaDescr']].apply(
+            lambda x: ' + '.join(x), axis='columns')
+        for key in ['nb', 'logBasis', 'historyLen', 'useOrtho', 'normalize', 'addInputToOutput']:
+            # lhsMasksInfo.loc[:, key] = np.nan
+            for rowIdx, row in lhsMasksInfo.iterrows():
+                if row['designFormula'] in designHistOptsDict:
+                    theseHistOpts = designHistOptsDict[row['designFormula']]
+                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                elif row['ensembleTemplate'] in templateHistOptsDict:
+                    theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
+                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                elif row['selfTemplate'] in templateHistOptsDict:
+                    theseHistOpts = templateHistOptsDict[row['selfTemplate']]
+                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                else:
+                    lhsMasksInfo.loc[rowIdx, key] = 'NULL'
+        # lhsMasksInfo.loc[:, 'lagSpec'] = np.nan
         for rowIdx, row in lhsMasksInfo.iterrows():
             if row['designFormula'] in designHistOptsDict:
                 theseHistOpts = designHistOptsDict[row['designFormula']]
-                lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'exhto{}'.format(addExogHistoryTerms.index(theseHistOpts))
             elif row['ensembleTemplate'] in templateHistOptsDict:
                 theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
-                lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'enhto{}'.format(addEndogHistoryTerms.index(theseHistOpts))
             elif row['selfTemplate'] in templateHistOptsDict:
                 theseHistOpts = templateHistOptsDict[row['selfTemplate']]
-                lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'enhto{}'.format(addEndogHistoryTerms.index(theseHistOpts))
             else:
-                lhsMasksInfo.loc[rowIdx, key] = 'NULL'
-    # lhsMasksInfo.loc[:, 'lagSpec'] = np.nan
-    for rowIdx, row in lhsMasksInfo.iterrows():
-        if row['designFormula'] in designHistOptsDict:
-            theseHistOpts = designHistOptsDict[row['designFormula']]
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'exhto{}'.format(addExogHistoryTerms.index(theseHistOpts))
-        elif row['ensembleTemplate'] in templateHistOptsDict:
-            theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'enhto{}'.format(addEndogHistoryTerms.index(theseHistOpts))
-        else:
-            lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'NULL'
-    htmlPath = os.path.join(
-        figureOutputFolder, '{}_{}.html'.format(designMatrixDatasetName, 'designs_info'))
-    lhsMasksInfo.drop(columns=['lag', 'maskName']).to_html(htmlPath)
-    lhsMasksInfo.to_hdf(designMatrixPath, 'lhsMasksInfo')
-    ###
-    trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
-    stimCondition = pd.Series(np.nan, index=trialInfo.index)
-    stimOrder = []
-    for name, group in trialInfo.groupby(['electrode', 'trialRateInHz']):
-        stimCondition.loc[group.index] = '{} {}'.format(*name)
-        stimOrder.append('{} {}'.format(*name))
-    trialInfo.loc[:, 'stimCondition'] = stimCondition
-    stimConditionLookup = (
-        trialInfo
-            .loc[:, ['electrode', 'trialRateInHz', 'stimCondition']]
-            .drop_duplicates()
-            .set_index(['electrode', 'trialRateInHz'])['stimCondition'])
-    kinCondition = pd.Series(np.nan, index=trialInfo.index)
-    kinOrder = []
-    for name, group in trialInfo.groupby(['pedalMovementCat', 'pedalDirection']):
-        kinCondition.loc[group.index] = '{} {}'.format(*name)
-        kinOrder.append('{} {}'.format(*name))
-    trialInfo.loc[:, 'kinCondition'] = kinCondition
-    kinConditionLookup = (
-        trialInfo
-            .loc[:, ['pedalMovementCat', 'pedalDirection', 'kinCondition']]
-            .drop_duplicates()
-            .set_index(['pedalMovementCat', 'pedalDirection'])['kinCondition'])
-    #
-    stimConditionLookup.to_hdf(designMatrixPath, 'stimConditionLookup')
-    kinConditionLookup.to_hdf(designMatrixPath, 'kinConditionLookup')
-    exec(modelsToTestStr)
-    modelsToTestDF = pd.DataFrame(modelsToTest)
-    modelsToTestDF.to_hdf(designMatrixPath, 'modelsToTest')
-    print('\n' + '#' * 50 + '\n{}\nComplete.\n'.format(__file__) + '#' * 50 + '\n')
+                lhsMasksInfo.loc[rowIdx, 'lagSpec'] = 'NULL'
+        ####
+        lhsMasksInfo.loc[:, 'designType'] = 'NULL'
+        thisDesignTypeMask = (
+                (lhsMasksInfo['designFormula'] == 'NULL') &
+                (lhsMasksInfo['ensembleTemplate'] == 'NULL') &
+                (lhsMasksInfo['selfTemplate'] == 'NULL')
+        )
+        assert (not thisDesignTypeMask.any())
+        thisDesignTypeMask = (
+                (lhsMasksInfo['designFormula'] == 'NULL') &
+                (lhsMasksInfo['ensembleTemplate'] != 'NULL') &
+                (lhsMasksInfo['selfTemplate'] == 'NULL')
+        )
+        lhsMasksInfo.loc[thisDesignTypeMask, 'designType'] = 'ensembleOnly'
+        thisDesignTypeMask = (
+                (lhsMasksInfo['designFormula'] == 'NULL') &
+                (lhsMasksInfo['ensembleTemplate'] == 'NULL') &
+                (lhsMasksInfo['selfTemplate'] != 'NULL')
+        )
+        lhsMasksInfo.loc[thisDesignTypeMask, 'designType'] = 'selfOnly'
+
+        thisDesignTypeMask = (
+                (lhsMasksInfo['designFormula'] != 'NULL') &
+                (lhsMasksInfo['ensembleTemplate'] == 'NULL') &
+                (lhsMasksInfo['selfTemplate'] == 'NULL')
+        )
+        lhsMasksInfo.loc[thisDesignTypeMask, 'designType'] = 'exogenousOnly'
+
+        thisDesignTypeMask = (
+                (lhsMasksInfo['designFormula'] != 'NULL') &
+                (lhsMasksInfo['ensembleTemplate'] != 'NULL') &
+                (lhsMasksInfo['selfTemplate'] == 'NULL')
+        )
+        lhsMasksInfo.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndExog'
+        thisDesignTypeMask = (
+                (lhsMasksInfo['designFormula'] != 'NULL') &
+                (lhsMasksInfo['ensembleTemplate'] == 'NULL') &
+                (lhsMasksInfo['selfTemplate'] != 'NULL')
+        )
+        lhsMasksInfo.loc[thisDesignTypeMask, 'designType'] = 'selfAndExog'
+        thisDesignTypeMask = (
+                (lhsMasksInfo['designFormula'] == 'NULL') &
+                (lhsMasksInfo['ensembleTemplate'] != 'NULL') &
+                (lhsMasksInfo['selfTemplate'] != 'NULL')
+        )
+        lhsMasksInfo.loc[thisDesignTypeMask, 'designType'] = 'ensembleAndSelf'
+        lhsMasksInfo.loc[thisDesignTypeMask, 'designType'] = 'selfAndExog'
+        thisDesignTypeMask = (
+                (lhsMasksInfo['designFormula'] != 'NULL') &
+                (lhsMasksInfo['ensembleTemplate'] != 'NULL') &
+                (lhsMasksInfo['selfTemplate'] != 'NULL')
+        )
+        lhsMasksInfo.loc[thisDesignTypeMask, 'designType'] = 'ensembleSelfAndSelf'
+        #
+        htmlPath = os.path.join(
+            figureOutputFolder, '{}_{}.html'.format(designMatrixDatasetName, 'designs_info'))
+        lhsMasksInfo.drop(columns=['lag', 'maskName']).to_html(htmlPath)
+        lhsMasksInfo.to_hdf(designMatrixPath, 'lhsMasksInfo')
+        ###
+        trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
+        stimCondition = pd.Series(np.nan, index=trialInfo.index)
+        stimOrder = []
+        for name, group in trialInfo.groupby(['electrode', 'trialRateInHz']):
+            stimCondition.loc[group.index] = '{} {}'.format(*name)
+            stimOrder.append('{} {}'.format(*name))
+        trialInfo.loc[:, 'stimCondition'] = stimCondition
+        stimConditionLookup = (
+            trialInfo
+                .loc[:, ['electrode', 'trialRateInHz', 'stimCondition']]
+                .drop_duplicates()
+                .set_index(['electrode', 'trialRateInHz'])['stimCondition'])
+        kinCondition = pd.Series(np.nan, index=trialInfo.index)
+        kinOrder = []
+        for name, group in trialInfo.groupby(['pedalMovementCat', 'pedalDirection']):
+            kinCondition.loc[group.index] = '{} {}'.format(*name)
+            kinOrder.append('{} {}'.format(*name))
+        trialInfo.loc[:, 'kinCondition'] = kinCondition
+        kinConditionLookup = (
+            trialInfo
+                .loc[:, ['pedalMovementCat', 'pedalDirection', 'kinCondition']]
+                .drop_duplicates()
+                .set_index(['pedalMovementCat', 'pedalDirection'])['kinCondition'])
+        #
+        stimConditionLookup.to_hdf(designMatrixPath, 'stimConditionLookup')
+        kinConditionLookup.to_hdf(designMatrixPath, 'kinConditionLookup')
+        exec(modelsToTestStr)
+        modelsToTestDF = pd.DataFrame(modelsToTest)
+        modelsToTestDF.to_hdf(designMatrixPath, 'modelsToTest')
+        print('\n' + '#' * 50 + '\n{}\nComplete.\n'.format(__file__) + '#' * 50 + '\n')

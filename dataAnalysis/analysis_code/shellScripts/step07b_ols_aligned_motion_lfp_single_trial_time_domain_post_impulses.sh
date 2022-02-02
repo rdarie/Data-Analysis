@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=200G
 
 # Specify a job name:
-#SBATCH -J s07_ols_post_impulses_td_stb_202101_27
+#SBATCH -J s07_bis_ols_post_impulses_td_stb_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s07_ols_post_impulses_td_stb_202101_27.out
-#SBATCH -e ../../batch_logs/regression/s07_ols_post_impulses_td_stb_202101_27.out
+#SBATCH -o ../../batch_logs/regression/s07_bis_ols_post_impulses_td_stb_202101_21.out
+#SBATCH -e ../../batch_logs/regression/s07_bis_ols_post_impulses_td_stb_202101_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -26,7 +26,7 @@
 
 # SLURM_ARRAY_TASK_ID=2
 # exps=(202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_21 202101_27)
+exps=(202101_21)
 for A in "${exps[@]}"
 do
   echo "step 07 impulse responses, scores, predictions, on $A"
@@ -40,13 +40,13 @@ do
   WINDOWTERM="XL"
   SUFFIX="_baseline"
   #  --forceReprocess
-  DIMRED="select"
-  ESTIMATOR="ols_${DIMRED}${SUFFIX}"
+  DIMRED="select2"
+  ESTIMATOR="ols2_${DIMRED}${SUFFIX}"
   # 
-  # python -u './processOrdinaryLeastSquaresImpulses.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './processOrdinaryLeastSquaresImpulses.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
   # 
   python -u './processOrdinaryLeastSquaresScoresVP1.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-  # python -u './processOrdinaryLeastSquaresPredictionsLite.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './processOrdinaryLeastSquaresPredictionsLite.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
   # python -u './plotOrdinaryLeastSquaresPredictions.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
   # python -u './processOrdinaryLeastSquaresPaperPlots.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done

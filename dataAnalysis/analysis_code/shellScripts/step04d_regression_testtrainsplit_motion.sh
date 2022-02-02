@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J s04d_tts_regression_motion_202101_21
+#SBATCH -J s04d_tts_regression_motion_202101
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s04d_tts_regression_motion_202101_21-%a.out
-#SBATCH -e ../../batch_logs/regression/s04d_tts_regression_motion_202101_21-%a.out
+#SBATCH -o ../../batch_logs/regression/s04d_tts_regression_motion_202101-%a.out
+#SBATCH -e ../../batch_logs/regression/s04d_tts_regression_motion_202101-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -22,10 +22,11 @@
 
 # Request custom resources
 #SBATCH --array=2-4
+# 
 # 201902_03 201902_04 201902_05
 # exps=(201901_25 201901_26 201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 #  SLURM_ARRAY_TASK_ID=2
-exps=(202101_21)
+exps=(202101_21 202101_27)
 for A in "${exps[@]}"
 do
   echo "step 04 apply normalization, motion,  get data for covariance, on $A"
@@ -35,7 +36,7 @@ do
   BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
   #
   echo $ANALYSISFOLDER
-  ITERATOR="--iteratorSuffix=rb"
+  ITERATOR="--iteratorSuffix=ra"
   ALIGNQUERYTERM="startingOrNoneExp${A}"
   CONTROLSTATUS=""
   #

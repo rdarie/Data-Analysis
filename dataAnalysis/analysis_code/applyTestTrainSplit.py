@@ -54,6 +54,7 @@ import os
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
+import dataAnalysis.helperFunctions.hampel as hf_hampel
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import pdb
@@ -134,12 +135,22 @@ if 'procFun' in iteratorOpts:
 outlierResultsPathCSV = os.path.join(
     scratchFolder, 'outlierTrials', arguments['alignFolderName'],
     blockBaseName + '_{}_outliers.csv'.format(arguments['window']))
-outlierTrialsForReference = pd.read_csv(outlierResultsPathCSV).set_index(['segment', 't'])
+# outlierTrialsForReference = pd.read_csv(outlierResultsPathCSV).set_index(['segment', 't'])
+outlierTrialsForReference = ash.processOutlierTrials(
+    scratchFolder, blockBaseName,
+    maskOutlierBlocks=True,
+    invertOutlierBlocks=False,
+    window=arguments['window'], alignFolderName=arguments['alignFolderName'],
+    includeDeviation=True)
+#
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 nSeg = len(dataBlock.segments)
+nSegLoading = len(loadingMeta['iteratorsBySegment'])
+blockWasChunked = (nSeg > nSegLoading)
+# pdb.set_trace()
 loadingMeta['alignedAsigsKWargs'] = alignedAsigsKWargs.copy()
-for segIdx in range(nSeg):
+for segIdx in range(nSegLoading):
     if arguments['verbose']:
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
     aakwa = deepcopy(alignedAsigsKWargs)
@@ -148,8 +159,20 @@ for segIdx in range(nSeg):
         aakwa['finalIndexMask'] = loadingMeta['listOfROIMasks'][segIdx]
     if arguments['verbose']:
         prf.print_memory_usage('Loading {}'.format(triggeredPath))
+    if blockWasChunked:
+        whichSegments = None
+        overrideSegIdx = segIdx
+    else:
+        whichSegments = [segIdx]
+        overrideSegIdx = None
     dataDF = ns5.alignedAsigsToDF(
-        dataBlock, whichSegments=[segIdx], **aakwa)
+        dataBlock, whichSegments=whichSegments, overrideSegIdx=overrideSegIdx, **aakwa)
+    if 'postLoadProcFun' in iteratorOpts:
+        if arguments['selectionName'] in iteratorOpts['postLoadProcFun']:
+            if iteratorOpts['postLoadProcFun'][arguments['selectionName']] is not None:
+                print('Applying processing to signal: {}'.format(iteratorOpts['postLoadProcFun'][arguments['selectionName']]))
+                fcn = eval(iteratorOpts['postLoadProcFun'][arguments['selectionName']])
+                dataDF = fcn(dataDF, None)
     print('dataDF.index.names = {}'.format(dataDF.index.names))
     print('dataDF.columns = {}'.format(dataDF.columns.to_frame().reset_index(drop=True)))
     #

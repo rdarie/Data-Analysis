@@ -329,9 +329,9 @@ if __name__ == '__main__':
                     continue
                 targetIdx = allTargetsDF.loc[(lhsMaskIdx, rhsMaskIdx, targetName), 'targetIdx']
                 if (targetIdx // slurmGroupSize) != slurmTaskID:
-                    print("targetIdx ({}) // slurmGroupSize = {}".format(targetIdx, targetIdx // slurmGroupSize))
-                    print('slurmTaskID = {}'.format(slurmTaskID))
-                    print('Skipping...')
+                    # print("targetIdx ({}) // slurmGroupSize = {}".format(targetIdx, targetIdx // slurmGroupSize))
+                    # print('slurmTaskID = {}'.format(slurmTaskID))
+                    # print('Skipping...')
                     continue
                 else:
                     processedTargetIndices.append(targetIdx)

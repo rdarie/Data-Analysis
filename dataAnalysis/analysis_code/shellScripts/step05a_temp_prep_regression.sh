@@ -29,7 +29,7 @@
 # SLURM_ARRAY_TASK_ID=2
 # 201902_03
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_21)
+exps=(202101_21 202101_27)
 # export CCV_HEADLESS=1
 for A in "${exps[@]}"
 do
@@ -52,21 +52,24 @@ do
   ##
   ESTIMATOR="select"
   TARGET="laplace_baseline"
+  #------------#
   python -u './calcSignalColumnSelector.py'  --selectMethod='keepAll' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+  #------------#
   #############################################################################################################
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
-  ##
+  #------------#
   python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs='select' --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
-  ###
+  #------------#
   ESTIMATOR="select"
   TARGET="laplace_spectral_baseline"
-  #  --averageByTrial
+  #------------#
   python -u './calcSignalColumnSelector.py'  --selectMethod='keepAll' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
-  #
+  #------------#
   ############################################################################################################
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
-  #
+  #------------#
   python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs=${ESTIMATOR} --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+  #------------#
 done

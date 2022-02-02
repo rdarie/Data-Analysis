@@ -315,7 +315,7 @@ def calcTransferFunctionFromLeastSquares():
             exogNames = exogNames0.dropna().to_list()
             if designFormula != 'NULL':
                 thisHistLen = designHistOptsDict[designFormula]['historyLen'] + designHistOptsDict[designFormula]['timeDelay']
-                histLens = [histLens]
+                histLens = [thisHistLen]
             else:
                 histLens = []
             ensTemplate = lhsMaskParams['ensembleTemplate']

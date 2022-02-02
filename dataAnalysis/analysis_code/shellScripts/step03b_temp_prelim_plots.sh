@@ -10,11 +10,11 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J s03b_prelim_plots_202101_21
+#SBATCH -J s03b_prelim_plots_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/s03b_prelim_plots_202101_21.out
-#SBATCH -e ../../batch_logs/s03b_prelim_plots_202101_21.out
+#SBATCH -o ../../batch_logs/s03b_prelim_plots_202101_27.out
+#SBATCH -e ../../batch_logs/s03b_prelim_plots_202101_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,24 +28,27 @@
 
 # exps=(201902_03 201902_04 201902_05)
 # exps=(201901_25 201901_26 201901_27 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_21)
+exps=(202101_27)
 for A in "${exps[@]}"
 do
   echo "step 03b plots, on $A"
   source ./shellScripts/run_exp_preamble_$A.sh
-  source ./shellScripts/calc_aligned_stim_preamble.sh
+  source ./shellScripts/calc_aligned_stim_raw_preamble.sh
   #
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  ITERATOR="pa"
-  #
+  ITERATOR="pb"
+  #--------#
   python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
-  #
+  #--------#
   COMMONOPTS=" --iteratorSuffix=${ITERATOR} --loadFromFrames --exp=${EXP} ${WINDOW} ${ALIGNQUERY} ${ANALYSISFOLDER} ${ALIGNFOLDER} ${BLOCKSELECTOR} --plotting --verbose=2"
-  python -u './assembleDataFrames.py' --resetHDF --inputBlockSuffix="laplace" --selectionName="laplace" $COMMONOPTS
-  python -u './assembleDataFrames.py' --inputBlockSuffix="laplace_spectral" --selectionName="laplace_spectral" $COMMONOPTS
+  #--------#
+  python -u './assembleDataFrames.py' --resetHDF --inputBlockSuffix="lfp" --selectionName="lfp" $COMMONOPTS
+  ###### python -u './assembleDataFrames.py' --inputBlockSuffix="laplace_spectral" --selectionName="laplace_spectral" $COMMONOPTS
   python -u './assembleDataFrames.py' --inputBlockSuffix='rig' --selectionName='rig' $COMMONOPTS
-  #
-  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_illustration" --verbose=1 --selectionName="laplace" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  #--------#
+  OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER} ${ALIGNQUERY}"
+  python -u './plotSignalDataFrameV2.py' --plotSuffix="lfp_illustration_topo" --verbose=1 --selectionName="lfp" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  python -u './plotSignalDataFrameV2.py' --plotSuffix="lfp_illustration" --verbose=1 --selectionName="lfp" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   python -u './plotSignalDataFrameV2.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName="rig" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_illustration" --verbose=1 --selectionName="laplace_spectral" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_illustration" --verbose=1 --selectionName="laplace_spectral" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
 done

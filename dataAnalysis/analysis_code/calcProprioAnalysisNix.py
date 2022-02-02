@@ -314,6 +314,8 @@ def calcBlockAnalysisWrapper():
             print('Deleting blocks from chunk {} memory usage: {:.1f} MB'.format(
                 idx, prf.memory_usage_psutil()))
     del spikeBlocks, asigBlocks
+    # pdb.set_trace()
+    # outputBlock.segments[0].analogsignals[0]
     outputFilePath = os.path.join(
         analysisSubFolder,
         ns5FileName + '_analyze.nix'

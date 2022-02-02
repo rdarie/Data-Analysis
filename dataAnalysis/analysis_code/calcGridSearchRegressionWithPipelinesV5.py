@@ -27,7 +27,7 @@ Options:
     --selector=selector                        filename if using a unit selector
 """
 import logging
-logging.captureWarnings(True)
+logging.captureWarnings(False)
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -200,7 +200,7 @@ if __name__ == '__main__':
         return_train_score=True, return_estimator=True)
     estimatorMetadata['crossvalKWArgs'] = crossvalKWArgs
     ###
-    nAlphas = 5
+    nAlphas = 50
     ###
     ## statsmodels elasticnet
     regressorKWArgs = {
@@ -208,8 +208,8 @@ if __name__ == '__main__':
         'family': sm.families.Gaussian(),
         'alpha': 1e-12, 'L1_wt': .1,
         'refit': True, 'tol': 1e-4,
-        'maxiter': 25, 'disp': False, 'check_step': True,
-        # 'start_params': 1.0,
+        'maxiter': 100, 'disp': False, 'check_step': True,
+        'start_params': 'rand',
         'calc_frequency_weights': True
         }
     regressorClass = tdr.SMWrapper
@@ -220,9 +220,10 @@ if __name__ == '__main__':
         return_train_score=True,
         refit=False,
         param_grid={
-            'regressor__regressor__calc_frequency_weights': [True],
+            # 'regressor__regressor__calc_frequency_weights': [True],
             l1_ratio_name: [.5],
-            alpha_name: np.logspace(-12, -2, nAlphas).tolist()}
+            # alpha_name: [0] + np.logspace(-3, 1, nAlphas - 1).tolist()
+            }
         )
     #
     '''regressorClass = ElasticNet
@@ -443,9 +444,9 @@ if __name__ == '__main__':
                     continue
                 targetIdx = allTargetsDF.loc[(lhsMaskIdx, rhsMaskIdx, targetName), 'targetIdx']
                 if (targetIdx // slurmGroupSize) != slurmTaskID:
-                    print("targetIdx ({}) // slurmGroupSize = {}".format(targetIdx, targetIdx // slurmGroupSize))
-                    print('slurmTaskID = {}'.format(slurmTaskID))
-                    print('Skipping...')
+                    # print("targetIdx ({}) // slurmGroupSize = {}".format(targetIdx, targetIdx // slurmGroupSize))
+                    # print('slurmTaskID = {}'.format(slurmTaskID))
+                    # print('Skipping...')
                     continue
                 else:
                     processedTargetIndices.append(targetIdx)
@@ -495,7 +496,42 @@ if __name__ == '__main__':
                 fullDesignDF.columns = fullDesignDF.columns.get_level_values('factor')
                 # pdb.set_trace()
                 del fullDesignList
+                #############
                 gsKWA = deepcopy(gridSearchKWArgs)
+                if 'param_grid' in gridSearchKWArgs:
+                    if l1_ratio_name in gsKWA['param_grid']:
+                        dummyDesign = clone(pipelineLhs.named_steps['averager']).fit_transform(fullDesignDF)
+                        dummyRhs = pd.DataFrame(
+                            clone(pipelineRhs.named_steps['averager']).fit_transform(rhGroup),
+                            columns=rhGroup.columns).loc[:, [targetName]]
+                        paramGrid = gsKWA.pop('param_grid')
+                        lOfL1Ratios = paramGrid.pop(l1_ratio_name)
+                        gsParams = []
+                        for l1Ratio in lOfL1Ratios:
+                            alphas = _alpha_grid(
+                                dummyDesign, dummyRhs,
+                                fit_intercept=True, eps=1e-2,
+                                l1_ratio=l1Ratio, n_alphas=nAlphas)
+                            # enet_alphas, _, _ = enet_path(dummyDesign, dummyRhs, l1_ratio=l1Ratio, n_alphas=nAlphas, eps=1e-4)
+                            alphas = np.atleast_1d(alphas).tolist()
+                            fastTrack = False
+                            if fastTrack:
+                                alphas = [alphas[-1], alphas[0]]
+                            gsParams.append(
+                                {
+                                    l1_ratio_name: [l1Ratio],
+                                    alpha_name: alphas,
+                                    'regressor__regressor__calc_frequency_weights': [True]
+                                    })
+                            alphasStr = ['{:.3g}'.format(a) for a in alphas]
+                            print('Evaluating alphas: {}'.format(alphasStr))
+                        # gsParams.append(
+                        #     {
+                        #         l1_ratio_name: [0.5],
+                        #         alpha_name: [0.],
+                        #         'regressor__regressor__calc_frequency_weights': [True]
+                        #         })
+                        gsKWA['param_grid'] = gsParams
                 #############
                 if DEBUGGING:
                     estimatorInstance.fit(fullDesignDF, targetDF)

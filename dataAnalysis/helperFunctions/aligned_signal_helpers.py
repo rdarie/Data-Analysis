@@ -60,28 +60,44 @@ def processOutlierTrials(
         maskOutlierBlocks=False,
         invertOutlierBlocks=False,
         window=None, alignFolderName=None,
+        includeDeviation=False,
         **kwargs
         ):
-    if maskOutlierBlocks:
-        resultPathCSV = os.path.join(
-            scratchPath, 'outlierTrials', alignFolderName,
-            prefix + '_{}_outliers.csv'.format(window))
-        if os.path.exists(resultPathCSV):
-            oBlocks = pd.read_csv(resultPathCSV).set_index(['segment', 't'])['rejectBlock']
-        else:
-            resultPathH5 = os.path.join(
-                scratchPath, 'outlierTrials', alignFolderName,
-                prefix + '_{}_outliers.h5'.format(window))
-            oBlocks = pd.read_hdf(resultPathH5, 'rejectBlock')
-        oBlocksCount = oBlocks.sum()
-        oBlocksSize = oBlocks.shape[0]
-        print('Loading outlier trials. Rejecting a proportion of {:.2f} ({} out of {})'.format(
-            oBlocksCount / oBlocksSize, oBlocksCount, oBlocksSize))
-        if invertOutlierBlocks:
-            oBlocks = ~oBlocks.astype(bool)
-        return oBlocks
-    else:
-        return None
+    fallBackWindows = ['XL']
+    for wN in [window] + fallBackWindows:
+        try:
+            if maskOutlierBlocks:
+                resultPathCSV = os.path.join(
+                    scratchPath, 'outlierTrials', alignFolderName,
+                    prefix + '_{}_outliers.csv'.format(wN))
+                if os.path.exists(resultPathCSV):
+                    oBlocks = pd.read_csv(resultPathCSV).set_index(['segment', 't'])
+                else:
+                    resultPathH5 = os.path.join(
+                        scratchPath, 'outlierTrials', alignFolderName,
+                        prefix + '_{}_outliers.h5'.format(wN))
+                    print('Outlier CSV does not exist! loading from {}'.format(resultPathH5))
+                    oBlocks = pd.read_hdf(resultPathH5, 'rejectBlock')
+                    if includeDeviation:
+                        devBlocks = pd.read_hdf(resultPathH5, 'deviation')
+                        oBlocks = pd.concat([oBlocks, devBlocks], names=['rejectBlock', 'deviation'])
+                    else:
+                        oBlocks = oBlocks.to_frame(name='rejectBlock')
+                oBlocksCount = oBlocks.sum()['rejectBlock']
+                oBlocksSize = oBlocks.shape[0]
+                print('Loading outlier trials. Rejecting a proportion of {:.2f} ({} out of {})'.format(
+                    oBlocksCount / oBlocksSize, oBlocksCount, oBlocksSize))
+                if invertOutlierBlocks:
+                    oBlocks.loc[:, 'rejectBlock'] = ~oBlocks.astype(bool)
+                if includeDeviation:
+                    return oBlocks
+                else:
+                    return oBlocks['rejectBlock']
+            else:
+                return None
+        except:
+            print('{} outlier trials not found. Falling back...'.format(wN))
+            # traceback.print_exc()
 
 
 def processUnitQueryArgs(

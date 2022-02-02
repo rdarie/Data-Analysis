@@ -369,7 +369,7 @@ if __name__ == '__main__':
     scoresStack.loc[:, 'fullFormulaAsLabel'] = scoresStack['fullFormulaDescr'].apply(lambda x: x.replace(' + ', ' +\n'))
     # pdb.set_trace()
     rankingMask = (~scoresStack['fullDesign'].str.contains('self')) & (scoresStack['trialType'] == 'test')
-    scoreRanking = scoresStack.loc[rankingMask, :].groupby('target').mean()['cc'].sort_values()
+    scoreRanking = scoresStack.loc[rankingMask, :].groupby('target').mean()['cc'].dropna().sort_values()
     featsToPlot = [scoreRanking.index[j] for j in [0, -2, -1]]
     # featsToPlot = (
     #     scoresStack.loc[scoresStack['fullFormulaDescr'].str.contains('NULL'), :].groupby('target').mean()['score'].idxmax(),
@@ -385,10 +385,10 @@ if __name__ == '__main__':
     if plotSingleTrials:
         predDF = predDF.xs(0, level='conditionUID')
         pdfPath = os.path.join(
-            figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'reconstructions_single_trial'))
+            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'reconstructions_single_trial'))
     else:
         pdfPath = os.path.join(
-            figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'reconstructions'))
+            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'reconstructions'))
     with PdfPages(pdfPath) as pdf:
         for name0, predGroup0 in predDF.groupby(groupPagesBy):
             nmLk0 = {key: value for key, value in zip(groupPagesBy, name0)}  # name lookup

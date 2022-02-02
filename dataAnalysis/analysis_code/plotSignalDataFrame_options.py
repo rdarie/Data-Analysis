@@ -93,7 +93,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'lfp_illustration': {
         'recalcStats': True,
-        'winStart': '-150', 'winStop': '350', 'limitPages': None,
+        'winStart': '-25', 'winStop': '60', 'limitPages': None,
         'unitQuery': "chanName.isin(['utah1#0', 'utah75#0'])",
         # 'alignQuery': None,
         # 'unitQuery': None,
@@ -129,6 +129,19 @@ argumentsLookup = {
     'laplace_illustration_topo': {
         'recalcStats': True,
         'winStart': '-1000', 'winStop': '1000', 'limitPages': None,
+        'unitQuery': None,
+        'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
+        'individualTraces': False, 'overlayStats': False,
+        'hueName': 'trialAmplitude', 'hueControl': '',
+        'rowName': 'yCoords', 'rowControl': '',
+        'colName': 'xCoords', 'colControl': '',
+        'groupPagesByColumn': 'all',
+        'groupPagesByIndex': 'stimCondition, kinematicConditionNoSize',
+        'sizeName': '', 'sizeControl': '',
+        'styleName': '', 'styleControl': ''},
+    'lfp_illustration_topo': {
+        'recalcStats': True,
+        'winStart': '-25', 'winStop': '55', 'limitPages': None,
         'unitQuery': None,
         'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
@@ -294,6 +307,16 @@ statsTestOptsLookup = {
         pThresh=5e-2,
         correctMultiple=True,
         ),
+    'lfp_illustration_topo': dict(
+        referenceTimeWindow=None,
+        # referenceTimeWindow=[-400e-3, -350e-3],
+        testStride=100e-3,
+        testWidth=100e-3,
+        tStart=-200e-3,
+        tStop=None,
+        pThresh=5e-2,
+        correctMultiple=True,
+        ),
     'laplace_illustration_topo': dict(
         referenceTimeWindow=None,
         # referenceTimeWindow=[-400e-3, -350e-3],
@@ -402,13 +425,13 @@ plotProcFunsLookup = {
         # asp.genTitleChanger(titleLabelLookup)
         ],
     'lfp_illustration': [
-        shadeAUCEpochsPerFacet,
+        # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genStimVLineAdder(
             'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=-100e-3, tOffset=.4,
+            tOnset=0., tOffset=60e-3,
             includeLeft=False, includeRight=False),
         asp.genTitleChanger(titleLabelLookup)
         ],
@@ -423,6 +446,13 @@ plotProcFunsLookup = {
         asp.genTitleChanger(titleLabelLookup)
         ],
     'laplace_illustration_topo': [
+        # shadeAUCEpochsPerFacet,
+        asp.xLabelsTime,
+        asp.genLegendRounder(decimals=2),
+        asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
+        # asp.genTitleChanger(titleLabelLookup)
+        ],
+    'lfp_illustration_topo': [
         # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genLegendRounder(decimals=2),
@@ -524,6 +554,12 @@ relPlotKWArgsLookup = {
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': 'se'
     },
+    'lfp_illustration_topo': {
+        'linewidth': 2., 'height': 2, 'aspect': 1.5,
+        'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
+        'facet_kws': {'sharey': False},
+        'errorbar': None  # 'se'
+    },
     'laplace_illustration_topo': {
         'linewidth': 2., 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
@@ -585,6 +621,10 @@ catPlotKWArgsLookup = {
         'linewidth': 1., 'height': 1, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1"
     },
+    'lfp_illustration_topo': {
+        'linewidth': 1., 'height': 1, 'aspect': 3,
+        'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1"
+    },
     'laplace_illustration_topo': {
         'linewidth': 1., 'height': 1, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1"
@@ -623,6 +663,9 @@ legendTitleOverridesLookup = {
     'laplace_illustration': {
         'trialAmplitude': 'Stimulation\namplitude (uA)',
     },
+    'lfp_illustration_topo': {
+        'trialAmplitude': 'Stimulation\namplitude (uA)',
+    },
     'laplace_illustration_topo': {
         'trialAmplitude': 'Stimulation\namplitude (uA)',
     },
@@ -654,6 +697,9 @@ styleOptsLookup = {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     },
     'laplace_illustration': {
+        'legend.lw': 2, 'tight_layout.pad': 2e-1,
+    },
+    'lfp_illustration_topo': {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     },
     'laplace_illustration_topo': {
@@ -709,6 +755,7 @@ titlesOptsLookup = {
     'rig_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'lfp_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'lfp_illustration_topo': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_illustration_topo': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_spectral_illustration_topo': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_spectral_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},

@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
     joblibBackendArgs = dict(
         backend='loky',
-    )
+        )
 
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
@@ -243,7 +243,11 @@ if __name__ == "__main__":
             stLikeList = [
                 un.spiketrains[segIdx]
                 for un in unitList]
-            dummySt = ns5.loadObjArrayAnn(ns5.loadStProxy(stLikeList[0]))
+            try:
+                dummySt = ns5.loadObjArrayAnn(ns5.loadStProxy(stLikeList[0]))
+            except:
+                traceback.print_exc()
+                pdb.set_trace()
         else:
             stLikeList = [
                 un.spiketrains[segIdx]
@@ -347,11 +351,11 @@ if __name__ == "__main__":
                 fig=fig, ax=origAx, heatmapKWs={'cmap': 'flare'})
             origAx.set_title('Original')
         #
-        if arguments['lazy']:
-            dataReader.file.close()
+        # if arguments['lazy']:
+        #     dataReader.file.close()
         nSegsOriginal = len(dataBlock.segments)
-        del dataReader, dataBlock
-        gc.collect()
+        # del dataReader, dataBlock
+        # gc.collect()
         if arguments['useKCSD']:
             print('estimating csd with kcsd...')
             nElecX = chanIndex.annotations['coordinateIndices'][:, 0].max()

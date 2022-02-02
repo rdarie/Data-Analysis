@@ -36,6 +36,7 @@ import os, sys
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
+import dataAnalysis.helperFunctions.hampel as hf_hampel
 import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions

@@ -891,7 +891,6 @@ def unitSpikeTrainWaveformsToDF(
             uniqueSpiketrains[i]
             for i in whichSegments
         ]
-    #
     waveformsList = []
     #
     getMetaDataWorking = deepcopy(getMetaData)
@@ -1070,9 +1069,9 @@ def unitSpikeTrainWaveformsToDF(
     # plt.plot(shiftedWaveform.columns, shiftedWaveform.mean()); plt.show()
     stackedMetaDF = pd.concat(laggedMetaDict, names=['feature', 'lag', 'originalDummy']).reset_index().drop(columns=['originalDummy'])
     # e.g. getFeatureMetaData = ['freqBandName', 'parentFeature']
-    # pdb.set_trace()
     if getFeatureMetaData is not None:
         featureMetaDF = stackedMetaDF.loc[:, ['feature', 'lag'] + getFeatureMetaData].drop_duplicates().reset_index(drop=True)
+        stackedMetaDF.drop(columns=getFeatureMetaData, inplace=True)
     else:
         featureMetaDF = None
     if transposeToColumns == 'feature':
@@ -1203,7 +1202,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
     try:
         # idxLabels = sorted(idxLabels)
         allWaveforms.set_index(idxLabels, inplace=True)
-        sortIndexBy = ['segment', 'originalIndex', 't']
+        sortIndexBy = ['segment', 't'] # , 'originalIndex'
         for cN in ['bin']:
             if cN in allWaveforms.index.names:
                 sortIndexBy = sortIndexBy + [cN]
@@ -1219,6 +1218,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             kind='mergesort', sort_remaining=False)
     except Exception:
         traceback.print_exc()
+    # pdb.set_trace() # allWaveforms.index.to_frame().reset_index(drop=True)
     return allWaveforms, allFeatureMetaDF
 
 
@@ -1235,7 +1235,7 @@ def alignedAsigsToDF(
         metaDataToCategories=False,
         outlierTrials=None, invertOutlierMask=False,
         makeControlProgram=False, removeFuzzyName=False,
-        procFun=None, dropNaNs=True, finalIndexMask=None):
+        procFun=None, dropNaNs=True, finalIndexMask=None, overrideSegIdx=None):
     #  channels to trigger
     if unitNames is None:
         unitNames = listChanNames(dataBlock, unitQuery, objType=Unit)
@@ -1252,29 +1252,21 @@ def alignedAsigsToDF(
         getMetaData=getMetaData, getFeatureMetaData=getFeatureMetaData,
         metaDataToCategories=metaDataToCategories)
     #
+    waveformsIndexDF = allWaveforms.index.to_frame().reset_index(drop=True)
+    waveformsIndexDF.loc[:, 't'] = np.round(waveformsIndexDF['t'], decimals=9)
+    if overrideSegIdx is not None:
+        # pdb.set_trace()
+        waveformsIndexDF.loc[:, 'segment'] = overrideSegIdx
+    allWaveforms.index = pd.MultiIndex.from_frame(waveformsIndexDF)
     manipulateIndex = np.any(
         [
             collapseSizes, duplicateControlsByProgram,
             makeControlProgram, removeFuzzyName
             ])
     if outlierTrials is not None:
-        '''
-        def rejectionLookup(entry):
-            key = []
-            for subKey in outlierTrials.index.names:
-                keyIdx = allWaveforms.index.names.index(subKey)
-                key.append(entry[keyIdx])
-            # print(key)
-            # outlierTrials.iloc[1, :]
-            # allWaveforms.iloc[1, :]
-            return outlierTrials[tuple(key)]
-        # pdb.set_trace()
-        '''
-        waveformsOutlierIndex = allWaveforms.index.to_frame()
-        waveformsOutlierIndex.loc[:, 't'] = np.round(waveformsOutlierIndex['t'], decimals=9)
         outlierMask = np.asarray(
             (
-                waveformsOutlierIndex
+                waveformsIndexDF
                 .set_index(outlierTrials.index.names)
                 .index
                 .map(outlierTrials)
@@ -1376,9 +1368,9 @@ def alignedAsigsToDF(
     if isinstance(allWaveforms.columns, pd.MultiIndex):
         allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     if 'bin' in allWaveforms.index.names:
-        sortIndexBy = ['segment', 'originalIndex', 't', 'bin']
+        sortIndexBy = ['segment', 't', 'bin']
     else:
-        sortIndexBy = ['feature', 'lag', 'segment', 'originalIndex', 't']
+        sortIndexBy = ['feature', 'lag', 'segment', 't']
     allWaveforms.sort_index(
         level=sortIndexBy,
         axis='index', inplace=True,
@@ -1388,13 +1380,15 @@ def alignedAsigsToDF(
         kind='mergesort', sort_remaining=False)
     ##
     if finalIndexMask is not None:
-        if False:
+        if True:
             tInfo1 = allWaveforms.index.to_frame().reset_index(drop=True).set_index(['segment', 't'])
             tInfo1 = tInfo1.loc[~tInfo1.index.duplicated(keep='first'), :]
             tInfo2 = finalIndexMask.index.to_frame().reset_index(drop=True).set_index(['segment', 't'])
             tInfo2 = tInfo2.loc[~tInfo2.index.duplicated(keep='first'), :]
             tInfo1.index[~tInfo1.index.duplicated(keep='first')]
         allWaveforms = allWaveforms.loc[finalIndexMask.to_numpy(), :]
+    # if postProcFun is not None:
+    #     allWaveforms = postProcFun(allWaveforms)
     return allWaveforms
 
 
@@ -1770,7 +1764,7 @@ def alignedAsigDFtoSpikeTrain(
                 ########
                 spikeWaveformsDF = transposeSpikeDF(
                     featGroup, 'bin', fastTranspose=True)
-                sortIndexBy = ['feature', 'segment', 'originalIndex', 't']
+                sortIndexBy = ['feature', 'segment', 't']
                 spikeWaveformsDF.sort_index(
                     level=sortIndexBy,
                     axis='index', inplace=True,

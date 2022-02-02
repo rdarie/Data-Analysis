@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s08_ols_tf_stb_202101_27
+#SBATCH -J s08_bis_ols_tf_stb_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s08_ols_tf_stb_202101_27-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s08_ols_tf_stb_202101_27-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s08_bis_ols_tf_stb_202101_21-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s08_bis_ols_tf_stb_202101_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,7 +28,7 @@
 
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 #    SLURM_ARRAY_TASK_ID=12
-exps=(202101_27)
+exps=(202101_21)
 for A in "${exps[@]}"
 do
   echo "step 08 transfer function calc, on $A"
@@ -44,7 +44,7 @@ do
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
   #  --forceReprocess
-  DIMRED="select"
-  ESTIMATOR="ols_${DIMRED}${SUFFIX}"
+  DIMRED="select2"
+  ESTIMATOR="ols2_${DIMRED}${SUFFIX}"
   python -u './processLeastSquaresTransferFunction.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done

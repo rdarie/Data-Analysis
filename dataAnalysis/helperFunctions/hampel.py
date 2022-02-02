@@ -177,3 +177,8 @@ def hampel(
     if average_across_channels:
         scaled_absolute_deviation = scaled_absolute_deviation.mean(axis='columns')
     return outlier_mask, scaled_absolute_deviation, (fig, ax)
+
+def defaultSpiketrainHampel(waveDF, spkTrain):
+    print('running defaultSpiketrainHampel!!!!')
+    res, _, _ =  hampel(waveDF, average_across_channels=True, window_size=31, thresh=3, imputation=True)
+    return res
