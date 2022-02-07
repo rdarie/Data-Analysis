@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s05_prep_regression_stb_202101_27
+#SBATCH -J s05_prep_regression_sta_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s05_prep_regression_stb_202101_27.out
-#SBATCH -e ../../batch_logs/regression/s05_prep_regression_stb_202101_27.out
+#SBATCH -o ../../batch_logs/regression/s05_prep_regression_sta_202101_27.out
+#SBATCH -e ../../batch_logs/regression/s05_prep_regression_sta_202101_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -39,7 +39,7 @@ do
   
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   
-  ITERATOR="rb"
+  ITERATOR="ra"
   
   python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
   # --preScale

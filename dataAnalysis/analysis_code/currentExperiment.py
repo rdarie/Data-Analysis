@@ -574,6 +574,7 @@ def parseAnalysisOptions(
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
+            'maskEachFreqBand': True,
             'cvKWArgs': dict(
                 n_splits=25,
                 splitterClass=None, splitterKWArgs=covarianceSplitterKWArgs,
@@ -602,6 +603,7 @@ def parseAnalysisOptions(
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
+            'maskEachFreqBand': True,
             'cvKWArgs': dict(
                 n_splits=25,
                 splitterClass=None, splitterKWArgs=covarianceSplitterKWArgs,
@@ -630,6 +632,7 @@ def parseAnalysisOptions(
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
+            'maskEachFreqBand': True,
             'cvKWArgs': dict(
                 n_splits=25,
                 splitterClass=None, splitterKWArgs=covarianceSplitterKWArgs,
@@ -658,6 +661,7 @@ def parseAnalysisOptions(
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
+            'maskEachFreqBand': True,
             'cvKWArgs': dict(
                 n_splits=25,
                 splitterClass=None, splitterKWArgs=covarianceSplitterKWArgs,
@@ -755,6 +759,7 @@ def parseAnalysisOptions(
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
+            'maskEachFreqBand': True,
             'cvKWArgs': dict(
                 n_splits=2,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
@@ -787,6 +792,7 @@ def parseAnalysisOptions(
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
+            'maskEachFreqBand': True,
             'cvKWArgs': dict(
                 n_splits=2,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
@@ -810,7 +816,8 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 2e-3,
+            'forceBinInterval': 10e-3,
+            'forceRollingWindow': 50e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
@@ -821,14 +828,14 @@ def parseAnalysisOptions(
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
-                'alignQuery': 'startingOrStimOn',
-                'winStart': -0.6,  # start 0.6 before whatever the query was
-                'winStop': 1.2  # stop .6 sec after startingOrStimOn
+                'alignQuery': None,
+                'winStart': None,
+                'winStop': None
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
-                'winStart': None,
-                'winStop':  None,
+                'winStart': -600e-3,
+                'winStop': -200e-3
                 }
             },
         # perimovement onset (or peristim onset if stim only) for RAUC
@@ -837,10 +844,11 @@ def parseAnalysisOptions(
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
-            'forceBinInterval': 2e-3,
+            'forceBinInterval': 10e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
+            'maskEachFreqBand': True,
             'cvKWArgs': dict(
                 n_splits=5,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
@@ -904,17 +912,23 @@ def parseAnalysisOptions(
         }
         }
     prettyNameLookup = {
+        'scaledAUC': 'AUC (a.u.)',
         'T': 'T',
         'hedges': 'g',
         'coef': r"$\beta$",
         'electrode = NA': 'No stim.',
         'stimCondition = NA_0.0': 'No stim.',
         'NA': 'No stim.',
+        'kinematicCondition': 'Movement type',
         'kinematicCondition = NA_NA': 'No movement',
         'kinematicCondition = CW_outbound': 'Start of movement\n(extension)',
         'kinematicCondition = CW_return': 'Return to start\n(flexion)',
         'kinematicCondition = CCW_outbound': 'Start of movement\n(flexion)',
         'kinematicCondition = CCW_return': 'Return to start\n(extension)',
+        'CW_outbound': 'Start of movement\n(extension)',
+        'CW_return': 'Return to start\n(flexion)',
+        'CCW_outbound': 'Start of movement\n(flexion)',
+        'CCW_return': 'Return to start\n(extension)',
         'feature = mahal_ledoit_all': 'Mahal. dist.\n(Broadband)',
         'feature = mahal_ledoit_alpha': 'Mahal. dist.\n(Alpha)',
         'feature = mahal_ledoit_beta': 'Mahal. dist.\n(Beta)',
@@ -940,6 +954,7 @@ def parseAnalysisOptions(
         '50.0_md': '50 (Mahal. dist.)',
         '100.0_md': '100 (Mahal. dist.)',
         'namesAndMD': 'Regressors',
+        'trialRateInHz': 'Stim. rate (Hz)',
         'trialAmplitude': 'Stim. amplitude',
         'trialAmplitude:trialRateInHz': 'Stim. rate interaction',
         'trialAmplitude_md': 'Stim. amplitude (Mahal. dist.)',
@@ -952,10 +967,12 @@ def parseAnalysisOptions(
         prettyNameLookup['-E{:02d}+E16_50.0'.format(eIdx)] = 'E{:02d} (50 Hz'.format(eIdx)
         prettyNameLookup['stimCondition = -E{:02d}+E16_100.0'.format(eIdx)] = 'Stim. E{:02d} (100 Hz)'.format(eIdx)
         prettyNameLookup['-E{:02d}+E16_100.0'.format(eIdx)] = 'E{:02d} (100 Hz)'.format(eIdx)
+        for kc in ['NA_NA', 'CW_outbound', 'CW_return', 'CCW_outbound', 'CCW_return']:
+            prettyNameLookup['kinAndElecCondition = -E{:02d}+E16_{}'.format(eIdx, kc)] = 'Stim. E{:02d}\n{}'.format(eIdx, prettyNameLookup['kinematicCondition = {}'.format(kc)])    
     for fbn in freqBandOrderExtended + [None]:
         if fbn in prettyNameLookup:
             prettyNameLookup['freqBandName = {}'.format(fbn)] = prettyNameLookup[fbn]
-        for eIdx in range(97):
+        for eIdx in range(99):
             fbSuffix = '_{}'.format(fbn) if fbn is not None else ''
             fbPrettyName = '\n({})'.format(prettyNameLookup[fbn]) if fbn is not None else ''
             prettyNameLookup['feature = utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)

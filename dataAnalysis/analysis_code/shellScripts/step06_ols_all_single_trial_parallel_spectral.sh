@@ -9,7 +9,7 @@
 #SBATCH --ntasks=5
 #SBATCH --cpus-per-task=1
 #SBATCH --ntasks-per-node=5
-#SBATCH --mem-per-cpu=5G
+#SBATCH --mem-per-cpu=10G
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
@@ -35,7 +35,7 @@ do
   #
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  ITERATOR="rb"
+  ITERATOR="ra"
   WINDOWTERM="XL"
   SUFFIX="_spectral_baseline"
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"

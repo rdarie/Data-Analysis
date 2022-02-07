@@ -378,8 +378,8 @@ estimatorsSrs.drop(lastFoldIdx, axis='index', level='fold', inplace=True)
 if 'spectral' in arguments['selectionName']:
     estimatorsSrs.drop('all', axis='index', level='freqBandName', inplace=True)
 #
+# pdb.set_trace()
 del covMatDict, eVSDict, estimatorsDict
-#
 calcAllDistances = True
 distancesDict = {}
 projectedDict = {}
@@ -495,6 +495,7 @@ if pickingColors:
     palAx = plt.gca()
     for tIdx, tN in enumerate(singlesPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN), fontsize=10)
+
 for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
     for distanceType in lOfDistanceTypesExtended:
         distanceDF = distancesDict[distanceType][freqBandName]

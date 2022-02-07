@@ -1255,7 +1255,6 @@ def alignedAsigsToDF(
     waveformsIndexDF = allWaveforms.index.to_frame().reset_index(drop=True)
     waveformsIndexDF.loc[:, 't'] = np.round(waveformsIndexDF['t'], decimals=9)
     if overrideSegIdx is not None:
-        # pdb.set_trace()
         waveformsIndexDF.loc[:, 'segment'] = overrideSegIdx
     allWaveforms.index = pd.MultiIndex.from_frame(waveformsIndexDF)
     manipulateIndex = np.any(

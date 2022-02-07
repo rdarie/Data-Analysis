@@ -175,6 +175,10 @@ limitPages = None
 #  End Overrides
 #
 compoundAnnLookupDF = pd.read_hdf(resultPath, 'compoundAnnLookup')
+pedalDirCat = pd.CategoricalDtype(['NA', 'CW', 'CCW'], ordered=True)
+pedalMoveCat = pd.CategoricalDtype(['NA', 'outbound', 'return'], ordered=True)
+compoundAnnLookupDF.loc[:, 'pedalMovementCat'] = compoundAnnLookupDF['pedalMovementCat'].astype(pedalMoveCat)
+compoundAnnLookupDF.loc[:, 'pedalDirection'] = compoundAnnLookupDF['pedalDirection'].astype(pedalDirCat)
 rawRecCurve = pd.read_hdf(resultPath, 'raw')
 recCurveFeatureInfo = rawRecCurve.columns.to_frame().reset_index(drop=True)
 rawRecCurve.columns = rawRecCurve.columns.get_level_values('feature')
@@ -250,6 +254,7 @@ pdfPath = os.path.join(
 recCurve.loc[:, 'freqBandName'] = recCurve.index.get_level_values('feature').map(recCurveFeatureInfo[['feature', 'freqBandName']].set_index('feature')['freqBandName'])
 recCurve.set_index('freqBandName', append=True, inplace=True)
 plotRC = recCurve.reset_index()
+# plotRC = plotRC.loc[plotRC['kinematicCondition'].isin(['NA_NA', 'CCW_outbound', 'CW_outbound']), :]
 kinematicOrderMaster = ['NA_NA', 'CCW_outbound', 'CW_outbound', 'CCW_return', 'CW_return']
 kinematicOrder = [hN for hN in kinematicOrderMaster if hN in plotRC['kinematicCondition'].to_list()]
 keepCols = [
@@ -524,8 +529,8 @@ with PdfPages(pdfPath) as pdf:
             hue=hueName, hue_order=hueOrder, palette=huePalette,
             data=testGroupPieces,
             ci=95, n_boot=100,
-            x_jitter=xJ,
-            scatter_kws=dict(s=2.5),
+            x_jitter=xJ, x_estimator=np.mean,
+            # scatter_kws=dict(s=2.5),
             height=height, aspect=aspect,
             facet_kws=dict(
                 sharey=False, sharex=False, margin_titles=True,
@@ -560,15 +565,24 @@ with PdfPages(pdfPath) as pdf:
                     y=whichRAUC,
                     hue=hueName, hue_order=hueOrder, palette=huePaletteAlpha,
                     data=refData, # saturation=0.25,
-                    ax=ax, whis=np.inf, dodge=True)
+                    ax=ax, whis=np.inf,
+                    dodge=True)
                 sns.stripplot(
                     # x=hueName, order=hueOrder,
                     x=colName,
                     y=whichRAUC,
-                    hue=hueName, hue_order=hueOrder, palette=huePalette, data=refData,
-                    ax=ax, size=2.5, dodge=True)
+                    hue=hueName, hue_order=hueOrder, palette=huePalette,
+                    data=refData,
+                    ax=ax, size=0., dodge=True)
                 ###
-                pairs = [("CW_outbound", "NA_NA"), ("CW_return", "NA_NA")]
+                ax.set_xlabel(None)
+                ax.set_ylabel(None)
+                ax.set_xticks([])
+                if ax.get_legend() is not None:
+                    ax.get_legend().remove()
+                #
+                # pairs = [("CW_outbound", "NA_NA"), ("CW_return", "NA_NA")]
+                pairs = [("CW_outbound", "NA_NA")]
                 thesePvalAnns = []
                 significantPairs = []
                 statsThisFeature = relativeStatsNoStimDF.xs(row_val, level=rowName)
@@ -587,11 +601,7 @@ with PdfPages(pdfPath) as pdf:
                         thesePvalAnns.append(r"$g_M$" + ' = {:0.2f} ({})'.format(
                             statsThisFeature.loc[pairMask, 'hedges'].iloc[0], pvFormatter.format_data(thisPV)))
                 # pdb.set_trace()
-                if len(significantPairs):
-                    # pairsDoubled = [
-                    #     ((tp[0], tp[0]), (tp[1], tp[1]))
-                    #     for tp in significantPairs
-                    #     ]
+                if (len(significantPairs) > 0) and True:
                     pairsDoubled = [
                         ((col_val, tp[0]), (col_val, tp[1]))
                         for tp in significantPairs
@@ -601,16 +611,16 @@ with PdfPages(pdfPath) as pdf:
                         # x=hueName, order=hueOrder,
                         x=colName,
                         y=whichRAUC,
-                        hue=hueName, hue_order=hueOrder, palette=huePalette, data=refData,
-                        size=2.5, whis=np.inf, dodge=True)
-                    annotator.configure(test=None, test_short_name='WT', line_height=0.01)
+                        hue=hueName, hue_order=hueOrder, palette=huePaletteAlpha, data=refData,
+                        # size=2.5, 
+                        # whis=np.inf,
+                        dodge=True)
+                    annotator.configure(
+                        test=None, test_short_name='WT',
+                        line_offset_to_group=0.
+                        )
                     annotator.annotate_custom_annotations(thesePvalAnns)
                 ###
-                ax.set_xlabel(None)
-                ax.set_ylabel(None)
-                ax.set_xticks([])
-                if ax.get_legend() is not None:
-                    ax.get_legend().remove()
         asp.reformatFacetGridLegend(
             g, titleOverrides={
                 'kinematicCondition': 'Movement type'

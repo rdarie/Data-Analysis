@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s05_prep_regression_stb_202101
+#SBATCH -J s05_prep_regression_sta_202101
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s05_prep_regression_stb_202101.out
-#SBATCH -e ../../batch_logs/regression/s05_prep_regression_stb_202101.out
+#SBATCH -o ../../batch_logs/regression/s05_prep_regression_sta_202101.out
+#SBATCH -e ../../batch_logs/regression/s05_prep_regression_sta_202101.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -39,7 +39,7 @@ do
   
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   
-  ITERATOR="rb"
+  ITERATOR="ra"
   
   ESTIMATOR="select2"
   TARGET="laplace_baseline"
@@ -53,11 +53,11 @@ do
   ESTIMATOR="select2"
   TARGET="laplace_spectral_baseline"
   #  --averageByTrial
-  python -u './calcSignalColumnSelector.py'  --selectMethod='fromRegression' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+  ##python -u './calcSignalColumnSelector.py'  --selectMethod='fromRegression' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
   #
   ############################################################################################################
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
   #
-  python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs=${ESTIMATOR} --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+  ##python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs=${ESTIMATOR} --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
 done

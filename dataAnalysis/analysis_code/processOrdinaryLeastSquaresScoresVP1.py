@@ -855,6 +855,8 @@ if __name__ == '__main__':
                 plt.show()
             else:
                 plt.close()
+        height, width = 1., 2.
+        aspect = width / height
         for hpN in hpNames:
             #
             # plotScores = gsScoresDF.loc[gsScoresDF['rhsMaskIdx'] == rhsMaskIdx, :].groupby(hpNames + ['lhsMaskIdx', 'rhsMaskIdx', 'trialType', 'designType', 'historyLen', 'designFormula', 'ensembleTemplate', 'fold']).mean().reset_index()
@@ -866,8 +868,8 @@ if __name__ == '__main__':
                 paramFromCV.loc[:, annName] = paramFromCV['lhsMaskIdx'].map(gsScoresDF.loc[:, ['lhsMaskIdx', annName]].drop_duplicates().set_index('lhsMaskIdx')[annName])
             #
             trialTypeMask = (
-                trialTypePalette.index.isin(gsScoresDF['trialType']) # &
-                # trialTypePalette.index.isin(['train', 'test'])
+                trialTypePalette.index.isin(gsScoresDF['trialType']) &
+                trialTypePalette.index.isin(['train'])
                 )
             thisPalette = trialTypePalette.loc[trialTypeMask]
             if len(gsScoresDF[hpN].unique()) > 1:
@@ -881,7 +883,7 @@ if __name__ == '__main__':
                     height=height, aspect=aspect,
                     facet_kws=dict(sharex=False, sharey=False)
                     )
-                if (gsScoresDF[hpN].abs().max() / gsScoresDF[hpN].abs().min()) > 1e6:
+                if hpN in ['alpha']:
                     g.set(xscale='log')
                 # xLimsRel = [a.get_xlim() for a in g.axes.flat]
                 g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")

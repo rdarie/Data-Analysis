@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s06_bis_ols_stb_202101
+#SBATCH -J s06_bis_ols_sta_202101
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s06_bis_ols_stb_202101-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s06_bis_ols_stb_202101-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s06_bis_ols_sta_202101-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s06_bis_ols_sta_202101-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -35,14 +35,14 @@ do
   #
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  ITERATOR="rb"
+  ITERATOR="ra"
   WINDOWTERM="XL"
   SUFFIX="_baseline"
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
   DIMRED="select2"
   ESTIMATOR="ols2_${DIMRED}${SUFFIX}"
-  python -u './calcGridSearchRegressionWithPipelinesV5.py' --transformerNameRhs="${DIMRED}" --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=5
+  # python -u './calcGridSearchRegressionWithPipelinesV5.py' --transformerNameRhs="${DIMRED}" --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=5
   python -u './calcOrdinaryLeastSquaresPredictionsLite.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
   # python -u './calcOrdinaryLeastSquaresPredictionsFull.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done

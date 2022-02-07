@@ -311,7 +311,9 @@ if __name__ == "__main__":
     trialInfo = rawRaucDF.index.to_frame().reset_index(drop=True)
     compoundAnnDescr = {
         'stimCondition': ['electrode', 'trialRateInHz', ],
-        'kinematicCondition': ['pedalDirection', 'pedalMovementCat']
+        'kinematicCondition': ['pedalDirection', 'pedalMovementCat'],
+        'kinAndRateCondition': ['pedalDirection', 'pedalMovementCat', 'trialRateInHz'],
+        'kinAndElecCondition': ['electrode', 'pedalDirection', 'pedalMovementCat'],
         }
     compoundAnnLookup = []
     for canName, can in compoundAnnDescr.items():
@@ -327,9 +329,11 @@ if __name__ == "__main__":
     #
     raucForExport = rawRaucDF.xs('main', level='controlFlag').mean(axis=1).sort_values(ascending=False).to_frame(name='average_rauc')
     raucForExportTrialInfo = raucForExport.index.to_frame().reset_index(drop=True)
-    raucForExportTrialInfo = raucForExportTrialInfo.loc[:, ['expName', 'segment', 'originalIndex', 't', 'stimCondition', 'kinematicCondition']]
+    raucForExportTrialInfo = raucForExportTrialInfo.loc[:, [
+        'expName', 'segment', 'originalIndex', 't', 'stimCondition', 'kinematicCondition', 'kinAndRateCondition', 'kinAndElecCondition']]
     raucForExport.index = pd.MultiIndex.from_frame(raucForExportTrialInfo)
     raucForExport.to_html(htmlOutputPath)
+    ############
     dfRelativeTo = rawRaucDF
     referenceRaucDF = (
         dfRelativeTo
@@ -344,7 +348,7 @@ if __name__ == "__main__":
         index=dfRelativeTo.index,
         columns=dfRelativeTo.columns)
     ##
-    sdThresh = 3.
+    sdThresh = 6.
     clippedScaledRaucDF = scaledRaucDF.clip(upper=sdThresh)
     clippedRaucDF = pd.DataFrame(
         qScaler.inverse_transform(clippedScaledRaucDF),
@@ -373,37 +377,52 @@ if __name__ == "__main__":
         mmScaler.transform(clippedScaledRaucDF),
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
-    scalers = pd.Series({'scale': qScaler, 'normalize': mmScaler, 'scale_normalize': mmScaler2})
+    scalers = pd.Series({'boxcox': qScaler, 'minmax': mmScaler, 'boxcox_minmax': mmScaler2})
     #
     #
     rawRaucDF.to_hdf(resultPath, 'raw')
-    scaledRaucDF.to_hdf(resultPath, 'scaled')
-    clippedRaucDF.to_hdf(resultPath, 'clipped')
-    clippedScaledRaucDF.to_hdf(resultPath, 'scaled_clipped')
+    scaledRaucDF.to_hdf(resultPath, 'boxcox')
+    clippedRaucDF.to_hdf(resultPath, 'raw_clipped')
+    clippedScaledRaucDF.to_hdf(resultPath, 'boxcox_clipped')
     normalizedRaucDF.to_hdf(resultPath, 'normalized')
-    scaledNormalizedRaucDF.to_hdf(resultPath, 'scaled_normalized')
+    scaledNormalizedRaucDF.to_hdf(resultPath, 'boxcox_normalized')
     referenceRaucDF.to_hdf(resultPath, 'reference_raw')
     scalers.to_hdf(resultPath, 'scalers')
     compoundAnnLookupDF.to_hdf(resultPath, 'compoundAnnLookup')
     #
-    dfForStats = rawRaucDF
+    dfForStats = scaledRaucDF
     recCurve = dfForStats.reset_index()
-    recCurve.loc[:, 'trialAmplitude'] /= recCurve['trialAmplitude'].max()
-    recCurve.loc[:, 'trialRateInHz'] /= recCurve['trialRateInHz'].max()
+    xPt = PatsyTransformer("trialAmplitude / trialRateInHz", return_type="dataframe")
+    X = xPt.fit_transform(recCurve)
+    xStd = X.std()
+    xStd.loc[xStd == 0] = 1.
+    yStd = dfForStats.std()
+    # recCurve.loc[:, 'trialAmplitude'] /= recCurve['trialAmplitude'].max()
+    # recCurve.loc[:, 'trialRateInHz'] /= recCurve['trialRateInHz'].max()
     amplitudeStatsDict = {}
     for name, group in recCurve.groupby(['electrode', 'kinematicCondition']):
         elecName, kinName = name
         if elecName != 'NA':
-            xPt = PatsyTransformer("trialAmplitude/trialRateInHz", return_type="dataframe")
-            X = xPt.fit_transform(group)
+            kinAndElecName = '{}_{}'.format(elecName, kinName)
+            groupMask = X.index.isin(group.index)
             for colName in dfForStats.columns:
                 if isinstance(colName, tuple):
-                    thisEntry = tuple([elecName, kinName] + [a for a in colName])
+                    thisEntry = tuple([elecName, kinName, kinAndElecName] + [a for a in colName])
                 else:
-                    thisEntry = tuple([elecName, kinName, colName])
-                lm = pg.linear_regression(X, group[colName], relimp=True)
-                amplitudeStatsDict[thisEntry] = lm
-    ampStatsDF = pd.concat(amplitudeStatsDict, names=['electrode', 'kinematicCondition'] + dfForStats.columns.names + ['factorIndex'])
+                    thisEntry = tuple([elecName, kinName, kinAndElecName, colName])
+                # pdb.set_trace()
+                thisX = X.loc[groupMask, :].copy()
+                if (group['trialRateInHz'].std() == 0):
+                    affectedColNames = [cN for cN in thisX.columns if 'trialRateInHz' in cN]
+                    thisX.loc[:, affectedColNames] = 0.
+                lmRes = pg.linear_regression(thisX, group[colName], relimp=True)
+                ##
+                lmRes.loc[:, 'coefStd'] = lmRes['coef'] * lmRes['names'].map(xStd) / yStd[colName]
+                ###
+                # lmResStd = pg.linear_regression(X / xStd, group[colName] / group[colName].std())
+                # print('{}\n{}'.format(lmRes.loc[:, ['names', 'coefStd']],lmResStd.loc[:, ['names', 'coef']]))
+                amplitudeStatsDict[thisEntry] = lmRes
+    ampStatsDF = pd.concat(amplitudeStatsDict, names=['electrode', 'kinematicCondition', 'kinAndElecCondition'] + dfForStats.columns.names + ['factorIndex'])
     ampStatsDF.index = ampStatsDF.index.droplevel('factorIndex')
     ampStatsDF.set_index('names', append=True, inplace=True)
     # TODO: concatenate stats, correct multicomp, reassign
@@ -418,30 +437,34 @@ if __name__ == "__main__":
     for name, group in recCurve.groupby(['stimCondition', 'kinematicCondition']):
         stimConditionName, kinName = name
         elecName = group['electrode'].unique()[0]
+        trialRateInHz = group['trialRateInHz'].unique()[0]
+        kinAndElecName = '{}_{}'.format(elecName, kinName)
         if elecName != 'NA':
-            refMask = (recCurve['electrode'] == 'NA') & (recCurve['kinematicCondition'] == kinName)
-            if refMask.any():
-                refGroup = recCurve.loc[refMask, :]
-            else:# 
-                refMask = (recCurve['electrode'] == 'NA')
-                refGroup = recCurve.loc[refMask, :]
+            # refMask = (recCurve['electrode'] == 'NA') & (recCurve['kinematicCondition'] == kinName)
+            # if refMask.any():
+            #     refGroup = recCurve.loc[refMask, :]
+            # else:
+            #     refMask = (recCurve['electrode'] == 'NA')
+            #     refGroup = recCurve.loc[refMask, :]
+            refMask = (group['trialAmplitude'] == group['trialAmplitude'].min())
             for colName in dfForStats.columns:
                 if isinstance(colName, tuple):
-                    thisEntry = tuple([stimConditionName, kinName] + [a for a in colName])
+                    thisEntry = tuple([stimConditionName, kinName, kinAndElecName] + [a for a in colName])
                 else:
-                    thisEntry = tuple([stimConditionName, kinName, colName])
+                    thisEntry = tuple([stimConditionName, kinName, kinAndElecName, colName])
                 ####
-                highAmps = np.unique(group['trialAmplitude'])[-2:]
-                maxAmpMask = group['trialAmplitude'].isin(highAmps)
+                # highAmps = np.unique(group['trialAmplitude'])[-2:]
+                # maxAmpMask = group['trialAmplitude'].isin(highAmps)
                 ####
-                # maxAmpMask = (group['trialAmplitude'] == group['trialAmplitude'].max())
+                maxAmpMask = (group['trialAmplitude'] == group['trialAmplitude'].max())
                 ####
                 tt = pg.ttest(
-                    group.loc[maxAmpMask, colName], refGroup[colName],
+                    # group.loc[maxAmpMask, colName], refGroup[colName],
+                    group.loc[maxAmpMask, colName], group.loc[refMask, colName],
                     confidence=confidence_alpha)
                 u1 = np.mean(group.loc[maxAmpMask, colName])
-                u2 = np.mean(refGroup[colName])
-                s2 = np.std(refGroup[colName])
+                u2 = np.mean(group.loc[refMask, colName])
+                s2 = np.std(group.loc[refMask, colName])
                 tt.loc[:, 'glass'] = (u1 - u2) / s2
                 tt.loc[:, 'cohen-d'] = np.sign(tt['T']) * tt['cohen-d']
                 tt.loc[:, 'critical_T_max'] = tt['dof'].apply(lambda x: stats.t(x).isf((1 - confidence_alpha) / 2))
@@ -450,7 +473,9 @@ if __name__ == "__main__":
                 tt.loc[:, 'hedges'] = pg.convert_effsize(
                     tt['cohen-d'], 'cohen', 'hedges',
                     nx=group.loc[maxAmpMask, colName].shape[0],
-                    ny=refGroup[colName].shape[0])
+                    ny=group.loc[refMask, colName].shape[0])
+                tt.loc[:, 'A'] = group['trialAmplitude'].min()
+                tt.loc[:, 'B'] = group['trialAmplitude'].max()
                 '''
                 if True:
                     fig, ax = plt.subplots()
@@ -462,7 +487,7 @@ if __name__ == "__main__":
                     plt.show()
                 '''
                 relativeStatsDict[thisEntry] = tt
-    relativeStatsDF = pd.concat(relativeStatsDict, names=['stimCondition', 'kinematicCondition'] + dfForStats.columns.names + ['testType'])
+    relativeStatsDF = pd.concat(relativeStatsDict, names=['stimCondition', 'kinematicCondition', 'kinAndElecCondition'] + dfForStats.columns.names + ['testType'])
     relativeStatsDF.index = relativeStatsDF.index.droplevel('testType')
     if correctMultiCompHere:
         reject, pval = pg.multicomp(relativeStatsDF['pval'].to_numpy(), alpha=confidence_alpha)
@@ -516,6 +541,12 @@ if __name__ == "__main__":
         reject, pval = pg.multicomp(noStimTTestDF['pval'].to_numpy(), alpha=confidence_alpha)
         noStimTTestDF.loc[:, 'pval'] = pval
         noStimTTestDF.loc[:, 'reject'] = reject
+    #
+    noStimTTestDF.loc[:, 'electrode'] = 'NA'
+    noStimTTestDF.loc[:, 'trialAmplitude'] = 0
+    noStimTTestDF.loc[:, 'trialRateInHz'] = 0
+    noStimTTestDF.loc[:, 'stimCondition'] = 'NA_0.0'
+    noStimTTestDF.set_index(['electrode', 'trialAmplitude', 'trialRateInHz', 'stimCondition'], append=True, inplace=True)
     noStimTTestDF.to_hdf(resultPath, 'noStimTTest')
     ###
     amplitudeStatsPerFBDict = {}
@@ -532,8 +563,10 @@ if __name__ == "__main__":
                 thisEntry = tuple([elecName, kinName, freqBandName])
                 freqGroup.columns = freqGroup.columns.get_level_values('feature')
                 freqGroupStack = freqGroup.stack().to_frame(name='rauc').reset_index()
+                # normalization
                 freqGroupStack.loc[:, 'trialAmplitude'] /= freqGroupStack['trialAmplitude'].max()
                 freqGroupStack.loc[:, 'trialRateInHz'] /= freqGroupStack['trialRateInHz'].max()
+                # normalization
                 xPt = PatsyTransformer("trialAmplitude * trialRateInHz", return_type="dataframe")
                 X = xPt.fit_transform(freqGroupStack)
                 lm = pg.linear_regression(X, freqGroupStack['rauc'], relimp=True)
@@ -653,9 +686,9 @@ if __name__ == "__main__":
         with PdfPages(pdfPath) as pdf:
             plotDFsDict = {
                 'raw': rawRaucDF.reset_index(drop=True),
-                'scaled': scaledRaucDF.reset_index(drop=True),
-                'clippedScaled': clippedScaledRaucDF.reset_index(drop=True),
-                'clipped': clippedRaucDF.reset_index(drop=True)
+                'boxcox': scaledRaucDF.reset_index(drop=True),
+                'boxcox_clipped': clippedScaledRaucDF.reset_index(drop=True),
+                'raw_clipped': clippedRaucDF.reset_index(drop=True)
                 }
             plotDF = pd.concat(plotDFsDict, names=['dataType'])
             plotDF.columns = plotDF.columns.get_level_values('feature')

@@ -233,6 +233,7 @@ if __name__ == "__main__":
         if un.name in reqUnitNames]
     unitNames = [ci.name for ci in unitList]
     #
+    outputBlock = Block(name='csd')
     nanMask = None
     for segIdx, seg in enumerate(dataBlock.segments):
         stLikeList = [
@@ -608,43 +609,42 @@ if __name__ == "__main__":
             gc.collect()
             prf.print_memory_usage(prefix='done reshaping laplacian')
             # end laplacian option
-    if csdTimeFilterOpts is not None:
-        if 'low' in csdTimeFilterOpts:
-            if 'Wn' not in csdTimeFilterOpts['low']:
-                csdTimeFilterOpts['low']['Wn'] = float(dummySt.sampling_rate) / 3
-        filterCoeffs = hf.makeFilterCoeffsSOS(
-            csdTimeFilterOpts.copy(), float(dummySt.sampling_rate))
-        print('time domain filtering csd estimate...')
-        for trialIdx in range(nTrials):
-            locator = slice(trialIdx * nBins, (trialIdx + 1) * nBins)
-            filteredAsigs = signal.sosfiltfilt(
-                filterCoeffs, csdAsigsLong.magnitude[locator, :],
-                axis=0)
-            csdAsigsLong.magnitude[locator, :] = filteredAsigs
-    if arguments['plotting']:
-        _, _, csdDF = csd.plotLfp2D(
-            asig=csdAsigsLong[0, :], chanIndex=csdChanIndex,
-            fig=fig, ax=csdAx,
-            heatmapKWs={'cmap': 'crest'})
-        csdAx.set_title('CSD estimate ({})'.format(methodName))
-        #
-        if not arguments['useKCSD']:
-            smoothedDF = pd.DataFrame(
-                ndimage.gaussian_filter(lfpDF, sigma), index=lfpDF.index,
-                columns=lfpDF.columns)
-            csd.plotLfp2D(
-                lfpDF=smoothedDF, fig=fig, ax=smoothedAx)
-            smoothedAx.set_title('Smoothed (sigma = {})'.format(sigma))
-        fig.savefig(
-            os.path.join(
-                figureOutputFolder,
-                '{}_{}_example.pdf'.format(blockBaseName, methodName)),
-            bbox_inches='tight', pad_inches=0
-            )
-        plt.close()
-    outputBlock = Block(name='csd')
-    # for segIdx, seg in enumerate(dataBlock.segments):
-    for segIdx in range(nSegsOriginal):
+        if (csdTimeFilterOpts is not None) and (segIdx == 0):
+            if 'low' in csdTimeFilterOpts:
+                if 'Wn' not in csdTimeFilterOpts['low']:
+                    csdTimeFilterOpts['low']['Wn'] = float(dummySt.sampling_rate) / 3
+            filterCoeffs = hf.makeFilterCoeffsSOS(
+                csdTimeFilterOpts.copy(), float(dummySt.sampling_rate))
+            print('time domain filtering csd estimate...')
+            for trialIdx in range(nTrials):
+                locator = slice(trialIdx * nBins, (trialIdx + 1) * nBins)
+                filteredAsigs = signal.sosfiltfilt(
+                    filterCoeffs, csdAsigsLong.magnitude[locator, :],
+                    axis=0)
+                csdAsigsLong.magnitude[locator, :] = filteredAsigs
+        if arguments['plotting']:
+            _, _, csdDF = csd.plotLfp2D(
+                asig=csdAsigsLong[0, :], chanIndex=csdChanIndex,
+                fig=fig, ax=csdAx,
+                heatmapKWs={'cmap': 'crest'})
+            csdAx.set_title('CSD estimate ({})'.format(methodName))
+            #
+            if not arguments['useKCSD']:
+                smoothedDF = pd.DataFrame(
+                    ndimage.gaussian_filter(lfpDF, sigma), index=lfpDF.index,
+                    columns=lfpDF.columns)
+                csd.plotLfp2D(
+                    lfpDF=smoothedDF, fig=fig, ax=smoothedAx)
+                smoothedAx.set_title('Smoothed (sigma = {})'.format(sigma))
+            fig.savefig(
+                os.path.join(
+                    figureOutputFolder,
+                    '{}_{}_example.pdf'.format(blockBaseName, methodName)),
+                bbox_inches='tight', pad_inches=0
+                )
+            plt.close()
+        # for segIdx, seg in enumerate(dataBlock.segments):
+        # for segIdx in range(nSegsOriginal):
         newSeg = Segment(name='seg{}_csd'.format(segIdx))
         newSeg.block = outputBlock
         outputBlock.segments.append(newSeg)

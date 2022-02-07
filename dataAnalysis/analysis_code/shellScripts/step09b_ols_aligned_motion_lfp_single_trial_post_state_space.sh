@@ -36,7 +36,7 @@ do
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   #
-  ITERATOR="rb"
+  ITERATOR="ra"
   WINDOWTERM="XL"
   SUFFIX="_baseline"
   #

@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s08_bis_ols_tf_stb_202101_21
+#SBATCH -J s08_bis_ols_tf_sta_202101
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s08_bis_ols_tf_stb_202101_21-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s08_bis_ols_tf_stb_202101_21-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s08_bis_ols_tf_sta_202101-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s08_bis_ols_tf_sta_202101-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,7 +28,7 @@
 
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 #    SLURM_ARRAY_TASK_ID=12
-exps=(202101_21)
+exps=(202101_21 202101_27)
 for A in "${exps[@]}"
 do
   echo "step 08 transfer function calc, on $A"
@@ -38,7 +38,7 @@ do
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   SUFFIX="_baseline"
-  ITERATOR="rb"
+  ITERATOR="ra"
   WINDOWTERM="XL"
   #
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"

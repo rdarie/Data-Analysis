@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s06_bis_ols_stb_202101_21
+#SBATCH -J s06_ols_sta_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s06_bis_ols_stb_202101_21-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s06_bis_ols_stb_202101_21-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s06_ols_sta_202101_27-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s06_ols_sta_202101_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -26,7 +26,7 @@
 #SBATCH --array=0-22
 
 # exps=(201901_27 201902_03 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_21)
+exps=(202101_27)
 for A in "${exps[@]}"
 do
   echo "step 06 pls regression and predictions, on $A"
@@ -35,12 +35,12 @@ do
   #
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  ITERATOR="rb"
+  ITERATOR="ra"
   WINDOWTERM="XL"
   SUFFIX="_baseline"
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
-  DIMRED="select2"
+  DIMRED="select"
   # ols_select_baseline
   ESTIMATOR="ols_${DIMRED}${SUFFIX}"
   python -u './calcGridSearchRegressionWithPipelinesV5.py' --transformerNameRhs="${DIMRED}" --estimatorName=$ESTIMATOR --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=5
