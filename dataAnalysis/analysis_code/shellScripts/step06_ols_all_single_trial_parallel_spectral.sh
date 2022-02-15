@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s06_ols_stb_spectral_202101
+#SBATCH -J s06_ols_sta_spectral_202101
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s06_ols_stb_spectral_202101-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s06_ols_stb_spectral_202101-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s06_ols_sta_spectral_202101-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s06_ols_sta_spectral_202101-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

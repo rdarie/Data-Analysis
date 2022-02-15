@@ -723,11 +723,11 @@ def genTraceAnnotator(
                     content = group[labelsList].loc[locIdx].to_dict()
                     try:
                         annText = ' '.join([
-                            '{}: {:.2f}\n'.format(key, value)
+                            ':{:.2f}\n'.format(value)
                             for key, value in content.items()])
                     except Exception:
                         annText = ' '.join([
-                            '{}: {}\n'.format(key, value)
+                            ':{}\n'.format(value)
                             for key, value in content.items()])
                     g.axes[ro, co].text(
                         xpos, ypos,
@@ -772,7 +772,9 @@ def genGridAnnotator(
         emptySubset = (
             (dataSubset.empty) or
             (dataSubset[dropNaNCol].isna().all()))
-        if ((topLeftCol) or (not shared)) and not emptySubset:
+        alreadyHasGridAnnotation = hasattr(g.axes[ro, co], 'isGridAnnotated')
+        if ((topLeftCol) or (not shared)) and (not emptySubset) and (not alreadyHasGridAnnotation):
+            # pdb.set_trace()
             dataEntries = []
             for cn in colNames:
                 if dropna:
@@ -791,9 +793,11 @@ def genGridAnnotator(
                 trnsf = g.axes[ro, co].transAxes
             else:
                 trnsf = None
+            # print(xText)
             g.axes[ro, co].text(
                 xpos, xpos, xText,
                 transform=trnsf, **textOpts)
+            g.axes[ro, co].isGridAnnotated = True
         return
     return gridAnnotator
 
@@ -921,6 +925,26 @@ def genTicksToScale(
         g.axes[ro, co].set_xticks(xTicks)
         return
     return ticksToScale
+
+
+def genGridFormatter(dropNaNCol='segment'):
+    def gridFormatter(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if emptySubset:
+            g.axes[ro, co].grid(False)
+        return
+    return gridFormatter
+
+def genAxTickRemover(x=False, y=False):
+    def axTickRemover(g, ro, co, hu, dataSubset):
+        if x:
+            g.axes[ro, co].set_xticklabels([])
+        if y:
+            g.axes[ro, co].set_yticklabels([])
+        return
+    return axTickRemover
 
 
 def genAxLimSaver(
@@ -1053,9 +1077,32 @@ def genDespiner(
     return despiner
 
 
-def genXLimSetter(newLims):
+def genXLimSetter(
+        newLims=None, quantileLims=None,
+        forceLims=False):
     def xLimSetter(g, ro, co, hu, dataSubset):
-        g.axes[ro, co].set_xlim(newLims)
+        oldLims = g.axes[ro, co].get_xlim()
+        if newLims is not None:
+            if forceLims:
+                g.axes[ro, co].set_xlim(newLims)
+            else:
+                g.axes[ro, co].set_xlim(
+                    [
+                        max(oldLims[0], newLims[0]),
+                        min(oldLims[1], newLims[1])]
+                    )
+        if quantileLims is not None:
+            quantileFrac = (1 - quantileLims) / 2
+            qLims = g.data[g._x_var].quantile(
+                [quantileFrac, 1 - quantileFrac]).to_list()
+            if forceLims:
+                g.axes[ro, co].set_xlim(qLims)
+            else:
+                g.axes[ro, co].set_xlim(
+                    [
+                        max(oldLims[0], qLims[0]),
+                        min(oldLims[1], qLims[1])]
+                )
         return
     return xLimSetter
 
@@ -1074,7 +1121,7 @@ def genYLimSetter(newLims=None, quantileLims=None, forceLims=False):
                 )
         if quantileLims is not None:
             quantileFrac = (1 - quantileLims) / 2
-            qLims = g.data['signal'].quantile(
+            qLims = g.data[g._y_var].quantile(
                 [quantileFrac, 1 - quantileFrac]).to_list()
             if forceLims:
                 g.axes[ro, co].set_ylim(qLims)
@@ -1117,35 +1164,201 @@ def genVLineAdder(posList, patchOpts, dropNaNCol='segment'):
 
 
 def genStimVLineAdder(
-        rateFieldName, patchOpts,
-        tOnset=0, tOffset=1, includeLeft=True, includeRight=True,
-        dropNaNCol='segment'):
+        rateFieldName=None, patchOpts={},
+        tOnset=0, tOffset=1,
+        includeLeft=True,
+        includeRight=True, autoscale=True,
+        dropNaNCol='segment', delayMap=None):
+    #
+    defaultDelayMap = {
+        'kinematicConditionNoSize': {
+            'NA_NA': 0.,
+            'CW_outbound': -100e-3,
+            'CCW_outbound': -100e-3,
+            'CW_return': -100e-3,
+            'CCW_return': -100e-3,
+        }
+    }
+    delayLookup = defaultDelayMap.copy()
+    if delayMap is  not None:
+        delayLookup.update(delayMap)
+    #
     def addVline(g, ro, co, hu, dataSubset):
         emptySubset = (
             (dataSubset.empty) or
             (dataSubset[dropNaNCol].isna().all()))
-        if not emptySubset:
+        alreadyAnnotated = hasattr(g.axes[ro, co], 'isStimVLineAdded')
+        if not (emptySubset or alreadyAnnotated):
             pulseRates = dataSubset[rateFieldName]
             pulseRate = pulseRates[pulseRates.notna()].unique()
             # try:
             assert pulseRate.size == 1, 'facet has more than one stim rate: {}'.format(pulseRate)
             # except:
             #     traceback.print_exc()
+            thesePatchOpts = patchOpts.copy()
+            yMin = thesePatchOpts.pop('ymin', 0.9)
+            yMax = thesePatchOpts.pop('ymax', 0.95)
+            if not hasattr(g, 'stimVLineInfo'):
+                transf = g.axes[ro, co].transLimits.inverted()
+                yMinData = transf.transform((0, yMin))[1]
+                yMaxData = transf.transform((0, yMax))[1]
+                g.stimVLineInfo = dict(
+                    yMinData=yMinData,
+                    yMaxData=yMaxData
+                    )
+            else:
+                yMinData = g.stimVLineInfo['yMinData']
+                yMaxData = g.stimVLineInfo['yMaxData']
+            #
             axLims = g.axes[ro, co].get_xlim()
             pulsePeriod = pulseRate[0] ** (-1)
+            #
             pulseLims = [
                 max(axLims[0], tOnset),
                 min(axLims[1], tOffset),
-            ]
+                ]
+            if g._row_var in delayLookup:
+                fieldValue = dataSubset[g._row_var].unique()[0]
+                pulseLims[0] += delayLookup[g._row_var][fieldValue]
+            if g._col_var in delayLookup:
+                fieldValue = dataSubset[g._col_var].unique()[0]
+                pulseLims[0] += delayLookup[g._col_var][fieldValue]
             if includeRight:
                 pulseLims[1] = pulseLims[1] + pulsePeriod
             posList = np.arange(*pulseLims, pulsePeriod)
             if not includeLeft:
                 posList = posList[1:]
-            for pos in posList:
-                g.axes[ro, co].axvline(pos, **patchOpts)
+            if len(posList) > 1:
+                for pos in posList:
+                    g.axes[ro, co].plot([pos, pos], [yMinData, yMaxData], **thesePatchOpts)
+            g.axes[ro, co].isStimVLineAdded = True
         return
     return addVline
+
+def genPedalPosAdder(
+        movementField='pedalMovementCat', directionField='pedalDirection',
+        plotOptsMain=dict(lw=1, c='k'),
+        plotOptsBounds=dict(lw=1, c='k', alpha=0.5, ls='--'),
+        tStart=None, tChange=0., tStop=None, autoscale=True,
+        yMin=0.9, yMax=0.95, # in ax coordinates
+        dropNaNCol='segment'):
+    def addPedalAnn(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        annAlreadyHere = hasattr(g.axes[ro, co], 'isPedalAnnAdded')
+        if not (emptySubset or annAlreadyHere):
+            movementCats = list(dataSubset.groupby([movementField, directionField]).groups.keys())
+            # try:
+            assert len(movementCats) == 1, 'facet has more than one movement type: {}'.format(movementCats)
+            moveCat, direction = movementCats[0][0], movementCats[0][1]
+            if tStart is not None:
+                xMin = tStart
+            else:
+                xMin = dataSubset[g._x_var].min()
+            if tStop is not None:
+                xMax = tStop
+            else:
+                xMax = dataSubset[g._x_var].max()
+            #
+            if not hasattr(g, 'pedalAnnInfo'):
+                transf = g.axes[ro, co].transLimits.inverted()
+                yMaxData = transf.transform((0, yMax))[1]
+                yMinData = transf.transform((0, yMin))[1]
+                yMidData = (yMaxData + yMinData) / 2
+                g.pedalAnnInfo = dict(
+                    yMinData=yMinData,
+                    yMidData=yMidData,
+                    yMaxData=yMaxData
+                    )
+            else:
+                yMinData = g.pedalAnnInfo['yMinData']
+                yMidData = g.pedalAnnInfo['yMidData']
+                yMaxData = g.pedalAnnInfo['yMaxData']
+            #
+            xx = [xMin, tChange, xMax]
+            xxNeutral = [xMin, xMax]
+            yyNeutral = [yMidData, yMidData]
+            if moveCat == 'NA':
+                yy = [yMidData, yMidData, yMidData]
+            elif moveCat == 'outbound':
+                if direction == 'CW':
+                    yy = [yMidData, yMidData, yMaxData]
+                elif direction == 'CCW':
+                    yy = [yMidData, yMidData, yMinData]
+            elif moveCat == 'return':
+                if direction == 'CW':
+                    yy = [yMaxData, yMaxData, yMidData]
+                elif direction == 'CCW':
+                    yy = [yMinData, yMinData, yMidData]
+            g.axes[ro, co].plot(xx, yy, **plotOptsMain)
+            g.axes[ro, co].plot(xxNeutral, yyNeutral, **plotOptsBounds)
+            # g.axes[ro, co].axhspan(yMinData, yMaxData, fc='w', alpha=0.2)
+            g.axes[ro, co].isPedalAnnAdded = True
+        return
+    return addPedalAnn
+
+
+def genAUCShader(
+        span=None,
+        whichHues=['min', 'max'], estimatorFun=np.mean,
+        patchOpts={}, dropNaNCol='segment'):
+    def shadeAUC(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        # alreadyShaded = hasattr(g.axes[ro, co], 'isAUCShaded')
+        if emptySubset:
+            return
+        else:
+            thesePatchOpts = patchOpts.copy()
+            # print(hu)# TODO figure out iteration
+            if g._hue_var is not None:
+                ##################
+                facetAddress = (
+                    ([] if g._col_var is None else [(g._col_var, g.col_names[co])]) +
+                    ([] if g._row_var is None else [(g._row_var, g.row_names[ro])])
+                    )
+                facetMask = pd.Series(True, index=g.data.index)
+                for fA in facetAddress:
+                    facetMask = facetMask & (g.data[fA[0]] == fA[1])
+                facetSubset = g.data.loc[facetMask, :]
+                #######################
+                shadeThisLine = False
+                allHues = np.unique(facetSubset[g._hue_var]).tolist()
+                thisHueName = dataSubset[g._hue_var].unique()[0]
+                # pdb.set_trace()
+                if ('all' in whichHues):
+                    shadeThisLine = True
+                elif ('min' in whichHues) and thisHueName == allHues[0]:
+                    shadeThisLine = True
+                elif ('max' in whichHues) and thisHueName == allHues[-1]:
+                    shadeThisLine = True
+                if ('palette' in g.hue_kws) and ('facecolor' not in thesePatchOpts):
+                    thesePatchOpts['facecolor'] = g.hue_kws['palette'][thisHueName]
+                # if shadeThisLine:
+                #     thisData = dataSubset.loc[dataSubset[g._hue_var] == thisHueName, [g._x_var, g._y_var]]
+                #     yy = thisData.groupby(g._x_var)[g._y_var].apply(estimatorFun)
+                #     if span is not None:
+                #         yy = yy.loc[(yy.index >= span[0]) & (yy.index <= span[1])]
+                #     thesePatchOpts = patchOpts.copy()
+                #     if ('palette' in g.hue_kws) and ('facecolor' not in thesePatchOpts):
+                #         thesePatchOpts['facecolor'] = g.hue_kws['palette'][thisHueName]
+                #     linesToShade.append([(yy.index, yy), thesePatchOpts])
+            else:
+                shadeThisLine = True
+                if 'facecolor' not in thesePatchOpts:
+                    thesePatchOpts['facecolor'] = g._colors[0]
+            if shadeThisLine:
+                thisData = dataSubset.loc[:, [g._x_var, g._y_var]]
+                yy = thisData.groupby(g._x_var)[g._y_var].apply(estimatorFun)
+                if span is not None:
+                    yy = yy.loc[(yy.index >= span[0]) & (yy.index <= span[1])]
+                print('shade auc {} {} {}'.format(ro, co, hu))
+                g.axes[ro, co].fill_between(yy.index, yy, **thesePatchOpts)
+            # g.axes[ro, co].isAUCShaded = True
+        return
+    return shadeAUC
 
 
 def genBlockShader(patchOpts, dropNaNCol='segment'):
@@ -1188,6 +1401,21 @@ def genBlockVertShader(lims, patchOpts, dropNaNCol='segment'):
                 lims[0], lims[1], **patchOpts)
             return
     return shadeBlocks
+
+def genAUCEpochShader(
+    commonPatchOpts = {'alpha': 0.15, 'zorder': -100}, span=(-100e-3, 200e-3)):
+    def shadeAUCEpochsPerFacet(g, ro, co, hu, dataSubset):
+        emptySubset = (
+                (dataSubset.empty) or
+                (dataSubset.iloc[:, 0].isna().all()))
+        if (not hasattr(g.axes[ro, co], 'aucEpochsShaded')) and (not emptySubset):
+            colName = g.col_names[co]
+            rowName = g.row_names[ro]
+            g.axes[ro, co].axvspan(
+                span[0], span[1], **commonPatchOpts)
+            g.axes[ro, co].aucEpochsShaded = True
+            return
+    return shadeAUCEpochsPerFacet
 
 
 def genLegendRounder(decimals=2):

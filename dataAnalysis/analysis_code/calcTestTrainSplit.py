@@ -116,6 +116,9 @@ if 'winStop' in arguments:
     if arguments['winStop'] is not None:
         alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 
+# for argum in ['duplicateControlsByProgram', 'makeControlProgram']:
+#     if argum in theseIteratorOpts:
+#         alignedAsigsKWargs[argum] = theseIteratorOpts[argum]
 
 if theseIteratorOpts['calcTimeROI'] and not arguments['loadFromFrames']:
     if arguments['eventBlockSuffix'] is not None:
@@ -231,6 +234,9 @@ if (not arguments['loadFromFrames']):
                 aQ = theseIteratorOpts['timeROIOpts_control']['alignQuery']
                 if aQ is None:
                     aQ = arguments['alignQuery']
+                    useAsMarked = True
+                else:
+                    useAsMarked =  False
                 endMaskQuery = ash.processAlignQueryArgs(
                     namedQueries, alignQuery=aQ)
                 ROIWinStart = theseIteratorOpts['timeROIOpts_control']['winStart']
@@ -239,6 +245,10 @@ if (not arguments['loadFromFrames']):
                 aQ = theseIteratorOpts['timeROIOpts']['alignQuery']
                 if aQ is None:
                     aQ = arguments['alignQuery']
+                    print('Using command line alignQuery, {}'.format(aQ))
+                    useAsMarked = True
+                else:
+                    useAsMarked = False
                 endMaskQuery = ash.processAlignQueryArgs(
                     namedQueries, alignQuery=aQ)
                 ROIWinStart = theseIteratorOpts['timeROIOpts']['winStart']
@@ -257,9 +267,12 @@ if (not arguments['loadFromFrames']):
             # select custom time ranges 
             for (_, _, t), group in dataDF.groupby(['segment', 'originalIndex', 't']):
                 timeDifference = (targetTrialAnnDF['t'] - t)
-                deltaT = timeDifference[timeDifference >= 0].min()
+                if not useAsMarked:
+                    deltaT = timeDifference[timeDifference >= 0].min()
+                else:
+                    deltaT = 0
                 groupBins = group.index.get_level_values('bin')
-                # print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
+                print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
             listOfROIMasks.append(targetMask)
             print('targetMask has dimension {}'.format(targetMask.shape))

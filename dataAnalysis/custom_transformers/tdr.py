@@ -844,6 +844,32 @@ class DataFrameBinTrimmer(TransformerMixin, BaseEstimator):
     def inverse_transform(self, X):
         return X
 
+class DataFrameColumnAverager(TransformerMixin, BaseEstimator):
+    def __init__(self, groupBy=None, metaDataFiller={}):
+        self.groupBy = groupBy
+        self.metaDataFiller = metaDataFiller
+        return
+    #
+    def fit(self, X, y=None):
+        return self
+    #
+    def transform(self, X):
+        if self.groupBy is None:
+            self.groupBy = 'all'
+        res = X.groupby(self.groupBy, axis='columns').mean()
+        resColumns = res.columns.to_frame().reset_index(drop=True)
+        for cN in X.columns.names:
+            if cN not in res.columns.names:
+                if cN in self.metaDataFiller:
+                    resColumns.loc[:, cN] = self.metaDataFiller[cN]
+                else:
+                    resColumns.loc[:, cN] = 'NA'
+        res.columns = pd.MultiIndex.from_frame(resColumns.loc[:, X.columns.names])
+        return res
+    #
+    def inverse_transform(self, X):
+        return X
+
 class DataFramePassThrough(TransformerMixin, BaseEstimator):
     def __init__(self):
         return
@@ -1778,81 +1804,6 @@ class LedoitWolfTransformer(LedoitWolf, TransformerMixin):
         return self.rescaler.transform(self.mahalanobis(X).reshape(-1, 1))
         # return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 
-class SMWrapperBackup(BaseEstimator, RegressorMixin):
-    """
-        A universal sklearn-style wrapper for statsmodels regressors
-        based on https://stackoverflow.com/questions/41045752/using-statsmodel-estimations-with-scikit-learn-cross-validation-is-it-possible/
-        by David Dale
-    """
-    def __init__(
-            self, sm_class, family=None,
-            alpha=None, L1_wt=None, refit=None,
-            maxiter=100, tol=1e-6, disp=False, fit_intercept=False,
-            ):
-        self.sm_class = sm_class
-        self.family = family
-        self.fit_intercept = fit_intercept
-        self.alpha = alpha
-        self.L1_wt = L1_wt
-        self.refit = refit
-        self.maxiter = maxiter
-        self.tol = tol
-        self.disp = disp
-    #
-    def fit(self, X, y):
-        model_opts = {}
-        for key in dir(self):
-            if key in ['family']:
-                model_opts.update({key: getattr(self, key)})
-        if self.fit_intercept:
-            XX = sm.add_constant(X)
-        else:
-            XX = X
-        try:
-            self.model_ = self.sm_class(
-                y, XX, **model_opts)
-        except Exception:
-            traceback.print_exc()
-        #
-        regular_opts = {}
-        for key in dir(self):
-            if key in ['alpha', 'L1_wt', 'refit']:
-                if getattr(self, key) is not None:
-                    regular_opts.update({key: getattr(self, key)})
-        fit_opts = {}
-        for key in dir(self):
-            if key in ['maxiter', 'tol', 'disp']:
-                if getattr(self, key) is not None:
-                    fit_opts.update({key: getattr(self, key)})
-        if not len(regular_opts.keys()):
-            self.results_ = self.model_.fit(**fit_opts)
-        else:
-            if 'tol' in fit_opts:
-                tol = fit_opts.pop('tol')
-                fit_opts['cnvrg_tol'] = tol
-            if 'disp' in fit_opts:
-                fit_opts.pop('disp')
-            self.results_ = self.model_.fit_regularized(
-                **regular_opts, **fit_opts)
-        self.coef_ = self.results_.params
-        self.summary_ = self.results_.summary()
-        self.summary2_ = self.results_.summary2()
-        self.results_.remove_data()
-    #
-    def predict(self, X):
-        if self.fit_intercept:
-            XX = sm.add_constant(X)
-        else:
-            XX = X
-        return self.results_.predict(XX)
-    #
-    def score(self, X, y=None):
-        if 'family' in dir(self):
-            if 'Poisson' in str(self.family):
-                return poisson_pseudoR2(self, X, y)
-            if 'Gaussian' in str(self.family):
-                return r2_score(y, self.predict(X))
-
 
 class SMWrapper(BaseEstimator, RegressorMixin):
     """
@@ -1864,7 +1815,7 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             self, sm_class, family=None,
             alpha=None, L1_wt=None, refit=None,
             maxiter=100, tol=1e-6, disp=False, check_step=True,
-            fit_intercept=False, start_params=None,
+            fit_intercept=False, start_params=None, active_set=True,
             calc_frequency_weights=False, frequency_weights_index='trialUID',
             frequency_group_columns=['electrode', 'trialAmplitude', 'trialRateInHz', 'pedalMovementCat', 'pedalDirection', 'pedalSizeCat']
             ):
@@ -1874,6 +1825,7 @@ class SMWrapper(BaseEstimator, RegressorMixin):
         self.alpha = alpha
         self.L1_wt = L1_wt
         self.refit = refit
+        self.active_set = active_set
         self.maxiter = maxiter
         self.tol = tol
         self.disp = disp
@@ -1928,7 +1880,7 @@ class SMWrapper(BaseEstimator, RegressorMixin):
                 self.start_params = rngNorm.standard_normal(XX.shape[1])
         regular_opts = {}
         for key in dir(self):
-            if key in ['alpha', 'L1_wt', 'refit', 'check_step', 'start_params']:
+            if key in ['alpha', 'L1_wt', 'refit', 'check_step', 'start_params', 'active_set']:
                 if getattr(self, key) is not None:
                     regular_opts.update({key: getattr(self, key)})
         fit_opts = {}

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sbatch shellScripts/step13e_tts_mahalanobis_check_outliers_stim.sh
+sbatch shellScripts/step13f_tts_mahalanobis_check_outliers_motion.sh

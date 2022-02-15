@@ -1,9 +1,11 @@
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import seaborn as sns
 import pandas as pd
+import numpy as np
 import pdb
+from itertools import product
 minNObservations = 3
-
+exampleChannelStr = 'utah_csd_2'
 colorMaps = {
     # coldish
     'covMat': 'crest_r',
@@ -56,23 +58,13 @@ def shadeTaskEpochsPerFacet(g, ro, co, hu, dataSubset):
                 **commonPatchOpts)
         g.axes[ro, co].taskEpochsShaded = True
         return
+#
 
-def shadeAUCEpochsPerFacet(g, ro, co, hu, dataSubset):
-    emptySubset = (
-            (dataSubset.empty) or
-            (dataSubset.iloc[:, 0].isna().all()))
-    commonPatchOpts = {
-        'alpha': 0.15, 'zorder': -100}
-    if not hasattr(g.axes[ro, co], 'aucEpochsShaded') and not emptySubset:
-        colName = g.col_names[co]
-        rowName = g.row_names[ro]
-        g.axes[ro, co].axvspan(
-            -100e-3, 200e-3, facecolor=iteratorPalette.loc['B', 'color'],
-            **commonPatchOpts)
-        g.axes[ro, co].aucEpochsShaded = True
-        return
 
-####
+exampleChannelListStr = ', '.join([
+    "'utah_csd_{}{}#0'".format(cn, fb) for fb, cn in product(
+        ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb'],
+        [2, 8, 17, 35])])
 argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
@@ -108,29 +100,63 @@ argumentsLookup = {
             ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
-    'laplace_illustration': {
+    'rig_hf_illustration': {
         'recalcStats': True,
-        'winStart': '-800', 'winStop': '1000', 'limitPages': None,
-        # 'unitQuery': None,
-        'unitQuery': "chanName.isin(['utah_csd_14#0', 'utah_csd_30#0', 'utah_csd_33#0', 'utah_csd_3#0', 'utah_csd_2#0', 'utah_csd_79#0', 'utah_csd_60#0', 'utah_csd_80#0', 'utah_csd_16#0', 'utah_csd_17#0'])",
+        'winStart': '-10', 'winStop': '35', 'limitPages': None,
+        'unitQuery': "chanName.isin(['position#0','velocity_x#0','velocity_y#0', 'amplitude#0', 'utah_rawAverage_0#0', 'ins_td0#0', 'ins_td2#0'])",
         # 'alignQuery': None,
+        # 'alignQuery': "conditionUID == 2",
         'individualTraces': False, 'overlayStats': False,
-        'colName': 'stimCondition', 'colControl': '',
-        # 'rowOrder':
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
-        'rowOrder': [
-           'NA_NA',
+        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
+            'NA_NA',
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
             ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
-    'laplace_illustration_topo': {
+    'lfp_hf_illustration': {
         'recalcStats': True,
-        'winStart': '-1000', 'winStop': '1000', 'limitPages': None,
+        'winStart': '-10', 'winStop': '35', 'limitPages': None,
+        'unitQuery': "chanName.isin(['utah1#0', 'utah75#0', 'averageSignal#0'])",
+        # 'alignQuery': None,
+        # 'unitQuery': None,
+        'individualTraces': False, 'overlayStats': False,
+        'hueName': 'trialAmplitude', 'hueControl': '',
+        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
+            'NA_NA',
+            'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return',
+            ],
+        'sizeName': '', 'sizeControl': '',
+        'styleName': '', 'styleControl': ''},
+    'laplace_hf_illustration': {
+        'recalcStats': True,
+        'winStart': '-10', 'winStop': '35', 'limitPages': None,
+        'unitQuery': "chanName.isin(['utah_csd_2#0', 'utah_csd_12#0', 'utah_csd_14#0', ])",
+        # 'alignQuery': None,
+        # 'unitQuery': None,
+        'individualTraces': False, 'overlayStats': False,
+        'hueName': 'trialAmplitude', 'hueControl': '',
+        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
+            'NA_NA',
+            'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return',
+            ],
+        'sizeName': '', 'sizeControl': '',
+        'styleName': '', 'styleControl': ''},
+    'laplace_topo_illustration': {
+        'recalcStats': True,
+        'winStart': '-150', 'winStop': '250', 'limitPages': None,
         'unitQuery': None,
-        'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
+        # 'alignQuery': "((trialRateInHz == 0.) | (trialRateInHz == 100.)) & (pedalMovementCat == 'outbound')",
+        'alignQuery': "(electrode == 'NA') & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'yCoords', 'rowControl': '',
@@ -152,9 +178,9 @@ argumentsLookup = {
         'groupPagesByIndex': 'stimCondition, kinematicConditionNoSize',
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
-    'laplace_spectral_illustration_topo': {
+    'laplace_spectral_topo_illustration': {
         'recalcStats': True,
-        'winStart': '-1000', 'winStop': '1000', 'limitPages': None,
+        'winStart': '-150', 'winStop': '250', 'limitPages': None,
         'unitQuery': None,
         'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
@@ -167,7 +193,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'factor_illustration': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '350', 'limitPages': None,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
         'unitQuery': "chanName.isin(['fa_all001#0', 'fa_all002#0', 'fa_all003#0', 'fa_all004#0'])",
         # 'alignQuery': None,
         # 'unitQuery': None,
@@ -184,7 +210,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'spectral_illustration': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '400', 'limitPages': None,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
         'unitQuery': "chanName.isin(['utah1_alpha#0', 'utah1_beta#0', 'utah1_gamma#0', 'utah1_higamma#0', 'utah1_spb#0'])",
         # 'unitQuery': None,
         # 'alignQuery': None,
@@ -199,11 +225,12 @@ argumentsLookup = {
             ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
-    'laplace_spectral_illustration': {
+    'laplace_illustration': {
         'recalcStats': True,
-        'winStart': '-800', 'winStop': '1000', 'limitPages': None,
-        'unitQuery': "chanName.isin(['utah_csd_2_alpha#0', 'utah_csd_60_alpha#0', 'utah_csd_14_alpha#0', 'utah_csd_63_alpha#0', 'utah_csd_2_beta#0', 'utah_csd_11_beta#0', 'utah_csd_56_beta#0', 'utah_csd_19_beta#0', 'utah_csd_30_gamma#0', 'utah_csd_60_gamma#0', 'utah_csd_53_gamma#0', 'utah_csd_17_gamma#0', 'utah_csd_40_higamma#0', 'utah_csd_60_higamma#0', 'utah_csd_27_higamma#0', 'utah_csd_14_higamma#0', 'utah_csd_70_spb#0', 'utah_csd_80_spb#0', 'utah_csd_28_spb#0', 'utah_csd_14_spb#0'])",
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
         # 'unitQuery': None,
+        'unitQuery': "chanName.isin([" + exampleChannelListStr + "])",
+        # 'unitQuery': "chanName.isin(['{}#0', 'utah_csd_8#0', 'utah_csd_35#0', 'utah_csd_17#0',])".format(exampleChannelStr),
         # 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'colName': 'stimCondition', 'colControl': '',
@@ -215,11 +242,53 @@ argumentsLookup = {
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
             ],
+        'groupPagesByColumn': 'feature',
+        'groupPagesByIndex': 'stimCondition',
+        'sizeName': '', 'sizeControl': '',
+        'styleName': '', 'styleControl': ''},
+    'laplace_auc_illustration': {
+        'recalcStats': True,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
+        # 'unitQuery': None,
+        'unitQuery': "chanName.isin(['{}#0', 'utah_csd_8#0', 'utah_csd_35#0', 'utah_csd_17#0',])".format(exampleChannelStr),
+        # 'alignQuery': None,
+        'individualTraces': False, 'overlayStats': False,
+        'colName': 'stimCondition', 'colControl': '',
+        # 'rowOrder':
+        'hueName': 'trialAmplitude', 'hueControl': '',
+        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
+        'rowOrder': [
+           'NA_NA',
+            'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return',
+            ],
+        'groupPagesByColumn': 'feature',
+        'groupPagesByIndex': 'stimCondition',
+        'sizeName': '', 'sizeControl': '',
+        'styleName': '', 'styleControl': ''},
+    'laplace_spectral_illustration': {
+        'recalcStats': True,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
+        'unitQuery': "chanName.isin([" + exampleChannelListStr + "])",
+        # 'unitQuery': None,
+        # 'alignQuery': None,
+        'individualTraces': False, 'overlayStats': False,
+        'colName': 'stimCondition', 'colControl': '',
+        # 'rowOrder':
+        'hueName': 'trialAmplitude', 'hueControl': '',
+        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
+        'groupPagesByColumn': 'feature',
+        'groupPagesByIndex': 'stimCondition',
+        'rowOrder': [
+           'NA_NA',
+            'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return',
+            ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'mahal_illustration': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '400', 'limitPages': None,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
         'unitQuery': None, 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'colName': 'stimCondition', 'colControl': '',
@@ -231,11 +300,13 @@ argumentsLookup = {
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
             ],
+        # 'groupPagesByColumn': 'feature',
+        # 'groupPagesByIndex': 'stimCondition',
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'mahal_per_trial_illustration': {
         'recalcStats': True,
-        'winStart': '-250', 'winStop': '350', 'limitPages': None,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
         'unitQuery': None, 'alignQuery': None,
         'individualTraces': True, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -250,7 +321,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'rig_per_trial_illustration': {
         'recalcStats': True,
-        'winStart': '-250', 'winStop': '350', 'limitPages': None,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
         'unitQuery': "chanName.isin(['utah_artifact_0#0', 'utah_rawAverage_0#0', 'position#0'])",
         # 'unitQuery': None, 'alignQuery': None,
         'individualTraces': True, 'overlayStats': False,
@@ -265,6 +336,17 @@ argumentsLookup = {
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''}
     }
+argumentsLookup['laplace_aucNoStim_illustration'] = argumentsLookup['laplace_auc_illustration'].copy()
+argumentsLookup['laplace_aucNoStim_illustration']['groupPagesByColumn'] = 'feature'
+argumentsLookup['laplace_aucNoStim_illustration']['groupPagesByIndex'] = 'stimCondition'
+#
+argumentsLookup['laplace_spectral_auc_illustration'] = argumentsLookup['laplace_spectral_illustration'].copy()
+#[=]]]
+argumentsLookup['laplace_spectral_aucNoStim_illustration'] = argumentsLookup['laplace_spectral_auc_illustration'].copy()
+argumentsLookup['laplace_spectral_aucNoStim_illustration']['groupPagesByColumn'] = 'feature'
+argumentsLookup['laplace_spectral_aucNoStim_illustration']['groupPagesByIndex'] = 'stimCondition'
+#
+argumentsLookup['laplace_std_illustration'] = argumentsLookup['laplace_illustration'].copy()
 
 statsTestOpts = dict(
     referenceTimeWindow=None,
@@ -276,6 +358,7 @@ statsTestOpts = dict(
     pThresh=5e-2,
     correctMultiple=True,
     )
+
 statsTestOptsLookup = {
     'rig_illustration': dict(
         referenceTimeWindow=None,
@@ -317,7 +400,7 @@ statsTestOptsLookup = {
         pThresh=5e-2,
         correctMultiple=True,
         ),
-    'laplace_illustration_topo': dict(
+    'laplace_topo_illustration': dict(
         referenceTimeWindow=None,
         # referenceTimeWindow=[-400e-3, -350e-3],
         testStride=100e-3,
@@ -327,7 +410,7 @@ statsTestOptsLookup = {
         pThresh=5e-2,
         correctMultiple=True,
         ),
-    'laplace_spectral_illustration_topo': dict(
+    'laplace_spectral_topo_illustration': dict(
         referenceTimeWindow=None,
         # referenceTimeWindow=[-400e-3, -350e-3],
         testStride=100e-3,
@@ -380,6 +463,15 @@ statsTestOptsLookup = {
     }
 statsTestOptsLookup['mahal_per_trial_illustration'] = statsTestOptsLookup['mahal_illustration']
 statsTestOptsLookup['rig_per_trial_illustration'] = statsTestOptsLookup['rig_illustration']
+statsTestOptsLookup['rig_hf_illustration'] = statsTestOptsLookup['rig_illustration']
+statsTestOptsLookup['lfp_hf_illustration'] = statsTestOptsLookup['lfp_illustration']
+statsTestOptsLookup['laplace_hf_illustration'] = statsTestOptsLookup['laplace_illustration']
+statsTestOptsLookup['laplace_auc_illustration'] = statsTestOptsLookup['laplace_illustration']
+statsTestOptsLookup['laplace_spectral_auc_illustration'] = statsTestOptsLookup['laplace_spectral_illustration'].copy()
+statsTestOptsLookup['laplace_aucNoStim_illustration'] = statsTestOptsLookup['laplace_illustration']
+statsTestOptsLookup['laplace_spectral_aucNoStim_illustration'] = statsTestOptsLookup['laplace_spectral_illustration'].copy()
+statsTestOptsLookup['laplace_std_illustration'] = statsTestOptsLookup['laplace_illustration'].copy()
+
 titleLabelLookup = {
     'stimCondition = NA_0.0': 'No stim.',
     'NA_0.0': 'No stim.',
@@ -416,8 +508,16 @@ for eIdx in range(97):
         fbPrettyName = '\n({})'.format(titleLabelLookup[fbn]) if fbn is not None else ''
         titleLabelLookup['feature = utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
         titleLabelLookup['utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
+
 plotProcFunsLookup = {
     'rig_illustration': [
+    # shadeTaskEpochsPerFacet,
+    asp.xLabelsTime,
+    asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
+    asp.genLegendRounder(decimals=2),
+        # asp.genTitleChanger(titleLabelLookup)
+        ],
+    'rig_hf_illustration': [
     # shadeTaskEpochsPerFacet,
     asp.xLabelsTime,
     asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
@@ -435,21 +535,55 @@ plotProcFunsLookup = {
             includeLeft=False, includeRight=False),
         asp.genTitleChanger(titleLabelLookup)
         ],
-    'laplace_illustration': [
-        shadeAUCEpochsPerFacet,
+    'lfp_hf_illustration': [
+        # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
+        asp.genTitleChanger(titleLabelLookup),
         asp.genStimVLineAdder(
-            'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=-100e-3, tOffset=.4, includeLeft=False, includeRight=False),
-        asp.genTitleChanger(titleLabelLookup)
+            'trialRateInHz', {
+                'color': 'y', 'lw': .5, 'alpha': 1,
+                'ymin': 1.01, 'ymax': 1.04},
+            tOnset=0., tOffset=60e-3,
+            includeLeft=True, includeRight=False),
+        asp.genPedalPosAdder(
+            autoscale=True,
+            yMin = 1.06, yMax = 1.14,
+            plotOptsMain=dict(lw=.5, c='k'),
+            plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),),
         ],
-    'laplace_illustration_topo': [
+    'laplace_hf_illustration': [
+        # shadeAUCEpochsPerFacet,
+        asp.xLabelsTime,
+        asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
+        asp.genLegendRounder(decimals=2),
+        asp.genTitleChanger(titleLabelLookup),
+        asp.genStimVLineAdder(
+            'trialRateInHz', {
+                'color': 'y', 'lw': .5, 'alpha': 1,
+                'ymin': 1.01, 'ymax': 1.04},
+            tOnset=0., tOffset=60e-3,
+            includeLeft=True, includeRight=False),
+        asp.genPedalPosAdder(
+            autoscale=True,
+            yMin = 1.06, yMax = 1.14,
+            plotOptsMain=dict(lw=.5, c='k'),
+            plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),),
+        ],
+    'laplace_topo_illustration': [
         # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genLegendRounder(decimals=2),
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
+        asp.genGridAnnotator(
+            xpos=.9, ypos=.9, template='{}',
+            colNames=['feature'],
+            textOpts={
+                'fontsize': 10,
+                'verticalalignment': 'top',
+                'horizontalalignment': 'right'
+            }, shared=False)
         # asp.genTitleChanger(titleLabelLookup)
         ],
     'lfp_illustration_topo': [
@@ -459,7 +593,7 @@ plotProcFunsLookup = {
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         # asp.genTitleChanger(titleLabelLookup)
         ],
-    'laplace_spectral_illustration_topo': [
+    'laplace_spectral_topo_illustration': [
         # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genLegendRounder(decimals=2),
@@ -467,48 +601,124 @@ plotProcFunsLookup = {
         # asp.genTitleChanger(titleLabelLookup)
         ],
     'factor_illustration': [
-        shadeAUCEpochsPerFacet,
+        #shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}, dropNaNCol='trialUID'),
         asp.genLegendRounder(decimals=2),
+        asp.genTitleChanger(titleLabelLookup),
         asp.genStimVLineAdder(
             'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
             tOnset=0., tOffset=.35, includeLeft=False, includeRight=False, dropNaNCol='trialUID'),
         asp.genTitleChanger(titleLabelLookup)],
     'spectral_illustration': [
-        shadeAUCEpochsPerFacet,
+        #shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
-        asp.genStimVLineAdder(
-            'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=-.10, tOffset=.4, includeLeft=False, includeRight=False),
-        asp.genTitleChanger(titleLabelLookup)],
-    'laplace_spectral_illustration': [
-        shadeAUCEpochsPerFacet,
-        asp.xLabelsTime,
-        asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
-        asp.genLegendRounder(decimals=2),
-        asp.genStimVLineAdder(
-            'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=-0.10, tOffset=.4, includeLeft=False, includeRight=False),
-        asp.genTitleChanger(titleLabelLookup)],
-    'mahal_illustration': [
-        shadeAUCEpochsPerFacet,
-        asp.xLabelsTime,
-        asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
-        asp.genLegendRounder(decimals=2),
-        asp.genStimVLineAdder(
-            'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
-            tOnset=-.10, tOffset=.4, includeLeft=False, includeRight=False),
         asp.genTitleChanger(titleLabelLookup),
-            # asp.genTraceAnnotator(
-            #     unit_var='trialUID', labelsList=['segment', 't'],
-            #     textOpts=dict(ha='left', va='bottom', fontsize=4))
+        asp.genStimVLineAdder(
+            'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
+            tOnset=0., tOffset=.4, includeLeft=False, includeRight=False),
+        asp.genTitleChanger(titleLabelLookup)],
+    'laplace_illustration': [
+        asp.genAUCEpochShader(
+            span=(-100e-3, 200e-3),
+            commonPatchOpts={'alpha': 0.15, 'zorder': -100, 'facecolor': iteratorPalette.loc['B', 'color']}),
+        asp.genGridFormatter(),
+        asp.genXLimSetter(quantileLims=1),
+        # asp.genAxTickRemover(y=True),
+        asp.genVLineAdder([0], {'color': 'm', 'alpha': 0.5}),
+        asp.genLegendRounder(decimals=2),
+        asp.genTitleChanger(titleLabelLookup),
+        asp.genStimVLineAdder(
+            'trialRateInHz', {
+                'color': 'm', 'lw': .5, 'alpha': 1,
+                'ymin': 0.96, 'ymax': 0.99},
+            tOnset=0., tOffset=250e-3,
+            includeLeft=True, includeRight=False),
+        asp.genPedalPosAdder(
+            autoscale=True,
+            yMin=0.86, yMax=0.94,
+            plotOptsMain=dict(lw=.5, c='k'),
+            plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),),
+        ],
+    'laplace_auc_illustration': [
+        asp.genAUCEpochShader(
+            span=(-100e-3, 200e-3),
+            commonPatchOpts={
+                'alpha': 0.05, 'zorder': -100,
+                # 'linewidth': 0.5, 'edgecolor': iteratorPalette.loc['B', 'color'],
+                'facecolor': iteratorPalette.loc['B', 'color']}),
+        asp.genAUCShader(span=(-100e-3, 200e-3), patchOpts=dict(alpha=0.5)),
+        asp.genGridFormatter(),
+        asp.genXLimSetter(quantileLims=1),
+        # asp.genAxTickRemover(y=True),
+        asp.genVLineAdder([0], {'color': 'm', 'alpha': 0.5}),
+        asp.genLegendRounder(decimals=2),
+        asp.genTitleChanger(titleLabelLookup),
+        asp.genStimVLineAdder(
+            'trialRateInHz', {
+                'color': 'm', 'lw': .5, 'alpha': 1,
+                'ymin': 0.96, 'ymax': 0.99},
+            tOnset=0., tOffset=250e-3,
+            includeLeft=True, includeRight=False),
+        asp.genPedalPosAdder(
+            autoscale=True,
+            yMin = 0.86, yMax = 0.94,
+            plotOptsMain=dict(lw=.5, c='k'),
+            plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),),
+        ],
+    'laplace_spectral_illustration': [
+        asp.genAUCEpochShader(
+            span=(-100e-3, 200e-3),
+            commonPatchOpts={'alpha': 0.15, 'zorder': -100, 'facecolor': iteratorPalette.loc['B', 'color']}),
+        asp.genGridFormatter(),
+        asp.genXLimSetter(quantileLims=1),
+        # asp.genAxTickRemover(y=True),
+        asp.genVLineAdder([0], {'color': 'b', 'alpha': 0.5}),
+        asp.genLegendRounder(decimals=2),
+        asp.genTitleChanger(titleLabelLookup),
+        asp.genStimVLineAdder(
+            'trialRateInHz', {
+                'color': 'b', 'lw': .5, 'alpha': 1,
+                'ymin': 0.96, 'ymax': 0.99},
+            tOnset=0., tOffset=250e-3,
+            includeLeft=True, includeRight=False),
+        asp.genPedalPosAdder(
+            autoscale=True,
+            yMin=0.86, yMax=0.94,
+            plotOptsMain=dict(lw=.5, c='k'),
+            plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),),
+        ],
+    'mahal_illustration': [
+        asp.genAUCEpochShader(
+            span=(-100e-3, 200e-3),
+            commonPatchOpts={'alpha': 0.15, 'zorder': -100, 'facecolor': iteratorPalette.loc['B', 'color']}),
+        asp.genGridFormatter(),
+        asp.genXLimSetter(quantileLims=1),
+        # asp.genAxTickRemover(y=True),
+        asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
+        asp.genLegendRounder(decimals=2),
+        asp.genTitleChanger(titleLabelLookup),
+        asp.genStimVLineAdder(
+            'trialRateInHz', {
+                'color': 'y', 'lw': .5, 'alpha': 1,
+                'ymin': 0.96, 'ymax': 0.99},
+            tOnset=0., tOffset=250e-3,
+            includeLeft=True, includeRight=False),
+        asp.genPedalPosAdder(
+            autoscale=True,
+            yMin=0.86, yMax=0.94,
+            plotOptsMain=dict(lw=.5, c='k'),
+            plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),),
             ]
     }
 plotProcFunsLookup['mahal_per_trial_illustration'] = plotProcFunsLookup['mahal_illustration']
 plotProcFunsLookup['rig_per_trial_illustration'] = plotProcFunsLookup['rig_illustration']
+plotProcFunsLookup['laplace_aucNoStim_illustration'] = plotProcFunsLookup['laplace_auc_illustration'].copy()
+plotProcFunsLookup['laplace_spectral_auc_illustration'] = plotProcFunsLookup['laplace_auc_illustration'].copy()
+plotProcFunsLookup['laplace_spectral_aucNoStim_illustration'] = plotProcFunsLookup['laplace_auc_illustration'].copy()
+plotProcFunsLookup['laplace_std_illustration'] = plotProcFunsLookup['laplace_illustration'].copy()
 
 unusedPlotProcFuns = [
     asp.genNumRepAnnotator(
@@ -544,15 +754,25 @@ relPlotKWArgsLookup = {
         'palette': "ch:0.8,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': 'se'
     },
+    'rig_hf_illustration': {
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'palette': "ch:0.8,-.3,dark=.25,light=0.75,reverse=1",
+        'errorbar': None
+    },
     'lfp_illustration': {
         'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': 'se'
     },
-    'laplace_illustration': {
+    'lfp_hf_illustration': {
         'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': 'se'
+        'errorbar': None
+    },
+    'laplace_hf_illustration': {
+        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
+        'errorbar': None
     },
     'lfp_illustration_topo': {
         'linewidth': 2., 'height': 2, 'aspect': 1.5,
@@ -560,13 +780,13 @@ relPlotKWArgsLookup = {
         'facet_kws': {'sharey': False},
         'errorbar': None  # 'se'
     },
-    'laplace_illustration_topo': {
+    'laplace_topo_illustration': {
         'linewidth': 2., 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'facet_kws': {'sharey': False},
         'errorbar': None  # 'se'
     },
-    'laplace_spectral_illustration_topo': {
+    'laplace_spectral_topo_illustration': {
         'linewidth': 2., 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'facet_kws': {'sharey': False},
@@ -582,23 +802,34 @@ relPlotKWArgsLookup = {
         'palette': "ch:0.,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': 'se'
     },
+    'laplace_illustration': {
+        'linewidth': 1., 'height': 2, 'aspect': 1.5,
+        'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
+        'errorbar': 'sd',
+        # 'errorbar': None, "alpha": 0.5, 'estimator': None, 'units': 'trialUID',
+        'rasterized': True, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
+    },
+    'laplace_auc_illustration': {
+        'linewidth': 1., 'height': 2, 'aspect': 1.5,
+        'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
+        'errorbar': None, 'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
+    },
     'laplace_spectral_illustration': {
-        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'linewidth': 1., 'height': 2, 'aspect': 1.5,
         'palette': "ch:0.,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': 'se'
+        'errorbar': 'sd', 'rasterized': True, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
     },
     'mahal_illustration': {
-        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'linewidth': 1., 'height': 2, 'aspect': 1.5,
         'palette': "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': 'se'
+        'errorbar': 'se', 'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
         # 'facet_kws': {'sharey': False},
         # 'estimator': None, 'units': 'trialUID'
     },
     'mahal_per_trial_illustration': {
         'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1",
-        'alpha': 0.5,
-        'errorbar': None
+        'alpha': 0.5, 'errorbar': None,
     },
     'rig_per_trial_illustration': {
         'linewidth': .75, 'height': 2, 'aspect': 1.5,
@@ -607,7 +838,18 @@ relPlotKWArgsLookup = {
         'errorbar': None
     }
 }
-
+relPlotKWArgsLookup['laplace_spectral_auc_illustration'] = relPlotKWArgsLookup['laplace_auc_illustration'].copy()
+relPlotKWArgsLookup['laplace_spectral_auc_illustration']['palette'] = relPlotKWArgsLookup['laplace_spectral_illustration']['palette']
+relPlotKWArgsLookup['laplace_aucNoStim_illustration'] = relPlotKWArgsLookup['laplace_auc_illustration'].copy()
+relPlotKWArgsLookup['laplace_spectral_aucNoStim_illustration'] = relPlotKWArgsLookup['laplace_auc_illustration'].copy()
+relPlotKWArgsLookup['laplace_spectral_aucNoStim_illustration']['palette'] = relPlotKWArgsLookup['laplace_spectral_illustration']['palette']
+#
+relPlotKWArgsLookup['laplace_std_illustration'] = relPlotKWArgsLookup['laplace_spectral_illustration'].copy()
+relPlotKWArgsLookup['laplace_std_illustration']['estimator'] = np.std
+relPlotKWArgsLookup['laplace_std_illustration']['errorbar'] = None
+# relPlotKWArgsLookup['laplace_std_illustration']['palette'] = "ch:0.,-.2,dark=.25,light=0.75,reverse=1",
+relPlotKWArgsLookup['laplace_std_illustration']['linewidth'] = 1.
+#
 catPlotKWArgsLookup = {
     'rig_illustration': {
         'linewidth': 1., 'height': 1.5, 'aspect': 3,
@@ -625,11 +867,11 @@ catPlotKWArgsLookup = {
         'linewidth': 1., 'height': 1, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1"
     },
-    'laplace_illustration_topo': {
+    'laplace_topo_illustration': {
         'linewidth': 1., 'height': 1, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1"
     },
-    'laplace_spectral_illustration_topo': {
+    'laplace_spectral_topo_illustration': {
         'linewidth': 1., 'height': 1, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1"
     },
@@ -652,6 +894,14 @@ catPlotKWArgsLookup = {
 }
 catPlotKWArgsLookup['mahal_per_trial_illustration'] = catPlotKWArgsLookup['mahal_illustration']
 catPlotKWArgsLookup['rig_per_trial_illustration'] = catPlotKWArgsLookup['rig_illustration']
+catPlotKWArgsLookup['rig_hf_illustration'] = catPlotKWArgsLookup['rig_illustration']
+catPlotKWArgsLookup['lfp_hf_illustration'] = catPlotKWArgsLookup['lfp_illustration']
+catPlotKWArgsLookup['laplace_hf_illustration'] = catPlotKWArgsLookup['laplace_illustration']
+catPlotKWArgsLookup['laplace_auc_illustration'] = catPlotKWArgsLookup['laplace_illustration']
+catPlotKWArgsLookup['laplace_spectral_auc_illustration'] = catPlotKWArgsLookup['laplace_spectral_illustration']
+catPlotKWArgsLookup['laplace_aucNoStim_illustration'] = catPlotKWArgsLookup['laplace_illustration']
+catPlotKWArgsLookup['laplace_spectral_aucStim_illustration'] = catPlotKWArgsLookup['laplace_spectral_illustration']
+catPlotKWArgsLookup['laplace_std_illustration'] = catPlotKWArgsLookup['laplace_illustration']
 #
 legendTitleOverridesLookup = {
     'rig_illustration': {
@@ -666,10 +916,10 @@ legendTitleOverridesLookup = {
     'lfp_illustration_topo': {
         'trialAmplitude': 'Stimulation\namplitude (uA)',
     },
-    'laplace_illustration_topo': {
+    'laplace_topo_illustration': {
         'trialAmplitude': 'Stimulation\namplitude (uA)',
     },
-    'laplace_spectral_illustration_topo': {
+    'laplace_spectral_topo_illustration': {
         'trialAmplitude': 'Stimulation\namplitude (uA)',
     },
     'factor_illustration': {
@@ -687,6 +937,15 @@ legendTitleOverridesLookup = {
 }
 legendTitleOverridesLookup['mahal_per_trial_illustration'] = legendTitleOverridesLookup['mahal_illustration']
 legendTitleOverridesLookup['rig_per_trial_illustration'] = legendTitleOverridesLookup['rig_illustration']
+legendTitleOverridesLookup['rig_hf_illustration'] = legendTitleOverridesLookup['rig_illustration']
+legendTitleOverridesLookup['lfp_hf_illustration'] = legendTitleOverridesLookup['lfp_illustration']
+legendTitleOverridesLookup['laplace_hf_illustration'] = legendTitleOverridesLookup['laplace_illustration']
+legendTitleOverridesLookup['laplace_auc_illustration'] = legendTitleOverridesLookup['laplace_illustration']
+legendTitleOverridesLookup['laplace_spectral_auc_illustration'] = legendTitleOverridesLookup['laplace_spectral_illustration']
+legendTitleOverridesLookup['laplace_aucNoStim_illustration'] = legendTitleOverridesLookup['laplace_illustration']
+legendTitleOverridesLookup['laplace_spectral_aucNoStim_illustration'] = legendTitleOverridesLookup['laplace_spectral_illustration']
+legendTitleOverridesLookup['laplace_std_illustration'] = legendTitleOverridesLookup['laplace_illustration']
+
 legendContentOverridesLookup = {}
 
 styleOptsLookup = {
@@ -702,10 +961,10 @@ styleOptsLookup = {
     'lfp_illustration_topo': {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     },
-    'laplace_illustration_topo': {
+    'laplace_topo_illustration': {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     },
-    'laplace_spectral_illustration_topo': {
+    'laplace_spectral_topo_illustration': {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     },
     'factor_illustration': {
@@ -717,6 +976,9 @@ styleOptsLookup = {
     'laplace_spectral_illustration': {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     },
+    'laplace_spectral_auc_illustration': {
+        'legend.lw': 2, 'tight_layout.pad': 2e-1,
+    },
     'mahal_illustration': {
         'legend.lw': 2, 'tight_layout.pad': 2e-1,
     }
@@ -724,25 +986,40 @@ styleOptsLookup = {
 
 styleOptsLookup['mahal_per_trial_illustration'] = styleOptsLookup['mahal_illustration']
 styleOptsLookup['rig_per_trial_illustration'] = styleOptsLookup['rig_illustration']
+styleOptsLookup['rig_hf_illustration'] = styleOptsLookup['rig_illustration']
+styleOptsLookup['lfp_hf_illustration'] = styleOptsLookup['lfp_illustration']
+styleOptsLookup['laplace_hf_illustration'] = styleOptsLookup['laplace_illustration']
+styleOptsLookup['laplace_auc_illustration'] = styleOptsLookup['laplace_illustration']
+styleOptsLookup['laplace_spectral_auc_illustration'] = styleOptsLookup['laplace_spectral_illustration']
+styleOptsLookup['laplace_aucNoStim_illustration'] = styleOptsLookup['laplace_illustration']
+styleOptsLookup['laplace_spectral_aucNoStim_illustration'] = styleOptsLookup['laplace_spectral_illustration']
+styleOptsLookup['laplace_std_illustration'] = styleOptsLookup['laplace_illustration']
 xAxisLabelLookup = {
     }
+yAxisLabelLookup = {
+    }
+xAxisUnitsLookup = {
+    }
+yAxisUnitsLookup = {
+    'mahal_illustration': '(a.u.)',
+    'laplace_illustration': '(z-scored, a.u.)',
+    'laplace_auc_illustration': '(z-scored, a.u.)',
+    'laplace_spectral_illustration': '(z-scored, a.u.)',
+    'laplace_spectral_auc_illustration': '(z-scored, a.u.)',
+    'laplace_std_illustration': '(std.dev., a.u.)'
+    }
+'''
 yAxisLabelLookup = {
     'rig_illustration': {
         'amplitude': 'Stimulation amplitude (uA)',
         'position': 'Pedal position (deg.)',
     },
     'lfp_illustration': {
-        'utah18': 'LFP recording (uV)',
+        'averageSignal': 'average LFP across entire array (uV)'
     },
     'factor_illustration': {
-        'utah18': 'LFP recording (uV)',
     },
     'spectral_illustration': {
-        'utah18_alpha': 'LFP alpha (uV)',
-        'utah18_beta': 'LFP beta (uV)',
-        'utah18_gamma': 'LFP gamma (uV)',
-        'utah18_higamma': 'LFP high gamma (uV)',
-        'utah18_spb': 'LFP SPB (uV)',
     },
     'mahal_illustration': {
         'mahal_ledoit_all': 'Mahalanobis\ndistance (a.u.)',
@@ -750,24 +1027,59 @@ yAxisLabelLookup = {
 }
 yAxisLabelLookup['mahal_per_trial_illustration'] = yAxisLabelLookup['mahal_illustration']
 yAxisLabelLookup['rig_per_trial_illustration'] = yAxisLabelLookup['rig_illustration']
+yAxisLabelLookup['rig_hf_illustration'] = yAxisLabelLookup['rig_illustration']
+yAxisLabelLookup['lfp_hf_illustration'] = yAxisLabelLookup['lfp_illustration']
+'''
+
 titlesOptsLookup = {
     'mahal_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'rig_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'lfp_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'lfp_hf_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_hf_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'lfp_illustration_topo': {'col_template': '{col_name}', 'row_template': '{row_name}'},
-    'laplace_illustration_topo': {'col_template': '{col_name}', 'row_template': '{row_name}'},
-    'laplace_spectral_illustration_topo': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_topo_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_spectral_topo_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_spectral_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_spectral_auc_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_auc_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_spectral_aucNoStim_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_aucNoStim_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_std_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     }
-
+sharexAcrossPagesLookup = {
+    }
+shareyAcrossPagesLookup = {
+    'mahal_illustration': False,
+    'laplace_illustration': False,
+    'laplace_auc_illustration': True,
+    'laplace_aucNoStim_illustration': False,
+    'laplace_spectral_illustration': True,
+    'laplace_spectral_aucNoStim_illustration': True,
+    'laplace_spectral_auc_illustration': True,
+    'laplace_std_illustration': False,
+    }
 titlesOptsLookup['mahal_per_trial_illustration'] = titlesOptsLookup['mahal_illustration']
 titlesOptsLookup['rig_per_trial_illustration'] = titlesOptsLookup['rig_illustration']
+titlesOptsLookup['rig_hf_illustration'] = titlesOptsLookup['rig_illustration']
+titlesOptsLookup['lfp_hf_illustration'] = titlesOptsLookup['lfp_illustration']
+titlesOptsLookup['laplace_hf_illustration'] = titlesOptsLookup['laplace_illustration']
+titlesOptsLookup['laplace_auc_illustration'] = titlesOptsLookup['laplace_illustration']
+titlesOptsLookup['laplace_spectral_auc_illustration'] = titlesOptsLookup['laplace_spectral_illustration']
+titlesOptsLookup['laplace_std_illustration'] = titlesOptsLookup['laplace_illustration']
 titleTextLookup = {}
+
 customCodeLookup = {
     'rig_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100",
     'rig_per_trial_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100",
+    'rig_hf_illustration': "dataDF.loc[:, idxSl['position', :, :, :, :]] = dataDF.loc[:, idxSl['position', :, :, :, :]] * 100",
     'laplace_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_std_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_spectral_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_spectral_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'laplace_spectral_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
-    'mahal_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()"
+    'mahal_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     }

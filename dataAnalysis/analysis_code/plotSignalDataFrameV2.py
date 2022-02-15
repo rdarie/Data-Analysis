@@ -70,6 +70,7 @@ from dataAnalysis.analysis_code.plotSignalDataFrame_options import *
 import pdb
 from tqdm import tqdm
 from copy import deepcopy
+import scipy as scp
 import numpy as np
 import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
@@ -200,9 +201,9 @@ if __name__ == '__main__':
         statsTestOpts = statsTestOptsLookup[arguments['plotSuffix']]
         # else uses default defined in plotSignalDataFrame_options
     if arguments['plotSuffix'] in plotProcFunsLookup:
-        plotProcFuns = plotProcFunsLookup[arguments['plotSuffix']]
+        plotProcFuns = plotProcFunsLookup[arguments['plotSuffix']] + [asp.genTitleChanger(prettyNameLookup)]
     else:
-        plotProcFuns = []
+        plotProcFuns = [asp.genTitleChanger(prettyNameLookup)]
     #
     with open(loadingMetaPath, 'rb') as _f:
         loadingMeta = pickle.load(_f)
@@ -221,9 +222,20 @@ if __name__ == '__main__':
     featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
     print('Signal columns are:\n{}'.format(featureInfo))
     # hack control time base to look like main time base
-    deltaB = trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'].min() - trialInfo.loc[trialInfo['controlFlag'] == 'main', 'bin'].min()
-    trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'] -= deltaB
+    shiftControlTrials = True
+    ############
+    buggyUUID = trialInfo.loc[(trialInfo['controlFlag'] == 'control') & (trialInfo['bin'] > -0.1).to_numpy(), 'originalIndex'].unique()
+    dropBecauseBugMask = trialInfo['originalIndex'].isin(buggyUUID).to_numpy()
+    # pdb.set_trace()
+    # trialInfo.loc[dropBecauseBugMask, :]
+    # trialInfo.loc[(trialInfo['controlFlag'] == 'control') & (trialInfo['bin'] > -0.1).to_numpy(), :]
+    # trialInfo.loc[(trialInfo['bin'] > 0.4).to_numpy(), :]
+    if shiftControlTrials:
+        deltaB = trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'].min() - trialInfo.loc[trialInfo['controlFlag'] == 'main', 'bin'].min()
+        trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'] -= deltaB
     dataDF.index = pd.MultiIndex.from_frame(trialInfo)
+    dataDF.drop(dataDF.index[dropBecauseBugMask], inplace=True)
+    trialInfo.drop(trialInfo.index[dropBecauseBugMask], inplace=True)
     #
     unitNames, unitQuery = ash.processUnitQueryArgs(
         namedQueries, scratchFolder, **arguments)
@@ -280,8 +292,14 @@ if __name__ == '__main__':
         trialInfo.loc[:, canName] = compoundAnn
     dataDF.index = pd.MultiIndex.from_frame(trialInfo)
     ######
+    # pdb.set_trace()
+    # ((trialInfo['trialRateInHz'] == 0) & (trialInfo['electrode'] != 'NA'))
+    # trialInfo.loc[, :]
     if arguments['plotSuffix'] in customCodeLookup:
-        exec(customCodeLookup[arguments['plotSuffix']])
+        try:
+            exec(customCodeLookup[arguments['plotSuffix']])
+        except Exception:
+            traceback.print_exc()
     prf.print_memory_usage('just loaded data, plotting')
     #
     rowColOpts = asp.processRowColArguments(arguments)
@@ -292,18 +310,18 @@ if __name__ == '__main__':
     if arguments['individualTraces']:
         pdfName += '_traces'
         relplotKWArgs.update(dict(
-            estimator=None, units='trialUID', alpha=0.7))
+            estimator=None, units='trialUID', alpha=0.5))
         plotProcFuns.append(
             asp.genTraceAnnotator(
                 unit_var='trialUID', labelsList=[
                     'expName', 'segment',
                     'originalIndex', 't'],
                 textOpts=dict(
-                    ha='left', va='bottom', fontsize=3,
+                    ha='left', va='bottom', fontsize=2,
                     c=(0., 0., 0., 0.7),
-                    # bbox=dict(
-                    #     boxstyle="square",
-                    #     ec=(0., 0., 0., 0.), fc=(1., 1., 1., 0.2))
+                    bbox=dict(
+                        boxstyle="square",
+                        ec=(0., 0., 0., 0.), fc=(1., 1., 1., 0.2))
                 )))
     #  Get stats results?
     if arguments['overlayStats']:
@@ -334,10 +352,35 @@ if __name__ == '__main__':
         relplotKWArgs['facet_kws'] = dict(margin_titles=True)
     with PdfPages(pdfPath) as pdf:
         pageCount = 0
+        ###
+        if 'hueName' in rowColOpts:
+            hueVar = rowColOpts['hueName']
+        elif 'hue' in relplotKWArgs:
+            hueVar = relplotKWArgs['hue']
+        else:
+            hueVar = None
+        if hueVar is not None:
+            relplotKWArgs['hue'] = hueVar
+            #
+            if 'palette' in rowColOpts:
+                thePaletteStr = rowColOpts['palette']
+            elif 'palette' in relplotKWArgs:
+                thePaletteStr = relplotKWArgs['palette']
+            else:
+                thePaletteStr = "ch:0.8,-.3,dark=.25,light=0.75,reverse=1"
+            uniqHues = sorted(dataDF.groupby(hueVar).groups.keys())
+            thePalette = pd.Series(
+                sns.color_palette(
+                    palette=thePaletteStr, n_colors=len(uniqHues)),
+                index=uniqHues)
+            relplotKWArgs['palette'] = thePalette.to_dict()
+            relplotKWArgs['hue_order'] = uniqHues
         if arguments['groupPagesByColumn'] == 'all':
             colGrouper = [('all', dataDF)]
         else:
             groupPagesByColumn = arguments['groupPagesByColumn'].split(', ')
+            if len(groupPagesByColumn) == 1:
+                groupPagesByColumn = groupPagesByColumn[0]
             colGrouper = dataDF.groupby(groupPagesByColumn, axis='columns', sort=False)
         #
         for colGroupName, colGroup in colGrouper:
@@ -345,14 +388,56 @@ if __name__ == '__main__':
                 idxGrouper = [('all', colGroup)]
             else:
                 groupPagesByIndex = arguments['groupPagesByIndex'].split(', ')
+                if len(groupPagesByIndex) == 1:
+                    groupPagesByIndex = groupPagesByIndex[0]
                 idxGrouper = colGroup.groupby(groupPagesByIndex, sort=False)
-            for idxGroupName, idxGroup in idxGrouper:
+            # pdb.set_trace()
+            if arguments['plotSuffix'] in shareyAcrossPagesLookup:
+                shareyAcrossPages = shareyAcrossPagesLookup[arguments['plotSuffix']]
+            else:
+                shareyAcrossPages = False
+            if shareyAcrossPages:
+                smallestGroupNames = ['bin']
+                if hueVar is not None:
+                    smallestGroupNames.append(hueVar)
+                for axn in ['row', 'col']:
+                    if rowColOpts['{}Name'.format(axn)] is not None:
+                        smallestGroupNames.append(rowColOpts['{}Name'.format(axn)])
                 # pdb.set_trace()
+                estFun = relplotKWArgs['estimator'] if 'estimator' in relplotKWArgs else np.mean
+                if estFun == 'mean':
+                    estFun = np.mean
+                if 'errorbar' in relplotKWArgs:
+                    if relplotKWArgs['errorbar'] == 'se':
+                        errFun = scp.stats.sem
+                    elif relplotKWArgs['errorbar'] == 'sd':
+                        errFun = np.std
+                    elif relplotKWArgs['errorbar'] is None:
+                        errFun = None
+                else:
+                    errFun = scp.stats.sem
+                if errFun is not None:
+                    maxSem = colGroup.groupby(smallestGroupNames).apply(errFun).max().max()
+                else:
+                    maxSem = 0.
+                newLims = [
+                    colGroup.groupby(smallestGroupNames).apply(estFun).min().min() - maxSem,
+                    colGroup.groupby(smallestGroupNames).apply(estFun).max().max() + maxSem
+                    ]
+                yLimProcFun = [asp.genYLimSetter(newLims=newLims, forceLims=True)]
+                if 'facet_kws' in relplotKWArgs:
+                    relplotKWArgs['facet_kws'].update(dict(sharey=False))
+                else:
+                    relplotKWArgs['facet_kws'] = dict(sharey=False)
+            else:
+                yLimProcFun = []
+            #pdb.set_trace()
+            for idxGroupName, idxGroup in idxGrouper:
                 plotDF = idxGroup.stack(level=idxGroup.columns.names).reset_index(name='signal')
                 # plotDF = dataDF.loc[:, colGroupName].reset_index(name='signal')
                 print('plotDF.columns = {}'.format(plotDF.columns))
                 rowColArgs = {}
-                for axn in ['row', 'col', 'hue']:
+                for axn in ['row', 'col']:
                     if rowColOpts['{}Name'.format(axn)] is not None:
                         rowColArgs[axn] = rowColOpts['{}Name'.format(axn)]
                         if '{}Order'.format(axn) in rowColOpts:
@@ -362,14 +447,23 @@ if __name__ == '__main__':
                 g = sns.relplot(
                     x='bin', y='signal',
                     **rowColArgs, **relplotKWArgs, data=plotDF)
+                ##
+                # why is this info missing??
+                g._hue_var = hueVar
+                if 'palette' in relplotKWArgs:
+                    g.hue_names = [hN for hN in relplotKWArgs['palette'].keys()]
+                    g.hue_kws['palette'] = relplotKWArgs['palette']
+                if 'hue_order' in relplotKWArgs:
+                    g.hue_kws['hue_order'] = relplotKWArgs['hue_order']
+                ##
                 if arguments['plotSuffix'] in titlesOptsLookup:
                     titlesOpts = titlesOptsLookup[arguments['plotSuffix']]
                     g.set_titles(**titlesOpts)
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
-                    #  print('(ro, co, hu) = {}'.format((ro, co, hu)))
+                    # print('(ro, co, hu) = {}'.format((ro, co, hu)))
                     if len(plotProcFuns):
-                        for procFun in plotProcFuns:
+                        for procFun in yLimProcFun + plotProcFuns:
                             procFun(g, ro, co, hu, dataSubset)
                     #
                     if sigTestResults is not None:
@@ -378,11 +472,15 @@ if __name__ == '__main__':
                         asp.addSignificanceStars(
                             g, sigTestResults.loc[unitMask, :],
                             ro, co, hu, dataSubset, sigStarOpts=asigSigStarOpts)
-
+                #
                 if arguments['plotSuffix'] in xAxisLabelLookup:
                     xAxisLabel = xAxisLabelLookup[arguments['plotSuffix']]
+                elif g._x_var in prettyNameLookup:
+                    xAxisLabel = prettyNameLookup[g._x_var]
                 else:
-                    xAxisLabel = 'Time (msec)'
+                    xAxisLabel = g._x_var
+                if arguments['plotSuffix'] in xAxisUnitsLookup:
+                    xAxisLabel += ' {}'.format(xAxisUnitsLookup[arguments['plotSuffix']])
                 if arguments['plotSuffix'] in yAxisLabelLookup:
                     thisYLookup = yAxisLabelLookup[arguments['plotSuffix']]
                     if isinstance(thisYLookup, dict):
@@ -392,8 +490,14 @@ if __name__ == '__main__':
                             yAxisLabel = '{}'.format(colGroupName)
                     else:
                         yAxisLabel = '{}'.format(thisYLookup)
+                elif colGroupName in prettyNameLookup:
+                    yAxisLabel = prettyNameLookup[colGroupName]
+                elif g._y_var in prettyNameLookup:
+                    yAxisLabel = prettyNameLookup[g._y_var]
                 else:
-                    yAxisLabel = '{}'.format(colGroupName)
+                    yAxisLabel = g._y_var
+                if arguments['plotSuffix'] in yAxisUnitsLookup:
+                    yAxisLabel += ' {}'.format(yAxisUnitsLookup[arguments['plotSuffix']])
                 g.set_axis_labels(xAxisLabel, yAxisLabel)
                 if arguments['plotSuffix'] in titleTextLookup:
                     titleText = titleTextLookup[arguments['plotSuffix']]

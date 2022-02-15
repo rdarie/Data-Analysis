@@ -39,10 +39,10 @@ do
   #
   #
   # SELECTIONLIST="laplace_spectral_baseline, laplace_baseline"
-  SELECTIONLIST="laplace_spectral_baseline, laplace_baseline, laplace_spectral_scaled_mahal_ledoit, laplace_scaled_mahal_ledoit"
+  SELECTIONLIST="laplace_spectral_scaled, laplace_scaled, laplace_spectral_scaled_mahal_ledoit, laplace_scaled_mahal_ledoit"
   #
   # exp201901251000, exp201902031100
   # exp202101201100, exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100
   # exp202101281100, exp202102021100, exp202101211100,
-  python -u "./plotSignalRecruitmentAcrossExp.py" --expList="exp202101281100, exp202102021100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+  python -u "./plotSignalRecruitmentAcrossExp.py" --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
 done

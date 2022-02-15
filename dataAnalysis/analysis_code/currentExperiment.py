@@ -686,7 +686,7 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 50e-3,
-            'forceRollingWindow': 100e-3,
+            'forceRollingWindow': 50e-3,
             # 'procFun': {
             #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
             #     'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
@@ -696,7 +696,7 @@ def parseAnalysisOptions(
             'controlProportion': None,
             'maskEachFreqBand': False,
             'cvKWArgs': dict(
-                n_splits=5,
+                n_splits=10,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
@@ -840,6 +840,8 @@ def parseAnalysisOptions(
             },
         # perimovement onset (or peristim onset if stim only) for RAUC
         'ma': {
+            # 'duplicateControlsByProgram': True,
+            # 'makeControlProgram': True,
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
@@ -856,12 +858,12 @@ def parseAnalysisOptions(
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
-                'alignQuery': 'startingOrStimOn',
+                'alignQuery': None,
                 'winStart': -0.3,  # start 0.3 before whatever the query was
                 'winStop': 0.4  # stop .6 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
-                'alignQuery': 'startingNoStim',
+                'alignQuery': None,
                 'winStart': -0.6,
                 'winStop': -0.1,
                 }
@@ -872,6 +874,10 @@ def parseAnalysisOptions(
         iteratorOpts[optsKey]['cvKWArgs']['splitterKWArgs']['samplerKWArgs']['test_size'] = 0.2
     iteratorOpts['ccs'] = iteratorOpts['cc'].copy()
     iteratorOpts['ccm'] = iteratorOpts['cc'].copy()
+    #
+    iteratorOpts['pc'] = iteratorOpts['pb'].copy()
+    iteratorOpts['pc']['postLoadProcFun'] = {}
+    #
     #
     if 'expIteratorOpts' in expOpts:
         for key in iteratorOpts.keys():
@@ -912,7 +918,8 @@ def parseAnalysisOptions(
         }
         }
     prettyNameLookup = {
-        'scaledAUC': 'AUC (a.u.)',
+        'scaledRAUC': 'AUC (a.u.)',
+        'clippedRAUC': 'AUC (a.u.)',
         'T': 'T',
         'hedges': 'g',
         'coef': r"$\beta$",
@@ -935,6 +942,14 @@ def parseAnalysisOptions(
         'feature = mahal_ledoit_gamma': 'Mahal. dist.\n(Gamma)',
         'feature = mahal_ledoit_higamma': 'Mahal. dist.\n(High gamma)',
         'feature = mahal_ledoit_spb': 'Mahal. dist.\n(Spike band)',
+        #
+        'mahal_ledoit_all': 'Mahal. dist.\n(Broadband)',
+        'mahal_ledoit_alpha': 'Mahal. dist.\n(Alpha)',
+        'mahal_ledoit_beta': 'Mahal. dist.\n(Beta)',
+        'mahal_ledoit_gamma': 'Mahal. dist.\n(Gamma)',
+        'mahal_ledoit_higamma': 'Mahal. dist.\n(High gamma)',
+        'mahal_ledoit_spb': 'Mahal. dist.\n(Spike band)',
+        #
         'freqBandName': 'Frequency band',
         'electrode': 'Stim. electrode (cathode)',
         'NA': 'Broadband',
@@ -959,6 +974,10 @@ def parseAnalysisOptions(
         'trialAmplitude:trialRateInHz': 'Stim. rate interaction',
         'trialAmplitude_md': 'Stim. amplitude (Mahal. dist.)',
         'trialAmplitude:trialRateInHz_md': 'Stim. rate interaction (Mahal. dist.)',
+        'stimCondition = NA_0.0': 'No stim.',
+        'stimCondition': 'Electrode\nStim. Rate (Hz)',
+        'NA_0.0': 'No stim.',
+        'bin': 'Time (sec)',
         }
     for eIdx in range(16):
         prettyNameLookup['electrode = -E{:02d}+E16'.format(eIdx)] = 'Stim. E{:02d}'.format(eIdx)
@@ -967,6 +986,8 @@ def parseAnalysisOptions(
         prettyNameLookup['-E{:02d}+E16_50.0'.format(eIdx)] = 'E{:02d} (50 Hz'.format(eIdx)
         prettyNameLookup['stimCondition = -E{:02d}+E16_100.0'.format(eIdx)] = 'Stim. E{:02d} (100 Hz)'.format(eIdx)
         prettyNameLookup['-E{:02d}+E16_100.0'.format(eIdx)] = 'E{:02d} (100 Hz)'.format(eIdx)
+        prettyNameLookup['stimCondition = -E{:02d}+E16_0.0'.format(eIdx)] = 'No Stim.'
+        prettyNameLookup['-E{:02d}+E16_0.0'.format(eIdx)] = 'No Stim.'
         for kc in ['NA_NA', 'CW_outbound', 'CW_return', 'CCW_outbound', 'CCW_return']:
             prettyNameLookup['kinAndElecCondition = -E{:02d}+E16_{}'.format(eIdx, kc)] = 'Stim. E{:02d}\n{}'.format(eIdx, prettyNameLookup['kinematicCondition = {}'.format(kc)])    
     for fbn in freqBandOrderExtended + [None]:

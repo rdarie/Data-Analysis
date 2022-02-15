@@ -349,7 +349,7 @@ def calcTransferFunctionFromLeastSquares():
             Phi.set_index(['bin', 'target'], inplace=True)
             Phi = Phi.stack().unstack('target').T
             #
-            nLags = int(5 * max(histLens) / binInterval)
+            nLags = int(3 * max(histLens) / binInterval)
             print('nLags = {}'.format(nLags))
             #
             A, B, K, C, D, H, (fig, ax,) = tdr.ERA(

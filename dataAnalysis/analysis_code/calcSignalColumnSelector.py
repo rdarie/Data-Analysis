@@ -183,7 +183,7 @@ if __name__ == '__main__':
         referenceTestMask = (referenceScores['trialType'] == 'test') & (referenceScores['lhsMaskIdx'] == 0)
         testCCDF = referenceScores.loc[referenceTestMask, ['targetParentFeature', 'cc']].groupby('targetParentFeature').median()
         testCCDF.sort_values('cc', ascending=False, kind='mergesort', inplace=True)
-        listOfParentNames = testCCDF.dropna().index.to_list()[:8]
+        listOfParentNames = testCCDF.dropna().index.to_list()[:16]
         listOfColumns = [cN for cN in dataDF.columns if cN[-1] in listOfParentNames]
     elif arguments['selectMethod'] == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)

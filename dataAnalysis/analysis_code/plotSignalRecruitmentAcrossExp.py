@@ -201,7 +201,7 @@ for expName in listOfExpNames:
         thisRecCurveFeatureInfo = rawRecCurve.columns.to_frame().reset_index(drop=True)
         rawRecCurve.columns = rawRecCurve.columns.get_level_values('feature')
         thisRecCurve = rawRecCurve.stack().to_frame(name='rawRAUC')
-        scaledRaucDF = pd.read_hdf(resultPath, 'scaled')
+        scaledRaucDF = pd.read_hdf(resultPath, 'boxcox')
         scaledRaucDF.columns = scaledRaucDF.columns.get_level_values('feature')
         thisRecCurve.loc[:, 'scaledRAUC'] = scaledRaucDF.stack().to_numpy()
         for iN in ['isOutlierTrial', 'outlierDeviation']:
@@ -210,9 +210,9 @@ for expName in listOfExpNames:
         # relativeRaucDF = pd.read_hdf(resultPath, 'relative')
         # relativeRaucDF.columns = relativeRaucDF.columns.get_level_values('feature')
         # thisRecCurve.loc[:, 'normalizedRAUC'] = relativeRaucDF.stack().to_numpy()
-        clippedRaucDF = pd.read_hdf(resultPath, 'clipped')
-        clippedRaucDF.columns = clippedRaucDF.columns.get_level_values('feature')
-        thisRecCurve.loc[:, 'clippedRAUC'] = clippedRaucDF.stack().to_numpy()
+        # clippedRaucDF = pd.read_hdf(resultPath, 'clipped')
+        # clippedRaucDF.columns = clippedRaucDF.columns.get_level_values('feature')
+        # thisRecCurve.loc[:, 'clippedRAUC'] = clippedRaucDF.stack().to_numpy()
         #
         thisRecCurve.loc[:, 'freqBandName'] = thisRecCurve.index.get_level_values('feature').map(thisRecCurveFeatureInfo[['feature', 'freqBandName']].set_index('feature')['freqBandName'])
         thisRecCurve.set_index('freqBandName', append=True, inplace=True)
@@ -365,7 +365,7 @@ if not os.path.exists(figureOutputFolder):
 countSummaryHtml = (
         countAmpStatsSignifDF.to_frame(name='significant_stim_effect').to_html() +
         countRelativeStatsSignifDF.to_frame('significant_stim_vs_no_stim').to_html())
-pdfNameSuffix = 'RAUC_outbound_no_move'
+pdfNameSuffix = 'RAUC_all'
 countSummaryPath = os.path.join(
     figureOutputFolder, '{}_{}.html'.format(subjectName, pdfNameSuffix))
 with open(countSummaryPath, 'w') as _f:
@@ -374,7 +374,7 @@ with open(countSummaryPath, 'w') as _f:
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(subjectName, pdfNameSuffix))
 # lOfKinematicsToPlot = ['NA_NA']
-lOfKinematicsToPlot = ['NA_NA', 'CW_outbound']
+lOfKinematicsToPlot = ['NA_NA', 'CW_outbound', 'CW_return']
 # lOfKinematicsToPlot = ['CW_outbound', 'CCW_outbound']
 # lOfKinematicsToPlot = ['CW_return', 'CCW_return']
 # lOfKinematicsToPlot = ['NA_NA', 'CW_return']

@@ -26,8 +26,6 @@ Options:
     --estimatorName=estimatorName              filename for resulting estimator (cross-validated n_comps)
     --selector=selector                        filename if using a unit selector
 """
-import logging
-logging.captureWarnings(False)
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -207,7 +205,7 @@ if __name__ == '__main__':
         'sm_class': sm.GLM,
         'family': sm.families.Gaussian(),
         'alpha': 1e-12, 'L1_wt': .1,
-        'refit': True, 'tol': 1e-4,
+        'refit': True, 'tol': 1e-4, 'active_set': False,
         'maxiter': 100, 'disp': False, 'check_step': True,
         'start_params': 'rand',
         'calc_frequency_weights': True
@@ -221,7 +219,7 @@ if __name__ == '__main__':
         refit=False,
         param_grid={
             # 'regressor__regressor__calc_frequency_weights': [True],
-            l1_ratio_name: [.5],
+            l1_ratio_name: [.1],
             # alpha_name: [0] + np.logspace(-3, 1, nAlphas - 1).tolist()
             }
         )
@@ -437,8 +435,8 @@ if __name__ == '__main__':
             gridSearcherDict1 = {}
             gsScoresDict1 = {}
             #
-            if DEBUGGING:
-                pdb.set_trace()
+            # if DEBUGGING:
+            #     pdb.set_trace()
             for targetName in rhGroup.columns:
                 if (lhsMaskIdx, rhsMaskIdx, targetName) not in allTargetsDF.index:
                     continue
@@ -510,7 +508,7 @@ if __name__ == '__main__':
                         for l1Ratio in lOfL1Ratios:
                             alphas = _alpha_grid(
                                 dummyDesign, dummyRhs,
-                                fit_intercept=True, eps=1e-2,
+                                fit_intercept=False, eps=1e-2,
                                 l1_ratio=l1Ratio, n_alphas=nAlphas)
                             # enet_alphas, _, _ = enet_path(dummyDesign, dummyRhs, l1_ratio=l1Ratio, n_alphas=nAlphas, eps=1e-4)
                             alphas = np.atleast_1d(alphas).tolist()

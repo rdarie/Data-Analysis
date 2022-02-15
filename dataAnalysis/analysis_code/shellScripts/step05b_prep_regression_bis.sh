@@ -53,11 +53,11 @@ do
   ESTIMATOR="select2"
   TARGET="laplace_spectral_baseline"
   #  --averageByTrial
-  ##python -u './calcSignalColumnSelector.py'  --selectMethod='fromRegression' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+  # python -u './calcSignalColumnSelector.py'  --selectMethod='fromRegression' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
   #
   ############################################################################################################
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
   #
-  ##python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs=${ESTIMATOR} --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+  # python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs=${ESTIMATOR} --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
 done

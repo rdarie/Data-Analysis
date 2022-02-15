@@ -70,16 +70,16 @@ except:
     pass
 for arg in sys.argv:
     print(arg)
-sns.set(
-    context='talk', style='darkgrid',
-    palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True)
+# sns.set(
+#     context='talk', style='darkgrid',
+#     palette='dark', font='sans-serif',
+#     font_scale=.8, color_codes=True)
 useDPI = 200
-dpiFactor = 72 / useDPI
+dpiFactor = 72 / useDPI #
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
         'lines.linewidth': .75,
-        'lines.markersize': 2.4,
+        'lines.markersize': 10.,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -87,8 +87,8 @@ snsRCParams = {
         "axes.linewidth": .125,
         "grid.linewidth": .2,
         "font.size": 7,
-        "axes.labelsize": 9,
-        "axes.titlesize": 9,
+        "axes.labelsize": 7,
+        "axes.titlesize": 7,
         "xtick.labelsize": 5,
         "ytick.labelsize": 5,
         "legend.fontsize": 7,
@@ -110,7 +110,7 @@ snsRCParams = {
         "ytick.direction": 'in',
     }
 mplRCParams = {
-    'figure.titlesize': 7,
+    'figure.titlesize': 9,
     'font.family': "Nimbus Sans",
     'pdf.fonttype': 42,
     'ps.fonttype': 42,
@@ -118,13 +118,13 @@ mplRCParams = {
 sns.set(
     context='paper', style='whitegrid',
     palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True, rc=snsRCParams)
+    font_scale=1., color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
 styleOpts = {
     'legend.lw': 2,
-    'tight_layout.pad': 2e-1, # units of font size
+    'tight_layout.pad': 2e-1,  # units of font size
     'panel_heading.pad': 0.
     }
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -145,11 +145,11 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-sns.set(
-    context='paper', style='whitegrid',
-    palette='dark', font='sans-serif',
-    font_scale=1., color_codes=True, rc={
-        'figure.dpi': 200, 'savefig.dpi': 200})
+# sns.set(
+#     context='paper', style='whitegrid',
+#     palette='dark', font='sans-serif',
+#     font_scale=1., color_codes=True, rc={
+#         'figure.dpi': 200, 'savefig.dpi': 200})
 #
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName'])
@@ -190,17 +190,21 @@ recCurve = rawRecCurve.stack().to_frame(name='rawRAUC')
 scaledRaucDF = pd.read_hdf(resultPath, 'boxcox')
 scaledRaucDF.columns = scaledRaucDF.columns.get_level_values('feature')
 recCurve.loc[:, 'scaledRAUC'] = scaledRaucDF.stack().to_numpy()
-# relativeRaucDF = pd.read_hdf(resultPath, 'relative')
-# relativeRaucDF.columns = relativeRaucDF.columns.get_level_values('feature')
-# recCurve.loc[:, 'normalizedRAUC'] = relativeRaucDF.stack().to_numpy()
+clippedRaucDF = pd.read_hdf(resultPath, 'boxcox')
+clippedRaucDF.columns = clippedRaucDF.columns.get_level_values('feature')
+recCurve.loc[:, 'clippedRAUC'] = clippedRaucDF.stack().to_numpy()
+dispersionDF = pd.read_hdf(resultPath, 'dispersion')
+dispersionDF.columns = dispersionDF.columns.get_level_values('feature')
+recCurve.loc[:, 'dispersion'] = dispersionDF.stack().to_numpy()
 clippedRaucDF = pd.read_hdf(resultPath, 'raw_clipped')
 clippedRaucDF.columns = clippedRaucDF.columns.get_level_values('feature')
 recCurve.loc[:, 'clippedRAUC'] = clippedRaucDF.stack().to_numpy()
 
 # whichRAUC = 'rawRAUC'
-# whichRAUC = 'normalizedRAUC'
+# whichRAUC = 'clippedRAUC'
 # whichRAUC = 'rauc'
 whichRAUC = 'scaledRAUC'
+# whichRAUC = 'dispersion'
 
 ampStatsDF = pd.read_hdf(resultPath, 'amplitudeStats')
 ampStatsDF.drop(labels=['Intercept'], axis='index', level='names', inplace=True)
@@ -251,8 +255,10 @@ allAmpPalette = pd.Series(
     index=[
         'trialAmplitude', 'trialRateInHz', 'trialAmplitude:trialRateInHz',
         'trialAmplitude_md', 'trialRateInHz_md', 'trialAmplitude:trialRateInHz_md'])
-allRelPalette = pd.Series(sns.color_palette('Set3')[1:12:2], index=['50.0', '100.0', '50.0_md', '100.0_md', '0.0', '0.0_md'])
-ratePalette = pd.Series(sns.husl_palette(3), index=[0., 50., 100.])
+allRelPalette = pd.Series(
+    sns.color_palette('Set3')[1:12:2],
+    index=['50.0', '100.0', '50.0_md', '100.0_md', '0.0', '0.0_md'])
+ratePalette = pd.Series(sns.husl_palette(3), index=[0., 100., 50.])
 #
 stimConditionPalette = compoundAnnLookupDF['trialRateInHz'].dropna().map(ratePalette)
 pdfPath = os.path.join(
@@ -260,7 +266,11 @@ pdfPath = os.path.join(
     blockBaseName + '_{}{}_{}_{}.pdf'.format(
         expDateTimePathStr, inputBlockSuffix, arguments['window'],
         'RAUC'))
-
+rankHtmlPath = os.path.join(
+    figureOutputFolder,
+    blockBaseName + '_{}{}_{}_{}.html'.format(
+        expDateTimePathStr, inputBlockSuffix, arguments['window'],
+        'RAUC'))
 recCurve.loc[:, 'freqBandName'] = recCurve.index.get_level_values('feature').map(recCurveFeatureInfo[['feature', 'freqBandName']].set_index('feature')['freqBandName'])
 recCurve.set_index('freqBandName', append=True, inplace=True)
 plotRC = recCurve.reset_index()
@@ -286,24 +296,51 @@ ampStatsDF.loc[:, 'coef_abs'] = ampStatsDF['coef'].abs()
 #     [i for i in range(nFeatsToPlot)] +
 #     [i for i in range(-1 * nFeatsToPlot, 0)]
 #     )
-# ampStatsDF.groupby(['names', 'feature']).mean()['coef']
+stimRankDF = ampStatsDF.xs('trialAmplitude', level='names').groupby(['freqBandName', 'feature'])['coefStd'].mean().to_frame(name='stimCoef')
+stimRankDF = stimRankDF / stimRankDF.abs().max()
+interactionRankDF = ampStatsDF.xs('trialAmplitude:trialRateInHz', level='names').groupby(['freqBandName', 'feature'])['coefStd'].mean().to_frame(name='interactCoef')
+interactionRankDF = interactionRankDF / interactionRankDF.abs().max()
+relativeRankDF = relativeStatsDF.groupby(['freqBandName', 'feature'])['T_abs'].max().to_frame(name='relativeAbsT')
+relativeRankDF = relativeRankDF / relativeRankDF.abs().max()
+relativeRankTDF = relativeStatsDF.groupby(['freqBandName', 'feature'])['T'].mean().to_frame(name='relativeT')
+relativeNoStimRankDF = relativeStatsNoStimDF.groupby(['freqBandName', 'feature'])['T_abs'].max().to_frame(name='relativeNoStimAbsT')
+relativeNoStimRankDF = relativeNoStimRankDF / relativeNoStimRankDF.max()
+relativeNoStimTRankDF = relativeStatsNoStimDF.groupby(['freqBandName', 'feature'])['T'].mean().to_frame(name='relativeNoStimT')
+exportRankDF = pd.concat([
+    stimRankDF, interactionRankDF, relativeRankDF, relativeNoStimRankDF, relativeRankTDF, relativeNoStimTRankDF
+    ], axis='columns')
+exportRankDF.loc[:, 'stimSlopeScore'] = (exportRankDF['stimCoef'] * exportRankDF['interactCoef']).abs()
+exportRankDF.sort_values('relativeNoStimT', inplace=True, ascending=False)
+exportRankDF.to_html(rankHtmlPath)
+# rankHtmlPath
+nFreqs = np.unique(relativeStatsDF.index.get_level_values('freqBandName')).shape[0]
 keepColsForPlot = []
 rankMask = relativeStatsDF.index.get_level_values('stimCondition') != 'NA_0.0'
 for freqBandName, relativeStatsThisFB in relativeStatsDF.loc[rankMask, :].groupby('freqBandName'):
     noStimStatsRankingDF = relativeStatsNoStimDF['T_abs'].xs(freqBandName, level='freqBandName').groupby('feature').max()
-    ampStatsRankingDF = ampStatsDF['T_abs'].xs(freqBandName, level='freqBandName').groupby(['names', 'feature']).max()
+    ampStatsRankingDF = ampStatsDF['coefStd'].xs(freqBandName, level='freqBandName').abs().groupby(['names', 'feature']).max()
     statsRankingDF = relativeStatsThisFB['T_abs'].groupby('feature').max()
     if True:
         orderedStats = (noStimStatsRankingDF + statsRankingDF + ampStatsRankingDF.xs('trialAmplitude:trialRateInHz', level='names')).sort_values(ascending=False)
     else:
-        orderedStats = ampStatsRankingDF.xs('trialAmplitude:trialRateInHz', level='names').sort_values(ascending=False)
-    nFeatsToPlot = max(min(2, int(np.floor(orderedStats.shape[0]/2))), 1)
+        orderedStats = (ampStatsRankingDF.xs('trialAmplitude:trialRateInHz', level='names') * ampStatsRankingDF.xs('trialAmplitude', level='names')).sort_values(ascending=False)
+    # nFeatsToPlot = max(min(int(np.ceil(5 / nFreqs)), int(np.floor(orderedStats.shape[0]/2))), 1)
+    nFeatsToPlot = max(min(1, int(np.floor(orderedStats.shape[0]/2))), 1)
     keepTopIdx = (
         [i for i in range(nFeatsToPlot)]
         # [i for i in range(-1 * nFeatsToPlot, 0)]
         )
     keepColsForPlot += orderedStats.index[keepTopIdx].to_list()
-#
+########################################################################################################################
+manualOverride = True
+if manualOverride:
+    manualOverrideList = ['mahal_ledoit_{}'.format(sfx) for sfx in ['all', 'alpha', 'beta', 'gamma', 'higamma', 'spb']]
+    manualOverrideList += ['utah_csd_2{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    manualOverrideList += ['utah_csd_8{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    manualOverrideList += ['utah_csd_35{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    manualOverrideList += ['utah_csd_17{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    keepColsForPlot = [cN for cN in relativeStatsDF.groupby('feature').groups.keys() if cN in manualOverrideList]
+########################################################################################################################
 print('Plotting select features:')
 print(', '.join(["'{}#0'".format(fN) for fN in keepColsForPlot]))
 plotRCPieces = plotRC.loc[plotRC['feature'].isin(keepColsForPlot), :].copy()
@@ -363,13 +400,16 @@ def genNumSigAnnotator(pvalDF, xOrder=None, hueVar=None, palette=None, fontOpts=
     return numSigAnnotator
 
 def genRegressionResultsOverlay(
-    statsResultsDF, rowVar=None, colVar=None, xOffset=None):
+        statsResultsDF,
+        rowVar=None, colVar=None,
+        xOffset=None, xBounds=None):
     def overlayRegressionResults(
             data=None,
             x=None, y=None,
             hue=None, hue_order=None, color=None,
-            ci=90,
-            *args, **kwargs):
+            ci=90, *args, **kwargs):
+        if data[x].unique().shape[0] == 1:
+            return
         ax = plt.gca()
         theseStatsDF = statsResultsDF
         if rowVar is not None:
@@ -384,8 +424,12 @@ def genRegressionResultsOverlay(
             theseStatsDF = theseStatsDF.xs(colName, level=colVar)
         #
         if xOffset is not None:
-            allOffsets = np.arange(len(hue_order)) - ((len(hue_order) - 1) / 2)
-            thisOffset = allOffsets[hue_order.index(data[hue].unique()[0])] * 4 * xOffset
+            #
+            allOffsets = np.linspace(0, xOffset - xOffset / len(hue_order), len(hue_order))
+            allOffsets -= allOffsets.mean()
+            #
+            # allOffsets = np.arange(len(hue_order)) - ((len(hue_order) - 1) / 2)
+            thisOffset = allOffsets[hue_order.index(data[hue].unique()[0])]
         else:
             thisOffset = 0.
         allHues = data[hue].unique()
@@ -393,9 +437,15 @@ def genRegressionResultsOverlay(
         hueXInteraction = '{}:{}'.format(x, hue)
         for hueName in allHues:
             hueMask = (data[hueVar] == hueName)
-            xx = np.linspace(data.loc[hueMask, x].min(), data.loc[hueMask, x].max(), 100)
+            if xBounds is None:
+                xx = np.linspace(data[x].min(), data[x].max(), 100)
+            else:
+                xx = np.linspace(*xBounds, 100)
             yy = np.zeros((xx.shape[0], ))
             nBoot = 10000
+            messageList = []
+            pvFormatter = PValueFormat()
+            pvFormatter.config(text_format='star')
             normRng = np.random.default_rng()
             yyBoot = np.zeros((nBoot, xx.shape[0]))
             if 'Intercept' in allRegressors:
@@ -403,8 +453,8 @@ def genRegressionResultsOverlay(
                 assert interceptStats.shape[0] == 1
                 interceptStats = interceptStats.iloc[0, :]
                 yy += interceptStats['coef']
-                # yyBoot += np.ones((xx.shape[0], )) * (interceptStats['coef'] + normRng.standard_normal(nBoot).reshape(-1, 1) * interceptStats['se'])
-                yyBoot += np.ones((xx.shape[0], )) * interceptStats['coef']
+                yyBoot += np.ones((xx.shape[0], )) * (interceptStats['coef'] + normRng.standard_normal(nBoot).reshape(-1, 1) * interceptStats['se'])
+                # yyBoot += np.ones((xx.shape[0], )) * interceptStats['coef']
             #
             if x in allRegressors:
                 xStats = theseStatsDF.xs(x, level='names')
@@ -413,24 +463,58 @@ def genRegressionResultsOverlay(
                 yy += (xx - thisOffset) * xStats['coef']
                 xCoefBoot = xStats['coef'] + normRng.standard_normal(nBoot).reshape(-1, 1) * xStats['se']
                 yyBoot += (xx - thisOffset) * xCoefBoot
+                thisPV = StatResult(
+                    test_description='', test_short_name='', stat_str=r"$\beta_{A}$",
+                    stat=xStats['coef'],
+                    pval=xStats['pval'],
+                    alpha=confidence_alpha)
+                messageList.append(
+                    r"$\beta_{A}$" + ' = {:0.2f} {}'.format(
+                        xStats['coefStd'], pvFormatter.format_data(thisPV)))
             if hue in allRegressors:
                 hueStats = theseStatsDF.xs(hue, level='names')
                 assert hueStats.shape[0] == 1
                 hueStats = hueStats.iloc[0, :]
                 yy += hueName * hueStats['coef']
                 yyBoot += hueName * (hueStats['coef'] + normRng.standard_normal(nBoot).reshape(-1, 1) * hueStats['se'])
+                thisPV = StatResult(
+                    test_description='', test_short_name='', stat_str=r"$\beta_{R}$",
+                    stat=hueStats['coef'],
+                    pval=hueStats['pval'],
+                    alpha=confidence_alpha)
+                messageList.append(
+                    r"$\beta_{R}$" + ' = {:0.2f} {}'.format(
+                        hueStats['coefStd'], pvFormatter.format_data(thisPV)))
             if hueXInteraction in allRegressors:
                 hueXInteractionStats = theseStatsDF.xs(hueXInteraction, level='names')
                 assert hueXInteractionStats.shape[0] == 1
                 hueXInteractionStats = hueXInteractionStats.iloc[0, :]
                 yy += (xx - thisOffset) * hueName * hueXInteractionStats['coef']
                 yyBoot += (xx - thisOffset) * hueName * (hueXInteractionStats['coef'] + normRng.standard_normal(nBoot).reshape(-1, 1) * hueXInteractionStats['se'])
-                # yyBoot += (xx - thisOffset) * hueName * hueXInteractionStats['coef']
+                thisPV = StatResult(
+                    test_description='', test_short_name='', stat_str=r"$\beta_{AR}$",
+                    stat=hueXInteractionStats['coef'],
+                    pval=hueXInteractionStats['pval'],
+                    alpha=confidence_alpha)
+                messageList.append(
+                    r"$\beta_{AR}$" + ' = {:0.2f} {}'.format(
+                        hueXInteractionStats['coefStd'], pvFormatter.format_data(thisPV)))
             yyUpper = np.percentile(yyBoot, 50 - ci/2, axis=0)
             yyLower = np.percentile(yyBoot, 50 + ci/2, axis=0)
-            ax.fill_between(xx, yyLower, yyUpper, color=color, alpha=0.1, edgecolor='face', linewidth=1.)
-            ax.plot(xx, yy, color=color, lw=1.5, ls='-')
-            # print('color = {}'.format(color))
+            ax.fill_between(
+                xx, yyLower, yyUpper,
+                color=color, alpha=0.2, edgecolor='face', linewidth=0., zorder=0.9)
+            ax.plot(xx, yy, color=color, lw=1.5, ls='-', zorder=0.95)
+            if not hasattr(ax, 'betasAnnotated'):
+                if len(messageList):
+                    message = '\n'.join(messageList)
+                    ax.text(
+                        0.95, 0.05, message,
+                        transform=ax.transAxes,
+                        va='bottom', ha='right', fontsize=snsRCParams["font.size"],
+                        bbox=dict(facecolor=color, alpha=0.2)
+                        )
+                ax.betasAnnotated = True
         return
     return overlayRegressionResults
 
@@ -451,6 +535,26 @@ def boxplotWrapper(
 def yTickLabelRemover(g, ro, co, hu, dataSubset):
     g.axes[ro, co].set_yticklabels([])
     return
+def genTickLabelOverrider(whichAxes=None, lookupDict={}, formatOpts={}):
+    def tickLabelOvverrider(g, ro, co, hu, dataSubset):
+        ax = g.axes[ro, co]
+        if hasattr(ax, 'tickLabelsOverriden'):
+            return
+        else:
+            for whichAxis in whichAxes:
+                if whichAxis  == 'x':
+                    get_tl, set_tl = ax.get_xticklabels, ax.set_xticklabels
+                elif whichAxis  == 'y':
+                    get_tl, set_tl = ax.get_yticklabels, ax.set_yticklabels
+                axTickLabels = [tl.get_text() for tl in get_tl()]
+                if len(axTickLabels):
+                    newAxTickLabels = [
+                        (lookupDict[tl] if tl in lookupDict else tl)
+                        for tl in axTickLabels]
+                    set_tl(newAxTickLabels, **formatOpts)
+            ax.tickLabelsOverriden = True
+            return
+    return tickLabelOvverrider
 
 def catplotWrapper(
         dataDF=None, statsDF=None,
@@ -461,6 +565,7 @@ def catplotWrapper(
         ):
     nHues = dataDF[catKWArgs['hue']].unique().shape[0]
     g = sns.catplot(
+        rasterized=True,
         data=dataDF,
         kind=catPlotKind, **catKWArgs,
         **facetKWArgs
@@ -473,9 +578,6 @@ def catplotWrapper(
         if len(plotProcFuns):
             for procFun in plotProcFuns:
                 procFun(g, ro, co, hu, dataSubset)
-    g.set_axis_labels(
-        renameLookup.pop(catKWArgs['x'], catKWArgs['x']),
-        renameLookup.pop(catKWArgs['y'], catKWArgs['y']))
     if g.axes.shape[1] > 1:
         for ro in range(g.axes.shape[0]):
             for co in range(g.axes.shape[1]):
@@ -483,8 +585,12 @@ def catplotWrapper(
                     g.axes[ro, 0].get_shared_y_axes().join(g.axes[ro, 0], g.axes[ro, co])
                     g.axes[ro, co].set_ylabel(None)
                     g.axes[ro, co].set_yticklabels([])
+    g.set_axis_labels(
+        renameLookup[catKWArgs['x']] if catKWArgs['x'] in renameLookup else catKWArgs['x'],
+        renameLookup[catKWArgs['y']] if catKWArgs['y'] in renameLookup else catKWArgs['y'],
+        )
     pvFormatter = PValueFormat()
-    pvFormatter.config(text_format='simple')
+    pvFormatter.config(text_format='star')
     #
     annotatorPlotKWArgs = catKWArgs.copy()
     annotatorPlotKWArgs.update(facetKWArgs)
@@ -497,21 +603,25 @@ def catplotWrapper(
         None, None)
     for (row_val, col_val), ax in g.axes_dict.items():
         #
+        '''
         axTickLabels = [tl.get_text() for tl in ax.get_xticklabels()]
         if len(axTickLabels):
             newAxTickLabels = [
                 (renameLookup[tl] if tl in renameLookup else tl)
                 for tl in axTickLabels]
+            ax.set_xticks(ax.get_xticks())
             ax.set_xticklabels(newAxTickLabels)
         axTickLabels = [tl.get_text() for tl in ax.get_yticklabels()]
         if len(axTickLabels):
             newAxTickLabels = [
                 (renameLookup[tl] if tl in renameLookup else tl)
                 for tl in axTickLabels]
+            ax.set_yticks(ax.get_yticks())
             ax.set_yticklabels(newAxTickLabels)
+        '''
         thesePvalAnns = []
         significantPairs = []
-        if len(pairsToAnnotate):
+        if statsDF is not None:
             maskStatsThisFeature = (statsDF[catKWArgs['row']] == row_val) & (statsDF[catKWArgs['col']] == col_val)
             statsThisFeature = statsDF.loc[maskStatsThisFeature, :]
             thisAxMask = (dataDF[catKWArgs['col']] == col_val) & (dataDF[catKWArgs['row']] == row_val)
@@ -520,8 +630,7 @@ def catplotWrapper(
         for tp in pairsToAnnotate:
             if nHues > 1:
                 (x1, h1), (x2, h2) = tp
-                assert h1 == h2
-                pairMask = (statsThisFeature['A'] == x1) & (statsThisFeature['B'] == x2) & (statsThisFeature[catKWArgs['hue']] == h1)
+                pairMask = (statsThisFeature['A'] == x1) & (statsThisFeature['B'] == x2) & (statsThisFeature[catKWArgs['hue']] == h2)
             else:
                 if isinstance(tp[0], tuple) or isinstance(tp[0], list):
                     # passed redundant information, remove hue
@@ -541,8 +650,9 @@ def catplotWrapper(
                 alpha=confidence_alpha)
             if thisPV.pvalue < confidence_alpha:
                 significantPairs.append(tp)
-                thesePvalAnns.append(gSuffix + ' = {:0.2f} ({})'.format(
+                thesePvalAnns.append(gSuffix + ' = {:0.2f} {}'.format(
                     statsThisFeature.loc[pairMask, 'hedges'].iloc[0], pvFormatter.format_data(thisPV)))
+        # print('len(significantPairs) = {}'.format(len(significantPairs)))
         if (len(significantPairs) > 0):
             if (nHues > 1) and (huesThisAx.shape[0] < nHues):
                 for missingHue in catKWArgs['hue_order']:
@@ -566,15 +676,15 @@ def catplotWrapper(
                 test=None, test_short_name='WT',
                 )
             # print(significantPairs)
-            # pdb.set_trace()
             annotator.annotate_custom_annotations(thesePvalAnns)
     asp.reformatFacetGridLegend(
         g, titleOverrides=renameLookup,
-        contentOverrides={
-            'NA_NA': 'No movement',
-            'CW_outbound': 'Start of movement (extension)',
-            'CW_return': 'Return to start (flexion)'
-            },
+        contentOverrides=renameLookup,
+        # contentOverrides={
+        #     'NA_NA': 'No movement',
+        #     'CW_outbound': 'Start of movement (extension)',
+        #     'CW_return': 'Return to start (flexion)'
+        #     },
         styleOpts=styleOpts)
     g.resize_legend(adjust_subtitles=True)
     g.tight_layout(pad=styleOpts['tight_layout.pad'])
@@ -583,18 +693,94 @@ def catplotWrapper(
         plt.show()
     else:
         plt.close()
-    return
+    return g
+
+def lmplotWrapper(
+        dataDF=None, statsDF=None,
+        pdf=None, lmKWArgs=None, facetKWArgs=None,
+        renameLookup=None, gSuffix="", dodge=False, offsetWidth=0.,
+        yLimOverride=None,
+        plotProcFuns=[], mapDFProcFuns=[]
+        ):
+    nHues = dataDF[lmKWArgs['hue']].unique().shape[0]
+    if dodge:
+        offsets = np.linspace(0, offsetWidth - offsetWidth / len(lmKWArgs['hue_order']), len(lmKWArgs['hue_order']))
+        offsets -= offsets.mean()
+        # offsets = np.arange(len(lmKWArgs['hue_order'])) - ((len(lmKWArgs['hue_order']) - 1) / 2)
+        for hueGrpIndex, thisOffset in enumerate(offsets):
+            hueMask = (dataDF[hueVar] == lmKWArgs['hue_order'][hueGrpIndex])
+            dataDF.loc[hueMask, xVar] = dataDF.loc[hueMask, xVar] + thisOffset
+    g = sns.lmplot(
+        data=dataDF, **lmKWArgs, **facetKWArgs
+        )
+    for mpdf in mapDFProcFuns:
+        mpdf_fun, mpdf_args, mpdf_kwargs = mpdf
+        g.map_dataframe(mpdf_fun, *mpdf_args, **mpdf_kwargs)
+    # ampStatsDF
+    for (ro, co, hu), dataSubset in g.facet_data():
+        if len(plotProcFuns):
+            for procFun in plotProcFuns:
+                procFun(g, ro, co, hu, dataSubset)
+    if g.axes.shape[1] > 1:
+        for ro in range(g.axes.shape[0]):
+            for co in range(g.axes.shape[1]):
+                if co != 0:
+                    g.axes[ro, 0].get_shared_y_axes().join(g.axes[ro, 0], g.axes[ro, co])
+                    g.axes[ro, co].set_ylabel(None)
+                    g.axes[ro, co].set_yticklabels([])
+    g.set_axis_labels(
+        renameLookup[lmKWArgs['x']] if lmKWArgs['x'] in renameLookup else lmKWArgs['x'],
+        renameLookup[lmKWArgs['y']] if lmKWArgs['y'] in renameLookup else lmKWArgs['y'],
+        )
+    for (row_val, col_val), ax in g.axes_dict.items():
+        if statsDF is not None:
+            maskStatsThisFeature = (statsDF[lmKWArgs['row']] == row_val) & (statsDF[lmKWArgs['col']] == col_val)
+            statsThisFeature = statsDF.loc[maskStatsThisFeature, :]
+            thisAxMask = (dataDF[lmKWArgs['col']] == col_val) & (dataDF[lmKWArgs['row']] == row_val)
+            dataThisAx = dataDF.loc[thisAxMask].copy()
+            huesThisAx = dataThisAx[lmKWArgs['hue']].unique()
+        if yLimOverride is not None:
+            yLimOverrideDF = yLimOverride.reset_index()
+            if lmKWArgs['row'] in yLimOverrideDF.columns:
+                yLimOverrideDF = yLimOverrideDF.loc[yLimOverrideDF[lmKWArgs['row']] == row_val, :]
+            if lmKWArgs['col'] in yLimOverrideDF.columns:
+                yLimOverrideDF = yLimOverrideDF.loc[yLimOverrideDF[lmKWArgs['col']] == col_val, :]
+            assert yLimOverrideDF.shape[0] == 1
+            yLimOverrideDF = yLimOverrideDF.iloc[0, :]
+            ax.set_ylim((yLimOverrideDF['yMin'], yLimOverrideDF['yMax']))
+    asp.reformatFacetGridLegend(
+        g, titleOverrides=renameLookup,
+        contentOverrides=renameLookup,
+        # contentOverrides={
+        #     'NA_NA': 'No movement',
+        #     'CW_outbound': 'Start of movement (extension)',
+        #     'CW_return': 'Return to start (flexion)'
+        #     },
+        styleOpts=styleOpts)
+    g.resize_legend(adjust_subtitles=True)
+    g.tight_layout(pad=styleOpts['tight_layout.pad'])
+    pdf.savefig(bbox_inches='tight', pad_inches=0, )
+    if arguments['showFigures']:
+        plt.show()
+    else:
+        plt.close()
+    return g
 
 with PdfPages(pdfPath) as pdf:
     plotLims = [
         plotRCPieces[whichRAUC].min(),
         plotRCPieces[whichRAUC].max()]
     if arguments['plotThePieces']:
+        axLimsList = []
         ##### nostim
         ################################################################################
         #
         noStimStatsForPlot = relativeStatsNoStimDF.copy().reset_index()
-        pairsToAnnotate = [(("CW_outbound", "NA_0.0"), ("NA_NA", "NA_0.0"))]
+        pairsToAnnotate = [
+            (("CW_outbound", "NA_0.0"), ("NA_NA", "NA_0.0")),
+            (("CW_return", "NA_0.0"), ("NA_NA", "NA_0.0")),
+            (("CW_outbound", "NA_0.0"), ("CW_return", "NA_0.0")),
+            ]
         #
         rowVar = 'feature'
         rowOrder = [rN for rN in keepColsForPlot if rN in plotRCPieces[rowVar].unique()]
@@ -611,12 +797,12 @@ with PdfPages(pdfPath) as pdf:
         #
         huePalette = {hN: tuple(list(stimConditionPalette[hN]) + [1.]) for hN in hueOrder}
         huePaletteAlpha = {hN: tuple(list(hV)[:3] + [0.5]) for hN, hV in huePalette.items()}
-        height, width = 2, 3
+        height, width = 2.5, 1.5 # no stim catplot
         aspect = width / height
         #
         violinKWArgs = dict(cut=0., split=False)
-        boxKWArgs = dict(whis=np.inf)
-        stripKWArgs = dict(size=2.5, dodge=True, jitter=0.2)
+        boxKWArgs = dict(whis=np.inf, width=0.9)
+        stripKWArgs = dict(dodge=True, jitter=0.25, s=snsRCParams['lines.markersize'], linewidth=0., alpha=0.75)
         facetKWArgs = stripKWArgs
         statAnnPlotType = 'boxplot'
         catPlotKind = 'strip'
@@ -629,40 +815,62 @@ with PdfPages(pdfPath) as pdf:
                 colName for colName in colOrder if colName in refGroupPieces[colVar].unique()],
             row=rowVar, row_order=rowOrder,
             height=height, aspect=aspect,
-            sharey=True, sharex=True,
+            sharey=False, sharex=True,
             facet_kws=dict(margin_titles=True),
-        )
+            )
         renameLookup = prettyNameLookup.copy()
-        renameLookup['NA_NA'] = 'No movement'
+        renameLookup.update({
+            'NA_NA': 'None',
+            'CW_outbound': 'Extension',
+            'CW_return': 'Flexion',
+            'CCW_outbound': 'Flexion',
+            'CCW_return': 'Extension',
+            })
+        if 'mahal' in arguments['inputBlockSuffix']:
+            renameLookup['scaledRAUC'] == 'Ave. Evoked Mahal. Dist. (a.u.)'
+        else:
+            renameLookup['scaledRAUC'] == 'Evoked potential size (LFP AUC, a.u.)'
+        #
+        renameLookup['0'] = 'No stim.'
         plotProcFuns = [
             yTickLabelRemover,
+            genTickLabelOverrider(
+                whichAxes='xy', lookupDict=renameLookup,
+                formatOpts=dict(rotation=-30, ha='left')),
             asp.genTitleChanger(renameLookup)]
         boxPalette = {hN: (1, 1, 1, 1) for hN, hV in huePalette.items()}
         mapDFProcFuns = [
             (boxplotWrapper, [], dict(
                 x=xVar, order=xOrder, y=whichRAUC,
                 hue=hueVar, hue_order=hueOrder,
-                palette=boxPalette, zorder=1.9, whis=np.inf)),
+                palette=boxPalette, zorder=1.9, whis=np.inf, width=0.9)),
             ]
-        catplotWrapper(
+        g = catplotWrapper(
             dataDF=refGroupPieces, statsDF=noStimStatsForPlot,
             pairsToAnnotate=pairsToAnnotate,
             pdf=pdf, catKWArgs=catKWArgs,
             catPlotKind=catPlotKind, statAnnPlotType=statAnnPlotType,
             facetKWArgs=facetKWArgs, renameLookup=renameLookup, gSuffix=r"$g_{M}$",
             plotProcFuns=plotProcFuns, mapDFProcFuns=mapDFProcFuns)
+        axLimsList.append(
+            pd.DataFrame(
+                {
+                    (row_val, col_val): [*ax.get_xlim(), *ax.get_ylim()]
+                    for (row_val, col_val), ax in g.axes_dict.items()},
+                index=['xMin', 'xMax', 'yMin', 'yMax']).T)
+        axLimsList[-1].index.names = [rowVar, colVar]
         ##### stim catplot
         ################################################################################
         #
         relativeStatsForPlot = relativeStatsDF.copy().reset_index()
         for cN in ['A', 'B', 'trialRateInHz']:
-            relativeStatsForPlot.loc[:, cN] = relativeStatsForPlot[cN].apply(lambda x: '{}'.format(x))
+            relativeStatsForPlot.loc[:, cN] = relativeStatsForPlot[cN].apply(lambda x: '{:d}'.format(int(x)))
         rowVar = 'feature'
         rowOrder = [rN for rN in keepColsForPlot if rN in plotRCPieces[rowVar].unique()]
         # rowOrder = sorted(np.unique(plotRCPieces[rowVar]))
         colWrap = min(3, len(colOrder))
         #
-        height, width = 2, 3
+        height, width = 2.5, 2. # stim, no move catplot
         aspect = width / height
         noMoveStimPiecesDF = testGroupPieces.loc[testGroupPieces['kinematicCondition'] == 'NA_NA', :].copy()
         hueVar = 'trialRateInHz'
@@ -672,9 +880,9 @@ with PdfPages(pdfPath) as pdf:
             if iV in np.unique(noMoveStimPiecesDF[hueVar])]
         huePalette = {hN: tuple(list(ratePalette[hN]) + [1.]) for hN in hueOrder}
         # convert to strings to resolve annotations bug
-        noMoveStimPiecesDF.loc[:, hueVar] = noMoveStimPiecesDF[hueVar].apply(lambda x: '{}'.format(x))
-        hueOrder = ['{}'.format(hN) for hN in hueOrder]
-        huePalette = {'{}'.format(hN): thisColor for hN, thisColor in huePalette.items()}
+        noMoveStimPiecesDF.loc[:, hueVar] = noMoveStimPiecesDF[hueVar].apply(lambda x: '{:d}'.format(int(x)))
+        hueOrder = ['{:d}'.format(int(hN)) for hN in hueOrder]
+        huePalette = {'{:d}'.format(int(hN)): thisColor for hN, thisColor in huePalette.items()}
         #
         colVar = 'kinAndElecCondition'
         colOrder = [
@@ -683,8 +891,8 @@ with PdfPages(pdfPath) as pdf:
             if iV in np.unique(noMoveStimPiecesDF[colVar])]
         xVar = amplitudeFieldName
         xOrder = sorted(noMoveStimPiecesDF[xVar].unique())
-        noMoveStimPiecesDF.loc[:, xVar] = noMoveStimPiecesDF[xVar].apply(lambda x: '{}'.format(x))
-        xOrder = ['{}'.format(xV) for xV in xOrder]
+        noMoveStimPiecesDF.loc[:, xVar] = noMoveStimPiecesDF[xVar].apply(lambda x: '{:d}'.format(int(x)))
+        xOrder = ['{:d}'.format(int(xV)) for xV in xOrder]
         catKWArgs.update(dict(
             x=xVar, order=xOrder,
             row=rowVar, row_order=rowOrder,
@@ -693,15 +901,32 @@ with PdfPages(pdfPath) as pdf:
             hue=hueVar, hue_order=hueOrder, palette=huePalette
             ))
         pairsToAnnotate = []
+        refHueName = '0'
         for name, group in noMoveStimPiecesDF.groupby([colVar, hueVar]):
             colName, hueName = name
-            minX, maxX = group[xVar].min(), group[xVar].max()
-            thisPair = ((minX, hueName), (maxX, hueName))
+            if hueName == refHueName:
+                continue
+            minX, maxX = noMoveStimPiecesDF[xVar].min(), group[xVar].max()
+            thisPair = ((minX, refHueName), (maxX, hueName))
             if thisPair not in pairsToAnnotate:
                 pairsToAnnotate.append(thisPair)
+        print('pairsToAnnotate = {}'.format(pairsToAnnotate))
         renameLookup = prettyNameLookup.copy()
-        renameLookup['NA_NA'] = 'No movement'
+        renameLookup.update({
+            'NA_NA': 'None',
+            'CW_outbound': 'Extension',
+            'CW_return': 'Flexion',
+            'CCW_outbound': 'Flexion',
+            'CCW_return': 'Extension',
+            'trialAmplitude': 'Stim. amplitude (uA)'
+            })
+        if 'mahal' in arguments['inputBlockSuffix']:
+            renameLookup['scaledRAUC'] == 'Ave. Evoked Mahal. Dist. (a.u.)'
+        else:
+            renameLookup['scaledRAUC'] == 'Evoked potential size (LFP AUC, a.u.)'
         plotProcFuns = [
+            yTickLabelRemover,
+            genTickLabelOverrider(whichAxes='xy', lookupDict=renameLookup),
             asp.genTitleChanger(renameLookup)]
         boxPalette = {hN: (1, 1, 1, 1) for hN, hV in huePalette.items()}
         mapDFProcFuns = [
@@ -710,7 +935,7 @@ with PdfPages(pdfPath) as pdf:
                 hue=hueVar, hue_order=hueOrder,
                 palette=boxPalette, zorder=1.9, whis=np.inf)),
             ]
-        catplotWrapper(
+        g = catplotWrapper(
             dataDF=noMoveStimPiecesDF,
             statsDF=relativeStatsForPlot,
             pairsToAnnotate=pairsToAnnotate,
@@ -718,7 +943,16 @@ with PdfPages(pdfPath) as pdf:
             catPlotKind=catPlotKind, statAnnPlotType=statAnnPlotType,
             facetKWArgs=facetKWArgs, renameLookup=renameLookup, gSuffix=r"$g_{S}$",
             plotProcFuns=plotProcFuns, mapDFProcFuns=mapDFProcFuns)
-        #
+        axLimsList.append(
+            pd.DataFrame(
+                {
+                    (row_val, col_val): [*ax.get_xlim(), *ax.get_ylim()]
+                    for (row_val, col_val), ax in g.axes_dict.items()},
+                index=['xMin', 'xMax', 'yMin', 'yMax']).T)
+        axLimsList[-1].index.names = [rowVar, colVar]
+        ########## stim boxplot
+        height, width = 2.5, 2.5 #
+        aspect = width / height
         moveStimPiecesDF = testGroupPieces.loc[testGroupPieces['kinematicCondition'] != 'NA_NA', :]
         xVar = amplitudeFieldName
         xOrder = sorted(moveStimPiecesDF[xVar].unique())
@@ -729,11 +963,11 @@ with PdfPages(pdfPath) as pdf:
             if iV in np.unique(moveStimPiecesDF[hueVar])]
         huePalette = {hN: tuple(list(ratePalette[hN]) + [1.]) for hN in hueOrder}
         # convert to strings to resolve annotations bug
-        moveStimPiecesDF.loc[:, hueVar] = moveStimPiecesDF[hueVar].apply(lambda x: '{}'.format(x))
-        hueOrder = ['{}'.format(hN) for hN in hueOrder]
-        huePalette = {'{}'.format(hN): thisColor for hN, thisColor in huePalette.items()}
-        moveStimPiecesDF.loc[:, xVar] = moveStimPiecesDF[xVar].apply(lambda x: '{}'.format(x))
-        xOrder = ['{}'.format(xV) for xV in xOrder]
+        moveStimPiecesDF.loc[:, hueVar] = moveStimPiecesDF[hueVar].apply(lambda x: '{:d}'.format(int(x)))
+        hueOrder = ['{:d}'.format(int(hN)) for hN in hueOrder]
+        huePalette = {'{:d}'.format(int(hN)): thisColor for hN, thisColor in huePalette.items()}
+        moveStimPiecesDF.loc[:, xVar] = moveStimPiecesDF[xVar].apply(lambda x: '{:d}'.format(int(x)))
+        xOrder = ['{:d}'.format(int(xV)) for xV in xOrder]
         colVar = 'kinAndElecCondition'
         colOrder = [
             iV
@@ -747,15 +981,32 @@ with PdfPages(pdfPath) as pdf:
             hue=hueVar, hue_order=hueOrder, palette=huePalette
             ))
         pairsToAnnotate = []
+        refHueName = '0'
         for name, group in moveStimPiecesDF.groupby([colVar, hueVar]):
             colName, hueName = name
-            minX, maxX = group[xVar].min(), group[xVar].max()
-            thisPair = ((minX, hueName), (maxX, hueName))
+            if hueName == refHueName:
+                continue
+            minX, maxX = moveStimPiecesDF[xVar].min(), group[xVar].max()
+            thisPair = ((minX, refHueName), (maxX, hueName))
             if thisPair not in pairsToAnnotate:
                 pairsToAnnotate.append(thisPair)
+        print('pairsToAnnotate = {}'.format(pairsToAnnotate))
         renameLookup = prettyNameLookup.copy()
-        renameLookup['NA_NA'] = 'No movement'
+        renameLookup.update({
+            'NA_NA': 'None',
+            'CW_outbound': 'Extension',
+            'CW_return': 'Flexion',
+            'CCW_outbound': 'Flexion',
+            'CCW_return': 'Extension',
+            'trialAmplitude': 'Stim. amplitude (uA)'
+            })
+        if 'mahal' in arguments['inputBlockSuffix']:
+            renameLookup['scaledRAUC'] == 'Ave. Evoked Mahal. Dist. (a.u.)'
+        else:
+            renameLookup['scaledRAUC'] == 'Evoked potential size (LFP AUC, a.u.)'
         plotProcFuns = [
+            yTickLabelRemover,
+            genTickLabelOverrider(whichAxes='xy', lookupDict=renameLookup),
             asp.genTitleChanger(renameLookup)]
         boxPalette = {hN: (1, 1, 1, 1) for hN, hV in huePalette.items()}
         mapDFProcFuns = [
@@ -764,14 +1015,24 @@ with PdfPages(pdfPath) as pdf:
                 hue=hueVar, hue_order=hueOrder,
                 palette=boxPalette, zorder=1.9, whis=np.inf)),
             ]
-        catplotWrapper(
+        g = catplotWrapper(
             dataDF=moveStimPiecesDF, statsDF=relativeStatsForPlot,
             pairsToAnnotate=pairsToAnnotate,
             pdf=pdf, catKWArgs=catKWArgs,
             catPlotKind=catPlotKind, statAnnPlotType=statAnnPlotType,
             facetKWArgs=facetKWArgs, renameLookup=renameLookup, gSuffix=r"$g_{SM}$",
             plotProcFuns=plotProcFuns, mapDFProcFuns=mapDFProcFuns)
+        axLimsList.append(
+            pd.DataFrame(
+                {
+                    (row_val, col_val): [*ax.get_xlim(), *ax.get_ylim()]
+                    for (row_val, col_val), ax in g.axes_dict.items()},
+                index=['xMin', 'xMax', 'yMin', 'yMax']).T)
+        axLimsList[-1].index.names = [rowVar, colVar]
+        ###############
         #### dummy to get legend from
+        height, width = 1.5, 2.
+        aspect = width / height
         xVar = amplitudeFieldName
         xOrder = sorted(plotRCPieces[xVar].unique())
         hueVar = 'trialRateInHz'
@@ -781,16 +1042,32 @@ with PdfPages(pdfPath) as pdf:
             if iV in np.unique(plotRCPieces[hueVar])]
         huePalette = {hN: tuple(list(ratePalette[hN]) + [1.]) for hN in hueOrder}
         # convert to strings to resolve annotations bug
-        plotRCPieces.loc[:, hueVar] = plotRCPieces[hueVar].apply(lambda x: '{}'.format(x))
-        hueOrder = ['{}'.format(hN) for hN in hueOrder]
-        huePalette = {'{}'.format(hN): thisColor for hN, thisColor in huePalette.items()}
-        plotRCPieces.loc[:, xVar] = plotRCPieces[xVar].apply(lambda x: '{}'.format(x))
-        xOrder = ['{}'.format(xV) for xV in xOrder]
+        plotRCPieces.loc[:, hueVar] = plotRCPieces[hueVar].apply(lambda x: '{:d}'.format(int(x)))
+        hueOrder = ['{:d}'.format(int(hN)) for hN in hueOrder]
+        huePalette = {'{:d}'.format(int(hN)): thisColor for hN, thisColor in huePalette.items()}
+        plotRCPieces.loc[:, xVar] = plotRCPieces[xVar].apply(lambda x: '{:d}'.format(int(x)))
+        xOrder = ['{:d}'.format(int(xV)) for xV in xOrder]
         colVar = 'kinAndElecCondition'
         colOrder = [
             iV
             for iV in compoundAnnLookupDF.sort_values(['pedalMovementCat', 'pedalDirection', 'electrode']).index
             if iV in np.unique(plotRCPieces[colVar])]
+        renameLookup = prettyNameLookup.copy()
+        renameLookup.update({
+            'NA_NA': 'None',
+            'CW_outbound': 'Extension',
+            'CW_return': 'Flexion',
+            'CCW_outbound': 'Flexion',
+            'CCW_return': 'Extension',
+            'trialAmplitude': 'Stim. amplitude (uA)'
+            })
+        if 'mahal' in arguments['inputBlockSuffix']:
+            renameLookup['scaledRAUC'] == 'Ave. Evoked Mahal. Dist. (a.u.)'
+        else:
+            renameLookup['scaledRAUC'] == 'Evoked potential size (LFP AUC, a.u.)'
+        plotProcFuns = [
+            yTickLabelRemover,
+            asp.genTitleChanger(renameLookup)]
         catKWArgs.update(dict(
             x=xVar, order=xOrder,
             row=rowVar, row_order=rowOrder,
@@ -805,124 +1082,113 @@ with PdfPages(pdfPath) as pdf:
             catPlotKind=catPlotKind, statAnnPlotType=statAnnPlotType,
             facetKWArgs=facetKWArgs, renameLookup=renameLookup, gSuffix="",
             plotProcFuns=plotProcFuns)
-        '''
-        g = sns.catplot(ss
-            data=testGroupPieces,
-            kind=catPlotKind, **catKWArgs,
-            **facetKWArgs
-            )
-        # ampStatsDF
-        plotProcFuns = [
-            asp.genTitleChanger(prettyNameLookup)]
-        for (ro, co, hu), dataSubset in g.facet_data():
-            if len(plotProcFuns):
-                for procFun in plotProcFuns:
-                    procFun(g, ro, co, hu, dataSubset)
-        g.set_axis_labels('Stimulation amplitude (uA)', 'Normalized AUC')
-        if g.axes.shape[1] > 1:
-            for ro in range(g.axes.shape[0]):
-                for co in range(g.axes.shape[1]):
-                    if co != 0:
-                        g.axes[ro, 0].get_shared_y_axes().join(g.axes[ro, 0], g.axes[ro, co])
-                        g.axes[ro, co].set_ylabel(None)
-                        g.axes[ro, co].set_yticklabels([])
-        pvFormatter = PValueFormat()
-        pvFormatter.config(text_format='simple')
-        #
-        annotatorPlotKWArgs = catKWArgs.copy()
-        annotatorPlotKWArgs.update(facetKWArgs)
-        for annN in ['col', 'col_order', 'row', 'row_order']:
-            annotatorPlotKWArgs.pop(annN, None)
-        annotator = Annotator(
-            None, None)
-        for (row_val, col_val), ax in g.axes_dict.items():
-            thisAxMask = (testGroupPieces[colVar] == col_val) & (testGroupPieces[rowVar] == row_val)
-            dataThisAx = testGroupPieces.loc[thisAxMask].copy()
-            thesePvalAnns = []
-            significantPairs = []
-            thisElec, thisMT, thisDir = compoundAnnLookupDF.loc[col_val, ['electrode', 'pedalMovementCat', 'pedalDirection']].to_list()
-            statsThisFeature = relativeStatsDF.xs(row_val, level=rowVar).xs(thisElec, level='electrode').xs('{}_{}'.format(thisDir, thisMT), level='kinematicCondition')
-            nHues = statsThisFeature.groupby(hueVar).ngroups
-            for thisRate, statsThisHue in statsThisFeature.groupby(hueVar):
-                assert statsThisHue.shape[0] == 1
-                thisPV = StatResult(
-                    test_description='', test_short_name='', stat_str='T',
-                    stat=statsThisHue['T'].iloc[0],
-                    pval=statsThisHue['pval'].iloc[0],
-                    alpha=confidence_alpha)
-                if thisPV.pvalue < confidence_alpha:
-                    thesePvalAnns.append(r"$g_{SM}$" + ' = {:0.2f} ({})'.format(
-                        statsThisHue['hedges'].iloc[0], pvFormatter.format_data(thisPV)))
-                    significantPairs.append(
-                        [
-                            (minAmp, thisRate), (maxAmp, thisRate)]
-                        )
-                    print('added pair {}'.format(significantPairs[-1]))
-            if (len(significantPairs) > 0):
-                for missingHue in hueOrder:
-                    if missingHue not in huesThisAx:
-                        dummyMask = (testGroupPieces[hueVar] == missingHue) & (testGroupPieces[rowVar] == row_val)
-                        dummyData = testGroupPieces.loc[dummyMask, :].copy()
-                        dummyData.loc[:, hueVar] = missingHue
-                        dataThisAx = pd.concat([
-                            dummyData, dataThisAx]).sort_values([hueVar, amplitudeFieldName])
-                annotatorPlotKWArgs['data'] = dataThisAx
-                annotator.new_plot(
-                    ax, pairs=significantPairs, 
-                    plot=statAnnPlotType,
-                    **annotatorPlotKWArgs
-                    )
-                annotator.configure(
-                    test=None, test_short_name='WT',
-                    )
-                annotator.annotate_custom_annotations(thesePvalAnns)
-        asp.reformatFacetGridLegend(
-            g, titleOverrides={
-                'kinematicCondition': 'Movement type'
-            },
-            contentOverrides={
-                'NA_NA': 'No movement',
-                'CW_outbound': 'Start of movement (extension)',
-                'CW_return': 'Return to start (flexion)'
-            },
-            styleOpts=styleOpts)
-        g.resize_legend(adjust_subtitles=True)
-        # for (rN, cN), ax in g.axes_dict.items():
-        #     ax.set_ylim([plotLimsMin.loc[rN], plotLimsMax.loc[rN]])
-        # g.axes[0, 0].set_ylim(plotLims)
-        g.tight_layout(pad=styleOpts['tight_layout.pad'])
-        pdf.savefig(bbox_inches='tight', pad_inches=0, )
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
-        '''
         ##### stim lmplot
         ################################################################################
         #
-        rowVar = 'feature'
-        rowOrder = [rN for rN in keepColsForPlot if rN in plotRCPieces[rowVar].unique()]
-        # rowOrder = sorted(np.unique(plotRCPieces[rowVar]))
+        height, width = 2.5, 1.5 # no move stim lmplot
+        aspect = width / height
+        axLimsDF = pd.concat(axLimsList)
+        newYLims = pd.DataFrame({
+            'yMin': axLimsDF.groupby('feature')['yMin'].min(),
+            'yMax': axLimsDF.groupby('feature')['yMax'].max(),
+            })
+        noMoveStimPiecesDF = testGroupPieces.loc[testGroupPieces['kinematicCondition'] == 'NA_NA', :].copy()
+        offsetWidth = 0.9 * np.min(np.abs(np.diff(np.unique(noMoveStimPiecesDF[xVar]))))
+        xJitter = 0.2 * offsetWidth / np.unique(noMoveStimPiecesDF[hueVar]).shape[0]
+        rowVar = 'feature' #
+        rowOrder = [rN for rN in keepColsForPlot if rN in noMoveStimPiecesDF[rowVar].unique()]
         colVar = 'kinAndElecCondition'
         colOrder = [
             iV
             for iV in compoundAnnLookupDF.sort_values(['pedalMovementCat', 'pedalDirection', 'electrode']).index
-            if iV in np.unique(testGroupPieces[colVar])]
+            if iV in np.unique(noMoveStimPiecesDF[colVar])]
         hueVar = 'trialRateInHz'
         hueOrder = [
             iV
             for iV in compoundAnnLookupDF['trialRateInHz'].dropna().drop_duplicates().sort_values()
-            if iV in np.unique(testGroupPieces[hueVar])]
+            if iV in np.unique(noMoveStimPiecesDF[hueVar])]
         huePalette = {hN: ratePalette[hN] for hN in hueOrder}
         huePaletteAlpha = {hN: tuple(list(hV) + [0.5]) for hN, hV in huePalette.items()}
         ##
-        height, width = 2, 3
         aspect = width / height
-        xJitter = testGroupPieces[xVar].diff().dropna().abs().unique().mean() / 20
         regPlotKWArgs = dict(
             x_jitter=xJitter,
-            fit_reg=False
+            fit_reg=False,
+            scatter_kws=dict(linewidths=0., s=snsRCParams['lines.markersize'], edgecolors='k', alpha=0.75)
         )
+        lmKWArgs = dict(
+            col=colVar,
+            col_order=colOrder,
+            row=rowVar, row_order=rowOrder,
+            x=xVar, y=whichRAUC,
+            hue=hueVar, hue_order=hueOrder, palette=huePalette,
+            height=height, aspect=aspect,
+            sharey=False, sharex=True,
+            facet_kws=dict(
+                margin_titles=True,
+                # gridspec_kws=dict(width_ratios=widthRatios)
+            ),
+            )
+        renameLookup = prettyNameLookup.copy()
+        renameLookup.update({
+            'NA_NA': 'None',
+            'CW_outbound': 'Extension',
+            'CW_return': 'Flexion',
+            'CCW_outbound': 'Flexion',
+            'CCW_return': 'Extension',
+            'trialAmplitude': 'Stim. amplitude (uA)'
+            })
+        if 'mahal' in arguments['inputBlockSuffix']:
+            renameLookup['scaledRAUC'] == 'Ave. Evoked Mahal. Dist. (a.u.)'
+        else:
+            renameLookup['scaledRAUC'] == 'Evoked potential size (LFP AUC, a.u.)'
+        plotProcFuns = [
+            yTickLabelRemover,
+            asp.genTitleChanger(renameLookup)]
+        freshAmpStatsDF = pd.read_hdf(resultPath, 'amplitudeStats')
+        mapDFProcFuns = [
+            (
+                genRegressionResultsOverlay(
+                    freshAmpStatsDF,
+                    rowVar=rowVar, colVar=colVar,
+                    xOffset=offsetWidth, xBounds=[
+                        noMoveStimPiecesDF[xVar].min() - offsetWidth / 2,
+                        noMoveStimPiecesDF[xVar].max() + offsetWidth / 2]),
+                [], dict(
+                    x=xVar, y=whichRAUC,
+                    hue=hueVar, hue_order=hueOrder, palette=huePalette,
+                    ci=95))
+        ]
+        lmplotWrapper(
+            dataDF=noMoveStimPiecesDF.copy(), statsDF=None,
+            pdf=pdf, lmKWArgs=lmKWArgs, facetKWArgs=regPlotKWArgs,
+            renameLookup=renameLookup, gSuffix="", dodge=True, offsetWidth=offsetWidth,
+            plotProcFuns=plotProcFuns, mapDFProcFuns=mapDFProcFuns,
+            yLimOverride=newYLims
+        )
+        height, width = 2.5, 2.5 # move stim lmplot
+        aspect = width / height
+        moveStimPiecesDF = testGroupPieces.loc[testGroupPieces['kinematicCondition'] != 'NA_NA', :].copy()
+        # xJitter = np.min(np.abs(np.diff(np.unique(moveStimPiecesDF[xVar])))) / 10
+        offsetWidth = 0.9 * np.min(np.abs(np.diff(np.unique(moveStimPiecesDF[xVar]))))
+        xJitter = 0.2 * offsetWidth / np.unique(moveStimPiecesDF[hueVar]).shape[0]
+        #
+        rowVar = 'feature'
+        rowOrder = [rN for rN in keepColsForPlot if rN in moveStimPiecesDF[rowVar].unique()]
+        colVar = 'kinAndElecCondition'
+        colOrder = [
+            iV
+            for iV in compoundAnnLookupDF.sort_values(['pedalMovementCat', 'pedalDirection', 'electrode']).index
+            if iV in np.unique(moveStimPiecesDF[colVar])]
+        hueVar = 'trialRateInHz'
+        hueOrder = [
+            iV
+            for iV in compoundAnnLookupDF['trialRateInHz'].dropna().drop_duplicates().sort_values()
+            if iV in np.unique(moveStimPiecesDF[hueVar])]
+        huePalette = {hN: ratePalette[hN] for hN in hueOrder}
+        huePaletteAlpha = {hN: tuple(list(hV) + [0.5]) for hN, hV in huePalette.items()}
+        ##
+        #
         lmKWArgs = dict(
             col=colVar,
             col_order=colOrder,
@@ -936,59 +1202,33 @@ with PdfPages(pdfPath) as pdf:
                 # gridspec_kws=dict(width_ratios=widthRatios)
                 ),
             )
-        jitteredPieces = testGroupPieces.copy()
-        dodge = True
-        if dodge:
-            offsets = np.arange(len(hueOrder)) - ((len(hueOrder) - 1) / 2)
-            for hueGrpIndex, thisOffset in enumerate(offsets):
-                hueMask = (testGroupPieces[hueVar] == hueOrder[hueGrpIndex])
-                jitteredPieces.loc[hueMask, xVar] = jitteredPieces.loc[hueMask, xVar] + 4 * xJitter * thisOffset
-        g = sns.lmplot(
-            data=jitteredPieces,
-            **lmKWArgs, **regPlotKWArgs
-            )
-        #
-        freshAmpStatsDF = pd.read_hdf(resultPath, 'amplitudeStats')
-        g.map_dataframe(
-            genRegressionResultsOverlay(
-                freshAmpStatsDF, rowVar=rowVar, colVar=colVar, xOffset=xJitter),
-            x=amplitudeFieldName, y=whichRAUC,
-            hue=hueVar, hue_order=hueOrder)
+        renameLookup = prettyNameLookup.copy()
+        renameLookup['NA_NA'] = 'No movement'
+        renameLookup['0'] = 'No stim.'
         plotProcFuns = [
-            asp.genTitleChanger(prettyNameLookup)]
-        for (ro, co, hu), dataSubset in g.facet_data():
-            if len(plotProcFuns):
-                for procFun in plotProcFuns:
-                    procFun(g, ro, co, hu, dataSubset)
-        g.set_axis_labels('Stimulation amplitude (uA)', 'Normalized AUC')
-        if g.axes.shape[1] > 1:
-            for ro in range(g.axes.shape[0]):
-                for co in range(g.axes.shape[1]):
-                    if co != 0:
-                        g.axes[ro, 0].get_shared_y_axes().join(g.axes[ro, 0], g.axes[ro, co])
-                        g.axes[ro, co].set_ylabel(None)
-                        g.axes[ro, co].set_yticklabels([])
-        asp.reformatFacetGridLegend(
-            g, titleOverrides={
-                'kinematicCondition': 'Movement type'
-            },
-            contentOverrides={
-                'NA_NA': 'No movement',
-                'CW_outbound': 'Start of movement (extension)',
-                'CW_return': 'Return to start (flexion)'
-            },
-            styleOpts=styleOpts)
-        g.resize_legend(adjust_subtitles=True)
-        # for (rN, cN), ax in g.axes_dict.items():
-        #     ax.set_ylim([plotLimsMin.loc[rN], plotLimsMax.loc[rN]])
-        # g.axes[0, 0].set_ylim(plotLims)
-        g.tight_layout(pad=styleOpts['tight_layout.pad'])
-        pdf.savefig(bbox_inches='tight', pad_inches=0, )
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
-    #
+            yTickLabelRemover,
+            asp.genTitleChanger(renameLookup)]
+        freshAmpStatsDF = pd.read_hdf(resultPath, 'amplitudeStats')
+        mapDFProcFuns = [
+            (
+                genRegressionResultsOverlay(
+                    freshAmpStatsDF,
+                    rowVar=rowVar, colVar=colVar, xOffset=offsetWidth, xBounds=[
+                        moveStimPiecesDF[xVar].min() - offsetWidth / 2,
+                        moveStimPiecesDF[xVar].max() + offsetWidth / 2]),
+                [], dict(
+                    x=xVar, y=whichRAUC,
+                    hue=hueVar, hue_order=hueOrder, palette=huePalette,
+                    ci=95))
+            ]
+        lmplotWrapper(
+            dataDF=moveStimPiecesDF.copy(), statsDF=None,
+            pdf=pdf, lmKWArgs=lmKWArgs, facetKWArgs=regPlotKWArgs,
+            renameLookup=renameLookup, gSuffix="", dodge=True, offsetWidth=offsetWidth,
+            plotProcFuns=plotProcFuns, mapDFProcFuns=mapDFProcFuns,
+            yLimOverride=newYLims
+            )
+        ######
     rowVar = 'feature'
     rowOrder = sorted(np.unique(plotRCPieces[rowVar]))
     colVar = 'electrode'
@@ -1000,9 +1240,9 @@ with PdfPages(pdfPath) as pdf:
     pal = sns.color_palette("Set2")
     huePalette = {hN: pal[hIdx] for hIdx, hN in enumerate(hueOrder)}
     huePaletteAlpha = {hN: tuple(list(hV) + [0.5]) for hN, hV in huePalette.items()}
-    height, width = 3, 1.5
+    height, width = 3, 4
     aspect = width / height
-    if True:
+    if False:
         ###
         plotAmpStatsDF = ampStatsDF.reset_index()
         plotAmpStatsDF.loc[:, 'namesAndMD'] = plotAmpStatsDF['names']
@@ -1300,6 +1540,7 @@ with PdfPages(pdfPath) as pdf:
         plotLimsMin -= plotLimsRange / 100
         plotLimsMax += plotLimsRange / 100
         xJitter = testGroup[amplitudeFieldName].diff().dropna().abs().unique().mean() / 20
+        #xJitter = 0.5 * np.min(np.abs(np.diff(np.unique(noMoveStimPiecesDF[xVar])))) / np.unique(noMoveStimPiecesDF[hueVar]).shape[0]
         g = sns.lmplot(
             col=colVar, col_order=colOrder,
             row=rowVar,

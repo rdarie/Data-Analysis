@@ -1,7 +1,7 @@
 #!/bin/bash
 #  10: Calculate align Times
 # Request runtime:
-#SBATCH --time=6:00:00
+#SBATCH --time=24:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
@@ -17,7 +17,7 @@
 #SBATCH -e ../../batch_logs/align_stim_202101_27_lfp_rig-%a.out
 
 # Request custom resources
-#SBATCH --array=1-2
+#SBATCH --array=2
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

@@ -1290,7 +1290,6 @@ def alignedAsigsToDF(
             except Exception:
                 traceback.print_exc()
         if duplicateControlsByProgram:
-            #
             noStimWaveforms = (
                 allWaveforms
                 .loc[allWaveforms[amplitudeColumn] == 0, :]
@@ -1335,7 +1334,6 @@ def alignedAsigsToDF(
             allWaveforms.rename(columns=colRenamer, inplace=True)
             idxLabels = np.unique(
                 [i.replace('Fuzzy', '') for i in idxLabels])
-        #
         allWaveforms.set_index(
             list(idxLabels),
             inplace=True)

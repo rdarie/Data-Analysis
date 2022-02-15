@@ -424,27 +424,29 @@ if pickingColors:
     for tIdx, tN in enumerate(primaryPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
 rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
+    primaryPalette.iloc[[1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
     columns=['r', 'g', 'b'],
     index=[
-        'vx', 'vy', 'absv', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
+        'vx', 'vy', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
 hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
-# hls.loc['v*r', :] = hls.loc[['v', 'r'], :].mean()
+hls.loc['vx*r', :] = hls.loc[['vx', 'r'], :].mean()
+hls.loc['vy*r', :] = hls.loc[['vy', 'r'], :].mean()
+hls.loc['vx*a', :] = hls.loc[['vx', 'a'], :].mean()
+hls.loc['vy*a', :] = hls.loc[['vy', 'a'], :].mean()
 # hls.loc['v*a', :] = hls.loc[['v', 'v', 'a'], :].mean()
 # hls.loc['v*a*r', :] = hls.loc[['v', 'a', 'r'], :].mean()
-# for sN in ['a*r', 'v*r', 'v*a', 'v*a*r']:
-#     hls.loc[sN, 's'] = hls.loc[sN, 's'] * 0.75
-#     hls.loc[sN, 'l'] = hls.loc[sN, 'l'] * 1.2
-# hls.loc['v*a*r', 's'] = hls.loc['v*a*r', 's'] * 0.5
-# hls.loc['v*a*r', 'l'] = hls.loc['v*a*r', 'l'] * 1.5
+for sN in ['a*r', 'vx*r', 'vx*a', 'vy*r', 'vy*a']:
+    hls.loc[sN, 's'] = hls.loc[sN, 's'] * 0.75
+    hls.loc[sN, 'l'] = hls.loc[sN, 'l'] * 1.2
 for rhsMaskIdx in range(rhsMasks.shape[0]):
     rhGroup = pd.read_hdf(designMatrixPath, 'rhGroups/rhsMask_{}/'.format(rhsMaskIdx))
     lumVals = np.linspace(0.3, 0.7, rhGroup.shape[1])
     for cIdx, cN in enumerate(rhGroup.columns):
         hls.loc[cN, :] = hls.loc['ens', :]
         hls.loc[cN, 'l'] = lumVals[cIdx]
-primarySourcePalette = hls.apply(lambda x: pd.Series(colorsys.hls_to_rgb(*x), index=['r', 'g', 'b']), axis='columns')
+primarySourcePalette = hls.apply(
+    lambda x: pd.Series(colorsys.hls_to_rgb(*x), index=['r', 'g', 'b']), axis='columns')
 sourcePalette = primarySourcePalette.apply(lambda x: tuple(x), axis='columns')
 if pickingColors:
     sns.palplot(sourcePalette, size=sourcePalette.shape[0])
