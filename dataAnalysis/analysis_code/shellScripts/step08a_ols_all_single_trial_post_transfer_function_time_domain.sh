@@ -28,7 +28,7 @@
 
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 #    SLURM_ARRAY_TASK_ID=12
-exps=(202101_21 202101_27)
+exps=(202101_21)
 for A in "${exps[@]}"
 do
   echo "step 08 transfer function calc, on $A"

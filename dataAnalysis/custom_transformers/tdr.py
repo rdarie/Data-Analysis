@@ -140,6 +140,30 @@ def ERAMittnik(
         return A, B, C, D, fig, ax
 
 
+def getComp(uPiece, lagSamples, psiMat):
+    co = uPiece.shift(lagSamples).fillna(0.) @ psiMat
+    return  co
+
+def inputDrivenDynamics(
+        psi=None, u=None, lag=None,
+        groupVar='trialUID', joblibBackendArgs={},
+        runInParallel=True, verbose=False):
+    if runInParallel:
+        parallelContext = jb.parallel_backend(**joblibBackendArgs)
+    else:
+        parallelContext = contextlib.nullcontext()
+    with parallelContext:
+        lOfPieces = jb.Parallel(verbose=verbose)(
+            jb.delayed(getComp)(uThisTrial, lag, psi)
+            for tIdx, uThisTrial in u.groupby(groupVar, sort=False))
+        resDF = pd.concat(lOfPieces)
+    # pdb.set_trace()
+    assert (resDF.index == u.index).all()
+    assert (resDF.columns == psi.columns).all()
+    # resDF = resDF.loc[u.index, :]
+    # resDF.columns = psi.columns
+    return resDF
+
 def ERA(
         Phi, maxNDim=None, endogNames=None, exogNames=None,
         plotting=False, nLags=None, method='ERA', verbose=0):
@@ -335,7 +359,7 @@ def ERA(
     outputH = pd.DataFrame(svdTargetH)
     outputH.columns.name = 'state'
     outputH.index.name = 'state'
-    return A, B, K, C, D, outputH, (fig, ax,)
+    return A, B, K, C, D, outputH, PsiDF, (fig, ax,)
 
 
 def makeImpulseLike(

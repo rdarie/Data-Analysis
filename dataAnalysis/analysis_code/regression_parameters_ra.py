@@ -208,8 +208,8 @@ lOfEndogAndExogTemplates = [
     (lOfDesignFormulas[3], lOfHistTemplates[0],  lOfHistTemplates[0],), # 10: full exog, self and ensemble, interactions and 
     ]
 lhsMasksOfInterest = {
-    'plotPredictions': [0, 4, 7],
-    'varVsEnsemble': [0, 4, 7]
+    'plotPredictions': [0, 3, 4, 5, 7],
+    'varVsEnsemble': [0, 3, 4, 5, 7]
     }
 # ######
 ################ define model comparisons

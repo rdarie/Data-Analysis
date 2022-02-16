@@ -41,6 +41,7 @@ from dataAnalysis.analysis_code.namedQueries import namedQueries
 import pdb, traceback
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from scipy.stats import zscore, mode
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
@@ -81,6 +82,7 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
 
 def calcTransferFunctionFromLeastSquares():
     analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
@@ -144,7 +146,6 @@ def calcTransferFunctionFromLeastSquares():
     else:
         workingPipelinesLhs = None'''
     #
-    lhsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsDF')
     lhsMasks = pd.read_hdf(estimatorMeta['designMatrixPath'], 'featureMasks')
     allTargetsDF = (
         pd.read_hdf(estimatorMeta['designMatrixPath'], 'allTargets')
@@ -159,6 +160,15 @@ def calcTransferFunctionFromLeastSquares():
     termPalette = pd.read_hdf(estimatorPath, 'termPalette')
     factorPalette = pd.read_hdf(estimatorPath, 'factorPalette')
     trialTypePalette = pd.read_hdf(estimatorPath, 'trialTypePalette')
+
+    lhsDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsDF')
+    pt = PatsyTransformer('vx + vy + e:(a + r) - 1', return_type="dataframe")
+    uDF = pt.fit_transform(lhsDF)
+    uDF.rename(
+        columns={
+            'e[{}]:{}'.format(eName, sVar): '[{}]{}'.format(eName, sVar)
+            for eName, sVar in product(lhsDF['e'].unique(), ['a', 'r'])},
+        inplace=True)
     ####
     # prep rhs dataframes
     '''
@@ -268,13 +278,15 @@ def calcTransferFunctionFromLeastSquares():
             )
         cm = PdfPages(pdfPath)
     else:
-        import contextlib
         cm = contextlib.nullcontext()
+
     #  ##################################################################
-    #  slurmTaskID = 23
-    #  estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
-    #  slurmTaskCount = 57
-    #  slurmTaskMin = 0
+    DEBUGGING = True
+    if DEBUGGING:
+        slurmTaskID = 7
+        estimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(slurmTaskID))
+        slurmTaskCount = processSlurmTaskCount
+        slurmTaskMin = 0
     #  ##################################################################
     slurmGroupSize = int(np.ceil(nTFsToProcess / slurmTaskCount))
     print('Each job will process {} tasks (slurmGroupSize)'.format(slurmGroupSize))
@@ -287,6 +299,8 @@ def calcTransferFunctionFromLeastSquares():
     CDict = {}
     DDict = {}
     HDict = {}
+    PsiDict = {}
+    inputDrivenDict = {}
     #################################################################
     with cm as pdf:
         for modelIdx, (name, iRGroup0) in enumerate(iRPerTerm.groupby(iRGroupNames)):
@@ -311,6 +325,8 @@ def calcTransferFunctionFromLeastSquares():
             lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
             lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
             #
+            # thisPredDF = pd.read_hdf(estimatorPath, 'predictions')
+            #
             exogNames0 = iRWorkingCopy.columns.map(termPalette.xs('exog', level='type').loc[:, ['source', 'term']].set_index('term')['source']).to_series()
             exogNames = exogNames0.dropna().to_list()
             if designFormula != 'NULL':
@@ -334,7 +350,7 @@ def calcTransferFunctionFromLeastSquares():
                     iRWorkingCopy.loc[:, sN] = 0.
             trialInfo = iRWorkingCopy.index.to_frame().reset_index(drop=True)
             ##
-            #####################################################################
+            #################################################################
             # Apply ERA
             Phi = pd.concat([
                     iRWorkingCopy.reset_index(drop=True),
@@ -349,13 +365,42 @@ def calcTransferFunctionFromLeastSquares():
             Phi.set_index(['bin', 'target'], inplace=True)
             Phi = Phi.stack().unstack('target').T
             #
-            nLags = int(3 * max(histLens) / binInterval)
+            nLags = int(5 * max(histLens) / binInterval)
             print('nLags = {}'.format(nLags))
             #
-            A, B, K, C, D, H, (fig, ax,) = tdr.ERA(
+            A, B, K, C, D, H, PsiDF, (fig, ax,) = tdr.ERA(
                 Phi, maxNDim=None,
                 endogNames=endogNames, exogNames=exogNames, nLags=nLags,
                 plotting=arguments['plotting'], verbose=2)
+            ########################################
+            print('Calculating input driven signal')
+            inputDrivenDF = pd.DataFrame(0, index=lhsDF.index, columns=PsiDF.index)
+            PsiDF.columns.names = ['feature', 'sampleBin']
+            showProgBar = True
+            if showProgBar:
+                progBarCtxt = tqdm(total=PsiDF.groupby('sampleBin', axis='columns').ngroups)
+            else:
+                progBarCtxt = contextlib.nullcontext()
+            with progBarCtxt as pbar:
+                for binIdx, psiThisLag in PsiDF.groupby(level='sampleBin', axis='columns', group_keys=False, sort=False):
+                    exogPsi = psiThisLag.loc[:, idxSl[uDF.columns, binIdx]].T
+                    exogPsi.index = exogPsi.index.droplevel('sampleBin')
+                    if not exogPsi.empty: # these systems have no input drive
+                        systemHasInputDrive = True
+                        thisPiece = tdr.inputDrivenDynamics(
+                            psi=exogPsi, u=uDF, lag=binIdx,
+                            groupVar='trialUID', joblibBackendArgs=dict(backend='loky'),
+                            runInParallel=True, verbose=False)
+                        # pdb.set_trace()
+                        inputDrivenDF += thisPiece
+                        if showProgBar:
+                            pbar.update(1)
+                    else:
+                        systemHasInputDrive = False
+            burnInThresh = inputDrivenDF.index.get_level_values('bin').min() + burnInPeriod
+            burnInMask = inputDrivenDF.index.get_level_values('bin') >= (burnInPeriod * (-1))
+            inputDrivenDF = inputDrivenDF.loc[burnInMask, :]
+            ########################################
             if arguments['plotting']:
                 fig.tight_layout()
                 figTitle = fig.suptitle(
@@ -370,12 +415,38 @@ def calcTransferFunctionFromLeastSquares():
                     plt.show()
                 else:
                     plt.close()
+                if systemHasInputDrive:
+                    plotInputDriven = inputDrivenDF.iloc[:, 0].to_frame(name='signal').reset_index()
+                    plotInputDriven.loc[:, 'stimCondition'] = plotInputDriven.apply(lambda coln: '{}_{}'.format(coln['electrode'], coln['trialRateInHz']), axis='columns')
+                    plotInputDriven.loc[:, 'kinematicCondition'] = plotInputDriven.apply(lambda coln: '{}_{}'.format(coln['pedalMovementCat'], coln['pedalDirection']), axis='columns')
+                    g = sns.relplot(
+                        x='bin', y='signal',
+                        col='stimCondition', row='kinematicCondition',
+                        data=plotInputDriven,
+                        kind='line', errorbar='se', hue='trialAmplitude',
+                        facet_kws=dict(margin_titles=True)
+                        )
+                    g.tight_layout()
+                    g.set_titles({'col_template': '{col_name}', 'row_template': '{row_name}'})
+                    figTitle = g.suptitle(
+                        'Input driven dynamics for\n{}\n    {}\n'.format(
+                            lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr'],
+                            {k: v for k, v in zip(iRGroupNames, name)}))
+                    pdf.savefig(
+                        bbox_inches='tight',
+                        )
+                    if arguments['showFigures']:
+                        plt.show()
+                    else:
+                        plt.close()
             ADict[name] = A
             BDict[name] = B
             KDict[name] = K
             CDict[name] = C
             DDict[name] = D
             HDict[name] = H
+            PsiDict[name] = PsiDF
+            inputDrivenDict[name] = inputDrivenDF
             # sS = ctrl.ss(A, B, C, D, dt=binInterval)
             theseEigValsList = []
             for nd in range(A.shape[0], 1, max(1, int(A.shape[0] / 20)) * (-1)):
@@ -427,6 +498,10 @@ def calcTransferFunctionFromLeastSquares():
         allD.to_hdf(estimatorPath, 'D')
         allH = pd.concat(HDict, names=iRGroupNames)
         allH.to_hdf(estimatorPath, 'H')
+        allPsi = pd.concat(PsiDict, names=iRGroupNames)
+        allPsi.to_hdf(estimatorPath, 'Psi')
+        allInputDrivenDF = pd.concat(inputDrivenDict, names=iRGroupNames)
+        allInputDrivenDF.to_hdf(estimatorPath, 'inputDriven')
     else:
         print('No tasks run on this job!!')
         if arguments['plotting']:
