@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s08_ols_tf_sta_202101
+#SBATCH -J s08a_ols_tf_sta_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s08_ols_tf_sta_202101-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s08_ols_tf_sta_202101-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s08a_ols_tf_sta_202101_21-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s08a_ols_tf_sta_202101_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -37,7 +37,7 @@ do
   #
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  SUFFIX="_baseline"
+  SUFFIX="_scaled"
   ITERATOR="ra"
   WINDOWTERM="XL"
   #
@@ -46,5 +46,5 @@ do
   #  --forceReprocess
   DIMRED="select"
   ESTIMATOR="ols_${DIMRED}${SUFFIX}"
-  python -u './processLeastSquaresTransferFunction.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './processLeastSquaresTransferFunction.py' --eraMethod=ERA --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done

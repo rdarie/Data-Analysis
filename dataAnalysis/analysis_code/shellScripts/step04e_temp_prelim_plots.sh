@@ -10,11 +10,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J s04e_prelim_plots_202101_21
+#SBATCH -J s04e_prelim_plots_202101
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/s04e_prelim_plots_202101_21.out
-#SBATCH -e ../../batch_logs/s04e_prelim_plots_202101_21.out
+#SBATCH -o ../../batch_logs/s04e_prelim_plots_202101.out
+#SBATCH -e ../../batch_logs/s04e_prelim_plots_202101.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -27,7 +27,7 @@
 #
 #  202101_21 202101_22
 # exps=(201901_25 201901_26 201901_27 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_21)
+exps=(202101_21 202101_27)
 for A in "${exps[@]}"
 do
   echo "step 04e plots, on $A"
@@ -35,7 +35,7 @@ do
   source ./shellScripts/calc_aligned_stim_preamble.sh
   #
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  ITERATOR="ra"
+  ITERATOR="rb"
   #
   OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER}"
   python -u './plotSignalDataFrameV2.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName="rig" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"

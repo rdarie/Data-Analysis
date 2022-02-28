@@ -143,7 +143,15 @@ if __name__ == '__main__':
     lhsDF = pd.read_hdf(lhsDatasetPath, '/{}/data'.format(arguments['selectionNameLhs']))
     rhsDF = pd.read_hdf(rhsDatasetPath, '/{}/data'.format(arguments['selectionNameRhs']))
     rhsMasks = pd.read_hdf(rhsDatasetPath, '/{}/featureMasks'.format(arguments['selectionNameRhs']))
+    ############ exclude trials with nonzero stim left over from previous trials
+    # nostimMask = np.asarray(lhsDF.index.get_level_values('electrode') == 'NA')
+    # zeroAmpMask = np.asarray(lhsDF.xs('amplitude', level='feature', axis='columns') == 0).flatten()
+    # nostimTInfo = lhsDF.loc[nostimMask & (~zeroAmpMask), :].index.to_frame().reset_index(drop=True)
+    # plotDF = lhsDF.loc[nostimMask, :].copy()
+    # plotDF.columns = plotDF.columns.get_level_values('feature')
     #
+    # sns.relplot(x='bin', y='amplitude', data=plotDF, kind='line', estimator=None, units='trialUID'); plt.show()
+    # sns.relplot(x='bin', y='RateInHz', data=plotDF, kind='line', estimator=None, units='trialUID'); plt.show()
     if arguments['transformerNameRhs'] is not None:
         transformedSelectionNameRhs = '{}_{}'.format(
             arguments['selectionNameRhs'], arguments['transformerNameRhs'])
@@ -311,7 +319,6 @@ if __name__ == '__main__':
             os.remove(designMatrixPath)
         lhsDF.to_hdf(designMatrixPath, 'lhsDF', mode='a')
         if arguments['plotting']:
-            # pdb.set_trace()
             g = sns.displot(data=lhsDF, kind='ecdf')
             g.set(yscale='log')
             g.suptitle('Exog regressors scale')
@@ -453,6 +460,9 @@ if __name__ == '__main__':
                     index=lhsDF.index,
                     columns=designInfo.column_names))
             designDF.columns.name = 'factor'
+            # nostimMask = np.asarray(['e[NA]' in cN for cN in designDF.columns])
+            # designDF.loc[:, nostimMask]
+            # lhsDF.xs('NA', level='electrode').min()
             for key, sl in designInfo.term_name_slices.items():
                 sourceFactorDict.update({cN: key for cN in designInfo.column_names[sl]})
             designDF.to_hdf(designMatrixPath, 'designs/exogParents/formula_{}'.format(parentFormulaIdx))

@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s05_prep_regression_sta_202101_27
+#SBATCH -J s05_prep_regression_stb_202101
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s05_prep_regression_sta_202101_27.out
-#SBATCH -e ../../batch_logs/regression/s05_prep_regression_sta_202101_27.out
+#SBATCH -o ../../batch_logs/regression/s05_prep_regression_stb_202101.out
+#SBATCH -e ../../batch_logs/regression/s05_prep_regression_stb_202101.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,7 +29,7 @@
 # SLURM_ARRAY_TASK_ID=2
 # 201902_03
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_27)
+exps=(202101_21 202101_27)
 # export CCV_HEADLESS=1
 for A in "${exps[@]}"
 do
@@ -39,7 +39,7 @@ do
   
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   
-  ITERATOR="ra"
+  ITERATOR="rb"
   
   python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS $TIMEWINDOWOPTS
   # --preScale

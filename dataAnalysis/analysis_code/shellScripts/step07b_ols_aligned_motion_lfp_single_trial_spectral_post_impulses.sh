@@ -38,7 +38,7 @@ do
   ###
   ITERATOR="ra"
   WINDOWTERM="XL"
-  SUFFIX="_spectral_baseline"
+  SUFFIX="_spectral_scaled"
   #  --forceReprocess
   DIMRED="select2"
   ESTIMATOR="ols2_${DIMRED}${SUFFIX}"

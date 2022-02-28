@@ -354,14 +354,14 @@ coefDF.to_hdf(estimatorPath, 'coefficients')
 termPalette = pd.concat({
     'exog': pd.Series(np.unique(np.concatenate([di.term_names for di in designInfoDF['designInfo']]))),
     'endog': pd.Series(np.unique(np.concatenate([di.term_names for di in histDesignInfoDF['designInfo']]))),
-    'other': pd.Series(['prediction', 'ground_truth', 'residuals']),
+    'other': pd.Series(['prediction', 'ground_truth', 'residuals', 'inputDriven']),
     }, names=['type', 'index']).to_frame(name='term')
 sourceTermLookup = pd.concat({
     'exog': pd.Series(sourceTermDict).to_frame(name='source'),
     'endog': pd.Series(histSourceTermDict).to_frame(name='source'),
     'other': pd.Series(
-        ['prediction', 'ground_truth', 'residuals'],
-        index=['prediction', 'ground_truth', 'residuals']).to_frame(name='source'),}, names=['type', 'term'])
+        ['prediction', 'ground_truth', 'residuals', 'inputDriven'],
+        index=['prediction', 'ground_truth', 'residuals', 'inputDriven']).to_frame(name='source'),}, names=['type', 'term'])
 #
 primaryPalette = pd.DataFrame(sns.color_palette('colorblind'), columns=['r', 'g', 'b'])
 pickingColors = False
@@ -372,12 +372,12 @@ if pickingColors:
         palAx.text(tIdx, .5, '{}'.format(tN))
     plt.show()
 rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 1, 1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
+    primaryPalette.iloc[[1, 1, 1, 1, 0, 2, 4, 7, 8, 9, 6], :].to_numpy(),
     columns=['r', 'g', 'b'],
     index=[
         'vx', 'vy', 'vxa', 'vya', 'a', 'r',
         'ens', 'residuals',
-        'prediction', 'ground_truth'])
+        'prediction', 'ground_truth', 'inputDriven'])
 hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
 hls.loc['vx*r', :] = hls.loc[['vx', 'r'], :].mean()
@@ -409,6 +409,7 @@ predictionLineStyleDF = pd.DataFrame([
         'prediction': 1.,
         'ground_truth': 1.,
         'residuals': 1.,
+        'inputDriven': 1.,
     },
     {
         'factor': (1, 1),
@@ -416,6 +417,7 @@ predictionLineStyleDF = pd.DataFrame([
         'prediction': (2, 1),
         'ground_truth': (8, 0),
         'residuals': (2, 1),
+        'inputDriven': (2, 1),
     }
 ], index=['sizes', 'dashes'])
 ########################################################################################

@@ -227,7 +227,6 @@ if (not arguments['loadFromFrames']):
         except Exception:
             traceback.print_exc()
             continue
-        # pdb.set_trace()
         # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         if theseIteratorOpts['calcTimeROI']:
             if arguments['controlSet']:
@@ -236,7 +235,7 @@ if (not arguments['loadFromFrames']):
                     aQ = arguments['alignQuery']
                     useAsMarked = True
                 else:
-                    useAsMarked =  False
+                    useAsMarked = False
                 endMaskQuery = ash.processAlignQueryArgs(
                     namedQueries, alignQuery=aQ)
                 ROIWinStart = theseIteratorOpts['timeROIOpts_control']['winStart']
@@ -274,6 +273,16 @@ if (not arguments['loadFromFrames']):
                 groupBins = group.index.get_level_values('bin')
                 print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
+            ######## also discard trials labeled as no stim that have stim from previous trials bleeding through
+            if 'electrode' in dataDF.index.names:
+                noStimMask = dataDF.index.get_level_values('electrode') == 'NA'
+                if 'amplitude#0' in dataDF.columns.get_level_values('feature'):
+                    nonZeroAmpMask = (~(dataDF.xs('amplitude#0', level='feature', axis='columns') == 0).to_numpy()).flatten()
+                    if (noStimMask & nonZeroAmpMask).any():
+                        addlBadTrials = dataDF.index[(noStimMask & nonZeroAmpMask)].get_level_values('t').unique()
+                        addlBadMask = dataDF.index.get_level_values('t').isin(addlBadTrials)
+                        targetMask = targetMask & (~addlBadMask)
+            #########
             listOfROIMasks.append(targetMask)
             print('targetMask has dimension {}'.format(targetMask.shape))
             dataDF = dataDF.loc[targetMask, :]
@@ -325,7 +334,6 @@ else:    # loading frames
                     controlKey = '/{}/control'.format(arguments['selectionName'])
                     if controlKey in store:
                         theseDF['control'] = pd.read_hdf(store, controlKey)
-                        # pdb.set_trace()
                     assert len(theseDF.keys()) > 0
                     print('Loaded {}\n    from {}'.format(arguments['selectionName'], dFPath))
                     thisDF = pd.concat(theseDF, names=['controlFlag'])

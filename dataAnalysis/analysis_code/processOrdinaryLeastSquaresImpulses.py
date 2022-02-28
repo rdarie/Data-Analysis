@@ -219,7 +219,7 @@ for rowIdx, row in allTargetsDF.iterrows():
     else:
         print('Warning! {} does not exists.'.format(thisEstimatorJBPath))
 estimatorsDF = pd.concat(estimatorsDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
-# pdb.set_trace()
+
 savingResults = True
 # prep rhs dataframes
 histDesignInfoDict = {}
@@ -334,60 +334,62 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
             selfDesignInfo = histDesignInfoDict[(rhsMaskIdx, selfTemplate)]
         ####
         for targetName in rhGroup.columns:
-            # add targetDF to designDF?
-            if ensTemplate != 'NULL':
-                templateIdx = lOfHistTemplates.index(ensTemplate)
-                thisEnsDesign = pd.read_hdf(
-                    designMatrixPath,
-                    'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
-                thisEnsFeatureInfo = pd.read_hdf(
-                    designMatrixPath, 'histDesigns/rhsMask_{}/term_lookup_{}'.format(rhsMaskIdx, templateIdx))
-                thisEnsDesign.columns = pd.MultiIndex.from_frame(thisEnsFeatureInfo)
-                ensHistList = [
-                    thisEnsDesign.iloc[:, sl]
-                    for key, sl in ensDesignInfo.term_name_slices.items()
-                    if key != ensTemplate.format(targetName)]
-                del thisEnsDesign
-                ensTermNames = [
-                    tN
-                    for tN in ensDesignInfo.term_names
-                    if tN != ensTemplate.format(targetName)]
-            else:
-                ensHistList = []
-                ensTermNames = []
-            #
-            if selfTemplate != 'NULL':
-                templateIdx = lOfHistTemplates.index(selfTemplate)
-                thisSelfDesign = pd.read_hdf(
-                    designMatrixPath,
-                    'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
-                thisSelfFeatureInfo = pd.read_hdf(
-                    designMatrixPath, 'histDesigns/rhsMask_{}/term_lookup_{}'.format(rhsMaskIdx, templateIdx))
-                thisSelfDesign.columns = pd.MultiIndex.from_frame(thisSelfFeatureInfo)
-                selfHistList = [
-                    thisSelfDesign.iloc[:, sl].copy()
-                    for key, sl in selfDesignInfo.term_name_slices.items()
-                    if key == selfTemplate.format(targetName)]
-                del thisSelfDesign
-                selfTermNames = [
-                    tN
-                    for tN in selfDesignInfo.term_names
-                    if tN == selfTemplate.format(targetName)]
-                # print('selfHistList:\n{}\nselfTermNames:\n{}'.format(selfHistList, selfTermNames))
-            else:
-                selfHistList = []
-                selfTermNames = []
-            #
-            fullDesignList = exogList + ensHistList + selfHistList
-            fullDesignDF = pd.concat(fullDesignList, axis='columns')
-            del fullDesignList
-            sortOrder = {cN: cIdx for cIdx, cN in enumerate(rhGroup.columns)}
-            sortKey = lambda x: x.map(sortOrder)
-            fullDesignDF.sort_index(
-                axis='columns', level='source',
-                key=sortKey, kind='mergesort',
-                sort_remaining=False, inplace=True)
-            fullDesignDF.columns = fullDesignDF.columns.get_level_values('factor')
+            '''
+                # add targetDF to designDF?
+                if ensTemplate != 'NULL':
+                    templateIdx = lOfHistTemplates.index(ensTemplate)
+                    thisEnsDesign = pd.read_hdf(
+                        designMatrixPath,
+                        'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
+                    thisEnsFeatureInfo = pd.read_hdf(
+                        designMatrixPath, 'histDesigns/rhsMask_{}/term_lookup_{}'.format(rhsMaskIdx, templateIdx))
+                    thisEnsDesign.columns = pd.MultiIndex.from_frame(thisEnsFeatureInfo)
+                    ensHistList = [
+                        thisEnsDesign.iloc[:, sl]
+                        for key, sl in ensDesignInfo.term_name_slices.items()
+                        if key != ensTemplate.format(targetName)]
+                    del thisEnsDesign
+                    ensTermNames = [
+                        tN
+                        for tN in ensDesignInfo.term_names
+                        if tN != ensTemplate.format(targetName)]
+                else:
+                    ensHistList = []
+                    ensTermNames = []
+                #
+                if selfTemplate != 'NULL':
+                    templateIdx = lOfHistTemplates.index(selfTemplate)
+                    thisSelfDesign = pd.read_hdf(
+                        designMatrixPath,
+                        'histDesigns/rhsMask_{}/template_{}'.format(rhsMaskIdx, templateIdx))
+                    thisSelfFeatureInfo = pd.read_hdf(
+                        designMatrixPath, 'histDesigns/rhsMask_{}/term_lookup_{}'.format(rhsMaskIdx, templateIdx))
+                    thisSelfDesign.columns = pd.MultiIndex.from_frame(thisSelfFeatureInfo)
+                    selfHistList = [
+                        thisSelfDesign.iloc[:, sl].copy()
+                        for key, sl in selfDesignInfo.term_name_slices.items()
+                        if key == selfTemplate.format(targetName)]
+                    del thisSelfDesign
+                    selfTermNames = [
+                        tN
+                        for tN in selfDesignInfo.term_names
+                        if tN == selfTemplate.format(targetName)]
+                    # print('selfHistList:\n{}\nselfTermNames:\n{}'.format(selfHistList, selfTermNames))
+                else:
+                    selfHistList = []
+                    selfTermNames = []
+                #
+                fullDesignList = exogList + ensHistList + selfHistList
+                fullDesignDF = pd.concat(fullDesignList, axis='columns')
+                del fullDesignList
+                sortOrder = {cN: cIdx for cIdx, cN in enumerate(rhGroup.columns)}
+                sortKey = lambda x: x.map(sortOrder)
+                fullDesignDF.sort_index(
+                    axis='columns', level='source',
+                    key=sortKey, kind='mergesort',
+                    sort_remaining=False, inplace=True)
+                fullDesignDF.columns = fullDesignDF.columns.get_level_values('factor')
+                '''
             for foldIdx in range(cvIterator.n_splits + 1):
                 targetDF = rhGroup.loc[:, [targetName]]
                 estimatorIdx = (lhsMaskIdx, rhsMaskIdx, targetName, foldIdx)
@@ -397,24 +399,30 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
                 if not estimatorIdx in estimatorsDF.index:
                     continue
                 estimator = estimatorsDF.loc[estimatorIdx]
-                coefs = pd.Series(
-                    estimator.regressor_.named_steps['regressor'].coef_, index=fullDesignDF.columns)
-                coefDict0[(lhsMaskIdx, designFormula, rhsMaskIdx, targetName, foldIdx)] = coefs
+                # coefsHere = pd.Series(
+                #     estimator.regressor_.named_steps['regressor'].coef_, index=fullDesignDF.columns)
+                coefsHere = pd.Series(
+                    estimator.regressor_.named_steps['regressor'].coef_,
+                    index=estimator.regressor_.named_steps['regressor'].model_.exog_names)
+                coefDict0[(lhsMaskIdx, designFormula, rhsMaskIdx, targetName, foldIdx)] = coefsHere
+                # (estimator.regressor_.named_steps['regressor'].model_.exog_names) == fullDesignDF.columns.to_list()
 coefDF = pd.concat(coefDict0, names=['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'factor'])
-if savingResults:   
+print('Saving to {}'.format(estimatorPath))
+if savingResults:
     coefDF.to_hdf(estimatorPath, 'coefficients')
 ###
+pdb.set_trace()
 termPalette = pd.concat({
     'exog': pd.Series(np.unique(np.concatenate([di.term_names for di in designInfoDF['designInfo']]))),
     'endog': pd.Series(np.unique(np.concatenate([di.term_names for di in histDesignInfoDF['designInfo']]))),
-    'other': pd.Series(['prediction', 'ground_truth', 'residuals']),
+    'other': pd.Series(['prediction', 'ground_truth', 'residuals', 'inputDriven', 'oneStepKalman']),
     }, names=['type', 'index']).to_frame(name='term')
 sourceTermLookup = pd.concat({
     'exog': pd.Series(sourceTermDict).to_frame(name='source'),
     'endog': pd.Series(histSourceTermDict).to_frame(name='source'),
     'other': pd.Series(
-        ['prediction', 'ground_truth', 'residuals'],
-        index=['prediction', 'ground_truth', 'residuals']).to_frame(name='source'),}, names=['type', 'term'])
+        ['prediction', 'ground_truth', 'residuals', 'inputDriven', 'oneStepKalman'],
+        index=['prediction', 'ground_truth', 'residuals', 'inputDriven', 'oneStepKalman']).to_frame(name='source'),}, names=['type', 'term'])
 #
 primaryPalette = pd.DataFrame(sns.color_palette('colorblind'), columns=['r', 'g', 'b'])
 pickingColors = False
@@ -424,10 +432,10 @@ if pickingColors:
     for tIdx, tN in enumerate(primaryPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN))
 rgb = pd.DataFrame(
-    primaryPalette.iloc[[1, 1, 0, 2, 4, 7, 8, 9], :].to_numpy(),
+    primaryPalette.iloc[[1, 1, 0, 2, 4, 7, 8, 9, 6, 5], :].to_numpy(),
     columns=['r', 'g', 'b'],
     index=[
-        'vx', 'vy', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth'])
+        'vx', 'vy', 'a', 'r', 'ens', 'residuals', 'prediction', 'ground_truth', 'inputDriven', 'oneStepKalman'])
 hls = rgb.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
 hls.loc['a*r', :] = hls.loc[['a', 'r'], :].mean()
 hls.loc['vx*r', :] = hls.loc[['vx', 'r'], :].mean()
@@ -461,13 +469,17 @@ predictionLineStyleDF = pd.DataFrame([
         'prediction': 1.,
         'ground_truth': 1.,
         'residuals': 1.,
+        'inputDriven': 1.,
+        'oneStepKalman': 1,
     },
     {
         'factor': (1, 1),
         'component': (3, 1),
         'prediction': (2, 1),
         'ground_truth': (8, 0),
-        'residuals': (2, 1),
+        'residuals': (2, 2),
+        'inputDriven': (2, 1),
+        'oneStepKalman': (3, 2),
     }
 ], index=['sizes', 'dashes'])
 ########################################################################################
@@ -577,6 +589,7 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
             #     outputIR.loc[:, cN] = np.nan
         else:
             selfTermNames = []
+        #######
         if len(histDesignList):
             histDesignDF = pd.concat(histDesignList, axis='columns')
             columnsInDesign = [cN for cN in coefs.index if cN in histDesignDF.columns]
@@ -681,14 +694,15 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
             plotIR = outputIR.copy()
             plotIR.index = plotIR.index.droplevel([idxName for idxName in plotIR.index.names if idxName not in ['trialUID', 'bin']])
             fig, ax = plt.subplots()
-            sns.heatmap(plotIR, ax=ax)
+            sns.heatmap(plotIR, ax=ax, center=0.)
             ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha='right')
+            ax.set_title('VAR model coefficients')
             for termName, termSlice in designInfo.term_name_slices.items():
                 histOpts = sourceHistOptsDict[termName.replace(' ', '')]
                 factorNames = designInfo.column_names[termSlice]
                 if 'rcb(' in termName:
                     basisApplier = tdr.raisedCosTransformer(histOpts)
-                    fig, ax = basisApplier.plot_basis()
+                    # fig, ax = basisApplier.plot_basis()
                     if histOpts['useOrtho']:
                         basisDF = basisApplier.orthobasisDF
                     else:
@@ -698,7 +712,7 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
                     nReps = int(len(factorNames) / basisDF.shape[1])
                     for trialUID in range(nReps):
                         basisDF.columns = factorNames[trialUID::nReps]
-                        irDF = plotIR.xs(trialUID, level='trialUID')
+                        irDF = plotIR   #.xs(trialUID, level='trialUID')
                         fig, ax = plt.subplots(2, 1, sharex=True)
                         for cN in basisDF.columns:
                             ax[0].plot(basisDF.index, basisDF[cN], label='basis {}'.format(cN))
@@ -706,6 +720,8 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
                             ax[1].plot(irDF.index.get_level_values('bin'), irDF[cN], '--', label='IR {}'.format(cN))
                         ax[0].legend()
                         ax[1].legend()
+                    ax[1].set_title('Term {}'.format(termName))
+                plt.show()
         ###########################
         prf.print_memory_usage('Calculated IR for {}, {}\n'.format((lhsMaskIdx, designFormula), (rhsMaskIdx, targetName, fold)))
         iRPerFactorDict1[(rhsMaskIdx, targetName, fold)] = outputIR

@@ -14,6 +14,7 @@ Options:
     --datasetName=datasetName                filename for resulting estimator (cross-validated n_comps)
     --analysisName=analysisName              append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName        append a name to the resulting blocks? [default: motion]
+    --eraMethod=eraMethod                    append a name to the resulting blocks? [default: ERA]
 """
 
 import logging
@@ -63,7 +64,7 @@ from scipy.spatial import distance
 import dill as pickle
 import gc
 import patsy
-from itertools import product
+from itertools import product, chain
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 
 import control as ctrl
@@ -73,7 +74,7 @@ dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
         'lines.linewidth': .5,
-        'lines.markersize': 1.,
+        'lines.markersize': 3.,
         'patch.linewidth': .5,
         "axes.spines.left": True,
         "axes.spines.bottom": True,
@@ -115,9 +116,9 @@ styleOpts = {
     'panel_heading.pad': 0.
     }
 sns.set(
-    context='paper', style='white',
+    context='paper', style='whitegrid',
     palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True, rc=snsRCParams)
+    font_scale=1., color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
@@ -173,6 +174,10 @@ estimatorMetaDataPath = os.path.join(
 with open(estimatorMetaDataPath, 'rb') as _f:
     estimatorMeta = pickle.load(_f)
 #
+transferFuncPath = os.path.join(
+    estimatorsSubFolder,
+    fullEstimatorName + '_{}_tf.h5'.format(arguments['eraMethod'])
+    )
 loadingMetaPath = estimatorMeta['loadingMetaPath']
 with open(loadingMetaPath, 'rb') as _f:
     loadingMeta = pickle.load(_f)
@@ -199,24 +204,30 @@ lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
 rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
 #
-if processSlurmTaskCountTransferFunctions is not None:
+if processSlurmTaskCount is not None:
     ################ collect estimators and scores
     AList = []
     BList = []
     CList = []
     DList = []
     HList = []
+    KList = []
     eigList = []
-    for workerIdx in range(processSlurmTaskCountTransferFunctions):
-        thisEstimatorPath = estimatorPath.replace('.h5', '_{}.h5'.format(workerIdx))
+    inputDrivenList = []
+    untruncatedHEigenValsList = []
+    for workerIdx in range(processSlurmTaskCount):
+        thisTFPath = transferFuncPath.replace('_tf.h5', '_{}_tf.h5'.format(workerIdx))
         try:
-            AList.append(pd.read_hdf(thisEstimatorPath, 'A'))
-            BList.append(pd.read_hdf(thisEstimatorPath, 'B'))
-            CList.append(pd.read_hdf(thisEstimatorPath, 'C'))
-            DList.append(pd.read_hdf(thisEstimatorPath, 'D'))
-            HList.append(pd.read_hdf(thisEstimatorPath, 'H'))
-            eigList.append(pd.read_hdf(thisEstimatorPath, 'eigenvalues'))
-            print('Loaded state transition matrices from {}'.format(thisEstimatorPath))
+            AList.append(pd.read_hdf(thisTFPath, 'A'))
+            BList.append(pd.read_hdf(thisTFPath, 'B'))
+            CList.append(pd.read_hdf(thisTFPath, 'C'))
+            DList.append(pd.read_hdf(thisTFPath, 'D'))
+            HList.append(pd.read_hdf(thisTFPath, 'H'))
+            KList.append(pd.read_hdf(thisTFPath, 'K'))
+            eigList.append(pd.read_hdf(thisTFPath, 'eigenvalues'))
+            inputDrivenList.append(pd.read_hdf(thisTFPath, 'inputDriven'))
+            untruncatedHEigenValsList.append(pd.read_hdf(thisTFPath, 'untruncatedHEigenVals'))
+            print('Loaded state transition matrices from {}'.format(thisTFPath))
         except Exception:
             traceback.print_exc()
     ADF = pd.concat(AList)
@@ -224,16 +235,20 @@ if processSlurmTaskCountTransferFunctions is not None:
     CDF = pd.concat(CList)
     DDF = pd.concat(DList)
     HDF = pd.concat(HList)
+    KDF = pd.concat(KList)
     eigDF = pd.concat(eigList)
+    inputDrivenDF = pd.concat(inputDrivenList)
+    untruncatedHEigDF = pd.concat(untruncatedHEigenValsList)
 else:
-    with pd.HDFStore(estimatorPath) as store:
+    with pd.HDFStore(transferFuncPath) as store:
         ADF = pd.read_hdf(store, 'A')
         BDF = pd.read_hdf(store, 'B')
         CDF = pd.read_hdf(store, 'C')
         DDF = pd.read_hdf(store, 'D')
         eigDF = pd.read_hdf(store, 'eigenvalues')
+        inputDrivenDF = pd.read_hdf(store, 'inputDriven')
+        untruncatedHEigDF = pd.read_hdf(store, 'untruncatedHEigenVals')
         eigValPalette = pd.read_hdf(store, 'eigValPalette')
-#
 eigValTypes = ['oscillatory decay', 'pure decay', 'oscillatory growth', 'pure growth']
 eigValColors = sns.color_palette('Set2')
 eigValPaletteDict = {}
@@ -264,11 +279,25 @@ if False:
                 height=height, aspect=aspect,
                 facet_kws={'margin_titles': True},
                 palette=eigValPalette.to_dict(),
-                kind='scatter', data=thisPlotEig.reset_index(), rasterized=True, edgecolor=None)
-            g.suptitle('design: {} freqBand: {}'.format(*name))
+                kind='scatter', data=thisPlotEig.xs(lastFoldIdx, level='fold').reset_index(), rasterized=True, edgecolor=None)
             for ax in g.axes.flatten():
-                c = Circle((0, 0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
+                c = Circle(
+                    (0, 0), 1,
+                    ec=(0, 0, 0, 0.25),
+                    fc=(0, 0, 0, 0))
                 ax.add_artist(c)
+                ax.set_ylim(-1.05, 1.05)
+                ax.set_yticks([-1, 0, 1])
+                ax.set_xlim(-1.05, 1.05)
+                ax.set_xticks([-1, 0, 1])
+            asp.reformatFacetGridLegend(
+                g, titleOverrides={
+                    'eigValType': 'Eigenvalue type'},
+                contentOverrides={},
+                styleOpts=styleOpts)
+            g.set_axis_labels('Real', 'Imaginary')
+            g.suptitle(name[0])
+            g.resize_legend(adjust_subtitles=True)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:
@@ -276,40 +305,61 @@ if False:
             else:
                 plt.close()
 #
+eigDF.loc[:, 'complexS'] = eigDF['complex'].apply(np.log) / binInterval
+eigDF.loc[:, 'realS'] = eigDF['complexS'].apply(np.real)
+eigDF.loc[:, 'imagS'] = eigDF['complexS'].apply(np.imag) / (2 * np.pi)
+#
 plotEig = eigDF.loc[eigDF['nDimIsMax'], :]
 pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues'))
+    figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'OKID_{}'.format(arguments['eraMethod'])))
 with PdfPages(pdfPath) as pdf:
     height, width = 2, 2
     aspect = width / height
     for name, eigGroup in plotEig.groupby(['lhsMaskIdx', 'fullFormula']):
         lhsMaskIdx, fullFormula = name
         # if lhsMaskIdx not in [29]:
+        # pdb.set_trace()
+        eigGroupForPlot = eigGroup.xs(lastFoldIdx, level='fold')
+        stateSpaceNDim = np.unique(eigGroupForPlot.index.get_level_values('stateNDim'))[0]
+        # maskForScatter = (~np.isinf(eigGroup['tau'])) & (~np.isinf(eigGroup['chi']))
+        maskForScatter = (~np.isnan(eigGroupForPlot['complex']))
+        # maskForHist = (~np.isinf(eigGroup['tau'])) & (~np.isinf(eigGroup['chi'])) & (eigGroup['tau'] > binInterval) & (eigGroup['chi'] < 1.)
+        if not maskForScatter.any():
+            continue
         #     continue
+        #############################################################################################################################
+        ## Z plane
         g = sns.relplot(
             col='freqBandName',
             x='real', y='imag', hue='eigValType',
             height=height, aspect=aspect,
             palette=eigValPalette.to_dict(),
             facet_kws={'margin_titles': True},
-            rasterized=True, edgecolor=None,
-            kind='scatter', data=eigGroup)
+            rasterized=True, edgecolor=None, marker='+', linewidth=1.,
+            kind='scatter', data=eigGroupForPlot.loc[maskForScatter, :])
         for ax in g.axes.flatten():
-            c = Circle(
-                (0, 0), 1,
-                ec=(0, 0, 0, 0.25),
-                fc=(0, 0, 0, 0))
-            ax.add_artist(c)
+            captions = ['no decay', '1 DT', '2 DT', '4 DT', '8 DT']
+            for radIdx, radius in enumerate([1, np.exp(-1/2), np.exp(-1/4), np.exp(-1/8), np.exp(-1/16)]):
+                c = Circle(
+                    (0, 0), radius,
+                    ec=(0, 0, 0, 0.25),
+                    fc=(0, 0, 0, 0))
+                ax.add_artist(c)
+                ax.text(0, radius, captions[radIdx], transform=ax.transData)
             ax.set_ylim(-1.05, 1.05)
             ax.set_yticks([-1, 0, 1])
             ax.set_xlim(-1.05, 1.05)
             ax.set_xticks([-1, 0, 1])
+            ax.text(
+                .95, .95, "Showing {}/{} eigenvalues".format(maskForScatter.sum(), maskForScatter.shape[0]),
+                ha='right', va='top', transform=ax.transAxes)
         asp.reformatFacetGridLegend(
             g, titleOverrides={
                 'eigValType': 'Eigenvalue type'},
             contentOverrides={},
             styleOpts=styleOpts)
         g.set_axis_labels('Real', 'Imaginary')
+        g.suptitle(fullFormula)
         g.resize_legend(adjust_subtitles=True)
         g.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
@@ -317,29 +367,120 @@ with PdfPages(pdfPath) as pdf:
             plt.show()
         else:
             plt.close()
-        #
-        fig, ax = plt.subplots(2, 1, figsize=(2, 1.5))
-        commonOpts = dict(element='step', stat="probability")
-        maskForHist = (eigGroup['tau'] > 0) & (~np.isinf(eigGroup['tau']))
-        eigGroupForHist = eigGroup.loc[maskForHist, :]
-        sns.histplot(
-            x='tau', data=eigGroupForHist,
-            ax=ax[0], color=eigValPalette['oscillatory decay'], **commonOpts)
-        sns.histplot(
-            x='chi', data=eigGroup, ax=ax[1],
-            color=eigValPalette['pure decay'], **commonOpts)
-        ax[0].set_xlabel('Oscillation period (sec)')
-        ax[0].set_xlim(eigGroupForHist['tau'].quantile([0, .85]).to_list())
-        ax[1].set_xlabel('Decay time constant (sec)')
-        ax[1].set_xlim(eigGroup['chi'].quantile([0, .99]).to_list())
-        sns.despine(fig)
+        #############################################################################################################################
+        #############################################################################################################################
+        ### S plane
+
+        maskForTimeConstant = ~np.isinf(eigGroupForPlot['tau']) & (eigGroupForPlot['tau'] > binInterval).to_numpy()
+        maskForPeriod = ~np.isinf(eigGroupForPlot['chi']) & (eigGroupForPlot['chi'] < 1.).to_numpy()
+        maskForScatter = maskForTimeConstant & maskForPeriod
+        if maskForScatter.any():
+            tauLims = eigGroupForPlot.loc[maskForScatter, 'tau'].quantile([0, .99]).to_list()
+            tauExt = tauLims[1] - tauLims[0]
+            tauLims = [tauLims[0] - tauExt * 5e-2, tauLims[1] + tauExt * 5e-2]
+            chiLims = eigGroupForPlot.loc[maskForScatter, 'chi'].quantile([0, .99]).to_list()
+            chiExt = chiLims[1] - chiLims[0]
+            chiLims = [chiLims[0] - chiExt * 5e-2, chiLims[1] + chiExt * 5e-2]
+            #
+            g = sns.relplot(
+                col='freqBandName',
+                x='tau', y='chi', hue='eigValType',
+                height=height, aspect=aspect,
+                palette=eigValPalette.to_dict(),
+                facet_kws={'margin_titles': True},
+                rasterized=True, edgecolor=None, marker='+', linewidth=1.,
+                kind='scatter', data=eigGroupForPlot.loc[maskForScatter, :])
+            asp.reformatFacetGridLegend(
+                g, titleOverrides={
+                    'eigValType': 'Eigenvalue type'},
+                contentOverrides={},
+                styleOpts=styleOpts)
+            #
+            for ax in g.axes.flatten():
+                ax.text(
+                    .95, .95, "Time constants for {}/{} eigenvalues".format(maskForScatter.sum(), maskForScatter.shape[0]),
+                    ha='right', va='top', transform=ax.transAxes)
+                ax.set_ylim(*chiLims)
+                ax.set_xlim(*tauLims)
+            #
+            g.set_axis_labels('Time constant (sec)', 'Period (sec)')
+            g.suptitle(fullFormula)
+            g.resize_legend(adjust_subtitles=True)
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+            #############################################################################################################################
+            #
+            fig, ax = plt.subplots(1, 2, figsize=(4, 2))
+            commonOpts = dict(element='step', stat="probability", cumulative=True)
+            sns.histplot(
+                x='tau', data=eigGroupForPlot.loc[maskForScatter, :],
+                ax=ax[0], color=eigValPalette['pure decay'], **commonOpts)
+            ax[0].set_xlim(tauLims)
+            ax[0].set_xlabel('Decay time constant (sec)')
+            sns.histplot(
+                x='chi', data=eigGroupForPlot.loc[maskForScatter, :], ax=ax[1],
+                color=eigValPalette['oscillatory decay'], **commonOpts)
+            ax[1].set_xlim(chiLims) #
+            ax[1].set_xlabel('Oscillation period (sec)')
+            sns.despine(fig)
+            fig.suptitle(fullFormula)
+            fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+        thisB = BDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        if not thisB.empty:
+            thisB = thisB.xs(lastFoldIdx, level='fold')
+        thisA = ADF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        if not thisA.empty:
+            thisA = thisA.xs(lastFoldIdx, level='fold')
+        thisA = thisA.iloc[:thisA.shape[1], :]
+        thisC = CDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        if not thisC.empty:
+            thisC = thisC.xs(lastFoldIdx, level='fold')
+        thisD = DDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        if not thisD.empty:
+            thisD = thisD.xs(lastFoldIdx, level='fold')
+        thisK = KDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
+        if not thisK.empty:
+            thisK = thisK.xs(lastFoldIdx, level='fold')
+        widthList = [df.shape[1] if not df.empty else 1 for df in [thisA, thisB, thisC, thisD, thisK]]
+        widthList = list(chain.from_iterable([wid, 1] for wid in widthList))
+        heightList = [df.shape[0] if not df.empty else 1 for df in [thisA, thisB, thisC, thisD, thisK]]
+        figH = 4
+        figW = sum(widthList) * 4 / max(heightList)
+        fig, ax = plt.subplots(1, 10, figsize=(figW, figH), gridspec_kw=dict(width_ratios=widthList))
+        commonHeatmapOpts = dict(
+            center=0,  # square=True, cbar=False,
+            xticklabels=False, yticklabels=False, rasterized=True)
+        if not thisA.empty:
+            sns.heatmap(thisA, ax=ax[0], cbar_ax=ax[1], **commonHeatmapOpts)
+        ax[0].set_title('A')
+        if not thisB.empty:
+            sns.heatmap(thisB, ax=ax[2], cbar_ax=ax[3], **commonHeatmapOpts)
+        ax[2].set_title('B')
+        if not thisC.empty:
+            sns.heatmap(thisC, ax=ax[4], cbar_ax=ax[5], **commonHeatmapOpts)
+        ax[4].set_title('C')
+        if not thisD.empty:
+            sns.heatmap(thisD, ax=ax[6], cbar_ax=ax[7], **commonHeatmapOpts)
+        ax[6].set_title('D')
+        if not thisK.empty:
+            sns.heatmap(thisK, ax=ax[8], cbar_ax=ax[9], **commonHeatmapOpts)
+        ax[8].set_title('K')
+        fig.suptitle('system matrices from validation set\n{}'.format(fullFormula))
         fig.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
             plt.show()
         else:
             plt.close()
-        thisB = BDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
         if not thisB.empty:
             fig, ax = plt.subplots(figsize=(2, 2))
             colsToEval = [cN for cN in thisB.columns if '[NA]' not in cN]
@@ -349,7 +490,7 @@ with PdfPages(pdfPath) as pdf:
             for cNr in colsToEval:
                 for cNc in colsToEval:
                     BCosineSim.loc[cNr, cNc] = distance.cosine(thisB[cNr], thisB[cNc])
-            sns.heatmap(BCosineSim, mask=mask, vmin=0, vmax=1, square=True, ax=ax)
+            sns.heatmap(BCosineSim, mask=mask, vmin=0, vmax=1, square=True, ax=ax, rasterized=True)
             ax.set_title('Cosine distance between input directions')
             fig.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
@@ -358,6 +499,31 @@ with PdfPages(pdfPath) as pdf:
             else:
                 plt.close()
             print('Saving to {}'.format(pdfPath))
+        #
+        thisHEig = untruncatedHEigDF.xs(lhsMaskIdx, level='lhsMaskIdx', drop_level=False)
+        nLags = int(np.ceil(lhsMasksInfo.loc[lhsMaskIdx, 'historyLen'] / binInterval))
+        nMeas = thisC.shape[0]
+        plotThisHEig = thisHEig.to_frame(name='s').reset_index()
+        rLim = min(plotThisHEig['state'].max(), max(2 * stateSpaceNDim, nMeas * nLags), ) + 1
+        g = sns.relplot(
+            x='state', y='s', col='rhsMaskIdx',
+            data=plotThisHEig.loc[plotThisHEig['state'] < rLim, :], kind='scatter',
+            height=3, aspect=1, )
+        g.set(yscale='log')
+        ax = g.axes[0, 0]
+        g.suptitle(
+            'singular values of Hankel matrix (ERA)\n{}'.format(lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']))
+        ax.axvline(stateSpaceNDim, c='b', label='state space model order: {}'.format(stateSpaceNDim), lw=1)
+        ax.axvline(nLags * nMeas, c='g', label='AR(p) order ({}) * num. channels ({}) = {}'.format(nLags, nMeas, nLags * nMeas), lw=1)
+        ax.axhline(np.spacing(1e4), c='r', label='floating point precision cutoff', ls='--')
+        ax.set_xlabel('Count')
+        ax.set_xlim([-1, rLim])
+        ax.legend(loc='lower right', )
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
         '''thisA = ADF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
         
         thisC = CDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
@@ -370,58 +536,3 @@ with PdfPages(pdfPath) as pdf:
             for outIdx in range(sys.noutputs):
                 ax[inpIdx, outIdx].semilogy(f, mag[outIdx, inpIdx, :])
         '''
-# ## pdfPath = os.path.join(
-# ##     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'OKID_ERA'))
-# ## with PdfPages(pdfPath) as pdf:
-# ##     for name, thisH in HDF.groupby(['lhsMaskIdx', 'design', 'rhsMaskIdx']):
-# ##         lhsMaskIdx, designFormula, rhsMaskIdx = name
-# ##         # lhsMasksInfo.loc[lhsMaskIdx, :]
-# ##         nLags = int(lhsMasksInfo.loc[lhsMaskIdx, 'historyLen'] / binInterval)
-# ##         plotH = thisH.xs(lastFoldIdx, level='fold').dropna(axis='columns')
-# ##         u, s, vh = np.linalg.svd(plotH, full_matrices=False)
-# ##         optThresh = tdr.optimalSVDThreshold(plotH) * np.median(s[:int(nLags)])
-# ##         optNDim = (s > optThresh).sum()
-# ##         stateSpaceNDim = min(optNDim, u.shape[0])
-# ##         fig, ax = plt.subplots(figsize=(3, 2))
-# ##         ax.plot(s)
-# ##         ax.set_title('singular values of Hankel matrix (ERA)\n{}'.format(lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']))
-# ##         ax.set_ylabel('s')
-# ##         ax.axvline(stateSpaceNDim, c='b', label='state space model order: {}'.format(stateSpaceNDim))
-# ##         ax.axvline(nLags, c='g', label='AR(p) order: {}'.format(nLags))
-# ##         ax.set_xlabel('Count')
-# ##         ax.set_xlim([-1, stateSpaceNDim * 10])
-# ##         ax.legend()
-# ##         pdf.savefig(bbox_inches='tight', pad_inches=0)
-# ##         if arguments['showFigures']:
-# ##             plt.show()
-# ##         else:
-# ##             plt.close()
-# ##         print('Saving to {}'.format(pdfPath))
-
-#
-'''pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalues'))
-with PdfPages(pdfPath) as pdf:
-    height, width = 3, 3
-    aspect = width / height
-    plotMask = plotEig['designFormula'] == lOfDesignFormulas[1]
-    g = sns.relplot(
-        row='designFormulaLabel', col='freqBandName',
-        x='real', y='imag', hue='eigValType',
-        height=height, aspect=aspect,
-        kind='scatter',
-        facet_kws={'margin_titles': True}, edgecolor=None, rasterized=True,
-        data=plotEig.loc[plotMask, :])
-    g.suptitle('design: {} freqBand: {}'.format(*name))
-    for ax in g.axes.flatten():
-        c = Circle((0,0), 1, ec=(0, 0, 0, 1.), fc=(0, 0, 0, 0))
-        ax.add_artist(c)
-        ax.set_ylim(-1, 1)
-        ax.set_xlim(-1, 1)
-    g.tight_layout(pad=styleOpts['tight_layout.pad'])
-    pdf.savefig(bbox_inches='tight', pad_inches=0)
-    if arguments['showFigures']:
-        plt.show()
-    else:
-        plt.close()
-'''

@@ -263,7 +263,7 @@ def parseAnalysisOptions(
     motionConditionNames = [
         'pedalMovementCat', 'pedalDirection',
         'pedalSizeCat',
-        ]
+        ] # ['pedalMovementCat', 'pedalDirection', 'electrode', amplitudeFieldName, 'trialRateInHz']
     if blockExperimentType in ['proprio-miniRC', 'proprio-RC', 'isi']:
         #if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
         # has stim but no motion
@@ -686,7 +686,7 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 50e-3,
-            'forceRollingWindow': 50e-3,
+            'forceRollingWindow': 30e-3,
             # 'procFun': {
             #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
             #     'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
@@ -696,7 +696,7 @@ def parseAnalysisOptions(
             'controlProportion': None,
             'maskEachFreqBand': False,
             'cvKWArgs': dict(
-                n_splits=10,
+                n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
@@ -719,7 +719,7 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 50e-3,
-            'forceRollingWindow': 100e-3,
+            'forceRollingWindow': 250e-3,
             # 'procFun': {
             #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
             #     'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
@@ -729,15 +729,15 @@ def parseAnalysisOptions(
             'controlProportion': None,
             'maskEachFreqBand': False,
             'cvKWArgs': dict(
-                n_splits=5,
+                n_splits=10,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': 'stoppingOrStimOff',
-                'winStart': -0.6,  # start 0.2 ( + .15 burn in period) before whatever the query was
-                'winStop': 0.2  # stop .1 sec after startingOrStimOn
+                'winStart': -0.8,  # start 0.2 ( + .15 burn in period) before whatever the query was
+                'winStop': 0.1  # stop .1 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
                 'alignQuery': None,

@@ -122,14 +122,19 @@ def ERAMittnik(
     R = np.diag(np.sqrt(s)) @ vh
     F = np.diag(np.sqrt(s) ** -1) @ u.T @ H1 @ vh.T @ np.diag(np.sqrt(s) ** -1)
     C = pd.DataFrame(O[:len(endogNames), :], index=endogNames)
+    C.index.name = 'target'
+    C.columns.name = 'state'
     K = pd.DataFrame(R[:, :len(endogNames)], columns=endogNames)
     G = pd.DataFrame(R[:, len(endogNames):len(endogNames) + len(exogNames)], columns=exogNames)
     A = pd.DataFrame(F + K @ C)
-    A.columns.name = 'state'
     A.index.name = 'state'
+    A.columns.name = 'state'
     D = pd.DataFrame(N.xs(0, level='bin', axis='columns').loc[:, exogNames], index=endogNames, columns=exogNames)
+    D.index.name = 'target'
+    D.columns.name = 'feature'
     B = pd.DataFrame(G + K @ D, columns=exogNames)
     B.index.name = 'state'
+    B.columns.name = 'feature'
     if not plotting:
         return A, B, C, D
     else:
@@ -142,7 +147,7 @@ def ERAMittnik(
 
 def getComp(uPiece, lagSamples, psiMat):
     co = uPiece.shift(lagSamples).fillna(0.) @ psiMat
-    return  co
+    return co
 
 def inputDrivenDynamics(
         psi=None, u=None, lag=None,
@@ -166,16 +171,21 @@ def inputDrivenDynamics(
 
 def ERA(
         Phi, maxNDim=None, endogNames=None, exogNames=None,
-        plotting=False, nLags=None, method='ERA', verbose=0):
+        eraReductionMethod='topFraction', eraFraction=None,
+        plotting=False, nLags=None, method='ERA',
+        verbose=0, noEndogTerms=False, checkApproximations=False):
     tBins = np.unique(Phi.columns.get_level_values('bin'))
     bins2Index = {bN: bIdx for bIdx, bN in enumerate(tBins)}
     Phi.rename(columns=bins2Index, inplace=True)
     # following notation from vicario 2014 (thesis)
-    p = Phi.columns.get_level_values('bin').max() # order of the varx model
+    p = Phi.columns.get_level_values('bin').max()  # order of the varx model
     Phi.loc[:, Phi.columns.get_level_values('bin') == p] = 0
     q = len(endogNames)
     m = len(exogNames)
-    N = nLags
+    if noEndogTerms:
+        N = int(2 * (p + 1))
+    else:
+        N = nLags
     if verbose > 1:
         print('ERA(): extracting phi matrix from coefficients')
     Phi1 = {}
@@ -230,6 +240,8 @@ def ERA(
     if verbose > 1:
         print('ERA(): inverting lPhiMat')
     lPhiMatInv = np.linalg.inv(lPhiMat)
+    if checkApproximations:
+        assert np.allclose(np.dot(lPhiMatInv, lPhiMat), np.eye(*lPhiMat.shape))
     del lPhiMat
     gc.collect()
     #
@@ -275,7 +287,7 @@ def ERA(
         dt = scipy.stats.mode(np.diff(tBins))[0][0]
         fig, ax = plt.subplots(
             3, 1,
-            figsize=(16,24))
+            figsize=(16, 24))
         plotS = Psi_sDF.stack('feature')
         plotG = Psi_gDF.stack('feature')
         for rowName, row in plotS.iterrows():
@@ -299,7 +311,7 @@ def ERA(
     PsiDF.sort_index(
         axis='columns', level=['bin'],
         kind='mergesort', sort_remaining=False, inplace=True)
-    PsiDF.loc[:, PsiDF.columns.get_level_values('bin') == N] = 0.
+    # PsiDF.loc[:, PsiDF.columns.get_level_values('bin') == N] = 0.
     ####
     HComps = []
     PsiBins = PsiDF.columns.get_level_values('bin')
@@ -318,11 +330,22 @@ def ERA(
         print('ERA(): svd of H')
     u, s, vh = np.linalg.svd(svdTargetH, full_matrices=False)
     if maxNDim is None:
-        optThresh = optimalSVDThreshold(svdTargetH) * np.median(s[:int(N)])
-        maxNDim = (s > optThresh).sum()
+        nonTrivialS = s[s > np.spacing(1e4)]
+        if eraReductionMethod == 'optimalSVD':
+            # s are sqrt eigenvalues
+            optThresh = optimalSVDThreshold(svdTargetH) * np.median(nonTrivialS) #  np.median(s[:int(N)])
+            maxNDim = (nonTrivialS > optThresh).sum()
+        elif eraReductionMethod == 'allNonTrivial':
+            maxNDim = nonTrivialS.shape[0]
+        else:
+            if eraFraction is None:
+                eraFraction = 1 - 1e-3
+            maxNDim = (np.cumsum(nonTrivialS / np.sum(nonTrivialS)) < eraFraction).sum()
     stateSpaceNDim = min(maxNDim, u.shape[0])
+    fullHEigenVals = pd.Series(s)
+    fullHEigenVals.index.name = 'state'
     if plotting:
-        ax[2].plot(s, label='singular values of H')
+        ax[2].plot(fullHEigenVals.to_numpy(), label='singular values of H')
         ax[2].set_title('singular values of Hankel matrix (ERA)')
         ax[2].set_ylabel('a. u.')
         ax[2].axvline(
@@ -333,11 +356,17 @@ def ERA(
         ax[2].set_xlim([0, 3 * max(p, stateSpaceNDim)])
         ax[2].set_xlabel('singular value count')
     #
-    u = u[:, :stateSpaceNDim]
-    s = s[:stateSpaceNDim]
-    vh = vh[:stateSpaceNDim, :]
+    u = u[:, :stateSpaceNDim].copy()
+    s = s[:stateSpaceNDim].copy()
+    vh = vh[:stateSpaceNDim, :].copy()
+    if checkApproximations:
+        hRecon = np.dot(u * s, vh)
+        errorNorm = np.linalg.norm(svdTargetH - hRecon, ord='fro')
+        print('ERA(): svd reconstruction error norm is {:.3g}'.format(errorNorm))
+        # mse = ((svdTargetH - hRecon) ** 2).mean().mean()
     ###
     O = u @ np.diag(np.sqrt(s))
+    # (u @ np.diag(np.sqrt(s))) == (u * np.sqrt(s))
     RColMask = PsiDF.columns.get_level_values('bin').isin(range(len(HComps)))
     if method == 'ERA':
         R = pd.DataFrame(np.diag(np.sqrt(s)) @ vh, index=None, columns=PsiDF.loc[:, RColMask].columns)
@@ -347,19 +376,45 @@ def ERA(
         ARaw = np.diag(np.sqrt(s) ** -1) @ u.T @ HH1 @ vh.T @ np.diag(np.sqrt(s) ** -1)
     ###
     A = pd.DataFrame(ARaw)
-    A.columns.name = 'state'
     A.index.name = 'state'
+    A.columns.name = 'state'
     C = pd.DataFrame(O[:len(endogNames), :], index=endogNames)
+    C.index.name = 'target'
+    C.columns.name = 'state'
     BK = R.xs(1, level='bin', axis='columns')
     B = BK.loc[:, exogNames]
     B.index.name = 'state'
+    B.columns.name = 'feature'
     K = BK.loc[:, endogNames]
     K.index.name = 'state'
+    K.columns.name = 'target'
     ###
     outputH = pd.DataFrame(svdTargetH)
     outputH.columns.name = 'state'
     outputH.index.name = 'state'
-    return A, B, K, C, D, outputH, PsiDF, (fig, ax,)
+    #
+    D.index.name = 'target'
+    D.columns.name = 'feature'
+    #
+    reconFunc = lambda nn: C @ np.linalg.matrix_power((A - K @ C), nn) @ BK
+    reconPsiDF = pd.concat(
+        {
+            ord: reconFunc(ord - 1)
+            for ord in range(1, stateSpaceNDim+1)}
+        , axis='columns', names=['bin', 'feature'])
+    reconPsiDF = reconPsiDF.swaplevel(axis='columns')
+    if D.any().any():
+        dWithBins = D.copy()
+        dwbCols = dWithBins.columns.to_frame().reset_index(drop=True)
+        dwbCols.loc[:, 'bin'] = 0
+        dWithBins.columns = pd.MultiIndex.from_frame(dwbCols)
+        fullPsiDF = pd.concat([dWithBins, PsiDF], axis='columns')
+        reconPsiDF = pd.concat([dWithBins, reconPsiDF], axis='columns')
+    else:
+        fullPsiDF = PsiDF
+    fullPsiDF.columns.names = ['feature', 'sampleBin']
+    reconPsiDF.columns.names = ['feature', 'sampleBin']
+    return A, B, K, C, D, outputH, fullPsiDF, reconPsiDF, fullHEigenVals, (fig, ax,)
 
 
 def makeImpulseLike(

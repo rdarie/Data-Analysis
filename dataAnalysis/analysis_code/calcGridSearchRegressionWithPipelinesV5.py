@@ -198,7 +198,7 @@ if __name__ == '__main__':
         return_train_score=True, return_estimator=True)
     estimatorMetadata['crossvalKWArgs'] = crossvalKWArgs
     ###
-    nAlphas = 50
+    nAlphas = 10
     ###
     ## statsmodels elasticnet
     regressorKWArgs = {
@@ -339,7 +339,7 @@ if __name__ == '__main__':
         slurmTaskID = 0
     ####################
     if DEBUGGING:
-        slurmTaskID = 4
+        slurmTaskID = 0
     ####################
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
@@ -409,6 +409,9 @@ if __name__ == '__main__':
             exogList = [designDF]
         else:
             exogList = []
+        # nostimMask = np.asarray(['e[NA]' in cN[0] for cN in designDF.columns])
+        # (designDF.loc[:, nostimMask] == 0).all()
+        #
         # add ensemble to designDF?
         #
         ensTemplate = lhsMaskParams['ensembleTemplate']
@@ -532,6 +535,8 @@ if __name__ == '__main__':
                         gsKWA['param_grid'] = gsParams
                 #############
                 if DEBUGGING:
+                    # noStimCols = [cN for cN in fullDesignDF.columns if 'e[NA]' in cN]
+                    # fullDesignDF.loc[:, noStimCols].max()
                     estimatorInstance.fit(fullDesignDF, targetDF)
                 ##############
                 cvScores, gridSearcherDict1[targetName], gsScoresDF = tdr.gridSearchHyperparameters(

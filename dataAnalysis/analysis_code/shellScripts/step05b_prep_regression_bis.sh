@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s05_prep_regression_sta_202101
+#SBATCH -J s05b_prep_regression_sta_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s05_prep_regression_sta_202101.out
-#SBATCH -e ../../batch_logs/regression/s05_prep_regression_sta_202101.out
+#SBATCH -o ../../batch_logs/regression/s05b_prep_regression_sta_202101_27.out
+#SBATCH -e ../../batch_logs/regression/s05b_prep_regression_sta_202101_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,7 +29,7 @@
 # SLURM_ARRAY_TASK_ID=2
 # 201902_03
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_21 202101_27)
+exps=(202101_27)
 # export CCV_HEADLESS=1
 for A in "${exps[@]}"
 do
@@ -40,9 +40,8 @@ do
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   
   ITERATOR="ra"
-  
   ESTIMATOR="select2"
-  TARGET="laplace_baseline"
+  TARGET="laplace_scaled"
   python -u './calcSignalColumnSelector.py'  --selectMethod='fromRegression' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
   #############################################################################################################
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"
@@ -51,8 +50,8 @@ do
   python -u './prepSignalsAsRegressorV3.py' --transformerNameRhs='select2' --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
   ###
   ESTIMATOR="select2"
-  TARGET="laplace_spectral_baseline"
-  #  --averageByTrial
+  TARGET="laplace_spectral_scaled"
+  #
   # python -u './calcSignalColumnSelector.py'  --selectMethod='fromRegression' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
   #
   ############################################################################################################

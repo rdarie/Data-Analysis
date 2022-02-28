@@ -227,7 +227,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_illustration': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '300', 'limitPages': None,
+        'winStart': '-800', 'winStop': '1000', 'limitPages': None,
         # 'unitQuery': None,
         'unitQuery': "chanName.isin([" + exampleChannelListStr + "])",
         # 'unitQuery': "chanName.isin(['{}#0', 'utah_csd_8#0', 'utah_csd_35#0', 'utah_csd_17#0',])".format(exampleChannelStr),
@@ -805,9 +805,9 @@ relPlotKWArgsLookup = {
     'laplace_illustration': {
         'linewidth': 1., 'height': 2, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': 'sd',
+        'errorbar': 'se',
         # 'errorbar': None, "alpha": 0.5, 'estimator': None, 'units': 'trialUID',
-        'rasterized': True, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
+        'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
     },
     'laplace_auc_illustration': {
         'linewidth': 1., 'height': 2, 'aspect': 1.5,

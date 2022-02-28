@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=250G
 
 # Specify a job name:
-#SBATCH -J s09_regression_state_space_sta_202101_21
+#SBATCH -J s09_regression_state_space_stb_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s09_regression_state_space_sta_202101_21.out
-#SBATCH -e ../../batch_logs/regression/s09_regression_state_space_sta_202101_21.out
+#SBATCH -o ../../batch_logs/regression/s09_regression_state_space_stb_202101_21.out
+#SBATCH -e ../../batch_logs/regression/s09_regression_state_space_stb_202101_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -36,14 +36,17 @@ do
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   #
-  ITERATOR="ra"
+  ITERATOR="rb"
   WINDOWTERM="XL"
-  SUFFIX="_spectral_baseline"
+  SUFFIX="_baseline"
   #
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
   #
   DIMRED="select2"
   ESTIMATOR="ols2_${DIMRED}${SUFFIX}"
-  python -u './processLeastSquaresStateSpaceVP1.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './processLeastSquaresStateSpace.py' --eraMethod=ERA --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './processOrdinaryLeastSquaresStateSpacePredictions.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './plotOrdinaryLeastSquaresStateSpacePredictions.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  # python -u './processOrdinaryLeastSquaresPredictionsLite.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done
