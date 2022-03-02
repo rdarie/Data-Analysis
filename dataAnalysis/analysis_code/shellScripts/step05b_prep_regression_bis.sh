@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s05b_prep_regression_sta_202101_27
+#SBATCH -J s05b_prep_regression_ra_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s05b_prep_regression_sta_202101_27.out
-#SBATCH -e ../../batch_logs/regression/s05b_prep_regression_sta_202101_27.out
+#SBATCH -o ../../batch_logs/regression/s05b_prep_regression_ra_202101_27.out
+#SBATCH -e ../../batch_logs/regression/s05b_prep_regression_ra_202101_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

@@ -237,17 +237,15 @@ if __name__ == '__main__':
     modelMetadataLookup.to_hdf(transferFuncPath, 'modelMetadataLookup')
     trialMetadataLookup.to_hdf(transferFuncPath, 'trialMetadataLookup')
     #
-    memoryEfficientLoad = True
+    memoryEfficientLoad = False
     if memoryEfficientLoad:
         predDF = None
-        R2Per = None
         ccDF = None
         inputDrivenDF = None
         oskDF = None
     else:
         # predDF = None
         predList = []
-        R2PerList = []
         ccList = []
         inputDrivenList = []
         oskList = []
@@ -320,53 +318,24 @@ if __name__ == '__main__':
     #
     predDF = predDF.reorder_levels(predIndexNames)
     inputDrivenDF = inputDrivenDF.stack().to_frame(name='inputDriven')
+    inputDrivenDF.loc[:, 'oneStepKalman'] = oskDF.stack().to_numpy()
     inputDrivenDF = inputDrivenDF.reorder_levels(predIndexNames)
-    oskDF = oskDF.stack().to_frame(name='oneStepKalman')
-    oskDF = oskDF.reorder_levels(predIndexNames)
-    #
-    stateSpaceScoresDict = {}
-    dataDict = {}
-    indicesIterBy = ['lhsMaskIdx', 'rhsMaskIdx', 'fold', 'target', 'foldType', 'trialType']
-
-    showProgBar = True
-    if showProgBar:
-        progBarCtxt = tqdm(total=predDF.groupby(indicesIterBy).ngroups, mininterval=30., maxinterval=120.)
-    else:
-        progBarCtxt = contextlib.nullcontext()
-    with progBarCtxt as pbar:   
-        for name, group in predDF.groupby(indicesIterBy, sort=False):
-            lhsMaskIdx, rhsMaskIdx, fold, target, foldType, trialType = name
-            try:
-                dataDF = pd.concat([
-                    predDF.xs(name, level=indicesIterBy),
-                    inputDrivenDF.xs(name, level=indicesIterBy),
-                    oskDF.xs(name, level=indicesIterBy), ], axis='columns').dropna()
-                #
-                allCorr = pd.concat(
-                    {
-                        False: dataDF.corr(), 
-                        True: dataDF.groupby('bin').mean().corr()},
-                    names=['isTrialAveraged', 'term'])
-                allCorr.columns.name = 'term'
-                stateSpaceScoresDict[name] = allCorr
-                #
-                dataDict[name] = dataDF
-                if showProgBar:
-                    pbar.update(1)
-            except Exception:
-                traceback.print_exc()
-                continue
+    # oskDF = oskDF.stack().to_frame(name='oneStepKalman')
+    # oskDF = oskDF.reorder_levels(predIndexNames)
+    dataDF = pd.concat([predDF, inputDrivenDF, ], axis='columns').dropna()
     del inputDrivenDF, oskDF, predDF
-    ######
     prf.print_memory_usage('done concatenating predictions from .h5 array')
-    # pdb.set_trace()
-    ##
-    ssScores = pd.concat(stateSpaceScoresDict, names=indicesIterBy)
-    del stateSpaceScoresDict
+    ###
+    indicesIterBy = ['lhsMaskIdx', 'rhsMaskIdx', 'fold', 'target', 'foldType', 'trialType']
+    ssScores = pd.concat(
+        {
+            False: dataDF.groupby(indicesIterBy, sort=False).corr(),
+            True: dataDF.groupby(indicesIterBy, sort=False).apply(lambda ddf: ddf.groupby('bin').mean().corr())
+            },
+        names=['isTrialAveraged'] + indicesIterBy + ['term'])
+    ssScores.columns.name = 'term'
     ssScores.to_hdf(transferFuncPath, 'stateSpaceScores')
-    predDF = pd.concat(dataDict, names=indicesIterBy)
-    del dataDict
-    predDF.to_hdf(transferFuncPath, 'stateSpacePredictions')
+    dataDF.to_hdf(transferFuncPath, 'stateSpacePredictions')
     ##
     gc.collect()
     print('\n' + '#' * 50 + '\n{}\nCompleted.\n'.format(__file__) + '#' * 50 + '\n')

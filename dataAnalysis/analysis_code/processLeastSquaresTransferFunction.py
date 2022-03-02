@@ -280,7 +280,7 @@ def calcTransferFunctionFromLeastSquares():
     #
     #  ##################################################################
     if arguments['debugging']:
-        slurmTaskID = 12
+        slurmTaskID = 3
         transferFuncPath = os.path.join(
             estimatorsSubFolder,
             fullEstimatorName + '_{}_{}_tf.h5'.format(arguments['eraMethod'], slurmTaskID)
@@ -347,9 +347,9 @@ def calcTransferFunctionFromLeastSquares():
             if not designIsLinear[designFormula]:
                 print('Skipping because designIsLinear[designFormula] = {}'.format(designIsLinear[designFormula]))
                 continue
-            if not (lhsMaskIdx in lhsMasksOfInterest['varVsEnsemble']):
-                print('not (lhsMaskIdx in lhsMasksOfInterest)')
-                continue
+            ## ## if not (lhsMaskIdx in lhsMasksOfInterest['varVsEnsemble']):
+            ## ##     print('not (lhsMaskIdx in lhsMasksOfInterest)')
+            ## ##     continue
             print('Calculating state space coefficients for\n{}\n    {}\n'.format(
                 lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr'],
                 {k: v for k, v in zip(iRGroupNames, name)}
@@ -447,7 +447,7 @@ def calcTransferFunctionFromLeastSquares():
                         exogPsi = psiThisLag.loc[:, idxSl[uDF.columns, binIdx]].T
                         exogPsi.index = exogPsi.index.droplevel('sampleBin')
                         thisPiece = tdr.inputDrivenDynamics(
-                            psi=exogPsi, u=uDF, lag=binIdx,
+                            psi=exogPsi, u=uDF.loc[:, exogPsi.index], lag=binIdx,
                             groupVar='trialUID', joblibBackendArgs=dict(backend='loky'),
                             runInParallel=True, verbose=False)
                         inputDrivenDF += thisPiece

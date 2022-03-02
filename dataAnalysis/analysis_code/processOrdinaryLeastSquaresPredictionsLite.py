@@ -420,10 +420,10 @@ if __name__ == '__main__':
     if plotSingleTrials:
         predDF = predDF.xs(0, level='conditionUID')
         pdfPath = os.path.join(
-            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'reconstructions_single_trial'))
+            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'reconstructions_single_trial'))
     else:
         pdfPath = os.path.join(
-            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'reconstructions'))
+            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'reconstructions'))
     with PdfPages(pdfPath) as pdf:
         for name0, predGroup0 in predDF.groupby(groupPagesBy):
             nmLk0 = {key: value for key, value in zip(groupPagesBy, name0)}  # name lookup

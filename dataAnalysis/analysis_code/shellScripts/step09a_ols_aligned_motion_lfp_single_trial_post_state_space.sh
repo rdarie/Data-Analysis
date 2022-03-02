@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=250G
 
 # Specify a job name:
-#SBATCH -J s09_regression_state_space_sta_202101
+#SBATCH -J s09a_regression_state_space_sta_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s09_regression_state_space_sta_202101.out
-#SBATCH -e ../../batch_logs/regression/s09_regression_state_space_sta_202101.out
+#SBATCH -o ../../batch_logs/regression/s09a_regression_state_space_sta_202101_21.out
+#SBATCH -e ../../batch_logs/regression/s09a_regression_state_space_sta_202101_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -38,13 +38,14 @@ do
   #
   ITERATOR="ra"
   WINDOWTERM="XL"
-  SUFFIX="_baseline"
+  SUFFIX="_scaled"
   #
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
   #
   DIMRED="select"
   ESTIMATOR="ols_${DIMRED}${SUFFIX}"
-  python -u './processLeastSquaresStateSpace.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-  python -u './processOrdinaryLeastSquaresPredictionsLite.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  ## python -u './processLeastSquaresStateSpace.py' --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  ###python -u './processOrdinaryLeastSquaresStateSpacePredictionsV2.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+  python -u './plotOLSStateSpacePredictionsForPaper.py' --memoryEfficientLoad --forceReprocess --estimatorName=$ESTIMATOR --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done

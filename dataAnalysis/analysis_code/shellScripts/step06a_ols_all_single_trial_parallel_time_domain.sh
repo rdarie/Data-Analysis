@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s06a_ols_sta_202101_21
+#SBATCH -J s06a_ols_rc_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s06a_ols_sta_202101_21-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s06a_ols_sta_202101_21-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s06a_ols_rc_202101_21-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s06a_ols_rc_202101_21-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -35,7 +35,7 @@ do
   #
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  ITERATOR="ra"
+  ITERATOR="rc"
   WINDOWTERM="XL"
   SUFFIX="_scaled"
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=laplace${SUFFIX}"

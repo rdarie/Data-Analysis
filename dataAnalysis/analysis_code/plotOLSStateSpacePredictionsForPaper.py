@@ -124,6 +124,7 @@ mplRCParams = {
     }
 styleOpts = {
     'legend.lw': 2,
+    'legend.markerscale': 2,
     'tight_layout.pad': 3e-1, # units of font size
     'panel_heading.pad': 0.
     }
@@ -199,6 +200,10 @@ if __name__ == '__main__':
     selectionNameRhs = estimatorMeta['arguments']['selectionNameRhs']
     #
     with pd.HDFStore(estimatorPath) as store:
+        modelCompareFUDE = pd.read_hdf(store, 'modelCompareFUDE')
+        modelCompareFUDEStats = pd.read_hdf(store, 'modelCompareFUDEStats')
+        modelCompareScores = pd.read_hdf(store, 'modelCompareScores')
+        #
         sourcePalette = pd.read_hdf(store, 'sourcePalette')
         termPalette = pd.read_hdf(store, 'termPalette')
         factorPalette = pd.read_hdf(store, 'factorPalette')
@@ -207,10 +212,24 @@ if __name__ == '__main__':
         predictionLineStyleDF = pd.read_hdf(store, 'termLineStyleDF')
     stimConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'stimConditionLookup')
     kinConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'kinConditionLookup')
+    modelsToTestDF = pd.read_hdf(estimatorMeta['designMatrixPath'], 'modelsToTest')
     modelMetadataLookup = pd.read_hdf(transferFuncPath, 'modelMetadataLookup')
     trialMetadataLookup = pd.read_hdf(transferFuncPath, 'trialMetadataLookup')
     #
-
+    prettyNameLookup.update({
+        'isTrialAveraged = True': 'Trial averaged',
+        'isTrialAveraged = False': 'Single trial',
+        'train': 'Train',
+        'test': 'Test',
+        'term': 'Term',
+        'NA': 'No  stim.',
+        'predType': 'Prediction type',
+        'prediction': 'VAR prediction',
+        'ground_truth': 'Ground truth',
+        'inputDriven': 'Input driven',
+        'oneStepKalman': 'One-step Kalman prediction',
+        'target': 'Regression target'
+    })
     def formatModelSpec(infoSrs):
         designShortHand = '(No exogenous)' if infoSrs['design'] == 'NULL' else formulasShortHand[infoSrs['design']]
         selfShort = 'No self' if (infoSrs['selfFormulaDescr'] == 'NULL') else 'self'
@@ -218,7 +237,9 @@ if __name__ == '__main__':
         return '({}) + ({}) + {}'.format(selfShort, ensShort, designShortHand)
 
     modelMetadataLookup.loc[:, 'fullDesignAsLabel'] = modelMetadataLookup.apply(formatModelSpec, axis='columns')
-
+    # pdb.set_trace()
+    modelMetadataLookup.loc[:, 'fullDesignAsMath'] = modelMetadataLookup.index.get_level_values('lhsMaskIdx').map(lhsMasksDesignAsMath)
+    modelMetadataLookup.loc[modelMetadataLookup['fullDesignAsMath'].isna(), 'fullDesignAsMath'] = modelMetadataLookup.loc[modelMetadataLookup['fullDesignAsMath'].isna(), 'fullDesignAsLabel']
     spinalMapDF = spinalElectrodeMaps[subjectName].sort_values(['xCoords', 'yCoords'])
     pedalDirCat = pd.CategoricalDtype(['NA', 'CW', 'CCW'], ordered=True)
     pedalMoveCat = pd.CategoricalDtype(['NA', 'outbound', 'return'], ordered=True)
@@ -233,7 +254,8 @@ if __name__ == '__main__':
     trialMetadataLookup.loc[:, 'stimCondition'] = trialMetadataLookup.apply(lambda x: '{}_{}'.format(x['electrode'], x['trialRateInHz']), axis='columns')
     uniqStimConditions = trialMetadataLookup.loc[:, ['electrode', 'trialRateInHz', 'stimCondition']].drop_duplicates().sort_values(['electrode', 'trialRateInHz']).reset_index(drop=True)
     trialMetadataLookup.loc[:, 'stimCondition'] = trialMetadataLookup['stimCondition'].astype(pd.CategoricalDtype(uniqStimConditions['stimCondition'].to_list(), ordered=True))
-
+    #pdb.set_trace()
+    trialMetadataLookup.loc[:, ['trialAmplitude', 'trialRateInHz']] = trialMetadataLookup.loc[:, ['trialAmplitude', 'trialRateInHz']].astype(int)
     #
     ################ collect estimators and scores
     scoresStack = pd.read_hdf(estimatorPath, 'processedScores')
@@ -242,24 +264,75 @@ if __name__ == '__main__':
     #
     ssScores = pd.read_hdf(transferFuncPath, 'stateSpaceScores')
     predDF = pd.read_hdf(transferFuncPath, 'stateSpacePredictions')
-    groupPagesBy = ['lhsMaskIdx', 'rhsMaskIdx']
-    groupSubPagesBy = ['trialType', 'electrode', 'trialRateInHz', 'target']
+    groupSubPagesBy = ['lhsMaskIdx', 'trialType', 'electrode', 'trialRateInHz', 'target']
     plotSingleTrials = False
     if plotSingleTrials:
         predDF = predDF.xs(0, level='conditionUID')
         pdfPath = os.path.join(
-            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'state_space_reconstructions_single_trial'))
+            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'state_space_reconstructions_single_trial_paper'))
     else:
         pdfPath = os.path.join(
-            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'state_space_reconstructions'))
+            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'state_space_reconstructions_paper'))
     # with PdfPages(pdfPath) as pdf:
-
+    def genInsetBoxplot(
+            insetData=None,
+            bounds=None, transform=None,
+            legend=True, newLabels={},
+            row=None, col=None, globalYLims=True, addTitle=False):
+        def insetBoxplot(
+                data=None,
+                x=None, order=None,
+                y=None,
+                hue=None, hue_order=None, palette=None,
+                color=None, *args, **kwargs):
+            ax = plt.gca()
+            axIns = ax.inset_axes(bounds=bounds, transform=transform, )
+            _ = (row, col, legend, globalYLims, addTitle)
+            if insetData is None:
+                ddf = data
+            else:
+                ddf = insetData
+                if row is not None:
+                    ddf = ddf.loc[ddf[row] == (data[row].unique()[0]), :]
+                if col is not None:
+                    ddf = ddf.loc[ddf[col] == (data[col].unique()[0]), :]
+            titleTextList = []
+            if row is not None:
+                titleTextList.append('{}'.format(ddf[row].unique()[0]))
+            if col is not None:
+                titleTextList.append('{}'.format(ddf[col].unique()[0]))
+            sns.boxplot(
+                data=ddf, x=x, order=order, y=y,
+                hue=hue, hue_order=hue_order, palette=palette,
+                ax=axIns, *args, **kwargs)
+            if  x == 'xDummy':
+                axIns.set_xticks([])
+                axIns.set_xticklabels([])
+            if not legend:
+                axIns.get_legend().remove()
+            if 'x' in newLabels:
+                axIns.set_xlabel(newLabels['x'])
+            if 'y' in newLabels:
+                axIns.set_ylabel(newLabels['y'])
+            if len(titleTextList) and addTitle:
+                axIns.set_title(' '.join(titleTextList))
+            if  globalYLims:
+                newLims = insetData[y].quantile([0,  1]).to_list()
+                deltaLims =  newLims[1] - newLims[0]
+                newLims[0] -= deltaLims * 5e-2
+                newLims[1] += deltaLims * 5e-2
+                axIns.set_ylim(newLims)
+            axIns.grid(False)
+            return
+        return insetBoxplot
+    
     def plotRoutine(
             inputDF=None,
             inputColorPalette=None, trimColorPalette=True,
             inputLegendUpdates=None, titleText=None,
-            inputLineStylePalette=None, trimLinesPalette=True,
-            axLims=None, relPlotKWArgs=None, plotContext=None, showFigures=False):
+            inputLineStylePalette=None, trimLinesPalette=True, setTitlesTemplate=None,
+            plotProcFuns=[],
+            axLims=None, axLabels=[None, None], relPlotKWArgs=None, plotContext=None, showFigures=False):
         defaultRelPlotKWargs = dict(
             col='trialAmplitude', row='kinCondition',
             x='bin', y='signal',
@@ -288,7 +361,13 @@ if __name__ == '__main__':
                 thisStyleLookup = thisStyleLookup.loc[thisStyleLookup.index.isin(inputDF[rkwa['style']])]
             rkwa.update(dict(style_order=thisStyleLookup.index.to_list(), dashes=thisStyleLookup.to_dict()))
         gg = sns.relplot(**rkwa,)
-        gg.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
+        if len(plotProcFuns):
+            for (ro, co, hu), dataSubset in gg.facet_data():
+                for procFun in plotProcFuns:
+                    procFun(gg, ro, co, hu, dataSubset)
+        gg.set_axis_labels(*axLabels)
+        if setTitlesTemplate is not None:
+            gg.set_titles(**setTitlesTemplate)
         if titleText is not None:
             print('Saving plot of {}...'.format(titleText))
             gg.suptitle(titleText)
@@ -316,21 +395,16 @@ if __name__ == '__main__':
         return gg, currAxLims
     # with contextlib.nullcontext() as pdf:
     with PdfPages(pdfPath) as pdf:
-        for name0, predGroup0 in predDF.groupby(groupPagesBy):
-            lhsMaskIdx, rhsMaskIdx = name0
-            if not (name0 in modelMetadataLookup.index):
-                continue
-            else:
-                modelMetadata = modelMetadataLookup.loc[name0]
-                print('plotting {}'.format(modelMetadata))
-            targetsByAverageScore = scoresStack.set_index(groupPagesBy).xs([0, rhsMaskIdx], level=groupPagesBy).groupby('target').mean()['cc'].sort_values().index.to_list()
+        for rhsMaskIdx, predGroup0 in predDF.groupby('rhsMaskIdx'):
+            modelMetadata = modelMetadataLookup.xs(rhsMaskIdx, level='rhsMaskIdx')
+            targetsByAverageScore = scoresStack.set_index(['lhsMaskIdx', 'rhsMaskIdx']).xs([0, rhsMaskIdx], level=['lhsMaskIdx', 'rhsMaskIdx']).groupby('target').mean()['cc'].sort_values().index.to_list()
             #########################################################################################################
-            plotScores = ssScores.xs(name0, level=groupPagesBy)
+            plotScores = ssScores.xs(rhsMaskIdx, level='rhsMaskIdx')
             plotScores.index.names = plotScores.index.names[:-1] + ['referenceTerm']
             plotScores.columns.name = 'comparisonTerm'
             plotScores = plotScores.stack().to_frame(name='cc')
             #
-            oldScores = scoresStack.set_index(groupPagesBy).xs(name0, level=groupPagesBy).reset_index(drop=True)
+            oldScores = scoresStack.loc[scoresStack['rhsMaskIdx'] == rhsMaskIdx, :].reset_index(drop=True)
             oldScores.loc[:, 'referenceTerm'] = 'ground_truth'
             oldScores.loc[:, 'comparisonTerm'] = 'original_prediction'
             oldScores.loc[:, 'isTrialAveraged'] = False
@@ -339,84 +413,207 @@ if __name__ == '__main__':
             plotScores = pd.concat([plotScores, oldScores]).reset_index()
             plotScores.loc[:, 'xDummy'] = 0
             plotScores.loc[:, 'isTrialAveraged_referenceTerm'] = plotScores.apply(lambda x: '{}_{}'.format(x['isTrialAveraged'], x['referenceTerm']), axis='columns')
-
+            plotScores.loc[:, 'fullDesignAsMath'] = plotScores['lhsMaskIdx'].map(modelMetadata['fullDesignAsMath'])
             boxPlotKWArgs = dict(whis=np.inf)
             catPlotKWArgs = dict(
                 y='cc', kind='box',
-                margin_titles=True, height=2, aspect=1.5, **boxPlotKWArgs)
+                margin_titles=True, height=1.5, aspect=1.,
+                **boxPlotKWArgs)
+            #
             scorePlotMask = (
                 (plotScores['trialType'].isin(['train', 'test'])) &
-                (plotScores['referenceTerm'].isin(['prediction', 'ground_truth'])) &
-                (plotScores['comparisonTerm'].isin(['original_prediction', 'prediction', 'oneStepKalman', 'inputDriven'])) &
+                (plotScores['lhsMaskIdx'].isin([0, 3])) &
+                (plotScores['referenceTerm'].isin(['ground_truth'])) &
+                (plotScores['comparisonTerm'].isin(['prediction'])) &
                 (plotScores['referenceTerm'] != plotScores['comparisonTerm'])
                 ).to_numpy()
             thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores.loc[scorePlotMask, 'trialType'])]
             g = sns.catplot(
                 data=plotScores.loc[scorePlotMask, :],
-                col='referenceTerm', row='isTrialAveraged',
-                x='comparisonTerm',
+                row='isTrialAveraged', row_order=[True, False],
+                x='fullDesignAsMath',
                 hue='trialType', 
                 hue_order=['train', 'test'], palette=thisPalette.to_dict(),
                 **catPlotKWArgs
                 )
-            g.suptitle(modelMetadata['fullDesignAsLabel'])
+            g.set_titles(col_template="{col_name}", row_template="{row_var} = {row_name}")
+            plotProcFuns = [
+                asp.genTitleChanger(prettyNameLookup)]
+            for (ro, co, hu), dataSubset in g.facet_data():
+                if len(plotProcFuns):
+                    for procFun in plotProcFuns:
+                        procFun(g, ro, co, hu, dataSubset)
+            titleText = 'Goodness-of-fit tests'
+            if titleText is not None:
+                print('Saving plot of {}...'.format(titleText))
+                g.suptitle(titleText)
+            g.set_xticklabels(rotation=-10, ha='center', va='top')
+            g.set_axis_labels('VAR model', 'CC')
+            asp.reformatFacetGridLegendV2(
+                g, labelOverrides=prettyNameLookup,
+                styleOpts=styleOpts, )
+            g.resize_legend(adjust_subtitles=True)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight')
             if arguments['showFigures']:
                 plt.show()
             else:
                 plt.close()
-            scorePlotMask = (
-                (plotScores['trialType'].isin(['train', 'test'])) &
-                (plotScores['referenceTerm'].isin(['ground_truth'])) &
-                (plotScores['comparisonTerm'].isin(['prediction', 'oneStepKalman', 'inputDriven'])) &
-                (plotScores['referenceTerm'] != plotScores['comparisonTerm'])
-                ).to_numpy()
-            thisPalette = sourcePalette.loc[sourcePalette.index.isin(plotScores.loc[scorePlotMask, 'target'])].to_dict()
-            ### pdb.set_trace()
-            g = sns.catplot(
-                data=plotScores.loc[scorePlotMask, :],
-                col='trialType', row='isTrialAveraged',
-                x='comparisonTerm',
-                hue='target', hue_order=targetsByAverageScore, palette=thisPalette,
-                **catPlotKWArgs
+            ###
+            titleText = None
+            plotFUDE = modelCompareFUDE.reset_index()
+            plotFUDEMask = (
+                (plotFUDE['testType'].isin(['exogVSExogAndSelf', 'VARVsVARInter'])) &
+                (plotFUDE['electrode'] == 'all') &
+                (plotFUDE['trialType'] == 'test')
                 )
-            g.suptitle(modelMetadata['fullDesignAsLabel'])
+            plotFUDE = plotFUDE.loc[plotFUDEMask, :]
+            plotFUDE.loc[:,  'xDummy'] = 0
+            plotFUDE.loc[:, 'testCaption'] = plotFUDE['testLhsMaskIdx'].map(modelMetadata['fullDesignAsMath'])
+            plotFUDE.loc[:, 'refCaption'] = plotFUDE['refLhsMaskIdx'].map(modelMetadata['fullDesignAsMath'])
+            ##
+            plotFUDEStats = modelCompareFUDEStats.reset_index()
+            plotFUDEStatsMask = (
+                (plotFUDEStats['testType'].isin(['exogVSExogAndSelf', 'VARVsVARInter'])) &
+                (plotFUDEStats['electrode'] == 'all')
+                )
+            plotFUDEStats = plotFUDEStats.loc[plotFUDEStatsMask, :]
+            #
+            plotScores = modelCompareScores.reset_index()
+            plotScoresMask = (
+                (plotScores['testType'].isin(['exogVSExogAndSelf', 'VARVsVARInter'])) &
+                (plotScores['electrode'] == 'all') &
+                (plotScores['trialType'].isin(['test']))
+                )
+            plotScores = plotScores.loc[plotScoresMask, :]
+            USERINSTEADOFR2 = True
+            if USERINSTEADOFR2:
+                plotScores.loc[:, 'test_score'] = plotScores['test_score'].apply(np.sqrt)
+                plotScores.loc[:, 'ref_score'] = plotScores['ref_score'].apply(np.sqrt)
+            #
+            lookupBasedOn = ['testLhsMaskIdx', 'refLhsMaskIdx', 'target']
+            lookupAt = pd.MultiIndex.from_frame(plotScores.loc[:, lookupBasedOn])
+            lookupFrom = plotFUDEStats.loc[:, lookupBasedOn + ['p-val']].set_index(lookupBasedOn)['p-val']
+            plotPVals = lookupFrom.loc[lookupAt]
+            plotScores.loc[:, 'significant'] = (plotPVals < 0.01).to_numpy()
+            plotScores.loc[:, 'testCaption'] = plotScores['testLhsMaskIdx'].map(modelMetadata['fullDesignAsMath'])
+            plotScores.loc[:, 'refCaption'] = plotScores['refLhsMaskIdx'].map(modelMetadata['fullDesignAsMath'])
+            ###
+            thisPalette = sourcePalette.reset_index()
+            thisPalette.loc[thisPalette['index'].isin(targetsByAverageScore), 'index'] = targetsByAverageScore
+            thisPalette = thisPalette.set_index('index')[0]
+            thisPalette = thisPalette.loc[thisPalette.index.isin(plotScores.loc[:, 'target'])]
+            # thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
+            height =  2.
+            aspect = 1.
+            g = sns.relplot(
+                data=plotScores, kind='scatter',
+                x='ref_score', y='test_score', 
+                # row='testCaption', col='refCaption',
+                col='testType',
+                hue='target',
+                height=height, aspect=aspect,
+                edgecolor=None,
+                hue_order=thisPalette.index.to_list(),
+                palette=thisPalette.to_dict(),
+                facet_kws=dict(
+                    margin_titles=True,
+                    sharex=False, sharey=False),
+                )
+            thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
+            mapDFProcFuns = [
+                (
+                    genInsetBoxplot(
+                        insetData=plotFUDE, bounds=[ 0.6, 0.1, 0.3, 0.3],
+                        legend=False, newLabels={'x': '', 'y': 'FUDE'},
+                        # row='refCaption', col='testCaption',
+                        col='testType'
+                        ),
+                    [],
+                    dict(
+                        x='xDummy', y='score', hue='trialType',
+                        palette=thisPalette.to_dict(), hue_order=['test'],
+                        whis=np.inf)),
+                    ]
+            for mpdf in mapDFProcFuns:
+                mpdf_fun, mpdf_args, mpdf_kwargs = mpdf
+                g.map_dataframe(mpdf_fun, *mpdf_args, **mpdf_kwargs)
+            plotProcFuns = [
+                asp.genLineDrawer(slope=1., offset=0, plotKWArgs=None),
+                asp.genAxisLabelOverride(
+                    xTemplate='{refCaption}', colKeys=['refCaption', 'testCaption'],
+                    yTemplate='{testCaption}', dropNaNCol='segment')]
+            for (ro, co, hu), dataSubset in g.facet_data():
+                if len(plotProcFuns):
+                    for procFun in plotProcFuns:
+                        procFun(g, ro, co, hu, dataSubset)
+            if titleText is not None:
+                print('Saving plot of {}...'.format(titleText))
+                g.suptitle(titleText)
+            g.set_titles(col_template="CC")
+            asp.reformatFacetGridLegendV2(
+                g=g, labelOverrides=prettyNameLookup,
+                styleOpts=styleOpts, shorten=True)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(bbox_inches='tight')
+            pdf.savefig(
+                bbox_inches='tight',
+                )
             if arguments['showFigures']:
                 plt.show()
             else:
                 plt.close()
+            continue
             #########################################################################################################
-            trialMetadata = trialMetadataLookup.apply(lambda x: predGroup0.index.droplevel([lN for lN in predGroup0.index.names if lN not in trialMetadataLookup.index.names]).map(x), axis='index')
-            trialMetadata = pd.concat([trialMetadata, predGroup0.index.to_frame().reset_index(drop=True), ], axis='columns')
-            plotMask0 = (
-                    (trialMetadata['trialType'] == 'train') &
-                    (trialMetadata['target'].isin([targetsByAverageScore[tIdx] for tIdx in [-1, 0]])) &
-                    (trialMetadata['trialRateInHz'] != 50)
-                ).to_numpy()
-            if plotMask0.any() and (lhsMaskIdx in [0, 3, 4]):
-                plotGroup0 = pd.DataFrame(predGroup0.loc[plotMask0, :])
-                plotGroup0.index = pd.MultiIndex.from_frame(trialMetadata.loc[plotMask0, :])
-                plotGroup0.columns.name = 'term'
-                for name1, plotGroup1 in plotGroup0.groupby(groupSubPagesBy):
-                    titleText = '{}\n{} {} {} Hz'.format(modelMetadata['fullDesignAsLabel'], name1[-1], name1[1], name1[2])
-                    ## groupSubPagesBy = ['trialType', 'electrode', 'trialRateInHz', 'target']
-                    plotGroup1 = plotGroup1.stack().to_frame(name='signal').reset_index()
-                    plotGroup1.loc[:, 'predType'] = plotGroup1['term'].map(termPalette.loc[:, ['term']].reset_index().set_index('term')['type'])
-                    expandOther = True
-                    if expandOther:
-                        plotGroup1.loc[plotGroup1['predType'] == 'other', 'predType'] = plotGroup1.loc[plotGroup1['predType'] == 'other', 'term']
-                    plotMask1 = (
-                            plotGroup1['term'].isin(['ground_truth', 'prediction', 'inputDriven', 'oneStepKalman']) &
-                            (plotGroup1['bin'] < 1.)
-                        ).to_numpy()
-                    gg, currAxLims = plotRoutine(
-                        inputDF=plotGroup1.loc[plotMask1, :],
-                        inputColorPalette=termPalette, trimColorPalette=True,
-                        inputLegendUpdates=prettyNameLookup,
-                        inputLineStylePalette=predictionLineStyleDF, trimLinesPalette=True,
-                        axLims=None, relPlotKWArgs=None, titleText=titleText,
-                        plotContext=pdf, showFigures=arguments['showFigures'])
+            for lhsMaskIdx, plotGroup0 in predGroup0.groupby('lhsMaskIdx'):
+                if lhsMaskIdx not in [0, 3]:
+                    continue
+                else:
+                    modelMetadata = modelMetadataLookup.loc[(lhsMaskIdx, rhsMaskIdx,)]
+                trialMetadata = trialMetadataLookup.apply(lambda x: plotGroup0.index.droplevel([lN for lN in plotGroup0.index.names if lN not in trialMetadataLookup.index.names]).map(x), axis='index')
+                trialMetadata = pd.concat([trialMetadata, plotGroup0.index.to_frame().reset_index(drop=True), ], axis='columns')
+                plotMask0 = (
+                        (trialMetadata['trialType'] == 'train') &
+                        (trialMetadata['target'].isin([targetsByAverageScore[tIdx] for tIdx in [-1]])) &
+                        (trialMetadata['trialAmplitude'].isin([500])) &
+                        (trialMetadata['kinCondition'].isin(['outbound_CW'])) &
+                        (trialMetadata['trialRateInHz'] != 50)
+                    ).to_numpy()
+                if plotMask0.any():
+                    plotGroup1 = pd.DataFrame(plotGroup0.loc[plotMask0, :])
+                    plotGroup1.index = pd.MultiIndex.from_frame(trialMetadata.loc[plotMask0, :])
+                    plotGroup1.columns.name = 'term'
+                    for name2, plotGroup2 in plotGroup1.groupby(groupSubPagesBy):
+                        titleText = '{}\n{} {} {} Hz'.format(
+                            modelMetadata.loc['fullDesignAsMath'],
+                            prettyNameLookup[name2[4]], prettyNameLookup[name2[2]], name2[3])
+                        ## groupSubPagesBy = ['lhsMaskIdx', 'trialType', 'electrode', 'trialRateInHz', 'target']
+                        plotGroup2 = plotGroup2.stack().to_frame(name='signal').reset_index()
+                        plotGroup2.loc[:, 'predType'] = plotGroup2['term'].map(termPalette.loc[:, ['term']].reset_index().set_index('term')['type'])
+                        expandOther = True
+                        if expandOther:
+                            plotGroup2.loc[plotGroup2['predType'] == 'other', 'predType'] = plotGroup2.loc[plotGroup2['predType'] == 'other', 'term']
+                        plotMask2 = (
+                                plotGroup2['term'].isin(['ground_truth', 'prediction']) &
+                                (plotGroup2['bin'] < 1.)
+                            ).to_numpy()
+                        pdb.set_trace()
+                        rkwa = {
+                            'facet_kws': {'margin_titles': True},
+                            'row_order': plotGroup2['kinCondition'].unique().sort_values().to_list(),
+                            'size': None, 'style': None
+                            }
+                        plotProcFuns = [
+                            asp.genTitleChanger(prettyNameLookup)]
+                        gg, currAxLims = plotRoutine(
+                            inputDF=plotGroup2.loc[plotMask2, :],
+                            inputColorPalette=termPalette, trimColorPalette=True,
+                            inputLegendUpdates=prettyNameLookup,
+                            inputLineStylePalette=None, trimLinesPalette=True,
+                            axLims=None, relPlotKWArgs=rkwa, titleText=titleText,
+                            axLabels=['Time (sec)', 'Normalized LFP ($z-score, a.u.$)'],
+                            setTitlesTemplate=dict(col_template='{col_name} $\mu A$', row_template=None),
+                            plotProcFuns=plotProcFuns,
+                            plotContext=pdf, showFigures=True
+                            # showFigures=arguments['showFigures']
+                            )
     print('\n' + '#' * 50 + '\n{}\nCompleted.\n'.format(__file__) + '#' * 50 + '\n')

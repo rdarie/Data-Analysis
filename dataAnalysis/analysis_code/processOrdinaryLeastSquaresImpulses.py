@@ -389,7 +389,7 @@ for lhsMaskIdx in range(lhsMasks.shape[0]):
                     key=sortKey, kind='mergesort',
                     sort_remaining=False, inplace=True)
                 fullDesignDF.columns = fullDesignDF.columns.get_level_values('factor')
-                '''
+            '''
             for foldIdx in range(cvIterator.n_splits + 1):
                 targetDF = rhGroup.loc[:, [targetName]]
                 estimatorIdx = (lhsMaskIdx, rhsMaskIdx, targetName, foldIdx)
@@ -411,7 +411,6 @@ print('Saving to {}'.format(estimatorPath))
 if savingResults:
     coefDF.to_hdf(estimatorPath, 'coefficients')
 ###
-pdb.set_trace()
 termPalette = pd.concat({
     'exog': pd.Series(np.unique(np.concatenate([di.term_names for di in designInfoDF['designInfo']]))),
     'endog': pd.Series(np.unique(np.concatenate([di.term_names for di in histDesignInfoDF['designInfo']]))),
@@ -777,7 +776,7 @@ if savingResults:
     #
 # expDateTimePathStr
 pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'impulse_responses'))
+    figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'impulse_responses'))
 with PdfPages(pdfPath) as pdf:
     height, width = .5, .5
     aspect = width / height

@@ -215,6 +215,7 @@ if processSlurmTaskCount is not None:
     eigList = []
     inputDrivenList = []
     untruncatedHEigenValsList = []
+    ctrbList = []
     for workerIdx in range(processSlurmTaskCount):
         thisTFPath = transferFuncPath.replace('_tf.h5', '_{}_tf.h5'.format(workerIdx))
         try:
@@ -227,6 +228,7 @@ if processSlurmTaskCount is not None:
             eigList.append(pd.read_hdf(thisTFPath, 'eigenvalues'))
             inputDrivenList.append(pd.read_hdf(thisTFPath, 'inputDriven'))
             untruncatedHEigenValsList.append(pd.read_hdf(thisTFPath, 'untruncatedHEigenVals'))
+            ctrbList.append(pd.read_hdf(thisTFPath, 'ctrbObsvRanks'))
             print('Loaded state transition matrices from {}'.format(thisTFPath))
         except Exception:
             traceback.print_exc()
@@ -239,6 +241,7 @@ if processSlurmTaskCount is not None:
     eigDF = pd.concat(eigList)
     inputDrivenDF = pd.concat(inputDrivenList)
     untruncatedHEigDF = pd.concat(untruncatedHEigenValsList)
+    ctrbObsvRanksDF = pd.concat(ctrbList)
 else:
     with pd.HDFStore(transferFuncPath) as store:
         ADF = pd.read_hdf(store, 'A')
@@ -266,45 +269,6 @@ eigDF.loc[:, 'designFormulaLabel'] = eigDF.reset_index()['designFormula'].apply(
 eigDF.loc[:, 'fullFormula'] = eigDF.reset_index()['lhsMaskIdx'].map(lhsMasksInfo['fullFormulaDescr']).to_numpy()
 eigDF.loc[:, 'fullFormulaLabel'] = eigDF.reset_index()['fullFormula'].apply(lambda x: x.replace(' + ', ' +\n')).to_numpy()
 ########################################
-pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'A_eigenvalue_reduction'))
-if False:
-    with PdfPages(pdfPath) as pdf:
-        for name, thisPlotEig in eigDF.groupby(['fullFormula', 'freqBandName']):
-            height, width = 3, 3
-            aspect = width / height
-            g = sns.relplot(
-                col='stateNDim', col_wrap=3,
-                x='real', y='imag', hue='eigValType',
-                height=height, aspect=aspect,
-                facet_kws={'margin_titles': True},
-                palette=eigValPalette.to_dict(),
-                kind='scatter', data=thisPlotEig.xs(lastFoldIdx, level='fold').reset_index(), rasterized=True, edgecolor=None)
-            for ax in g.axes.flatten():
-                c = Circle(
-                    (0, 0), 1,
-                    ec=(0, 0, 0, 0.25),
-                    fc=(0, 0, 0, 0))
-                ax.add_artist(c)
-                ax.set_ylim(-1.05, 1.05)
-                ax.set_yticks([-1, 0, 1])
-                ax.set_xlim(-1.05, 1.05)
-                ax.set_xticks([-1, 0, 1])
-            asp.reformatFacetGridLegend(
-                g, titleOverrides={
-                    'eigValType': 'Eigenvalue type'},
-                contentOverrides={},
-                styleOpts=styleOpts)
-            g.set_axis_labels('Real', 'Imaginary')
-            g.suptitle(name[0])
-            g.resize_legend(adjust_subtitles=True)
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-#
 eigDF.loc[:, 'complexS'] = eigDF['complex'].apply(np.log) / binInterval
 eigDF.loc[:, 'realS'] = eigDF['complexS'].apply(np.real)
 eigDF.loc[:, 'imagS'] = eigDF['complexS'].apply(np.imag) / (2 * np.pi)
@@ -313,6 +277,31 @@ plotEig = eigDF.loc[eigDF['nDimIsMax'], :]
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'OKID_{}'.format(arguments['eraMethod'])))
 with PdfPages(pdfPath) as pdf:
+    thisCtrb = ctrbObsvRanksDF.set_index(['matrix', 'inputSubset'], append=True).melt(value_name='rank', ignore_index=False).reset_index()
+    thisCtrb = thisCtrb.loc[thisCtrb['inputSubset'] != 'NA', :]
+    def makeNameColumns(x):
+        if x['variable'] == 'nDim':
+            return 'system'
+        else:
+            return '{} ({})'.format(x['matrix'], x['inputSubset'])
+    thisCtrb.loc[:, 'rankOf'] = thisCtrb.apply(makeNameColumns, axis='columns')
+    thisCtrb.loc[:, 'fullFormulaDescr'] = thisCtrb['lhsMaskIdx'].map(lhsMasksInfo['fullFormulaDescr'])
+    height, width = 2, 2
+    aspect = width / height
+    g = sns.catplot(
+        data=thisCtrb,
+        x='fullFormulaDescr', y='rank',
+        hue='rankOf',
+        kind='bar',
+        height=height, aspect=aspect
+        )
+    g.set_xticklabels(rotation=-10, ha='left', va='top')
+    g.tight_layout(pad=styleOpts['tight_layout.pad'])
+    pdf.savefig(bbox_inches='tight', pad_inches=0)
+    if arguments['showFigures']:
+        plt.show()
+    else:
+        plt.close()
     height, width = 2, 2
     aspect = width / height
     for name, eigGroup in plotEig.groupby(['lhsMaskIdx', 'fullFormula']):
@@ -338,14 +327,17 @@ with PdfPages(pdfPath) as pdf:
             rasterized=True, edgecolor=None, marker='+', linewidth=1.,
             kind='scatter', data=eigGroupForPlot.loc[maskForScatter, :])
         for ax in g.axes.flatten():
-            captions = ['no decay', '1 DT', '2 DT', '4 DT', '8 DT']
-            for radIdx, radius in enumerate([1, np.exp(-1/2), np.exp(-1/4), np.exp(-1/8), np.exp(-1/16)]):
+            # captions = ['no decay', '1 DT', '2 DT', '4 DT', '8 DT']
+            # for radIdx, radius in enumerate([1, np.exp(-1/2), np.exp(-1/4), np.exp(-1/8), np.exp(-1/16)]):
+            captions = ['', ]
+            for radIdx, radius in enumerate([1, ]):
                 c = Circle(
                     (0, 0), radius,
                     ec=(0, 0, 0, 0.25),
                     fc=(0, 0, 0, 0))
                 ax.add_artist(c)
-                ax.text(0, radius, captions[radIdx], transform=ax.transData)
+                if  len(captions[radIdx]):
+                    ax.text(0, radius, captions[radIdx], transform=ax.transData)
             ax.set_ylim(-1.05, 1.05)
             ax.set_yticks([-1, 0, 1])
             ax.set_xlim(-1.05, 1.05)

@@ -4,6 +4,7 @@ from matplotlib.patches import FancyBboxPatch, Rectangle
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import matplotlib.path as mpath
+import matplotlib
 import pandas as pd
 import numpy as np
 import pdb
@@ -686,7 +687,59 @@ def plotAsigsAlignedWrapper(
     if _arguments['lazy']:
         _dataReader.file.close()
 
+def genLineDrawer(slope=1., offset=0, plotKWArgs=None):
+    defaultPlotKWArgs = dict(ls='-', c=(0., 0., 0., 0.75), zorder=1.9)
+    pkwa = defaultPlotKWArgs.copy()
+    if plotKWArgs is not None:
+        pkwa.update(plotKWArgs)
+    def drawUnityLine(g, ro, co, hu, dataSubset):
+        emptySubset = (
+                (dataSubset.empty) or
+                (dataSubset.iloc[:, 0].isna().all()))
+        if not hasattr(g.axes[ro, co], 'axHasUnityLine'):
+            g.axes[ro, co].axHasUnityLine = True
+            if not emptySubset:
+                currXLim, currYLim = g.axes[ro, co].get_xlim(), g.axes[ro, co].get_ylim()
+                leftEdge = min(currXLim[0], currYLim[0])
+                rightEdge = max(currXLim[1], currYLim[1])
+                g.axes[ro, co].plot(
+                    [leftEdge, rightEdge],
+                    [slope * leftEdge + offset, slope * rightEdge + offset],
+                    **pkwa)
+                g.axes[ro, co].set_xlim(currXLim)
+                g.axes[ro, co].set_ylim(currYLim)
+        return
+    return drawUnityLine
 
+def annotateWithPVal(g, ro, co, hu, dataSubset):
+    emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset.iloc[:, 0].isna().all()))
+    if not hasattr(g.axes[ro, co], 'axHasPValAnnotation'):
+        g.axes[ro, co].axHasPValAnnotation = True
+        if not emptySubset:
+            nSig = dataSubset.loc[dataSubset['fold'] == 0., 'significant'].sum()
+            nTot = dataSubset.loc[dataSubset['fold'] == 0., 'significant'].shape[0]
+            messageStr = 'n = {}/{} significant'.format(nSig, nTot)
+            g.axes[ro, co].text(
+                0.9, 1, messageStr, ha='right', va='top',
+                fontsize=snsRCParams['font.size'], transform=g.axes[ro, co].transAxes)
+        return
+
+def annotateWithQuantile(g, ro, co, hu, dataSubset):
+    qMin, qMax = 0.25, 0.75
+    emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset.iloc[:, 0].isna().all()))
+    if not hasattr(g.axes[ro, co], 'axHasQuantileAnnotation'):
+        g.axes[ro, co].axHasQuantileAnnotation = True
+        if not emptySubset:
+            qMinVal, qMaxVal = dataSubset['parameter'].quantile([0.25, 0.75])
+            messageStr = 'quantiles([{:.3g}, {:.3g}]) = ({:.3g}, {:.3g})'.format(qMin, qMax, qMinVal, qMaxVal)
+            g.axes[ro, co].text(
+                0.9, 1, messageStr, ha='right', va='top',
+                fontsize=snsRCParams['font.size'], transform=g.axes[ro, co].transAxes)
+        return
 def genNumRepAnnotator(
         hue_var=None, unit_var=None,
         xpos=0, ypos=0, textOpts={}):
@@ -1145,6 +1198,29 @@ def genYLimSetterTwin(newLims):
     return yLimSetter
 
 
+def genAxisLabelOverride(
+        xTemplate=None, yTemplate=None, colKeys=None, dropNaNCol='segment'):
+    def axisLabelOverrider(g, ro, co, hu, dataSubset):
+        if dataSubset.empty:
+            return
+        if dropNaNCol in dataSubset.columns:
+            if dataSubset[dropNaNCol].isna().all():
+                return
+        if hasattr(g.axes[ro, co], 'axesLabelsOverriden'):
+            return
+        _ = (xTemplate, yTemplate, colKeys, dropNaNCol)
+        newNames = dataSubset.loc[:, colKeys].drop_duplicates()
+        assert newNames.shape[0] == 1
+        newNamesDict = newNames.iloc[0, :].to_dict()
+        # pdb.set_trace()
+        if xTemplate is not None:
+            g.axes[ro, co].set_xlabel(xTemplate.format(**newNamesDict))
+        if yTemplate is not None:
+            g.axes[ro, co].set_ylabel(yTemplate.format(**newNamesDict))
+        g.axes[ro, co].axesLabelsOverriden = True
+        return
+    return axisLabelOverrider
+
 def xLabelsTime(g, ro, co, hu, dataSubset):
     if ro == g.axes.shape[0] - 1:
         g.axes[ro, co].set_xlabel('Time (sec)')
@@ -1454,6 +1530,38 @@ def reformatFacetGridLegend(
             if 'legend.lw' in styleOpts:
                 l.set_lw(styleOpts['legend.lw'])
         g.resize_legend(adjust_subtitles=True)
+    return
+
+
+def reformatFacetGridLegendV2(
+        g=None, labelOverrides={},
+        styleOpts={}, decimate=None, shorten=False):
+    leg = g._legend
+    if leg is not None:
+        originalTitle = leg.get_title().get_text()
+        if originalTitle in labelOverrides:
+            originalTitle = labelOverrides[originalTitle]
+        # pdb.set_trace()
+        legendData = pd.Series(g._legend_data)
+        legendData.index = [
+            (labelOverrides[label] if label in labelOverrides else label)
+            for label in legendData.index]
+        if decimate is not None:
+            legendData = legendData.iloc[::decimate]
+        if shorten: #
+            blank_handle = mpl.patches.Patch(alpha=0, linewidth=0)
+            legendData = pd.concat([legendData.iloc[:5], pd.Series({'...': blank_handle}), legendData.iloc[-5:]])
+        leg.remove()
+        legendKWArgs = dict()
+        if 'legend.markerscale' in styleOpts:
+            legendKWArgs['markerscale'] = styleOpts['legend.markerscale']
+        g.add_legend(
+            legendData.to_dict(),
+            title=originalTitle, **legendKWArgs)
+        if 'legend.lw' in styleOpts:
+            for l in leg.get_lines():
+                l.set_lw(styleOpts['legend.lw'])
+        # g.resize_legend(adjust_subtitles=True)
     return
 
 

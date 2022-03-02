@@ -212,10 +212,8 @@ lhsMasksOfInterest = {
     'varVsEnsemble': [0, 1, 2, 3, 4, 5, 6, 7]
     }
 lhsMasksDesignAsMath = {
-    0: r'$[y_i] = \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
-    3: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
-    4: r'$[y_i] = \mathbf{{}^y\Phi}[y_i]$',
-    7: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r] + \mathbf{{}^{i}\Phi}[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    0: '$y_i = \mathbf{{}^u\Phi}(\mathbf{v} + a + r)$',
+    3: '$y_i = \mathbf{{}^y\Phi}(y_i) + \mathbf{{}^u\Phi}(\mathbf{v} + a + r)$',
     }
 # ######
 ################ define model comparisons

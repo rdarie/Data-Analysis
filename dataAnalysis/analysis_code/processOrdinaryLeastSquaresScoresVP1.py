@@ -556,7 +556,7 @@ if __name__ == '__main__':
     try:
         pdfPath = os.path.join(
             figureOutputFolder,
-            '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'partial_scores'))
+            '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'partial_scores'))
         with PdfPages(pdfPath) as pdf:
             height, width = 2, 2
             aspect = width / height
@@ -653,7 +653,7 @@ if __name__ == '__main__':
     # estimatorsDF.iloc[0].regressor_.named_steps['regressor'].results_.summary()
     try:
         pdfPath = os.path.join(
-            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'r2'))
+            figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'r2'))
         with PdfPages(pdfPath) as pdf:
             height, width = 1.5, 2
             aspect = width / height
@@ -757,7 +757,7 @@ if __name__ == '__main__':
         lambda x: print(x.regressor_.named_steps['regressor']))
     '''
     pdfPath = os.path.join(
-        figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, arguments['estimatorName'], 'hyperparameters_gridSearch'))
+        figureOutputFolder, '{}_{}_{}.pdf'.format(expDateTimePathStr, fullEstimatorName, 'hyperparameters_gridSearch'))
     with PdfPages(pdfPath) as pdf:
         height, width = 1.5, 2
         aspect = width / height
