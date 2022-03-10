@@ -303,7 +303,7 @@ def getExpOpts():
             },
         'na': {
             'experimentsToAssemble': {
-                '201901251000-Murdoc': [1, 2],
+                '201901251000-Murdoc': [2],
                 }
             }
         }

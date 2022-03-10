@@ -6,7 +6,6 @@ from itertools import product
 validTargetLhsMaskIdx = {
     'ols_select_scaled': [0, 1, 2, 3, 4, 7],
     'ols2_select2_scaled': [0, 3, 4, 5, 6],
-    'ols_select3_scaled': [0, 3],
     'ols_select_spectral_scaled': [0, 1, 2, 3, 4, 7],
     'ols2_select2_spectral_scaled': [0, 3, 4, 5, 6]
 }
@@ -24,16 +23,6 @@ burnInPeriod = 600e-3
 addEndogHistoryTerms = [
     # enhto0
     {
-        'nb': 5, 'dt': None,
-        'historyLen': 600e-3,
-        'timeDelay': 0.,
-        'useOrtho': True, 'normalize': True, 'groupBy': 'trialUID',
-        'causalShift': True, 'causalFill': True,
-        'useFirst': True, 'useLast': False,
-        'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
-    # enhto1
-    {
         'nb': 5, 'logBasis': True,
         'dt': None,
         'historyLen': 600e-3,
@@ -47,16 +36,6 @@ addEndogHistoryTerms = [
     ]
 addExogHistoryTerms = [
     # exhto0
-    {
-        'nb': 5, 'dt': None,
-        'historyLen': 600e-3,
-        'timeDelay': 0.,
-        'useOrtho': True, 'normalize': True, 'groupBy': 'trialUID',
-        'causalShift': False, 'causalFill': False,
-        'useFirst': True, 'useLast': False,
-        'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
-    # exhto1
     {
         'nb': 5, 'logBasis': True,
         'dt': None,
@@ -98,7 +77,6 @@ def elecWrap(x):
     return 'e:({})'.format(x)
 
 rcb = tdr.patsyRaisedCosTransformer
-bsb = tdr.patsyBSplineTransformer
 
 def genRcbWrap(htoStr):
     def rcbWrap(x):
@@ -109,16 +87,6 @@ def genElecRcbWrap(htoStr):
     def elecRcbWrap(x):
         return 'e:rcb({}, **{})'.format(x, htoStr)
     return elecRcbWrap
-
-def genBsbWrap(htoStr):
-    def bsbWrap(x):
-        return 'bsb({}, **{})'.format(x, htoStr)
-    return bsbWrap
-
-def genElecBsbWrap(htoStr):
-    def elecBsbWrap(x):
-        return 'e:bsb({}, **{})'.format(x, htoStr)
-    return elecBsbWrap
 
 def ddt(x):
     return x.diff().fillna(0)
@@ -168,13 +136,8 @@ formulasShortHand = {}
 #
 for lagSpecIdx in range(len(addExogHistoryTerms)):
     lagSpec = 'exhto{}'.format(lagSpecIdx)
-    if 'zflag' in addExogHistoryTerms[lagSpecIdx]:
-        wrapperFun = genRcbWrap(lagSpec)
-        elecWrapperFun = genElecRcbWrap(lagSpec)
-    else:
-        wrapperFun = genBsbWrap(lagSpec)
-        elecWrapperFun = genElecBsbWrap(lagSpec)
-    #
+    wrapperFun = genRcbWrap(lagSpec)
+    elecWrapperFun = genElecRcbWrap(lagSpec)
     laggedModels = {}
     for source in ['vx', 'vy']:
         laggedModels[source] = wrapperFun(source)
@@ -220,10 +183,7 @@ lOfEndogAndExogTemplates = []
 
 for lagSpecIdx in range(len(addEndogHistoryTerms)):
     lagSpec = 'enhto{}'.format(lagSpecIdx)
-    if 'zflag' in addEndogHistoryTerms[lagSpecIdx]:
-        wrapperFun = genRcbWrap(lagSpec)
-    else:
-        wrapperFun = genBsbWrap(lagSpec)
+    wrapperFun = genRcbWrap(lagSpec)
     histTemplate = wrapperFun('{}')
     lOfHistTemplates.append(histTemplate)
     templateHistOptsDict[histTemplate] = addEndogHistoryTerms[lagSpecIdx]

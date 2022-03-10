@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=200G
 
 # Specify a job name:
-#SBATCH -J s07a_ols_post_impulses_td_ra_202101_27
+#SBATCH -J s07a_ols_post_impulses_td_rc_202101_21
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s07a_ols_post_impulses_td_ra_202101_27.out
-#SBATCH -e ../../batch_logs/regression/s07a_ols_post_impulses_td_ra_202101_27.out
+#SBATCH -o ../../batch_logs/regression/s07a_ols_post_impulses_td_rc_202101_21.out
+#SBATCH -e ../../batch_logs/regression/s07a_ols_post_impulses_td_rc_202101_21.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,8 +25,8 @@
 #SBATCH --array=999
 
 # SLURM_ARRAY_TASK_ID=2
-# exps=(202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_27)
+# exps=(201901_25 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
+exps=(202101_21)
 for A in "${exps[@]}"
 do
   echo "step 07 impulse responses, scores, predictions, on $A"
@@ -36,7 +36,7 @@ do
   ALIGNQUERYTERM="starting"
   BLOCKSELECTOR="--blockIdx=2 --processAll"
   ###
-  ITERATOR="ra"
+  ITERATOR="rc"
   WINDOWTERM="XL"
   SUFFIX="_scaled"
   #  --forceReprocess

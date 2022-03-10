@@ -5,14 +5,12 @@ from itertools import product
 
 validTargetLhsMaskIdx = {
     'ols_select_scaled': [0, 1, 2, 3, 4, 7],
-    'ols2_select2_scaled': [0, 3, 4, 5, 6],
-    'ols_select_spectral_scaled': [0, 1, 2, 3, 4, 7],
-    'ols2_select2_spectral_scaled': [0, 3, 4, 5, 6]
+    'ols2_select2_scaled': [0, 3, 5, 6],
 }
 
 processSlurmTaskCountPLS = 3
-processSlurmTaskCount = 23
-processSlurmTaskCountTransferFunctions = 23
+processSlurmTaskCount = 96
+processSlurmTaskCountTransferFunctions = 96
 joblibBackendArgs = dict(
     backend='loky',
     n_jobs=-1
@@ -27,10 +25,10 @@ addEndogHistoryTerms = [
         'dt': None,
         'historyLen': 600e-3,
         'timeDelay': 0.,
-        'b': 100e-3, 'useOrtho': True,
+        'b': 50e-3, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
-        'causalShift': True, 'causalFill': True,
+        'causalShift': False, 'causalFill': True,
         'addInputToOutput': False, 'verbose': 0,
         'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
     ]
@@ -41,7 +39,7 @@ addExogHistoryTerms = [
         'dt': None,
         'historyLen': 600e-3,
         'timeDelay': 0.,
-        'b': 100e-3, 'useOrtho': True,
+        'b': 100e-3, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': False, 'causalFill': False,
@@ -77,6 +75,7 @@ def elecWrap(x):
     return 'e:({})'.format(x)
 
 rcb = tdr.patsyRaisedCosTransformer
+bsb = tdr.patsyBSplineTransformer
 
 def genRcbWrap(htoStr):
     def rcbWrap(x):
@@ -87,6 +86,16 @@ def genElecRcbWrap(htoStr):
     def elecRcbWrap(x):
         return 'e:rcb({}, **{})'.format(x, htoStr)
     return elecRcbWrap
+
+def genBsbWrap(htoStr):
+    def bsbWrap(x):
+        return 'bsb({}, **{})'.format(x, htoStr)
+    return bsbWrap
+
+def genElecBsbWrap(htoStr):
+    def elecBsbWrap(x):
+        return 'e:bsb({}, **{})'.format(x, htoStr)
+    return elecBsbWrap
 
 def ddt(x):
     return x.diff().fillna(0)
@@ -136,8 +145,13 @@ formulasShortHand = {}
 #
 for lagSpecIdx in range(len(addExogHistoryTerms)):
     lagSpec = 'exhto{}'.format(lagSpecIdx)
-    wrapperFun = genRcbWrap(lagSpec)
-    elecWrapperFun = genElecRcbWrap(lagSpec)
+    if 'zflag' in addExogHistoryTerms[lagSpecIdx]:
+        wrapperFun = genRcbWrap(lagSpec)
+        elecWrapperFun = genElecRcbWrap(lagSpec)
+    else:
+        wrapperFun = genBsbWrap(lagSpec)
+        elecWrapperFun = genElecBsbWrap(lagSpec)
+    #
     laggedModels = {}
     for source in ['vx', 'vy']:
         laggedModels[source] = wrapperFun(source)
@@ -165,7 +179,7 @@ for lagSpecIdx in range(len(addExogHistoryTerms)):
     # for fIdx in range(len(theseFormulas)):
     #     designIsLinear.update({
     #         theseFormulas[fIdx]: True})
-    masterExogFormulas.append(theseFormulas[3])
+    masterExogFormulas.append(theseFormulas[3]) # 3, aka templateBothInteractions
     for tf in theseFormulas:
         masterExogLookup[tf] = theseFormulas[3]
     lOfDesignFormulas += theseFormulas
@@ -183,7 +197,10 @@ lOfEndogAndExogTemplates = []
 
 for lagSpecIdx in range(len(addEndogHistoryTerms)):
     lagSpec = 'enhto{}'.format(lagSpecIdx)
-    wrapperFun = genRcbWrap(lagSpec)
+    if 'zflag' in addEndogHistoryTerms[lagSpecIdx]:
+        wrapperFun = genRcbWrap(lagSpec)
+    else:
+        wrapperFun = genBsbWrap(lagSpec)
     histTemplate = wrapperFun('{}')
     lOfHistTemplates.append(histTemplate)
     templateHistOptsDict[histTemplate] = addEndogHistoryTerms[lagSpecIdx]
@@ -205,15 +222,27 @@ lOfEndogAndExogTemplates = [
     (lOfDesignFormulas[4], lOfHistTemplates[-1],  lOfHistTemplates[0],), # 8: full exog, self,  a*r interactions
     (lOfDesignFormulas[5], lOfHistTemplates[-1],  lOfHistTemplates[0],), # 9: full exog, self, (v, stim) interactions
     #
-    (lOfDesignFormulas[3], lOfHistTemplates[0],  lOfHistTemplates[0],), # 10: full exog, self and ensemble, interactions and 
+    (lOfDesignFormulas[3], lOfHistTemplates[0],  lOfHistTemplates[0],), # 10: full exog, self, ensemble and interactions
     ]
 lhsMasksOfInterest = {
-    'plotPredictions': [0, 3, 5],
-    'varVsEnsemble': [0, 1, 2, 3, 4, 5, 6, 7]
+    'plotPredictions': [0, 3, 4, 5],
+    'varVsEnsemble': [0, 1, 2, 3, 4, 5, 6, 7],
+    'plotERA': [0, 3, 5],
     }
 lhsMasksDesignAsMath = {
-    0: '$y_i = \mathbf{{}^u\Phi}(\mathbf{v} + a + r)$',
-    3: '$y_i = \mathbf{{}^y\Phi}(y_i) + \mathbf{{}^u\Phi}(\mathbf{v} + a + r)$',
+    0: r'$[y_i] = \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
+    1: r'$[y_i] = \mathbf{{}^u\Phi}[\mathbf{v}]$',
+    2: r'$[y_i] = \mathbf{{}^u\Phi}[a \vert r]$',
+    3: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
+    4: r'$[y_i] = \mathbf{{}^y\Phi}[y_i]$',
+    5: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y}] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
+    6: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y_{k \neq i}}] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
+    7: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r] + \mathbf{{}^{i}\Phi}[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    }
+addedTermsAsMath = {
+    'exogVSExogAndSelf': r'$[\mathbf{v} \vert a \vert r]$',
+    'VARVsVARInter': r'$[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    'ensVSFull': r'$[\mathbf{y_{k \neq i}}]$'
     }
 # ######
 ################ define model comparisons

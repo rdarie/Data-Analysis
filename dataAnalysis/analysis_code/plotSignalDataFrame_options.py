@@ -59,12 +59,14 @@ def shadeTaskEpochsPerFacet(g, ro, co, hu, dataSubset):
         g.axes[ro, co].taskEpochsShaded = True
         return
 #
-
-
-exampleChannelListStr = ', '.join([
+exampleLaplaceChannelListStr = ', '.join([
     "'utah_csd_{}{}#0'".format(cn, fb) for fb, cn in product(
         ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb'],
         [2, 8, 17, 35])])
+exampleLfpChannelListStr = ', '.join([
+    "'utah{}{}#0'".format(cn, fb) for fb, cn in product(
+        ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb'],
+        [90, 96, 86, 64])])
 argumentsLookup = {
     'rig_illustration': {
         'recalcStats': True,
@@ -102,9 +104,10 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'rig_hf_illustration': {
         'recalcStats': True,
-        'winStart': '-10', 'winStop': '35', 'limitPages': None,
+        'winStart': '-5', 'winStop': '35', 'limitPages': None,
         'unitQuery': "chanName.isin(['position#0','velocity_x#0','velocity_y#0', 'amplitude#0', 'utah_rawAverage_0#0', 'ins_td0#0', 'ins_td2#0'])",
         # 'alignQuery': None,
+        'alignQuery': "((trialRateInHz == 50.) | (trialRateInHz == 100.))",
         # 'alignQuery': "conditionUID == 2",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -119,8 +122,9 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'lfp_hf_illustration': {
         'recalcStats': True,
-        'winStart': '-10', 'winStop': '35', 'limitPages': None,
-        'unitQuery': "chanName.isin(['utah1#0', 'utah75#0', 'averageSignal#0'])",
+        'winStart': '-5', 'winStop': '35', 'limitPages': None,
+        'unitQuery': "chanName.isin([" + exampleLfpChannelListStr + ", 'averageSignal#0'])",
+        'alignQuery': "((trialRateInHz == 50.) | (trialRateInHz == 100.))",
         # 'alignQuery': None,
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
@@ -136,13 +140,14 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_hf_illustration': {
         'recalcStats': True,
-        'winStart': '-10', 'winStop': '35', 'limitPages': None,
-        'unitQuery': "chanName.isin(['utah_csd_2#0', 'utah_csd_12#0', 'utah_csd_14#0', ])",
+        'winStart': '-5', 'winStop': '35', 'limitPages': None,
+        'unitQuery': "chanName.isin([" + exampleLaplaceChannelListStr + "])",
+        'alignQuery': "((trialRateInHz == 50.) | (trialRateInHz == 100.))",
         # 'alignQuery': None,
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'rowName': 'stimCondition', 'rowControl': '', # 'rowOrder':
+        'rowName': 'stimCondition', 'rowControl': '',
         'colName': 'kinematicConditionNoSize', 'colControl': '',
         'colOrder': [
             'NA_NA',
@@ -151,12 +156,26 @@ argumentsLookup = {
             ],
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
+    'laplace_hf_topo_illustration': {
+        'recalcStats': True,
+        'winStart': '-5', 'winStop': '35', 'limitPages': None,
+        'alignQuery': "((trialRateInHz == 50.) | (trialRateInHz == 100.))",
+        # 'alignQuery': None,
+        # 'unitQuery': None,
+        'individualTraces': False, 'overlayStats': False,
+        'hueName': 'trialAmplitude', 'hueControl': '',
+        'rowName': 'yCoords', 'rowControl': '',
+        'colName': 'xCoords', 'colControl': '',
+        'groupPagesByColumn': 'all',
+        'groupPagesByIndex': 'stimCondition, kinematicConditionNoSize',
+        'sizeName': '', 'sizeControl': '',
+        'styleName': '', 'styleControl': ''},
     'laplace_topo_illustration': {
         'recalcStats': True,
-        'winStart': '-150', 'winStop': '250', 'limitPages': None,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
         'unitQuery': None,
-        # 'alignQuery': "((trialRateInHz == 0.) | (trialRateInHz == 100.)) & (pedalMovementCat == 'outbound')",
-        'alignQuery': "(electrode == 'NA') & (pedalMovementCat == 'outbound')",
+        'alignQuery': "((trialRateInHz == 0.) | (trialRateInHz == 100.)) & (pedalMovementCat == 'outbound')",
+        # 'alignQuery': "(electrode == 'NA') & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'yCoords', 'rowControl': '',
@@ -167,7 +186,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'lfp_illustration_topo': {
         'recalcStats': True,
-        'winStart': '-25', 'winStop': '55', 'limitPages': None,
+        'winStart': '-20', 'winStop': '40', 'limitPages': None,
         'unitQuery': None,
         'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
@@ -229,7 +248,7 @@ argumentsLookup = {
         'recalcStats': True,
         'winStart': '-800', 'winStop': '1000', 'limitPages': None,
         # 'unitQuery': None,
-        'unitQuery': "chanName.isin([" + exampleChannelListStr + "])",
+        'unitQuery': "chanName.isin([" + exampleLaplaceChannelListStr + "])",
         # 'unitQuery': "chanName.isin(['{}#0', 'utah_csd_8#0', 'utah_csd_35#0', 'utah_csd_17#0',])".format(exampleChannelStr),
         # 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
@@ -269,7 +288,7 @@ argumentsLookup = {
     'laplace_spectral_illustration': {
         'recalcStats': True,
         'winStart': '-200', 'winStop': '300', 'limitPages': None,
-        'unitQuery': "chanName.isin([" + exampleChannelListStr + "])",
+        'unitQuery': "chanName.isin([" + exampleLaplaceChannelListStr + "])",
         # 'unitQuery': None,
         # 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
@@ -347,6 +366,7 @@ argumentsLookup['laplace_spectral_aucNoStim_illustration']['groupPagesByColumn']
 argumentsLookup['laplace_spectral_aucNoStim_illustration']['groupPagesByIndex'] = 'stimCondition'
 #
 argumentsLookup['laplace_std_illustration'] = argumentsLookup['laplace_illustration'].copy()
+argumentsLookup['lfp_hf_topo_illustration'] = argumentsLookup['laplace_hf_topo_illustration'].copy()
 
 statsTestOpts = dict(
     referenceTimeWindow=None,
@@ -471,6 +491,8 @@ statsTestOptsLookup['laplace_spectral_auc_illustration'] = statsTestOptsLookup['
 statsTestOptsLookup['laplace_aucNoStim_illustration'] = statsTestOptsLookup['laplace_illustration']
 statsTestOptsLookup['laplace_spectral_aucNoStim_illustration'] = statsTestOptsLookup['laplace_spectral_illustration'].copy()
 statsTestOptsLookup['laplace_std_illustration'] = statsTestOptsLookup['laplace_illustration'].copy()
+statsTestOptsLookup['laplace_hf_topo_illustration'] = statsTestOptsLookup['laplace_illustration'].copy()
+statsTestOptsLookup['lfp_hf_topo_illustration'] = statsTestOptsLookup['laplace_illustration'].copy()
 
 titleLabelLookup = {
     'stimCondition = NA_0.0': 'No stim.',
@@ -530,46 +552,75 @@ plotProcFunsLookup = {
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genStimVLineAdder(
-            'trialRateInHz', {'color': 'y', 'lw': 0.5, 'alpha': 1, 'ymin': 0.9, 'ymax': .95},
+            'trialRateInHz', {
+                'color': 'y', 'lw': 1.5, 'alpha': 1,
+                'ymin': 0.9, 'ymax': .95},
             tOnset=0., tOffset=60e-3,
-            includeLeft=False, includeRight=False),
-        asp.genTitleChanger(titleLabelLookup)
+            includeLeft=True, includeRight=False),
+        asp.genTitleChanger(titleLabelLookup),
+        asp.genAxisLabelOverride(
+            xTemplate=None, yTemplate='{feature}',
+            titleTemplate=None, colKeys=['feature'])
         ],
     'lfp_hf_illustration': [
         # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
-        asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
+        # asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genTitleChanger(titleLabelLookup),
         asp.genStimVLineAdder(
             'trialRateInHz', {
-                'color': 'y', 'lw': .5, 'alpha': 1,
+                'color': 'y', 'lw': 1.5, 'alpha': 1,
                 'ymin': 1.01, 'ymax': 1.04},
-            tOnset=0., tOffset=60e-3,
-            includeLeft=True, includeRight=False),
+            tOnset=0., tOffset=80e-3,
+            delayMap = {
+                'kinematicConditionNoSize': {
+                    'NA_NA': 0.,
+                    'CW_outbound': 0.,
+                    'CCW_outbound': 0.,
+                    'CW_return': 0.,
+                    'CCW_return': 0.,
+                    }
+                },
+            includeLeft=True, includeRight=False, addTitle=True, titleFontOpts=dict(fontweight='bold')),
         asp.genPedalPosAdder(
             autoscale=True,
             yMin = 1.06, yMax = 1.14,
             plotOptsMain=dict(lw=.5, c='k'),
-            plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),),
+            plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'), addTitle=True, titleFontOpts=dict(fontweight='bold')),
+        asp.genAxisLabelOverride(
+            xTemplate=None, yTemplate='{feature}',
+            titleTemplate=None, colKeys=['feature'])
         ],
     'laplace_hf_illustration': [
         # shadeAUCEpochsPerFacet,
         asp.xLabelsTime,
-        asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
+        # asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
         asp.genLegendRounder(decimals=2),
         asp.genTitleChanger(titleLabelLookup),
         asp.genStimVLineAdder(
             'trialRateInHz', {
-                'color': 'y', 'lw': .5, 'alpha': 1,
+                'color': 'y', 'lw': 1.5, 'alpha': 1,
                 'ymin': 1.01, 'ymax': 1.04},
-            tOnset=0., tOffset=60e-3,
+            tOnset=0., tOffset=80e-3,
+            delayMap = {
+                'kinematicConditionNoSize': {
+                    'NA_NA': 0.,
+                    'CW_outbound': 0.,
+                    'CCW_outbound': 0.,
+                    'CW_return': 0.,
+                    'CCW_return': 0.,
+                    }
+                },
             includeLeft=True, includeRight=False),
         asp.genPedalPosAdder(
             autoscale=True,
             yMin = 1.06, yMax = 1.14,
             plotOptsMain=dict(lw=.5, c='k'),
             plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),),
+        asp.genAxisLabelOverride(
+            xTemplate=None, yTemplate='{feature}',
+            titleTemplate=None, colKeys=['feature'])
         ],
     'laplace_topo_illustration': [
         # shadeAUCEpochsPerFacet,
@@ -719,6 +770,8 @@ plotProcFunsLookup['laplace_aucNoStim_illustration'] = plotProcFunsLookup['lapla
 plotProcFunsLookup['laplace_spectral_auc_illustration'] = plotProcFunsLookup['laplace_auc_illustration'].copy()
 plotProcFunsLookup['laplace_spectral_aucNoStim_illustration'] = plotProcFunsLookup['laplace_auc_illustration'].copy()
 plotProcFunsLookup['laplace_std_illustration'] = plotProcFunsLookup['laplace_illustration'].copy()
+plotProcFunsLookup['laplace_hf_topo_illustration'] = plotProcFunsLookup['laplace_illustration'].copy()
+plotProcFunsLookup['lfp_hf_topo_illustration'] = plotProcFunsLookup['laplace_illustration'].copy()
 
 unusedPlotProcFuns = [
     asp.genNumRepAnnotator(
@@ -755,7 +808,7 @@ relPlotKWArgsLookup = {
         'errorbar': 'se'
     },
     'rig_hf_illustration': {
-        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'linewidth': .75, 'height': 2, 'aspect': 3,
         'palette': "ch:0.8,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': None
     },
@@ -765,12 +818,12 @@ relPlotKWArgsLookup = {
         'errorbar': 'se'
     },
     'lfp_hf_illustration': {
-        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'linewidth': .75, 'height': 2, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': None
     },
     'laplace_hf_illustration': {
-        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'linewidth': .75, 'height': 2, 'aspect': 3,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': None
     },
@@ -781,9 +834,9 @@ relPlotKWArgsLookup = {
         'errorbar': None  # 'se'
     },
     'laplace_topo_illustration': {
-        'linewidth': 2., 'height': 2, 'aspect': 1.5,
+        'linewidth': 1., 'height': 1, 'aspect': 1.5,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'facet_kws': {'sharey': False},
+        'facet_kws': {'sharey': True},
         'errorbar': None  # 'se'
     },
     'laplace_spectral_topo_illustration': {
@@ -838,6 +891,12 @@ relPlotKWArgsLookup = {
         'errorbar': None
     }
 }
+relPlotKWArgsLookup['laplace_hf_topo_illustration'] = relPlotKWArgsLookup['laplace_topo_illustration'].copy()
+#
+relPlotKWArgsLookup['lfp_hf_topo_illustration'] = relPlotKWArgsLookup['laplace_topo_illustration'].copy()
+relPlotKWArgsLookup['lfp_hf_topo_illustration']['rasterized'] = True
+relPlotKWArgsLookup['lfp_hf_topo_illustration']['aspect'] = 1
+#
 relPlotKWArgsLookup['laplace_spectral_auc_illustration'] = relPlotKWArgsLookup['laplace_auc_illustration'].copy()
 relPlotKWArgsLookup['laplace_spectral_auc_illustration']['palette'] = relPlotKWArgsLookup['laplace_spectral_illustration']['palette']
 relPlotKWArgsLookup['laplace_aucNoStim_illustration'] = relPlotKWArgsLookup['laplace_auc_illustration'].copy()
@@ -902,6 +961,8 @@ catPlotKWArgsLookup['laplace_spectral_auc_illustration'] = catPlotKWArgsLookup['
 catPlotKWArgsLookup['laplace_aucNoStim_illustration'] = catPlotKWArgsLookup['laplace_illustration']
 catPlotKWArgsLookup['laplace_spectral_aucStim_illustration'] = catPlotKWArgsLookup['laplace_spectral_illustration']
 catPlotKWArgsLookup['laplace_std_illustration'] = catPlotKWArgsLookup['laplace_illustration']
+catPlotKWArgsLookup['laplace_hf_topo_illustration'] = catPlotKWArgsLookup['laplace_illustration']
+catPlotKWArgsLookup['lfp_hf_topo_illustration'] = catPlotKWArgsLookup['laplace_illustration']
 #
 legendTitleOverridesLookup = {
     'rig_illustration': {
@@ -945,6 +1006,8 @@ legendTitleOverridesLookup['laplace_spectral_auc_illustration'] = legendTitleOve
 legendTitleOverridesLookup['laplace_aucNoStim_illustration'] = legendTitleOverridesLookup['laplace_illustration']
 legendTitleOverridesLookup['laplace_spectral_aucNoStim_illustration'] = legendTitleOverridesLookup['laplace_spectral_illustration']
 legendTitleOverridesLookup['laplace_std_illustration'] = legendTitleOverridesLookup['laplace_illustration']
+legendTitleOverridesLookup['laplace_hf_topo_illustration'] = legendTitleOverridesLookup['laplace_illustration']
+legendTitleOverridesLookup['lfp_hf_topo_illustration'] = legendTitleOverridesLookup['laplace_illustration']
 
 legendContentOverridesLookup = {}
 
@@ -994,6 +1057,8 @@ styleOptsLookup['laplace_spectral_auc_illustration'] = styleOptsLookup['laplace_
 styleOptsLookup['laplace_aucNoStim_illustration'] = styleOptsLookup['laplace_illustration']
 styleOptsLookup['laplace_spectral_aucNoStim_illustration'] = styleOptsLookup['laplace_spectral_illustration']
 styleOptsLookup['laplace_std_illustration'] = styleOptsLookup['laplace_illustration']
+styleOptsLookup['laplace_hf_topo_illustration'] = styleOptsLookup['laplace_illustration']
+styleOptsLookup['lfp_hf_topo_illustration'] = styleOptsLookup['laplace_illustration']
 xAxisLabelLookup = {
     }
 yAxisLabelLookup = {
@@ -1040,6 +1105,8 @@ titlesOptsLookup = {
     'laplace_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'lfp_illustration_topo': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_topo_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'laplace_hf_topo_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
+    'lfp_hf_topo_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_spectral_topo_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_spectral_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
     'laplace_spectral_auc_illustration': {'col_template': '{col_name}', 'row_template': '{row_name}'},
@@ -1064,6 +1131,8 @@ titlesOptsLookup['mahal_per_trial_illustration'] = titlesOptsLookup['mahal_illus
 titlesOptsLookup['rig_per_trial_illustration'] = titlesOptsLookup['rig_illustration']
 titlesOptsLookup['rig_hf_illustration'] = titlesOptsLookup['rig_illustration']
 titlesOptsLookup['lfp_hf_illustration'] = titlesOptsLookup['lfp_illustration']
+titlesOptsLookup['laplace_hf_topo_illustration'] = titlesOptsLookup['lfp_illustration']
+titlesOptsLookup['lfp_hf_topo_illustration'] = titlesOptsLookup['lfp_illustration']
 titlesOptsLookup['laplace_hf_illustration'] = titlesOptsLookup['laplace_illustration']
 titlesOptsLookup['laplace_auc_illustration'] = titlesOptsLookup['laplace_illustration']
 titlesOptsLookup['laplace_spectral_auc_illustration'] = titlesOptsLookup['laplace_spectral_illustration']

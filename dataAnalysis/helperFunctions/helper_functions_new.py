@@ -3991,6 +3991,10 @@ def exportNormalizedDataFrame(
                 conditionUID.loc[subGroup.index] = uid
         trialInfo.loc[:, 'conditionUID'] = conditionUID
         dataDF.index = pd.MultiIndex.from_frame(trialInfo)
+    # pdb.set_trace()
+    ddfColumns = dataDF.columns.to_frame().reset_index(drop=True)
+    ddfColumns.loc[ddfColumns['parentFeature'] == 'NA', 'parentFeature'] = ddfColumns.loc[ddfColumns['parentFeature'] == 'NA', 'feature']
+    dataDF.columns = pd.MultiIndex.from_frame(ddfColumns)
     # save, copied from assemble dataframes
     finalDF = dataDF.copy()
     #  #### end of data loading stuff

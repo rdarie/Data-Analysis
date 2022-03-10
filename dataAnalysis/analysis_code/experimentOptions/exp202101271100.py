@@ -276,12 +276,12 @@ def getExpOpts():
             },
         'pb': {
             'experimentsToAssemble': {
-                '202101271100-Rupert': [1],
+                '202101271100-Rupert': [1, 2],
                 }
             },
         'pc': {
             'experimentsToAssemble': {
-                '202101271100-Rupert': [1],
+                '202101271100-Rupert': [1, 2],
                 }
             },
         'ma': {

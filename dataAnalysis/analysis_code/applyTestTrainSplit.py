@@ -250,6 +250,10 @@ trialInfo.loc[:, 't'] = np.round(trialInfo['t'], decimals=9)
 trialInfo.loc[:, 'isOutlierTrial'] = trialInfo.set_index(['segment', 't']).index.map(outlierTrialsForReference['rejectBlock'])
 trialInfo.loc[:, 'outlierDeviation'] = trialInfo.set_index(['segment', 't']).index.map(outlierTrialsForReference['deviation'])
 exportDF.index = pd.MultiIndex.from_frame(trialInfo)
+##
+ddfColumns = exportDF.columns.to_frame().reset_index(drop=True)
+ddfColumns.loc[ddfColumns['parentFeature'] == 'NA', 'parentFeature'] = ddfColumns.loc[ddfColumns['parentFeature'] == 'NA', 'feature']
+exportDF.columns = pd.MultiIndex.from_frame(ddfColumns)
 exportDF.to_hdf(outputDFPath, exportKey, mode='a')
 ##
 featureGroupNames = [cN for cN in exportDF.columns.names]

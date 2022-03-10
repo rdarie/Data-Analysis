@@ -10,11 +10,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J s02d_tts_plots_stim_202101_27
+#SBATCH -J s02b_tts_plots_stim_202101_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/s02d_test_train_split_plots_stim_202101_27-%a.out
-#SBATCH -e ../../batch_logs/s02d_test_train_split_plots_stim_202101_27-%a.out
+#SBATCH -o ../../batch_logs/s02b_test_train_split_plots_stim_202101_27-%a.out
+#SBATCH -e ../../batch_logs/s02b_test_train_split_plots_stim_202101_27-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

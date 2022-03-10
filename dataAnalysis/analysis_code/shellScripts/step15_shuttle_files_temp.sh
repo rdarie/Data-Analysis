@@ -76,12 +76,10 @@ python --version
 #  or option '-j' for a specific Job ID.
 
 WINDOW="XL"
-# WINDOW="XXS"
 # KEYPROMPT="--requireKeypress"
 KEYPROMPT=""
 #  # exps=(exp201901251000 exp201901261000 exp201901271000 exp201902031100 exp201902041100 exp201902051100 exp202101201100 exp202101211100 exp202101221100 exp202101251100 exp202101271100 exp202101281100 exp202102021100)
 #  # exps=(exp201901251000 exp201901261000 exp201901271000 exp202101271100 exp202101281100)
-#  # exps=(exp201902031100 exp201902041100 exp201902051100)
 exps=(exp201902031100 exp201902041100 exp201902051100)
 for EXP in "${exps[@]}"
 do
@@ -136,37 +134,36 @@ do
   # after step 8
   # after step 9
   # 
-  BLOCK_ID_NO="0*"
-  iters=(ra rb rc)
+  # iters=(ra rb rc)
+  # for ITER in "${iters[@]}"
+  # do
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}_*.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}_*.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}_*_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="select*_${ITER}_*_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="select*_${ITER}_*.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="ols*_${ITER}.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="ols*_${ITER}_*.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="ols*_${ITER}_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  #    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="ols*_${ITER}_*" --fromScratchToData --moveItems --foldersIncluded ${KEYPROMPT}
+  #  done
+  # after step 11
+  #
+  iters=(ca cb ccm ccs cd)
   for ITER in "${iters[@]}"
   do
-    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_${ITER}_*.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_${ITER}.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_${ITER}_*.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block${BLOCK_ID_NO}_${ITER}_*_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="select*_${ITER}_*_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="select*_${ITER}_*.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="ols*_${ITER}.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="ols*_${ITER}_*.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="ols*_${ITER}_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-    # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="ols*_${ITER}_*" --fromScratchToData --moveItems --foldersIncluded ${KEYPROMPT}
+    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}_*.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+    python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}_*_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
   done
-  # after step 11
-  ## ##
-  ## ##iters=(ca cb ccm ccs cd)
-  ## ##for ITER in "${iters[@]}"
-  ## ##do
-  ## ##  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}_*.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  ## ##  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}.h5" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  ## ##  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}_*_meta.pickle" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  ## ##done
-  ## ##
+  #
   # #after step 13
   ## ##
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_laplace_scaled_${WINDOW}.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_laplace_spectral_scaled_${WINDOW}.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_laplace_baseline_${WINDOW}.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
-  python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_laplace_spectral_baseline_${WINDOW}.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_laplace_scaled_${WINDOW}.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_laplace_spectral_scaled_${WINDOW}.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_laplace_baseline_${WINDOW}.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
+  # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_laplace_spectral_baseline_${WINDOW}.nix" --fromScratchToData --moveItems --filesIncluded ${KEYPROMPT}
   ## ##
   # ## #after step 14
   

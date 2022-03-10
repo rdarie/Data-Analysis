@@ -80,10 +80,11 @@ def processOutlierTrials(
                     oBlocks = pd.read_hdf(resultPathH5, 'rejectBlock')
                     if includeDeviation:
                         devBlocks = pd.read_hdf(resultPathH5, 'deviation')
-                        oBlocks = pd.concat([oBlocks, devBlocks], names=['rejectBlock', 'deviation'])
+                        oBlocks = pd.concat([oBlocks, devBlocks], names=['rejectBlock', 'deviation'], axis='columns')
                     else:
                         oBlocks = oBlocks.to_frame(name='rejectBlock')
-                oBlocksCount = oBlocks.sum()['rejectBlock']
+                # pdb.set_trace()
+                oBlocksCount = oBlocks['rejectBlock'].sum()
                 oBlocksSize = oBlocks.shape[0]
                 print('Loading outlier trials. Rejecting a proportion of {:.2f} ({} out of {})'.format(
                     oBlocksCount / oBlocksSize, oBlocksCount, oBlocksSize))
@@ -96,8 +97,10 @@ def processOutlierTrials(
             else:
                 return None
         except:
+            traceback.print_exc()
+            print('#' * 50)
             print('{} outlier trials not found. Falling back...'.format(wN))
-            # traceback.print_exc()
+            print('#' * 50)
 
 
 def processUnitQueryArgs(

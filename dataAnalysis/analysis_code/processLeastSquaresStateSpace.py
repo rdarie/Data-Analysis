@@ -203,7 +203,17 @@ lhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'lhsMasksInfo')
 ###
 rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
 rhsMasksInfo = pd.read_hdf(estimatorMeta['designMatrixPath'], 'rhsMasksInfo')
-#
+
+with pd.HDFStore(estimatorPath) as store:
+    sourcePalette = pd.read_hdf(store, 'sourcePalette')
+    termPalette = pd.read_hdf(store, 'termPalette')
+    factorPalette = pd.read_hdf(store, 'factorPalette')
+    trialTypePalette = pd.read_hdf(store, 'trialTypePalette')
+    sourceTermLookup = pd.read_hdf(store, 'sourceTermLookup')
+    predictionLineStyleDF = pd.read_hdf(store, 'termLineStyleDF')
+stimConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'stimConditionLookup')
+kinConditionLookup = pd.read_hdf(estimatorMeta['designMatrixPath'], 'kinConditionLookup')
+
 if processSlurmTaskCount is not None:
     ################ collect estimators and scores
     AList = []
@@ -284,18 +294,33 @@ with PdfPages(pdfPath) as pdf:
             return 'system'
         else:
             return '{} ({})'.format(x['matrix'], x['inputSubset'])
+    thisCtrb = thisCtrb.loc[thisCtrb['lhsMaskIdx'].isin([0, 3, 5]), :]
     thisCtrb.loc[:, 'rankOf'] = thisCtrb.apply(makeNameColumns, axis='columns')
     thisCtrb.loc[:, 'fullFormulaDescr'] = thisCtrb['lhsMaskIdx'].map(lhsMasksInfo['fullFormulaDescr'])
+    thisCtrb.loc[:, 'fullFormulaAsMath'] = thisCtrb['lhsMaskIdx'].map(lhsMasksDesignAsMath)
+    thisCtrb.loc[thisCtrb['fullFormulaAsMath'].isna(), 'fullFormulaAsMath'] = thisCtrb.loc[thisCtrb['fullFormulaAsMath'].isna(), 'fullFormulaDescr']
+    #
+    thisPalette = {
+        'system': sourcePalette['ens'],
+        'observability (full)': termPalette.loc[termPalette['term'] ==  'ground_truth', 'color'].iloc[0],
+        'controlability (velocity)': sourcePalette['vx'],
+        }
+    thisPalette.update({'controlability ({})'.format(eN): sourcePalette['a'] for eN in stimConditionLookup.index.get_level_values('electrode').unique() if eN != 'NA'})
+    #
     height, width = 2, 2
     aspect = width / height
     g = sns.catplot(
         data=thisCtrb,
-        x='fullFormulaDescr', y='rank',
+        x='fullFormulaAsMath', y='rank',
         hue='rankOf',
-        kind='bar',
+        kind='bar', palette=thisPalette,
         height=height, aspect=aspect
         )
     g.set_xticklabels(rotation=-10, ha='left', va='top')
+    g.set_axis_labels('AR model', 'Matrix rank')
+    asp.reformatFacetGridLegendV2(
+        g, labelOverrides=prettyNameLookup,
+        styleOpts=styleOpts, capitalizeLabels=True)
     g.tight_layout(pad=styleOpts['tight_layout.pad'])
     pdf.savefig(bbox_inches='tight', pad_inches=0)
     if arguments['showFigures']:
@@ -306,20 +331,22 @@ with PdfPages(pdfPath) as pdf:
     aspect = width / height
     for name, eigGroup in plotEig.groupby(['lhsMaskIdx', 'fullFormula']):
         lhsMaskIdx, fullFormula = name
-        # if lhsMaskIdx not in [29]:
-        # pdb.set_trace()
+        fullFormulasAsMath = lhsMasksDesignAsMath[lhsMaskIdx]
+        if lhsMaskIdx not in lhsMasksOfInterest['plotERA']:
+            continue
         eigGroupForPlot = eigGroup.xs(lastFoldIdx, level='fold')
         stateSpaceNDim = np.unique(eigGroupForPlot.index.get_level_values('stateNDim'))[0]
         # maskForScatter = (~np.isinf(eigGroup['tau'])) & (~np.isinf(eigGroup['chi']))
         maskForScatter = (~np.isnan(eigGroupForPlot['complex']))
         # maskForHist = (~np.isinf(eigGroup['tau'])) & (~np.isinf(eigGroup['chi'])) & (eigGroup['tau'] > binInterval) & (eigGroup['chi'] < 1.)
         if not maskForScatter.any():
+            print("{}, all np.isnan(eigGroupForPlot['complex'])!".format(fullFormula))
             continue
         #     continue
         #############################################################################################################################
         ## Z plane
         g = sns.relplot(
-            col='freqBandName',
+            # col='freqBandName',
             x='real', y='imag', hue='eigValType',
             height=height, aspect=aspect,
             palette=eigValPalette.to_dict(),
@@ -351,7 +378,7 @@ with PdfPages(pdfPath) as pdf:
             contentOverrides={},
             styleOpts=styleOpts)
         g.set_axis_labels('Real', 'Imaginary')
-        g.suptitle(fullFormula)
+        g.suptitle(fullFormulasAsMath)
         g.resize_legend(adjust_subtitles=True)
         g.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
@@ -375,7 +402,7 @@ with PdfPages(pdfPath) as pdf:
             chiLims = [chiLims[0] - chiExt * 5e-2, chiLims[1] + chiExt * 5e-2]
             #
             g = sns.relplot(
-                col='freqBandName',
+                # col='freqBandName',
                 x='tau', y='chi', hue='eigValType',
                 height=height, aspect=aspect,
                 palette=eigValPalette.to_dict(),
@@ -396,7 +423,7 @@ with PdfPages(pdfPath) as pdf:
                 ax.set_xlim(*tauLims)
             #
             g.set_axis_labels('Time constant (sec)', 'Period (sec)')
-            g.suptitle(fullFormula)
+            g.suptitle(fullFormulasAsMath)
             g.resize_legend(adjust_subtitles=True)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
@@ -419,7 +446,7 @@ with PdfPages(pdfPath) as pdf:
             ax[1].set_xlim(chiLims) #
             ax[1].set_xlabel('Oscillation period (sec)')
             sns.despine(fig)
-            fig.suptitle(fullFormula)
+            fig.suptitle(fullFormulasAsMath)
             fig.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:
@@ -466,7 +493,7 @@ with PdfPages(pdfPath) as pdf:
         if not thisK.empty:
             sns.heatmap(thisK, ax=ax[8], cbar_ax=ax[9], **commonHeatmapOpts)
         ax[8].set_title('K')
-        fig.suptitle('system matrices from validation set\n{}'.format(fullFormula))
+        fig.suptitle('system matrices from validation set\n{}'.format(fullFormulasAsMath))
         fig.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
@@ -483,7 +510,7 @@ with PdfPages(pdfPath) as pdf:
                 for cNc in colsToEval:
                     BCosineSim.loc[cNr, cNc] = distance.cosine(thisB[cNr], thisB[cNc])
             sns.heatmap(BCosineSim, mask=mask, vmin=0, vmax=1, square=True, ax=ax, rasterized=True)
-            ax.set_title('Cosine distance between input directions')
+            ax.set_title('Cosine distance between input directions\n{}'.format(fullFormulasAsMath))
             fig.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:
@@ -496,26 +523,33 @@ with PdfPages(pdfPath) as pdf:
         nLags = int(np.ceil(lhsMasksInfo.loc[lhsMaskIdx, 'historyLen'] / binInterval))
         nMeas = thisC.shape[0]
         plotThisHEig = thisHEig.to_frame(name='s').reset_index()
-        rLim = min(plotThisHEig['state'].max(), max(2 * stateSpaceNDim, nMeas * nLags), ) + 1
-        g = sns.relplot(
-            x='state', y='s', col='rhsMaskIdx',
-            data=plotThisHEig.loc[plotThisHEig['state'] < rLim, :], kind='scatter',
-            height=3, aspect=1, )
-        g.set(yscale='log')
-        ax = g.axes[0, 0]
-        g.suptitle(
-            'singular values of Hankel matrix (ERA)\n{}'.format(lhsMasksInfo.loc[lhsMaskIdx, 'fullFormulaDescr']))
-        ax.axvline(stateSpaceNDim, c='b', label='state space model order: {}'.format(stateSpaceNDim), lw=1)
-        ax.axvline(nLags * nMeas, c='g', label='AR(p) order ({}) * num. channels ({}) = {}'.format(nLags, nMeas, nLags * nMeas), lw=1)
-        ax.axhline(np.spacing(1e4), c='r', label='floating point precision cutoff', ls='--')
-        ax.set_xlabel('Count')
-        ax.set_xlim([-1, rLim])
-        ax.legend(loc='lower right', )
-        pdf.savefig(bbox_inches='tight', pad_inches=0)
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
+        rLim = min(plotThisHEig['state'].max(), max(3 * stateSpaceNDim, nLags), ) + 1
+        optsDict = {
+            'kind': ['scatter', 'line'],
+            'yScale': ['log', None],
+            'otherRelPlot': [{'edgecolor': None}, {}]
+        }
+        for optsIdx in range(2):
+            g = sns.relplot(
+                x='state', y='s', col='rhsMaskIdx',
+                data=plotThisHEig.loc[plotThisHEig['state'] < rLim, :], kind=optsDict['kind'][optsIdx],
+                height=3, aspect=1, **optsDict['otherRelPlot'][optsIdx])
+            if optsDict['yScale'][optsIdx] is not None:
+                g.set(yscale=optsDict['yScale'][optsIdx])
+            ax = g.axes[0, 0]
+            g.suptitle(
+                'singular values of Hankel matrix (ERA)\n{}'.format(fullFormulasAsMath))
+            ax.axvline(stateSpaceNDim, c='b', label='state space model order: {}'.format(stateSpaceNDim), lw=1)
+            ax.axvline(nLags, c='g', label='AR(p) order: {}'.format(nLags), lw=1)
+            ax.axhline(np.spacing(1e4), c='r', label='floating point precision cutoff', ls='--')
+            ax.set_xlabel('Count')
+            ax.set_xlim([-1, rLim])
+            ax.legend(loc='lower right', )
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
         '''thisA = ADF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')
         
         thisC = CDF.xs(lhsMaskIdx, level='lhsMaskIdx').dropna(axis='columns')

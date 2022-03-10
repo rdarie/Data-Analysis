@@ -206,9 +206,12 @@ if __name__ == '__main__':
             formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
             locals().update({'enhto{}'.format(hIdx): formattedHistOpts})
             histOptsForExportDict['enhto{}'.format(hIdx)] = formattedHistOpts
-            raisedCosBaser = tdr.raisedCosTransformer(formattedHistOpts)
+            if 'zflag' in formattedHistOpts:
+                basisApplier = tdr.raisedCosTransformer(formattedHistOpts)
+            else:
+                basisApplier = tdr.bSplineTransformer(formattedHistOpts)
             if arguments['plotting']:
-                fig, ax = raisedCosBaser.plot_basis()
+                fig, ax = basisApplier.plot_basis()
                 fig.suptitle('enhto{}'.format(hIdx))
                 fig.tight_layout()
                 pdf.savefig(
@@ -222,9 +225,12 @@ if __name__ == '__main__':
             formattedHistOpts = getHistoryOpts(histOpts, iteratorOpts, rasterOpts)
             locals().update({'exhto{}'.format(hIdx): formattedHistOpts})
             histOptsForExportDict['exhto{}'.format(hIdx)] = formattedHistOpts
-            raisedCosBaser = tdr.raisedCosTransformer(formattedHistOpts)
+            if 'zflag' in formattedHistOpts:
+                basisApplier = tdr.raisedCosTransformer(formattedHistOpts)
+            else:
+                basisApplier = tdr.bSplineTransformer(formattedHistOpts)
             if arguments['plotting']:
-                fig, ax = raisedCosBaser.plot_basis()
+                fig, ax = basisApplier.plot_basis()
                 fig.suptitle('exhto{}'.format(hIdx))
                 fig.tight_layout()
                 pdf.savefig(
@@ -525,13 +531,13 @@ if __name__ == '__main__':
             for rowIdx, row in lhsMasksInfo.iterrows():
                 if row['designFormula'] in designHistOptsDict:
                     theseHistOpts = designHistOptsDict[row['designFormula']]
-                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key] if key in theseHistOpts else np.nan
                 elif row['ensembleTemplate'] in templateHistOptsDict:
                     theseHistOpts = templateHistOptsDict[row['ensembleTemplate']]
-                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key] if key in theseHistOpts else np.nan
                 elif row['selfTemplate'] in templateHistOptsDict:
                     theseHistOpts = templateHistOptsDict[row['selfTemplate']]
-                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key]
+                    lhsMasksInfo.loc[rowIdx, key] = theseHistOpts[key] if key in theseHistOpts else np.nan
                 else:
                     lhsMasksInfo.loc[rowIdx, key] = 'NULL'
         # lhsMasksInfo.loc[:, 'lagSpec'] = np.nan

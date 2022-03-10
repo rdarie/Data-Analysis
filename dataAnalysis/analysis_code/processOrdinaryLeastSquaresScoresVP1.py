@@ -428,14 +428,20 @@ if __name__ == '__main__':
     gsScoresDF = pd.concat(gsScoresDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
     gsScoresDF.drop(columns=['lhsMaskIdx', 'rhsMaskIdx'], inplace=True)
     gsScoresDF.loc[:, 'cc'] = np.sqrt(gsScoresDF['score'])
+    if savingResults:
+        gsScoresDF.to_hdf(estimatorPath, 'gsScoresDF')
     del gsScoresDict
     prf.print_memory_usage('done concatenating gs scores from h5 file')
     if len(nItersDict):
         nItersDF = pd.concat(nItersDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
+        if savingResults:
+            nItersDF.to_hdf(estimatorPath, 'nItersDF')
     else:
         nItersDF = None
     if len(convergenceDict):
         convergenceDF = pd.concat(convergenceDict, names=['lhsMaskIdx', 'rhsMaskIdx', 'target'])
+        if savingResults:
+            convergenceDF.to_hdf(estimatorPath, 'convergenceDF')
     else:
         convergenceDF = None
     #

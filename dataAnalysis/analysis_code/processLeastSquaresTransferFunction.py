@@ -280,7 +280,7 @@ def calcTransferFunctionFromLeastSquares():
     #
     #  ##################################################################
     if arguments['debugging']:
-        slurmTaskID = 3
+        slurmTaskID = 10
         transferFuncPath = os.path.join(
             estimatorsSubFolder,
             fullEstimatorName + '_{}_{}_tf.h5'.format(arguments['eraMethod'], slurmTaskID)
@@ -401,6 +401,7 @@ def calcTransferFunctionFromLeastSquares():
             except Exception:
                 traceback.print_exc()
                 print('This occured during\nlhsMaskIdx {},\ndesignFormula {},\nrhsMaskIdx {},\nfold {}\n'.format(*name))
+                print("Phi.loc[Phi['bin'] == 0, endogNames].abs().max() = {:.3e}".format(Phi.loc[Phi['bin'] == 0, endogNames].abs().max().max()))    
             Phi.loc[Phi['bin'] == 0, endogNames] = 0. # enforce that y[t] = F(y[t-p]), p positive
             ###
             Phi.sort_values(
@@ -408,7 +409,7 @@ def calcTransferFunctionFromLeastSquares():
             Phi.set_index(['bin', 'target'], inplace=True)
             Phi = Phi.stack().unstack('target').T
             # sns.heatmap(Phi, mask=Phi > 0); plt.show()
-            nLags = int(10 * max(histLens) / binInterval)
+            nLags = int(7 * max(histLens) / binInterval)
             print('nLags = {}'.format(nLags))
             #
             A, B, K, C, D, H, PsiDF, reconPsiDF, hEigenVals, (fig, ax,) = tdr.ERA(
@@ -416,6 +417,8 @@ def calcTransferFunctionFromLeastSquares():
                 endogNames=endogNames, exogNames=exogNames, nLags=nLags,
                 plotting=arguments['plotting'], verbose=2,
                 checkApproximations=True,
+                # eraReductionMethod='topFraction', eraFraction=0.99,
+                eraReductionMethod='optimalSVD',
                 noEndogTerms=((ensTemplate == 'NULL') & (selfTemplate == 'NULL'))
                 )
             ##################

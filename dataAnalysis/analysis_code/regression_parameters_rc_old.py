@@ -6,9 +6,6 @@ from itertools import product
 validTargetLhsMaskIdx = {
     'ols_select_scaled': [0, 1, 2, 3, 4, 7],
     'ols2_select2_scaled': [0, 3, 4, 5, 6],
-    'ols_select3_scaled': [0, 3],
-    'ols_select_spectral_scaled': [0, 1, 2, 3, 4, 7],
-    'ols2_select2_spectral_scaled': [0, 3, 4, 5, 6]
 }
 
 processSlurmTaskCountPLS = 3
@@ -24,45 +21,25 @@ burnInPeriod = 600e-3
 addEndogHistoryTerms = [
     # enhto0
     {
-        'nb': 5, 'dt': None,
-        'historyLen': 600e-3,
-        'timeDelay': 0.,
-        'useOrtho': True, 'normalize': True, 'groupBy': 'trialUID',
-        'causalShift': True, 'causalFill': True,
-        'useFirst': True, 'useLast': False,
-        'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
-    # enhto1
-    {
         'nb': 5, 'logBasis': True,
         'dt': None,
         'historyLen': 600e-3,
         'timeDelay': 0.,
-        'b': 100e-3, 'useOrtho': True,
+        'b': 10e-3, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
-        'causalShift': True, 'causalFill': True,
+        'causalShift': False, 'causalFill': True,
         'addInputToOutput': False, 'verbose': 0,
         'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
     ]
 addExogHistoryTerms = [
     # exhto0
     {
-        'nb': 5, 'dt': None,
-        'historyLen': 600e-3,
-        'timeDelay': 0.,
-        'useOrtho': True, 'normalize': True, 'groupBy': 'trialUID',
-        'causalShift': False, 'causalFill': False,
-        'useFirst': True, 'useLast': False,
-        'addInputToOutput': False, 'verbose': 0,
-        'joblibBackendArgs': joblibBackendArgs, 'convolveMethod': 'auto'},
-    # exhto1
-    {
         'nb': 5, 'logBasis': True,
         'dt': None,
         'historyLen': 600e-3,
         'timeDelay': 0.,
-        'b': 100e-3, 'useOrtho': True,
+        'b': 10e-3, 'useOrtho': False,
         'normalize': True, 'groupBy': 'trialUID',
         'zflag': False,
         'causalShift': False, 'causalFill': False,
@@ -98,7 +75,6 @@ def elecWrap(x):
     return 'e:({})'.format(x)
 
 rcb = tdr.patsyRaisedCosTransformer
-bsb = tdr.patsyBSplineTransformer
 
 def genRcbWrap(htoStr):
     def rcbWrap(x):
@@ -109,16 +85,6 @@ def genElecRcbWrap(htoStr):
     def elecRcbWrap(x):
         return 'e:rcb({}, **{})'.format(x, htoStr)
     return elecRcbWrap
-
-def genBsbWrap(htoStr):
-    def bsbWrap(x):
-        return 'bsb({}, **{})'.format(x, htoStr)
-    return bsbWrap
-
-def genElecBsbWrap(htoStr):
-    def elecBsbWrap(x):
-        return 'e:bsb({}, **{})'.format(x, htoStr)
-    return elecBsbWrap
 
 def ddt(x):
     return x.diff().fillna(0)
@@ -142,7 +108,6 @@ templateBothInteractions = (
 templateVARInteractions = (
     '{vx} + {vy} + {a} + {r} + ' +
     ' + '.join(interactionList) + ' - 1')
-
 templateIsLinear = {
     '{vx} + {vy} + {a} + {r} - 1': True, # 0
     '{vx} + {vy} - 1': True, # 1
@@ -168,13 +133,8 @@ formulasShortHand = {}
 #
 for lagSpecIdx in range(len(addExogHistoryTerms)):
     lagSpec = 'exhto{}'.format(lagSpecIdx)
-    if 'zflag' in addExogHistoryTerms[lagSpecIdx]:
-        wrapperFun = genRcbWrap(lagSpec)
-        elecWrapperFun = genElecRcbWrap(lagSpec)
-    else:
-        wrapperFun = genBsbWrap(lagSpec)
-        elecWrapperFun = genElecBsbWrap(lagSpec)
-    #
+    wrapperFun = genRcbWrap(lagSpec)
+    elecWrapperFun = genElecRcbWrap(lagSpec)
     laggedModels = {}
     for source in ['vx', 'vy']:
         laggedModels[source] = wrapperFun(source)
@@ -220,17 +180,14 @@ lOfEndogAndExogTemplates = []
 
 for lagSpecIdx in range(len(addEndogHistoryTerms)):
     lagSpec = 'enhto{}'.format(lagSpecIdx)
-    if 'zflag' in addEndogHistoryTerms[lagSpecIdx]:
-        wrapperFun = genRcbWrap(lagSpec)
-    else:
-        wrapperFun = genBsbWrap(lagSpec)
+    wrapperFun = genRcbWrap(lagSpec)
     histTemplate = wrapperFun('{}')
     lOfHistTemplates.append(histTemplate)
     templateHistOptsDict[histTemplate] = addEndogHistoryTerms[lagSpecIdx]
 lOfHistTemplates.append('NULL')
 #
-# exog, ensemble, self
 lOfEndogAndExogTemplates = [
+    # exog, ensemble, self
     (lOfDesignFormulas[0],  lOfHistTemplates[-1], lOfHistTemplates[-1],), # 0: full exog no interactions
     (lOfDesignFormulas[1],  lOfHistTemplates[-1], lOfHistTemplates[-1],), # 1: v only
     (lOfDesignFormulas[2],  lOfHistTemplates[-1], lOfHistTemplates[-1],), # 2: a r only
@@ -246,10 +203,14 @@ lOfEndogAndExogTemplates = [
     (lOfDesignFormulas[5], lOfHistTemplates[-1],  lOfHistTemplates[0],), # 9: full exog, self, (v, stim) interactions
     #
     (lOfDesignFormulas[3], lOfHistTemplates[0],  lOfHistTemplates[0],), # 10: full exog, self and ensemble, interactions and 
+    #
+    (lOfDesignFormulas[0], lOfHistTemplates[1], lOfHistTemplates[-1],), # 11: full exog and ensemble
+    (lOfDesignFormulas[0],  lOfHistTemplates[-1], lOfHistTemplates[1],), # 12: full exog and self
+    (lOfDesignFormulas[0], lOfHistTemplates[1],  lOfHistTemplates[1],), # 13: full exog and self and ensemble
     ]
 lhsMasksOfInterest = {
     'plotPredictions': [0, 3, 5],
-    'varVsEnsemble': [0, 1, 2, 3, 4, 5, 6, 7]
+    'varVsEnsemble': [0, 1, 2, 3, 4, 5, 6, 7, 11, 12, 13]
     }
 lhsMasksDesignAsMath = {
     0: r'$[y_i] = \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
@@ -257,7 +218,14 @@ lhsMasksDesignAsMath = {
     2: r'$[y_i] = \mathbf{{}^u\Phi}[a \vert r]$',
     3: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
     4: r'$[y_i] = \mathbf{{}^y\Phi}[y_i]$',
+    5: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y}] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
+    6: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y_{k \neq i}}] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
     7: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r] + \mathbf{{}^{i}\Phi}[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    }
+addedTermsAsMath = {
+    'exogVSExogAndSelf': r'$[\mathbf{v} \vert a \vert r]$',
+    'VARVsVARInter': r'$[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    'ensVSFull': r'$[\mathbf{y_{k \neq i}}]$'
     }
 # ######
 ################ define model comparisons
@@ -353,6 +321,26 @@ modelsToTest.append({
     'testType': 'ARInterVsVARInter',
     'testHasEnsembleHistory': True,
     'lagSpec': lhsMasksInfo.loc[7, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 13,
+    'refDesign': 12,
+    'testCaption': 'v + a + r + self + ensemble',
+    'refCaption': 'v + a + r + self',
+    'captionStr': 'partial R2 of adding terms for ens to V+A+R+self+ens',
+    'testType': 'ensVSFull',
+    'testHasEnsembleHistory': True,
+    'lagSpec': lhsMasksInfo.loc[13, 'lagSpec'],
+    })
+modelsToTest.append({
+    'testDesign': 13,
+    'refDesign': 11,
+    'testCaption': 'v + a + r + self + ensemble',
+    'refCaption': 'v + a + r + ensemble',
+    'captionStr': 'partial R2 of adding terms for self to V+A+R+self+ens',
+    'testType': 'selfVSFull',
+    'testHasEnsembleHistory': True,
+    'lagSpec': lhsMasksInfo.loc[13, 'lagSpec'],
     })
     '''
 #

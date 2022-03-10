@@ -10,6 +10,7 @@ Options:
     --alignFolderName=alignFolderName               append a name to the resulting blocks? [default: motion]
     --window=window                                 process with short window? [default: long]
     --lazy                                          load from raw, or regular? [default: False]
+    --saveFeatureInfoHTML                           output info from columns [default: False]
     --showFigures                                   load from raw, or regular? [default: False]
     --debugging                                     load from raw, or regular? [default: False]
     --verbose=verbose                               print diagnostics? [default: 0]
@@ -126,9 +127,9 @@ mplRCParams = {
     'ps.fonttype': 42,
     }
 sns.set(
-    context='talk', style='white',
+    context='talk', style='whitegrid',
     palette='dark', font='sans-serif',
-    font_scale=2, color_codes=True, rc=snsRCParams)
+    font_scale=1, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
@@ -221,12 +222,14 @@ if __name__ == '__main__':
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
     print('Signal columns are:\n{}'.format(featureInfo))
+    if arguments['saveFeatureInfoHTML']:
+        featureInfoHtmlPath = os.path.join(figureOutputFolder, '{}_columnsInfo.html'.format(selectionName))
+        featureInfo.to_html(featureInfoHtmlPath)
     # hack control time base to look like main time base
     shiftControlTrials = True
     ############
     buggyUUID = trialInfo.loc[(trialInfo['controlFlag'] == 'control') & (trialInfo['bin'] > -0.1).to_numpy(), 'originalIndex'].unique()
     dropBecauseBugMask = trialInfo['originalIndex'].isin(buggyUUID).to_numpy()
-    # pdb.set_trace()
     # trialInfo.loc[dropBecauseBugMask, :]
     # trialInfo.loc[(trialInfo['controlFlag'] == 'control') & (trialInfo['bin'] > -0.1).to_numpy(), :]
     # trialInfo.loc[(trialInfo['bin'] > 0.4).to_numpy(), :]
@@ -272,6 +275,7 @@ if __name__ == '__main__':
     #
     tBins = trialInfo['bin'].unique()
     targetFrameLen = 2 * useDPI * relplotKWArgs['height'] * relplotKWArgs['aspect'] # nominal num. points per facet
+    # pdb.set_trace()
     if tBins.shape[0] > targetFrameLen:
         skipFactor = int(np.ceil(tBins.shape[0] // targetFrameLen))
         tMask2 = trialInfo['bin'].isin(tBins[::skipFactor])
@@ -292,7 +296,6 @@ if __name__ == '__main__':
         trialInfo.loc[:, canName] = compoundAnn
     dataDF.index = pd.MultiIndex.from_frame(trialInfo)
     ######
-    # pdb.set_trace()
     # ((trialInfo['trialRateInHz'] == 0) & (trialInfo['electrode'] != 'NA'))
     # trialInfo.loc[, :]
     if arguments['plotSuffix'] in customCodeLookup:
@@ -382,16 +385,21 @@ if __name__ == '__main__':
             if len(groupPagesByColumn) == 1:
                 groupPagesByColumn = groupPagesByColumn[0]
             colGrouper = dataDF.groupby(groupPagesByColumn, axis='columns', sort=False)
-        #
+        if not (arguments['groupPagesByIndex'] == 'all'):
+            groupPagesByIndex = arguments['groupPagesByIndex'].split(', ')
+            if len(groupPagesByIndex) == 1:
+                groupPagesByIndex = groupPagesByIndex[0]
+        dataDF = dataDF.droplevel([
+            'controlFlag', 'segment', 'originalIndex', 't', 'trialRateInHz',
+            'stimCat', 'electrode', 'pedalDirection', 'pedalMovementCat', 'pedalMetaCat',
+            'bin', 'trialUID', 'conditionUID',
+            'stimCondition', 'stimConditionWithDate', 'kinematicCondition',
+            'kinematicConditionNoSize'])
         for colGroupName, colGroup in colGrouper:
             if arguments['groupPagesByIndex'] == 'all':
                 idxGrouper = [('all', colGroup)]
             else:
-                groupPagesByIndex = arguments['groupPagesByIndex'].split(', ')
-                if len(groupPagesByIndex) == 1:
-                    groupPagesByIndex = groupPagesByIndex[0]
                 idxGrouper = colGroup.groupby(groupPagesByIndex, sort=False)
-            # pdb.set_trace()
             if arguments['plotSuffix'] in shareyAcrossPagesLookup:
                 shareyAcrossPages = shareyAcrossPagesLookup[arguments['plotSuffix']]
             else:
@@ -403,7 +411,6 @@ if __name__ == '__main__':
                 for axn in ['row', 'col']:
                     if rowColOpts['{}Name'.format(axn)] is not None:
                         smallestGroupNames.append(rowColOpts['{}Name'.format(axn)])
-                # pdb.set_trace()
                 estFun = relplotKWArgs['estimator'] if 'estimator' in relplotKWArgs else np.mean
                 if estFun == 'mean':
                     estFun = np.mean
@@ -431,7 +438,6 @@ if __name__ == '__main__':
                     relplotKWArgs['facet_kws'] = dict(sharey=False)
             else:
                 yLimProcFun = []
-            #pdb.set_trace()
             for idxGroupName, idxGroup in idxGrouper:
                 plotDF = idxGroup.stack(level=idxGroup.columns.names).reset_index(name='signal')
                 # plotDF = dataDF.loc[:, colGroupName].reset_index(name='signal')

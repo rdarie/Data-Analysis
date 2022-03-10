@@ -941,7 +941,7 @@ def unitSpikeTrainWaveformsToDF(
         if procFun is not None:
             wfDF = procFun(wfDF, st)
         idxLabels = ['segment', 'originalIndex', 't']
-        wfDF.loc[:, 't'] = np.asarray(st.times.magnitude)
+        wfDF.loc[:, 't'] = np.asarray(st.times.magnitude.astype(np.float64))
         if (getMetaDataWorking) or (dataQuery is not None):
             # if there's a query, get metadata temporarily to resolve it
             annDict = {}
@@ -1188,8 +1188,8 @@ def concatenateUnitSpikeTrainWaveformsDF(
         assert len(waveformsList) > 0, 'Error: dataquery ({}) yields empty list!'.format(dataQuery)
     except:
         traceback.print_exc()
-    allWaveforms = pd.concat(
-        waveformsList, axis=concatOn)
+    allWaveforms = pd.concat(waveformsList, axis=concatOn)
+    # allWaveforms.loc[allWaveforms.isna().any(axis=1), :]
     if getFeatureMetaData is not None:
         allFeatureMetaDF = pd.concat(featureMetaList).drop_duplicates().set_index(['feature', 'lag'])
     else:
@@ -1218,7 +1218,6 @@ def concatenateUnitSpikeTrainWaveformsDF(
             kind='mergesort', sort_remaining=False)
     except Exception:
         traceback.print_exc()
-    # pdb.set_trace() # allWaveforms.index.to_frame().reset_index(drop=True)
     return allWaveforms, allFeatureMetaDF
 
 
@@ -1253,7 +1252,9 @@ def alignedAsigsToDF(
         metaDataToCategories=metaDataToCategories)
     #
     waveformsIndexDF = allWaveforms.index.to_frame().reset_index(drop=True)
-    waveformsIndexDF.loc[:, 't'] = np.round(waveformsIndexDF['t'], decimals=9)
+    roundFactor = 9
+    waveformsIndexDF.loc[:, 't'] = np.around(waveformsIndexDF['t'], decimals=roundFactor)
+    # np.unique(waveformsIndexDF['t'])
     if overrideSegIdx is not None:
         waveformsIndexDF.loc[:, 'segment'] = overrideSegIdx
     allWaveforms.index = pd.MultiIndex.from_frame(waveformsIndexDF)
@@ -1263,13 +1264,17 @@ def alignedAsigsToDF(
             makeControlProgram, removeFuzzyName
             ])
     if outlierTrials is not None:
-        outlierMask = np.asarray(
-            (
+        outlierTrialsIndex = outlierTrials.index.to_frame().reset_index(drop=True)
+        outlierTrialsIndex.loc[:, 't'] = np.around(outlierTrialsIndex['t'], decimals=roundFactor)
+        # pd.concat({'outlierT':  pd.Series(np.unique(outlierTrialsIndex['t'])), 'dataT': pd.Series(np.unique(waveformsIndexDF['t']))}, axis='columns')
+        outlierTrials.index = pd.MultiIndex.from_frame(outlierTrialsIndex)
+        outlierMask = (
                 waveformsIndexDF
                 .set_index(outlierTrials.index.names)
                 .index
                 .map(outlierTrials)
-            ), dtype=bool)
+            ).to_numpy(dtype=bool)
+        #  waveformsIndexDF.set_index(outlierTrials.index.names).index.map(outlierTrials)
         if invertOutlierMask:
             outlierMask = ~outlierMask
         allWaveforms = allWaveforms.loc[~outlierMask, :]
@@ -1383,7 +1388,10 @@ def alignedAsigsToDF(
             tInfo2 = finalIndexMask.index.to_frame().reset_index(drop=True).set_index(['segment', 't'])
             tInfo2 = tInfo2.loc[~tInfo2.index.duplicated(keep='first'), :]
             tInfo1.index[~tInfo1.index.duplicated(keep='first')]
-        allWaveforms = allWaveforms.loc[finalIndexMask.to_numpy(), :]
+        try:
+            allWaveforms = allWaveforms.loc[finalIndexMask.to_numpy(), :]
+        except  Exception:
+            pdb.set_trace()
     # if postProcFun is not None:
     #     allWaveforms = postProcFun(allWaveforms)
     return allWaveforms

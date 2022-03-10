@@ -289,7 +289,9 @@ def getExpOpts():
             },
         'rc': {
             'experimentsToAssemble': {
-                experimentName: [],
+                experimentName: [1, 2, 3, 4, 5],
+                '201902041100-Murdoc': [1, 2, 3, 4],
+                '201902051100-Murdoc': [1, 2, 3, 4],
                 }
             },
         'rd': {
@@ -316,7 +318,7 @@ def getExpOpts():
             },
         'na': {
             'experimentsToAssemble': {
-                experimentName: [1, 2, 3, 4, 5],
+                experimentName: [1, 2, 3, 4],
                 }
             }
         }

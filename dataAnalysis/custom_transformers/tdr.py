@@ -2,7 +2,7 @@ from sklearn.base import TransformerMixin, BaseEstimator, RegressorMixin
 # from sklearn.decomposition import PCA
 from sklearn.model_selection import (
     cross_val_score, cross_validate,
-    GridSearchCV, StratifiedKFold, StratifiedShuffleSplit)
+    GridSearchCV, StratifiedKFold, ShuffleSplit, StratifiedShuffleSplit)
 # from imblearn.over_sampling import RandomOverSampler
 # from sklearn.model_selection._split import _BaseKFold
 # from sklearn.metrics import make_scorer
@@ -30,7 +30,7 @@ import statsmodels
 import warnings
 from patsy import (
     ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
-    EvalFactor, LookupFactor, demo_data, dmatrix, dmatrices)
+    EvalFactor, LookupFactor, demo_data, dmatrix, dmatrices, bs)
 import pyglmnet
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -162,7 +162,6 @@ def inputDrivenDynamics(
             jb.delayed(getComp)(uThisTrial, lag, psi)
             for tIdx, uThisTrial in u.groupby(groupVar, sort=False))
         resDF = pd.concat(lOfPieces)
-    # pdb.set_trace()
     assert (resDF.index == u.index).all()
     assert (resDF.columns == psi.columns).all()
     # resDF = resDF.loc[u.index, :]
@@ -241,7 +240,12 @@ def ERA(
         print('ERA(): inverting lPhiMat')
     lPhiMatInv = np.linalg.inv(lPhiMat)
     if checkApproximations:
-        assert np.allclose(np.dot(lPhiMatInv, lPhiMat), np.eye(*lPhiMat.shape))
+        try:
+            reconstructionError = np.dot(lPhiMatInv, lPhiMat)
+            assert np.allclose(reconstructionError, np.eye(*lPhiMat.shape))
+        except:
+            traceback.print_exc()
+            print("np.max(np.abs(reconstructionError - np.eye(*lPhiMat.shape))) = {:.3e}".format(np.max(np.abs(reconstructionError - np.eye(*lPhiMat.shape)))))
     del lPhiMat
     gc.collect()
     #
@@ -339,7 +343,7 @@ def ERA(
             maxNDim = nonTrivialS.shape[0]
         else:
             if eraFraction is None:
-                eraFraction = 1 - 1e-3
+                eraFraction = 1 - 1e-2
             maxNDim = (np.cumsum(nonTrivialS / np.sum(nonTrivialS)) < eraFraction).sum()
     stateSpaceNDim = min(maxNDim, u.shape[0])
     fullHEigenVals = pd.Series(s)
@@ -714,7 +718,9 @@ class raisedCosTransformer(object):
         ax[1].set_xlabel('Time (sec)')
         return fig, ax
 
-class raisedCosTransformerBackup(object):
+patsyRaisedCosTransformer = stateful_transform(raisedCosTransformer)
+
+class bSplineTransformer(object):
     def __init__(self, kWArgs=None):
         if kWArgs is not None:
             self.memorize_chunk(None, **kWArgs)
@@ -722,22 +728,15 @@ class raisedCosTransformerBackup(object):
 
     def memorize_chunk(
             self, vecSrs, nb=1, dt=1.,
-            historyLen=None, b=1e-3,
+            historyLen=None, timeDelay=0.,
             normalize=False, useOrtho=True,
+            useFirst=False, useLast=False,
             groupBy='trialUID', tLabel='bin',
-            zflag=False, logBasis=True,
             addInputToOutput=False,
             causalShift=True, causalFill=False,
             selectColumns=None, preprocFun=None,
             joblibBackendArgs=None, convolveMethod='auto', verbose=0):
         ##
-        if logBasis:
-            nlin = None
-            invnl = None
-        else:
-            nlin = lambda x: x
-            invnl = lambda x: x
-            b = 0
         self.verbose = verbose
         self.convolveMethod = convolveMethod
         if joblibBackendArgs is not None:
@@ -757,11 +756,10 @@ class raisedCosTransformerBackup(object):
             self.joblibBackendArgs = None
         self.nb = nb
         self.dt = dt
-        self.historyLen = historyLen
-        self.zflag = zflag
-        self.logBasis = logBasis
         self.normalize = normalize
         self.useOrtho = useOrtho
+        self.useFirst = useFirst
+        self.useLast = useLast
         self.groupBy = groupBy
         self.tLabel = tLabel
         self.addInputToOutput = addInputToOutput
@@ -771,28 +769,24 @@ class raisedCosTransformerBackup(object):
         else:
             self.preprocFun = preprocFun
         self.causalShift = causalShift
-        self.causalFill = causalFill
-        if not logBasis:
-            b = 0.
-        self.b = b
-        self.endpoints = raisedCosBoundary(
-            b=b, DT=historyLen,
-            minX=0.,
-            nb=nb, nlin=nlin, invnl=invnl, causal=causalShift)
-        if logBasis:
-            self.ihbasisDF, self.orthobasisDF = makeLogRaisedCosBasis(
-                nb=nb, dt=dt, endpoints=self.endpoints, b=b,
-                zflag=zflag, normalize=normalize, causal=causalFill)
+        if causalShift:
+            self.timeDelay = timeDelay + dt
         else:
-            self.ihbasisDF, self.orthobasisDF = makeRaisedCosBasis(
-                nb=nb, dt=dt, endpoints=self.endpoints,
-                normalize=normalize, causal=causalFill)
+            self.timeDelay = timeDelay
+        self.endpoints = [self.timeDelay, self.timeDelay + historyLen]
+        #
+        self.causalFill = causalFill
+        self.ihbasisDF, self.orthobasisDF = makeBSplineBasis(
+            nb=nb, dt=dt, endpoints=self.endpoints,
+            useFirst=useFirst, useLast=useLast,
+            normalize=normalize, causal=causalFill)
+        self.iht = np.asarray(self.ihbasisDF.index)
         if self.useOrtho:
             self.basisDF = self.orthobasisDF
         else:
             self.basisDF = self.ihbasisDF
-        self.iht = np.array(self.ihbasisDF.index)
         self.leftShiftBasis = int(((max(self.iht) - min(self.iht)) / 2 + min(self.iht)) / self.dt) + 1
+        self.historyLen = self.basisDF.index[-1]
 
         def transformPiece(name, group):
             resDF = pd.DataFrame(np.nan, index=group.index, columns=self.basisDF.columns)
@@ -817,12 +811,11 @@ class raisedCosTransformerBackup(object):
 
     def transform(
             self, vecSrs, nb=1, dt=1.,
-            historyLen=None, b=1e-3,
-            normalize=False, useOrtho=True,
-            groupBy='trialUID', tLabel='bin',
-            zflag=False, logBasis=True, causalShift=True, causalFill=False,
-            addInputToOutput=False,
-            selectColumns=None, preprocFun=None,
+            historyLen=None, normalize=False, useOrtho=True,
+            timeDelay=0., groupBy='trialUID', tLabel='bin',
+            causalShift=True, causalFill=False,
+            useFirst=False, useLast=False,
+            addInputToOutput=False, selectColumns=None, preprocFun=None,
             convolveMethod='auto', joblibBackendArgs=None, verbose=0):
         # print('Starting to apply raised cos basis to {} (size={})'.format(vecSrs.name, vecSrs.size))
         # for line in traceback.format_stack():
@@ -865,14 +858,14 @@ class raisedCosTransformerBackup(object):
     def plot_basis(self):
         fig, ax = plt.subplots(2, 1, sharex=True)
         ax[0].plot(self.ihbasisDF)
-        titleStr = 'raised log cos basis' if self.logBasis else 'raised cos basis'
+        titleStr = 'b spline basis'
         ax[0].set_title(titleStr)
         ax[1].plot(self.orthobasisDF)
         ax[1].set_title('orthogonalized basis')
         ax[1].set_xlabel('Time (sec)')
         return fig, ax
 
-patsyRaisedCosTransformer = stateful_transform(raisedCosTransformer)
+patsyBSplineTransformer = stateful_transform(bSplineTransformer)
 
 class DataFrameAverager(TransformerMixin, BaseEstimator):
     def __init__(
@@ -1010,6 +1003,7 @@ class trialAwareStratifiedKFold:
                 n_splits=7, random_state=None,
                 test_size=None,)
         self.sampler = samplerClass(**samplerKWArgs)
+        self.samplerKWArgs = samplerKWArgs
         self.stratifyFactors = stratifyFactors
         self.continuousFactors = continuousFactors
         if resamplerClass is not None:
@@ -1069,17 +1063,37 @@ class trialAwareStratifiedKFold:
                 index=infoPerTrial.index, columns=['stratifyGroup'])
             stratifyGroup = labelsPerTrial.copy()
         #
+        requestedZeroTestSize = (self.sampler.test_size == 0)
+        notEnoughSamples = np.around(stratifyGroup.shape[0] * self.sampler.test_size) < stratifyGroup['stratifyGroup'].nunique()
+        # pdb.set_trace()
+        if (notEnoughSamples) and (not requestedZeroTestSize):
+            print('#' * 50)
+            print('Setting sampler to ShuffleSplit')
+            print('#' * 50)
+            samplerClass = ShuffleSplit
+            self.sampler = samplerClass(**self.samplerKWArgs)
+        #
         self.folds = []
         self.raw_folds = []
         self.folds_per_trial = []
         self.raw_folds_per_trial = []
-        #
-        if self.sampler.test_size == 0:
+        if requestedZeroTestSize:
+            print('#' * 50)
+            print('Setting  test size to 0')
+            print('#' * 50)
             sampleIterator = [
                 (np.arange(infoPerTrial.shape[0], dtype=np.int), np.asarray([], dtype=np.int))
                 for idx in range(self.sampler.n_splits)]
         else:
-            sampleIterator = self.sampler.split(infoPerTrial, stratifyGroup)
+            try:
+                sampleIterator = self.sampler.split(infoPerTrial, stratifyGroup)
+            except Exception:
+                print('#' * 50)
+                traceback.print_exc()
+                print('#' * 50)
+                sampleIterator = [
+                    (np.arange(infoPerTrial.shape[0], dtype=np.int), np.asarray([], dtype=np.int))
+                    for idx in range(self.sampler.n_splits)]
         for tr, te in sampleIterator:
             trainCG = infoPerTrial['continuousGroup'].iloc[tr].reset_index(drop=True)
             rawTrainCG = trainCG.to_list()
@@ -1091,7 +1105,7 @@ class trialAwareStratifiedKFold:
             #
             testCG = infoPerTrial['continuousGroup'].iloc[te].reset_index(drop=True)
             rawTestCG = []
-            if self.sampler.test_size == 0:
+            if requestedZeroTestSize or notEnoughSamples:
                 rawTestIdx = np.asarray([], dtype=np.int)
                 testIdx = np.asarray([], dtype=np.int)
             else:
@@ -1571,6 +1585,44 @@ def raisedCosBoundary(
     # print('endpoints {}'.format(endpoints))
     return endpoints - b
 
+def makeBSplineBasis(
+        nb=None, dt=None, endpoints=None,
+        useFirst=False, useLast=False,
+        normalize=False, causal=False):
+    ihbasis, iht = None, None
+    iht = np.arange(*endpoints, dt)
+    numDFs = nb + 2 + (-1 if useFirst else 0) + (-1 if useLast else 0)
+    ihbasis = bs(iht, df=numDFs, include_intercept=True)
+    ctrs = np.linspace(*endpoints, numDFs+2)[1:-1]
+    #
+    keepMask = np.ones(ihbasis.shape[1], dtype=bool)
+    keepMask[0] = useFirst
+    keepMask[-1] = useLast
+    #
+    ihbasis = ihbasis[:, keepMask]
+    ctrs = ctrs[keepMask]
+    if normalize:
+        for colIdx in range(ihbasis.shape[1]):
+            ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+    iht = np.round(iht, decimals=6)
+    if causal:
+        ihbasis[iht <= 0] = 0
+    orthobas = scipy.linalg.orth(ihbasis)
+    ctrCols = np.round(ctrs, decimals=3)
+    ihbDF = pd.DataFrame(ihbasis, index=iht, columns=ctrCols)
+    orthobasDF = pd.DataFrame(orthobas, index=iht, columns=ctrCols)
+    if causal:
+        ihbDF = ihbDF.loc[iht >= 0, :]
+        orthobasDF = orthobasDF.loc[iht >= 0, :]
+    if iht[0] != 0:
+        paddingT = np.round(np.arange(0, iht[0], dt), decimals=6)
+        assert paddingT[-1] < iht[0]
+        if paddingT.shape[0] > 0:
+            paddingDF = pd.DataFrame(0, index=paddingT, columns=ctrCols)
+            ihbDF = pd.concat([paddingDF, ihbDF])
+            orthobasDF = pd.concat([paddingDF, orthobasDF])
+    return ihbDF, orthobasDF
+
 def makeRaisedCosBasis(
         nb=None, spacing=None, dt=None, endpoints=None, normalize=False, causal=False):
     """
@@ -1896,7 +1948,9 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             maxiter=100, tol=1e-6, disp=False, check_step=True,
             fit_intercept=False, start_params=None, active_set=True,
             calc_frequency_weights=False, frequency_weights_index='trialUID',
-            frequency_group_columns=['electrode', 'trialAmplitude', 'trialRateInHz', 'pedalMovementCat', 'pedalDirection', 'pedalSizeCat']
+            frequency_group_columns=[
+                'electrode', 'trialAmplitude', 'trialRateInHz',
+                'pedalMovementCat', 'pedalDirection', 'pedalSizeCat']
             ):
         self.sm_class = sm_class
         self.family = family

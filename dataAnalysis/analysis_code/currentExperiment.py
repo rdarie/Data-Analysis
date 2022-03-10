@@ -261,9 +261,9 @@ def parseAnalysisOptions(
     stimConditionNames = [
         'electrode', amplitudeFieldName, 'trialRateInHz']
     motionConditionNames = [
-        'pedalMovementCat', 'pedalDirection',
-        'pedalSizeCat',
-        ] # ['pedalMovementCat', 'pedalDirection', 'electrode', amplitudeFieldName, 'trialRateInHz']
+        'pedalMovementCat', 'pedalDirection', 'pedalSizeCat',
+        ]
+        # ['pedalMovementCat', 'pedalDirection', 'electrode', amplitudeFieldName, 'trialRateInHz']
     if blockExperimentType in ['proprio-miniRC', 'proprio-RC', 'isi']:
         #if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
         # has stim but no motion
@@ -530,6 +530,9 @@ def parseAnalysisOptions(
     #
     equalSamplerKWArgs = dict(random_state=42, test_size=0.5)
     equalPrelimSamplerKWArgs = dict(random_state=42, test_size=0.15)
+    #
+    normalizationSamplerKWArgs = dict(random_state=42, test_size=0.)
+    normalizationPrelimSamplerKWArgs = dict(random_state=42, test_size=0.)
     # args for tdr.
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
@@ -561,6 +564,16 @@ def parseAnalysisOptions(
         continuousFactors=['segment', 'originalIndex', 't'],
         samplerClass=None,
         samplerKWArgs=equalPrelimSamplerKWArgs)
+    normalizationSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=normalizationSamplerKWArgs)
+    normalizationPrelimSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=normalizationPrelimSamplerKWArgs)
     #
     iteratorOpts = {
         # rest period from before movement onset
@@ -752,7 +765,40 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 10e-3,
-            # 'forceRollingWindow': 250e-3,
+            'forceRollingWindow': 10e-3,
+            # 'procFun': {
+            #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
+            #     'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
+            #     },
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'maskEachFreqBand': False,
+            'cvKWArgs': dict(
+                n_splits=7,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'stoppingOrStimOff',
+                'winStart': -0.8,  # start 0.2 ( + .15 burn in period) before whatever the query was
+                'winStop': 0.  # stop .1 sec after startingOrStimOn
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': None,
+                'winStop':  None,
+                }
+            },
+        # perimovement, any stim, for regression
+        'rd': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 10e-3,
+            'forceRollingWindow': 10e-3,
             # 'procFun': {
             #     'laplace_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
             #     'laplace_spectral_scaled': 'ash.genDetrender(timeWindow=[-0.2, 0.6], useMean=True)',
@@ -770,7 +816,7 @@ def parseAnalysisOptions(
             'timeROIOpts': {
                 'alignQuery': 'stoppingOrStimOff',
                 'winStart': -0.8,  # start 0.2 ( + .15 burn in period) before whatever the query was
-                'winStop': 0.1  # stop .1 sec after startingOrStimOn
+                'winStop': 0.  # stop .1 sec after startingOrStimOn
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
@@ -818,22 +864,22 @@ def parseAnalysisOptions(
             'postLoadProcFun': {
                 'lfp': 'hf_hampel.defaultSpiketrainHampel'
             },
-            # # #'procFun': {
-            # # #    'laplace': 'ash.genDetrender(timeWindow=[-0.6, -0.3], useMean=True)',
-            # # #    'laplace_spectral': 'ash.genDetrender(timeWindow=[-0.6, -0.3], useMean=True)',
-            # # #    },
+            'procFun': {
+                'laplace': 'ash.genDetrender(timeWindow=[-0.1, 0.], useMean=True)',
+                'lfp': 'ash.genDetrender(timeWindow=[-0.1, 0.], useMean=True)',
+                },
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'maskEachFreqBand': True,
             'cvKWArgs': dict(
                 n_splits=2,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                splitterClass=None, splitterKWArgs=normalizationSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=normalizationPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
-                'alignQuery': 'startingOrStimOn',
+                'alignQuery': None,
                 'winStart': -0.2,  # start 0.6 before whatever the query was
                 'winStop': .4  # stop .6 sec after startingOrStimOn
             },
@@ -850,14 +896,14 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 10e-3,
-            'forceRollingWindow': 50e-3,
+            'forceRollingWindow': 10e-3,
             'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=2,
-                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                splitterClass=None, splitterKWArgs=normalizationSplitterKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=normalizationPrelimSplitterKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -971,6 +1017,10 @@ def parseAnalysisOptions(
         'CW_return': 'Return to start\n(flexion)',
         'CCW_outbound': 'Start of movement\n(flexion)',
         'CCW_return': 'Return to start\n(extension)',
+        'outbound_CW': 'Start of movement\n(extension)',
+        'return_CCW': 'Return to start\n(flexion)',
+        'outbound_CCW': 'Start of movement\n(flexion)',
+        'return_CW': 'Return to start\n(extension)',
         'feature = mahal_ledoit_all': 'Mahal. dist.\n(Broadband)',
         'feature = mahal_ledoit_alpha': 'Mahal. dist.\n(Alpha)',
         'feature = mahal_ledoit_beta': 'Mahal. dist.\n(Beta)',
@@ -1033,6 +1083,9 @@ def parseAnalysisOptions(
             fbPrettyName = '\n({})'.format(prettyNameLookup[fbn]) if fbn is not None else ''
             prettyNameLookup['feature = utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
             prettyNameLookup['utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
+            #
+            prettyNameLookup['feature = utah{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
+            prettyNameLookup['utah{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
     applyPrettyNameLookup = lambda x: prettyNameLookup[x] if x in prettyNameLookup else x
     expNameElectrodeLookup = {
         'Murdoc': {

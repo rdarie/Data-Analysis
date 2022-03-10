@@ -511,10 +511,10 @@ if __name__ == '__main__':
                         for l1Ratio in lOfL1Ratios:
                             alphas = _alpha_grid(
                                 dummyDesign, dummyRhs,
-                                fit_intercept=False, eps=1e-2,
+                                fit_intercept=False, eps=1e-3,
                                 l1_ratio=l1Ratio, n_alphas=nAlphas)
                             # enet_alphas, _, _ = enet_path(dummyDesign, dummyRhs, l1_ratio=l1Ratio, n_alphas=nAlphas, eps=1e-4)
-                            alphas = np.atleast_1d(alphas).tolist()
+                            alphas = np.atleast_1d(alphas).tolist() + [0.]
                             fastTrack = False
                             if fastTrack:
                                 alphas = [alphas[-1], alphas[0]]

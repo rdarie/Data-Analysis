@@ -4,11 +4,8 @@ import pdb
 from itertools import product
 
 validTargetLhsMaskIdx = {
-    'ols_select_scaled': [0, 1, 2, 3, 4, 7],
-    'ols2_select2_scaled': [0, 3, 4, 5, 6],
-    'ols_select3_scaled': [0, 3],
-    'ols_select_spectral_scaled': [0, 1, 2, 3, 4, 7],
-    'ols2_select2_spectral_scaled': [0, 3, 4, 5, 6]
+    'ols_select_scaled': [0, 3, 4, 7],
+    'ols2_select2_scaled': [0, 3, 5, 6],
 }
 
 processSlurmTaskCountPLS = 3
@@ -248,7 +245,7 @@ lOfEndogAndExogTemplates = [
     (lOfDesignFormulas[3], lOfHistTemplates[0],  lOfHistTemplates[0],), # 10: full exog, self and ensemble, interactions and 
     ]
 lhsMasksOfInterest = {
-    'plotPredictions': [0, 3, 5],
+    'plotPredictions': [0, 3, 4],
     'varVsEnsemble': [0, 1, 2, 3, 4, 5, 6, 7]
     }
 lhsMasksDesignAsMath = {
@@ -257,7 +254,14 @@ lhsMasksDesignAsMath = {
     2: r'$[y_i] = \mathbf{{}^u\Phi}[a \vert r]$',
     3: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
     4: r'$[y_i] = \mathbf{{}^y\Phi}[y_i]$',
+    5: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y}] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
+    6: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y_{k \neq i}}] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
     7: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r] + \mathbf{{}^{i}\Phi}[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    }
+addedTermsAsMath = {
+    'exogVSExogAndSelf': r'$[\mathbf{v} \vert a \vert r]$',
+    'VARVsVARInter': r'$[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    'ensVSFull': r'$[\mathbf{y_{k \neq i}}]$'
     }
 # ######
 ################ define model comparisons

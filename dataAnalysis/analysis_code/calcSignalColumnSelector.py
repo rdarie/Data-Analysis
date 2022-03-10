@@ -187,8 +187,8 @@ if __name__ == '__main__':
         listOfColumns = [cN for cN in dataDF.columns if cN[-1] in listOfParentNames]
     elif arguments['selectMethod'] == 'decimateSpace':
         featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
-        keepX = np.unique(featureInfo['xCoords'])[::3]
-        keepY = np.unique(featureInfo['yCoords'])[::3]
+        keepX = np.unique(featureInfo['xCoords'])[::4]
+        keepY = np.unique(featureInfo['yCoords'])[::4]
         xyMask = (
             featureInfo['xCoords'].isin(keepX) &
             featureInfo['yCoords'].isin(keepY)
@@ -196,6 +196,8 @@ if __name__ == '__main__':
         listOfColumns = dataDF.columns[xyMask.to_numpy()].to_list()
     elif arguments['selectMethod'] == 'keepAll':
         listOfColumns = dataDF.columns.to_list()
+    elif arguments['selectMethod'] == 'chooseRandom':
+        listOfColumns = dataDF.columns.to_list() # TODO: implement
     elif arguments['selectMethod'] == 'mostModulated':
         blockBaseName, _ = hf.processBasicPaths(arguments)
         raucResultsPath = os.path.join(

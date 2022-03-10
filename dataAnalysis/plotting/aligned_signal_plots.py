@@ -1199,7 +1199,10 @@ def genYLimSetterTwin(newLims):
 
 
 def genAxisLabelOverride(
-        xTemplate=None, yTemplate=None, colKeys=None, dropNaNCol='segment'):
+        xTemplate=None, yTemplate=None,
+        titleTemplate=None, rowTitleTemplate=None, colTitleTemplate=None,
+        prettyNameLookup=None,
+        colKeys=None, dropNaNCol='segment'):
     def axisLabelOverrider(g, ro, co, hu, dataSubset):
         if dataSubset.empty:
             return
@@ -1212,11 +1215,27 @@ def genAxisLabelOverride(
         newNames = dataSubset.loc[:, colKeys].drop_duplicates()
         assert newNames.shape[0] == 1
         newNamesDict = newNames.iloc[0, :].to_dict()
-        # pdb.set_trace()
+        if prettyNameLookup is not None:
+            for key, value in newNamesDict.items():
+                if value in prettyNameLookup:
+                    newNamesDict[key] = prettyNameLookup[value]
         if xTemplate is not None:
             g.axes[ro, co].set_xlabel(xTemplate.format(**newNamesDict))
         if yTemplate is not None:
             g.axes[ro, co].set_ylabel(yTemplate.format(**newNamesDict))
+        #
+        if titleTemplate is not None:
+            g.axes[ro, co].set_title(titleTemplate.format(**newNamesDict))
+        elif colTitleTemplate is not None:
+            g.axes[ro, co].set_title(colTitleTemplate.format(**newNamesDict))
+        #
+        if rowTitleTemplate is not None:
+            if not hasattr(g, 'titleChangerCheckedMargins'):
+                g.titleChangerCheckedMargins = True
+                if g._margin_titles:
+                    for t in g._margin_titles_texts:
+                        tContent = t.get_text()
+                        t.set_text(rowTitleTemplate.format(**newNamesDict))
         g.axes[ro, co].axesLabelsOverriden = True
         return
     return axisLabelOverrider
@@ -1244,7 +1263,8 @@ def genStimVLineAdder(
         tOnset=0, tOffset=1,
         includeLeft=True,
         includeRight=True, autoscale=True,
-        dropNaNCol='segment', delayMap=None):
+        dropNaNCol='segment', delayMap=None,
+        addTitle=False, titleFontOpts={}):
     #
     defaultDelayMap = {
         'kinematicConditionNoSize': {
@@ -1286,7 +1306,8 @@ def genStimVLineAdder(
                 yMinData = g.stimVLineInfo['yMinData']
                 yMaxData = g.stimVLineInfo['yMaxData']
             #
-            axLims = g.axes[ro, co].get_xlim()
+            # axLims = g.axes[ro, co].get_xlim()
+            axLims = [dataSubset[g._x_var].min(), dataSubset[g._x_var].max()]
             pulsePeriod = pulseRate[0] ** (-1)
             #
             pulseLims = [
@@ -1307,6 +1328,10 @@ def genStimVLineAdder(
             if len(posList) > 1:
                 for pos in posList:
                     g.axes[ro, co].plot([pos, pos], [yMinData, yMaxData], **thesePatchOpts)
+                if addTitle:
+                    defFontOpts = dict(ha='right', va='top')
+                    defFontOpts.update(titleFontOpts)
+                    g.axes[ro, co].text(axLims[0], yMinData, 'stim.', **defFontOpts)
             g.axes[ro, co].isStimVLineAdded = True
         return
     return addVline
@@ -1317,6 +1342,7 @@ def genPedalPosAdder(
         plotOptsBounds=dict(lw=1, c='k', alpha=0.5, ls='--'),
         tStart=None, tChange=0., tStop=None, autoscale=True,
         yMin=0.9, yMax=0.95, # in ax coordinates
+        addTitle=False, titleFontOpts={},
         dropNaNCol='segment'):
     def addPedalAnn(g, ro, co, hu, dataSubset):
         emptySubset = (
@@ -1370,6 +1396,11 @@ def genPedalPosAdder(
             g.axes[ro, co].plot(xx, yy, **plotOptsMain)
             g.axes[ro, co].plot(xxNeutral, yyNeutral, **plotOptsBounds)
             # g.axes[ro, co].axhspan(yMinData, yMaxData, fc='w', alpha=0.2)
+            # , transform=g.axes[ro, co].transLimits
+            if addTitle:
+                defFontOpts = dict(ha='right', va='top')
+                defFontOpts.update(titleFontOpts)
+                g.axes[ro, co].text(xx[0], yMidData, 'pedal', **defFontOpts)
             g.axes[ro, co].isPedalAnnAdded = True
         return
     return addPedalAnn
@@ -1403,7 +1434,6 @@ def genAUCShader(
                 shadeThisLine = False
                 allHues = np.unique(facetSubset[g._hue_var]).tolist()
                 thisHueName = dataSubset[g._hue_var].unique()[0]
-                # pdb.set_trace()
                 if ('all' in whichHues):
                     shadeThisLine = True
                 elif ('min' in whichHues) and thisHueName == allHues[0]:
@@ -1534,8 +1564,8 @@ def reformatFacetGridLegend(
 
 
 def reformatFacetGridLegendV2(
-        g=None, labelOverrides={},
-        styleOpts={}, decimate=None, shorten=False):
+        g=None, labelOverrides={}, capitalizeLabels=False,
+        styleOpts={}, decimate=None, shorten=None):
     leg = g._legend
     if leg is not None:
         originalTitle = leg.get_title().get_text()
@@ -1546,11 +1576,16 @@ def reformatFacetGridLegendV2(
         legendData.index = [
             (labelOverrides[label] if label in labelOverrides else label)
             for label in legendData.index]
+        if capitalizeLabels:
+            legendData.index = [
+                label.capitalize()
+                for label in legendData.index]
         if decimate is not None:
             legendData = legendData.iloc[::decimate]
-        if shorten: #
-            blank_handle = mpl.patches.Patch(alpha=0, linewidth=0)
-            legendData = pd.concat([legendData.iloc[:5], pd.Series({'...': blank_handle}), legendData.iloc[-5:]])
+        if shorten is not None:
+            if legendData.shape[0] > 2 * shorten:
+                blank_handle = mpl.patches.Patch(alpha=0, linewidth=0)
+                legendData = pd.concat([legendData.iloc[:shorten], pd.Series({'...': blank_handle}), legendData.iloc[-shorten:]])
         leg.remove()
         legendKWArgs = dict()
         if 'legend.markerscale' in styleOpts:

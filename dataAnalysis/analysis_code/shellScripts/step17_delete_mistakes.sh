@@ -81,7 +81,7 @@ KEYPROMPT="--requireKeypress"
 #
 # exps=(exp201901251000 exp201901261000 exp201901271000) exp201902031100 exp201902041100 exp201902051100 exp202101251100 exp202102021100
 #  # exps=(exp202101201100 exp202101211100 exp202101221100 exp202101251100 exp202101271100 exp202101281100 exp202102021100)
-exps=(exp202101271100)
+exps=(exp202101211100 exp202101271100)
 for EXP in "${exps[@]}"
 do
   echo "step 15, DELETE, on $EXP"
@@ -123,8 +123,8 @@ do
   # 
   # after step 5
   # after step 6
-
-  iters=(ra)
+  #
+  iters=(rc)
   for ITER in "${iters[@]}"
   do
     python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm="Block*_${ITER}_*.pickle" --fromScratchToData --deleteItems --filesIncluded ${KEYPROMPT}

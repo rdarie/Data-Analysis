@@ -224,6 +224,7 @@ if (not arguments['loadFromFrames']):
                 dataBlock,
                 whichSegments=[segIdx],
                 **aakwa)
+            print('    Loaded dataDF, shape = {}'.format(dataDF.shape))
         except Exception:
             traceback.print_exc()
             continue
@@ -263,6 +264,7 @@ if (not arguments['loadFromFrames']):
                 traceback.print_exc()
                 pass
             targetMask = pd.Series(True, index=dataDF.index)
+            print('targetMask covers {}/{} samples'.format(targetMask.sum(), targetMask.shape[0]))
             # select custom time ranges 
             for (_, _, t), group in dataDF.groupby(['segment', 'originalIndex', 't']):
                 timeDifference = (targetTrialAnnDF['t'] - t)
@@ -273,6 +275,7 @@ if (not arguments['loadFromFrames']):
                 groupBins = group.index.get_level_values('bin')
                 print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
+                print('targetMask covers {}/{} samples'.format(targetMask.sum(), targetMask.shape[0]))
             ######## also discard trials labeled as no stim that have stim from previous trials bleeding through
             if 'electrode' in dataDF.index.names:
                 noStimMask = dataDF.index.get_level_values('electrode') == 'NA'
