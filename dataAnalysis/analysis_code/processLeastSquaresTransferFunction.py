@@ -321,7 +321,7 @@ def calcTransferFunctionFromLeastSquares():
     CDict = {}
     DDict = {}
     HDict = {}
-    PsiDict = {}
+    ## PsiDict = {}
     inputDrivenDict = {}
     oneStepKalmanDict = {}
     untruncatedHEigenValsDict = {}
@@ -412,12 +412,12 @@ def calcTransferFunctionFromLeastSquares():
             nLags = int(7 * max(histLens) / binInterval)
             print('nLags = {}'.format(nLags))
             #
-            A, B, K, C, D, H, PsiDF, reconPsiDF, hEigenVals, (fig, ax,) = tdr.ERA(
+            A, B, K, C, D, H, reconPhiDF, reconPsiDF, hEigenVals, (fig, ax,) = tdr.ERA(
                 Phi, maxNDim=None, method=arguments['eraMethod'],
                 endogNames=endogNames, exogNames=exogNames, nLags=nLags,
                 plotting=arguments['plotting'], verbose=2,
                 checkApproximations=True,
-                # eraReductionMethod='topFraction', eraFraction=0.99,
+                # eraReductionMethod='topFraction', eraFraction=0.95,
                 eraReductionMethod='optimalSVD',
                 noEndogTerms=((ensTemplate == 'NULL') & (selfTemplate == 'NULL'))
                 )
@@ -437,16 +437,17 @@ def calcTransferFunctionFromLeastSquares():
             ctrbObsvRanksDF = pd.DataFrame(theseRanks, columns=['matrix', 'inputSubset', 'nDim', 'rank'])
             ########################################
             # print('Calculating input driven signal')
-            inputDrivenDF = pd.DataFrame(0, index=lhsDF.index, columns=PsiDF.index)
-            oneStepKalmanDF = pd.DataFrame(0, index=lhsDF.index, columns=PsiDF.index)
+            inputDrivenDF = pd.DataFrame(0, index=lhsDF.index, columns=reconPsiDF.index)
+            oneStepKalmanDF = pd.DataFrame(0, index=lhsDF.index, columns=reconPsiDF.index)
             showProgBar = True
             if showProgBar:
                 progBarCtxt = tqdm(total=reconPsiDF.groupby('sampleBin', axis='columns').ngroups, mininterval=30., maxinterval=120.)
             else:
                 progBarCtxt = contextlib.nullcontext()
             with progBarCtxt as pbar:
-                for binIdx, psiThisLag in reconPsiDF.groupby(level='sampleBin', axis='columns', group_keys=False, sort=False):
+                for binIdx, phiThisLag in reconPhiDF.groupby(level='sampleBin', axis='columns', group_keys=False, sort=False):
                     if designFormula != 'NULL':  # these systems have input drive
+                        psiThisLag = reconPsiDF.xs(binIdx, level='sampleBin', axis='columns', drop_level=False)
                         exogPsi = psiThisLag.loc[:, idxSl[uDF.columns, binIdx]].T
                         exogPsi.index = exogPsi.index.droplevel('sampleBin')
                         thisPiece = tdr.inputDrivenDynamics(
@@ -455,10 +456,10 @@ def calcTransferFunctionFromLeastSquares():
                             runInParallel=True, verbose=False)
                         inputDrivenDF += thisPiece
                     # pdb.set_trace()
-                    reconPsiThisLag = psiThisLag.copy().T
-                    reconPsiThisLag.index = reconPsiThisLag.index.droplevel('sampleBin')
+                    reconPhiThisLag = phiThisLag.copy().T
+                    reconPhiThisLag.index = reconPhiThisLag.index.droplevel('sampleBin')
                     thisReconPiece = tdr.inputDrivenDynamics(
-                        psi=reconPsiThisLag, u=vDF.loc[:, reconPsiThisLag.index], lag=binIdx,
+                        psi=reconPhiThisLag, u=vDF.loc[:, reconPhiThisLag.index], lag=binIdx,
                         groupVar='trialUID', joblibBackendArgs=dict(backend='loky'),
                         runInParallel=True, verbose=False)
                     oneStepKalmanDF += thisReconPiece
@@ -513,7 +514,7 @@ def calcTransferFunctionFromLeastSquares():
             CDict[name] = C
             DDict[name] = D
             HDict[name] = H
-            PsiDict[name] = PsiDF
+            ## PsiDict[name] = reconPsiDF
             inputDrivenDict[name] = inputDrivenDF
             oneStepKalmanDict[name] = oneStepKalmanDF
             untruncatedHEigenValsDict[name] = hEigenVals
@@ -579,8 +580,8 @@ def calcTransferFunctionFromLeastSquares():
         allD.to_hdf(transferFuncPath, 'D')
         allH = pd.concat(HDict, names=iRGroupNames)
         allH.to_hdf(transferFuncPath, 'H')
-        allPsi = pd.concat(PsiDict, names=iRGroupNames)
-        allPsi.to_hdf(transferFuncPath, 'Psi')
+        # # allPsi = pd.concat(PsiDict, names=iRGroupNames)
+        # # allPsi.to_hdf(transferFuncPath, 'Psi')
         allInputDrivenDF = pd.concat(inputDrivenDict, names=iRGroupNames)
         allInputDrivenDF.to_hdf(transferFuncPath, 'inputDriven')
         #

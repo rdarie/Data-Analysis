@@ -334,7 +334,7 @@ def ERA(
         print('ERA(): svd of H')
     u, s, vh = np.linalg.svd(svdTargetH, full_matrices=False)
     if maxNDim is None:
-        nonTrivialS = s[s > np.spacing(1e4)]
+        nonTrivialS = s[s > np.spacing(1e5)]
         if eraReductionMethod == 'optimalSVD':
             # s are sqrt eigenvalues
             optThresh = optimalSVDThreshold(svdTargetH) * np.median(nonTrivialS) #  np.median(s[:int(N)])
@@ -400,25 +400,43 @@ def ERA(
     D.index.name = 'target'
     D.columns.name = 'feature'
     #
-    reconFunc = lambda nn: C @ np.linalg.matrix_power((A - K @ C), nn) @ BK
+    if D.any().any():
+        BBar = pd.concat([B - K @ D, K], axis='columns')
+    else:
+        BBar = pd.concat([B, K], axis='columns')
+    ABar = A - K @ C
+    #
+    reconFuncBar = lambda nn: C @ np.linalg.matrix_power((ABar), nn) @ BBar
+    reconPhiDF = pd.concat(
+        {
+            ord: reconFuncBar(ord - 1)
+            for ord in range(1, stateSpaceNDim+1)}
+        , axis='columns', names=['bin', 'feature'])
+    reconPhiDF = reconPhiDF.swaplevel(axis='columns')
+    #
+    reconFunc = lambda nn: C @ np.linalg.matrix_power(A, nn) @ B
     reconPsiDF = pd.concat(
         {
             ord: reconFunc(ord - 1)
             for ord in range(1, stateSpaceNDim+1)}
         , axis='columns', names=['bin', 'feature'])
     reconPsiDF = reconPsiDF.swaplevel(axis='columns')
+    #
     if D.any().any():
         dWithBins = D.copy()
         dwbCols = dWithBins.columns.to_frame().reset_index(drop=True)
         dwbCols.loc[:, 'bin'] = 0
         dWithBins.columns = pd.MultiIndex.from_frame(dwbCols)
         fullPsiDF = pd.concat([dWithBins, PsiDF], axis='columns')
+        #
         reconPsiDF = pd.concat([dWithBins, reconPsiDF], axis='columns')
+        reconPhiDF = pd.concat([dWithBins, reconPhiDF], axis='columns')
     else:
         fullPsiDF = PsiDF
     fullPsiDF.columns.names = ['feature', 'sampleBin']
     reconPsiDF.columns.names = ['feature', 'sampleBin']
-    return A, B, K, C, D, outputH, fullPsiDF, reconPsiDF, fullHEigenVals, (fig, ax,)
+    reconPhiDF.columns.names = ['feature', 'sampleBin']
+    return A, B, K, C, D, outputH, reconPhiDF, reconPsiDF, fullHEigenVals, (fig, ax,)
 
 
 def makeImpulseLike(

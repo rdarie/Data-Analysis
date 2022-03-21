@@ -6,18 +6,18 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --ntasks=5
+#SBATCH --ntasks=7
 #SBATCH --cpus-per-task=1
-#SBATCH --ntasks-per-node=5
+#SBATCH --ntasks-per-node=7
 #SBATCH --mem-per-cpu=15G
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s06b_ols_rc_td_202101_21
+#SBATCH -J s06b_ols_rc_td_201902_03
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s06b_ols_rc_td_202101_21-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s06b_ols_rc_td_202101_21-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s06b_ols_rc_td_201902_03-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s06b_ols_rc_td_201902_03-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -26,7 +26,7 @@
 #SBATCH --array=0-95
 
 # exps=(201901_27 201902_03 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_21)
+exps=(201902_03)
 for A in "${exps[@]}"
 do
   echo "step 06 pls regression and predictions, on $A"

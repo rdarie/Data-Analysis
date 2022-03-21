@@ -76,12 +76,12 @@ python --version
 #  or option '-j' for a specific Job ID.
 
 WINDOW="XL"
-WINDOW="XXS"
+# WINDOW="XXS"
 # KEYPROMPT="--requireKeypress"
 KEYPROMPT=""
 # exps=(exp201901251000 exp201901261000 exp201901271000 exp201902031100 exp201902041100 exp201902051100) 
 #  # exps=(exp202101201100 exp202101211100 exp202101221100 exp202101251100 exp202101271100 exp202101281100 exp202102021100)
-exps=(exp202101271100)
+exps=(exp201901251000 exp201901261000 exp201901271000)
 for EXP in "${exps[@]}"
 do
   echo "step 16, restore from processed, on $EXP"

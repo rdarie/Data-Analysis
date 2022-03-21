@@ -230,18 +230,18 @@ lhsMasksOfInterest = {
     'plotERA': [0, 3, 5],
     }
 lhsMasksDesignAsMath = {
-    0: r'$[y_i] = \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
+    0: r'$[y_i] = \mathbf{{}^u\Phi}[\mathbf{v}~a~r]$',
     1: r'$[y_i] = \mathbf{{}^u\Phi}[\mathbf{v}]$',
-    2: r'$[y_i] = \mathbf{{}^u\Phi}[a \vert r]$',
-    3: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
+    2: r'$[y_i] = \mathbf{{}^u\Phi}[a~r]$',
+    3: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v}~a~r]$',
     4: r'$[y_i] = \mathbf{{}^y\Phi}[y_i]$',
-    5: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y}] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
-    6: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y_{k \neq i}}] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r]$',
-    7: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v} \vert a \vert r] + \mathbf{{}^{i}\Phi}[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    5: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y}] + \mathbf{{}^u\Phi}[\mathbf{v}~a~r]$',
+    6: r'$[y_i] = \mathbf{{}^y\Phi}[\mathbf{y_{j \neq i}}] + \mathbf{{}^u\Phi}[\mathbf{v}~a~r]$',
+    7: r'$[y_i] = \mathbf{{}^y\Phi}[y_i] + \mathbf{{}^u\Phi}[\mathbf{v}~a~r] + \mathbf{{}^{int}\Phi}[\mathbf{v}*a~\mathbf{v}*a~a*r]$',
     }
 addedTermsAsMath = {
-    'exogVSExogAndSelf': r'$[\mathbf{v} \vert a \vert r]$',
-    'VARVsVARInter': r'$[\mathbf{v}*a \vert \mathbf{v}*a \vert a*r]$',
+    'exogVSExogAndSelf': r'$[\mathbf{v}~a~r]$',
+    'VARVsVARInter': r'$[\mathbf{v}*a~\mathbf{v}*a~a*r]$',
     'ensVSFull': r'$[\mathbf{y_{k \neq i}}]$'
     }
 # ######

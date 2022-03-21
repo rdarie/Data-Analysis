@@ -131,7 +131,7 @@ styleOpts = {
 sns.set(
     context='paper', style='whitegrid',
     palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True, rc=snsRCParams)
+    font_scale=1., color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
@@ -224,12 +224,21 @@ if __name__ == '__main__':
         'term': 'Term',
         'NA': 'No  stim.',
         'predType': 'Prediction type',
-        'prediction': 'AR model prediction',
-        'ground_truth': 'Ground truth data',
-        'inputDriven': 'SS (input driven)',
-        'oneStepKalman': 'SS (one-step Kalman prediction)',
         'target': 'Regression target'
     })
+    predictionPrettyNamesShort = {
+        'prediction': r'$\hat{y}^{VARX}_i$',
+        'ground_truth': r'$y_i$',
+        'inputDriven': r'$\hat{y}^{ID}_i$',
+        'oneStepKalman': r'$\hat{y}^{OSK}_i$',
+        }
+    predictionPrettyNamesLong = {
+        'prediction': 'VARX model prediction ({})'.format(predictionPrettyNamesShort['prediction']),
+        'ground_truth': 'Ground truth ({})'.format(predictionPrettyNamesShort['ground_truth']),
+        'inputDriven': 'Prediction input-driven component ({})'.format(predictionPrettyNamesShort['inputDriven']),
+        'oneStepKalman': 'One step Kalman prediction ({})'.format(predictionPrettyNamesShort['oneStepKalman']),
+        }
+    prettyNameLookup.update(predictionPrettyNamesLong)
     def formatModelSpec(infoSrs):
         designShortHand = '(No exogenous)' if infoSrs['design'] == 'NULL' else formulasShortHand[infoSrs['design']]
         selfShort = 'No self' if (infoSrs['selfFormulaDescr'] == 'NULL') else 'self'
@@ -419,7 +428,7 @@ if __name__ == '__main__':
             plotScores.loc[:, 'isTrialAveraged_referenceTerm'] = plotScores.apply(lambda x: '{}_{}'.format(x['isTrialAveraged'], x['referenceTerm']), axis='columns')
             plotScores.loc[:, 'fullDesignAsMath'] = plotScores['lhsMaskIdx'].map(modelMetadata['fullDesignAsMath'])
             plotScores.loc[:, 'referenceTermAsLabel'] = plotScores['referenceTerm'].map(prettyNameLookup)
-            plotScores.loc[:, 'comparisonTermAsLabel'] = plotScores['comparisonTerm'].map(prettyNameLookup)
+            plotScores.loc[:, 'comparisonTermAsLabel'] = plotScores['comparisonTerm'].map(predictionPrettyNamesShort)
             boxPlotKWArgs = dict(whis=np.inf)
             catPlotKWArgs = dict(
                 y='cc', kind='box',
@@ -437,7 +446,6 @@ if __name__ == '__main__':
             scorePlotMaskList.append((
                 (plotScores['trialType'].isin(['train', 'test'])) &
                 (plotScores['lhsMaskIdx'].isin([5])) &
-                (plotScores['isTrialAveraged'].isin([False])) &
                 (plotScores['referenceTerm'].isin(['ground_truth'])) &
                 (plotScores['comparisonTerm'].isin(['prediction', 'inputDriven', 'oneStepKalman'])) &
                 (plotScores['referenceTerm'] != plotScores['comparisonTerm'])
@@ -474,7 +482,7 @@ if __name__ == '__main__':
                 if titleText is not None:
                     print('Saving plot of {}...'.format(titleText))
                     g.suptitle(titleText)
-                g.set_xticklabels(rotation=-10, ha='center', va='top')
+                g.set_xticklabels(ha='center', va='top')
                 g.set_axis_labels('', 'CC')
                 asp.reformatFacetGridLegendV2(
                     g, labelOverrides=prettyNameLookup,
