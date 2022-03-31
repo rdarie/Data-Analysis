@@ -11,11 +11,11 @@
 #SBATCH --mem-per-cpu=200G
 
 # Specify a job name:
-#SBATCH -J s07b_ols_post_impulses_td_rc_201902_03
+#SBATCH -J s07b_ols_post_impulses_td_rc_201901_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s07b_ols_post_impulses_td_rc_201902_03.out
-#SBATCH -e ../../batch_logs/regression/s07b_ols_post_impulses_td_rc_201902_03.out
+#SBATCH -o ../../batch_logs/regression/s07b_ols_post_impulses_td_rc_201901_27.out
+#SBATCH -e ../../batch_logs/regression/s07b_ols_post_impulses_td_rc_201901_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -26,7 +26,7 @@
 
 # SLURM_ARRAY_TASK_ID=2
 # exps=(201902_03 201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(201902_03)
+exps=(201901_27)
 for A in "${exps[@]}"
 do
   echo "step 07 impulse responses, scores, predictions, on $A"

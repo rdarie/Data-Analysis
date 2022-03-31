@@ -248,12 +248,9 @@ argumentsLookup = {
         'recalcStats': True,
         'winStart': '-800', 'winStop': '1000', 'limitPages': None,
         # 'unitQuery': None,
-        'unitQuery': "chanName.isin([" + exampleLaplaceChannelListStr + "])",
-        # 'unitQuery': "chanName.isin(['{}#0', 'utah_csd_8#0', 'utah_csd_35#0', 'utah_csd_17#0',])".format(exampleChannelStr),
-        # 'alignQuery': None,
+        'unitQuery': "chanName.isin([" + exampleLaplaceChannelListStr + "])", # 'unitQuery': "chanName.isin(['{}#0', 'utah_csd_8#0', 'utah_csd_35#0', 'utah_csd_17#0',])".format(exampleChannelStr), 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
-        'colName': 'stimCondition', 'colControl': '',
-        # 'rowOrder':
+        'colName': 'stimCondition', 'colControl': '',  # 'rowOrder':
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'kinematicConditionNoSize', 'rowControl': '',
         'rowOrder': [

@@ -272,7 +272,7 @@ def getExpOpts():
             },
         'na': {
             'experimentsToAssemble': {
-                '202101251100-Rupert': [1, 2, 3],
+                '202101251100-Rupert': [2],
                 }
             }
         }

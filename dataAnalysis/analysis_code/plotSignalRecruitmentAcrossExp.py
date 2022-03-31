@@ -68,10 +68,6 @@ except:
     pass
 for arg in sys.argv:
     print(arg)
-sns.set(
-    context='talk', style='darkgrid',
-    palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True)
 useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
@@ -138,12 +134,6 @@ if consoleDebug:
         'showFigures': False}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     '''
-
-sns.set(
-    context='paper', style='whitegrid',
-    palette='dark', font='sans-serif',
-    font_scale=1., color_codes=True, rc={
-        'figure.dpi': 200, 'savefig.dpi': 200})
 
 basePalette = pd.Series(sns.color_palette('Paired'))
 allAmpPalette = pd.Series(

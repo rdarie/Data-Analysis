@@ -10,22 +10,22 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J s04c_tts_regression_rc_stim_201901_27
+#SBATCH -J s04c_tts_regression_rc_stim_202101_20_22
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s04c_tts_regression_rc_stim_201901_27-%a.out
-#SBATCH -e ../../batch_logs/regression/s04c_tts_regression_rc_stim_201901_27-%a.out
+#SBATCH -o ../../batch_logs/regression/s04c_tts_regression_rc_stim_202101_20_22-%a.out
+#SBATCH -e ../../batch_logs/regression/s04c_tts_regression_rc_stim_202101_20_22-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 #SBATCH --export=CCV_HEADLESS=1
 
 # Request custom resources
-#SBATCH --array=5
+#SBATCH --array=1
 
 # exps=(201902_03 201902_04 201902_05)
 # exps=(201901_25 201901_26 201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(201901_27)
+exps=(202101_20 202101_22)
 # SLURM_ARRAY_TASK_ID=5
 for A in "${exps[@]}"
 do

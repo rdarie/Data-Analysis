@@ -1714,6 +1714,7 @@ def makeLogRaisedCosBasis(
     yrnge = nlin(endpoints + b)
     db = np.diff(yrnge)/(nb-1)  # spacing between raised cosine peaks
     ctrs = np.arange(yrnge[0], yrnge[1] + db, db)  # centers for basis vectors
+    # pdb.set_trace()
     if ctrs.size > nb:
         ctrs = ctrs[:nb]
     mxt = invnl(yrnge[1]+2*db) - b  # maximum time bin
@@ -1733,8 +1734,8 @@ def makeLogRaisedCosBasis(
         ihbasis[iht <= 0] = 0
     orthobas = scipy.linalg.orth(ihbasis)
     # orthobas, _ = scipy.linalg.qr(ihbasis)
-    ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(ctrs, decimals=3))
-    orthobasDF = pd.DataFrame(orthobas, index=iht, columns=np.round(ctrs, decimals=3))
+    ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(invnl(ctrs), decimals=3))
+    orthobasDF = pd.DataFrame(orthobas, index=iht, columns=np.round(invnl(ctrs), decimals=3))
     if causal:
         ihbDF = ihbDF.loc[iht >= 0, :]
         orthobasDF = orthobasDF.loc[iht >= 0, :]

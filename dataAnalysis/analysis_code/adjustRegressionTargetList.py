@@ -71,10 +71,56 @@ import dill as pickle
 pickle.settings['recurse'] = True
 import gc, sys
 from copy import deepcopy
+useDPI = 200
+dpiFactor = 72 / useDPI
+snsRCParams = {
+        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+        'lines.linewidth': .5,
+        'lines.markersize': 2.,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.spines.right": True,
+        "axes.spines.top": True,
+        "axes.linewidth": .125,
+        "grid.linewidth": .2,
+        "font.size": 5,
+        "axes.labelsize": 5,
+        "axes.titlesize": 7,
+        "xtick.labelsize": 5,
+        "ytick.labelsize": 5,
+        "legend.fontsize": 5,
+        "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": True,
+        "ytick.left": True,
+        "ytick.right": True,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
+    }
+mplRCParams = {
+    'figure.titlesize': 9
+    }
+styleOpts = {
+    'legend.lw': 2,
+    'legend.markerscale': 2,
+    'tight_layout.pad': 3e-1, # units of font size
+    'panel_heading.pad': 0.
+    }
 sns.set(
-    context='talk', style='darkgrid',
+    context='paper', style='white',
     palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True)
+    font_scale=1., color_codes=True, rc=snsRCParams)
+for rcK, rcV in mplRCParams.items():
+    matplotlib.rcParams[rcK] = rcV
+#
 for arg in sys.argv:
     print(arg)
 ##
@@ -224,6 +270,143 @@ if __name__ == '__main__':
                 fig, ax = basisApplier.plot_basis()
                 fig.suptitle('exhto{}'.format(hIdx))
                 fig.tight_layout()
+                pdf.savefig(bbox_inches='tight')
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                basisDF = basisApplier.basisDF.iloc[::3, :].copy()
+                basisDF.iloc[0, :] = 0.
+                basisDF.index = np.around(basisDF.index, decimals=3)
+                nLags, nCenters = basisDF.shape
+                basisDF.columns = np.arange(nCenters) + 1
+                basisDF.columns.name = 'center'
+                # pdb.set_trace()
+                basisDF.index.name = 'lag'
+                basisCoefs = pd.Series(
+                    # np.ones(nCenters),
+                    [0.1, 0.5, 1., 0.3, -.7],
+                    index=basisDF.columns.copy())
+                basisCoefsPlot = pd.DataFrame(
+                    np.diag(basisCoefs),
+                    index=basisDF.columns.copy(),
+                    columns=basisDF.columns.copy())
+                #
+                fullRankBasis = pd.DataFrame(
+                    np.eye(nLags),
+                    index=basisDF.index.copy(),
+                    columns=basisDF.index.copy())
+                fullRankBasis.columns = np.arange(nLags) + 1
+                fullRankBasis.columns.name = 'center'
+                #
+                basisModel = basisDF * basisCoefs
+                regressionModel = basisModel.sum(axis='columns')
+                #
+                fullRankModel = pd.DataFrame(
+                    np.diag(regressionModel),
+                    index=basisDF.index.copy(),
+                    columns=basisDF.index.copy())
+                fullRankModel.columns = np.arange(nLags) + 1
+                fullRankModel.columns.name = 'center'
+                fullRankCoefs = fullRankModel.copy()
+                fullRankCoefs.index = fullRankModel.columns.copy()
+                #
+                fullRankPalette = pd.Series(
+                    sns.color_palette(
+                        'Spectral', n_colors=nLags),
+                    index=fullRankModel.columns.copy()).to_dict()
+                basisPalette = pd.Series(
+                    sns.color_palette(
+                        'Spectral', n_colors=nCenters),
+                    index=basisDF.columns.copy())
+                #pdb.set_trace()
+                basisPalette = basisPalette.apply(sns.utils.alter_color, s=-0.2, l=0.2).to_dict()
+                regressionModelForPlot = regressionModel.to_frame(name='model').reset_index()
+                regressionModelForPlot.loc[:, 'barXTicks'] = regressionModelForPlot.index
+                regressionModelForPlot.loc[:, 'barXTickLabels'] = regressionModelForPlot.apply(
+                    lambda x: '{:.2f}'.format(x['lag']), axis='columns')
+                newXTicks = regressionModelForPlot.iloc[::3, :]
+                fig, ax = plt.subplots(2, 3, figsize=(8, 4))
+                fig.subplots_adjust(left=0.1, bottom=0.1, top=0.9, right=0.88)
+                barplotOpts = dict(rot=0, legend=False)
+                lineplotOpts = dict(kind='line', c='k', lw=1., legend=False)
+                nominalWidth = 0.6
+                fuAx, fuCoAx, fuMoAx = ax[0]  # fullModel, full basis (ones), fullCoefficients
+                baAx, baCoAx, baMoAx = ax[1]  # basisModel, basis, basisCoefficients
+                barplotOpts['color'] = fullRankPalette
+                ## draw this legend before other artists are added
+                regressionModelForPlot.plot(
+                    x='barXTicks', y='model', ax=fuMoAx,
+                    xlabel='', ylabel='', title='Regression coefficients',
+                    **lineplotOpts)
+                fuMoAx.legend(
+                    title='Regression\ncoefficients',
+                    loc='center left',
+                    bbox_to_anchor=(0.9, 0.5),
+                    bbox_transform=fig.transFigure,
+                    borderaxespad=0.)
+                ####
+                fullRankModel.plot(
+                    kind='bar', stacked=True,
+                    width=nominalWidth, ax=fuMoAx, lw=0,
+                    xlabel='', ylabel='(a.u.)', title='Regression coefficients',
+                    **barplotOpts)
+                fullRankBasis.plot(
+                    kind='bar', stacked=True, width=nominalWidth, ax=fuAx, lw=0,
+                    xlabel='', ylabel='(a.u.)', title='Basis functions',
+                    **barplotOpts)
+                fullRankCoefs.plot(
+                    kind='barh', stacked=True, width=nominalWidth, ax=fuCoAx,
+                    lw=0,  # edgecolor='k',
+                    xlabel='Basis function #', ylabel='(dimensionless)', title='Basis coefficients',
+                    **barplotOpts)
+                #
+                barplotOpts['color'] = basisPalette
+                regressionModelForPlot.plot(
+                    x='barXTicks', y='model', ax=baMoAx,
+                    xlabel='Lag (sec.)', ylabel='(a.u.)',
+                    **lineplotOpts)
+                basisModel.plot(
+                    kind='bar', stacked=True, width=nominalWidth, ax=baMoAx,
+                    lw=0,
+                    xlabel='Lag (sec.)', ylabel='(a.u.)',
+                    **barplotOpts)
+                basisDF.plot(
+                    kind='bar', width=nominalWidth * nCenters, ax=baAx,
+                    lw=0,
+                    xlabel='Lag (sec.)', ylabel='(a.u.)',
+                    **barplotOpts)
+                basisCoefsPlot.plot(
+                    kind='barh', stacked=True,
+                    lw=0, # edgecolor='k',
+                    width=nominalWidth * nCenters / nLags, ax=baCoAx,
+                    xlabel='Basis function #', ylabel='(dimensionless)',
+                    **barplotOpts)
+                for thisAx in [fuMoAx, fuAx, baMoAx, baAx]:
+                    thisAx.set_xticks(newXTicks['barXTicks'].to_list())
+                    thisAx.set_xticklabels(newXTicks['barXTickLabels'].to_list())
+                #
+                rCoefMin = min(basisModel.min().min(), regressionModel.min())
+                rCoefMax = max(basisModel.max().max(), regressionModel.max())
+                rCoefExtent = rCoefMax - rCoefMin
+                zoomFactor = 0.05
+                fuMoAx.set_ylim(rCoefMin - zoomFactor * rCoefExtent, rCoefMax + zoomFactor * rCoefExtent)
+                baMoAx.set_ylim(rCoefMin - zoomFactor * rCoefExtent, rCoefMax + zoomFactor * rCoefExtent)
+                #
+                fuAx.set_ylim(-0.1, 1.5)
+                fuCoAx.legend(
+                    title='Full\nbasis',
+                    loc='upper left',
+                    bbox_to_anchor=(0.9, 0.9),
+                    bbox_transform=fig.transFigure,
+                    borderaxespad=0.)
+                baCoAx.legend(
+                    title='Raised cosine\nbasis',
+                    loc='lower left',
+                    bbox_to_anchor=(0.9, 0.1),
+                    bbox_transform=fig.transFigure,
+                    borderaxespad=0.)
+                baCoAx.set_xlabel('(dimensionless)')
                 pdf.savefig(
                     bbox_inches='tight',
                     )
@@ -232,7 +415,8 @@ if __name__ == '__main__':
                 else:
                     plt.close()
         ###
-        if arguments['plotting']:
+        savingResults = False
+        if arguments['plotting'] and savingResults:
             histOptsForExportDF = pd.DataFrame(histOptsForExportDict)
             histOptsHtmlPath = os.path.join(
                 figureOutputFolder, '{}_{}.html'.format(designMatrixDatasetName, 'histOpts'))
@@ -395,10 +579,11 @@ if __name__ == '__main__':
         allTargetsDF = pd.concat(allTargetsDict1, names=['regressorName', 'index']).reset_index()
         allTargetsDF.drop(columns=['index'], inplace=True)
         allTargetsDF.set_index(['regressorName', 'lhsMaskIdx', 'rhsMaskIdx', 'target'], inplace=True)
-        print('Saving list of all targets to {}'.format(designMatrixPath))
-        allTargetsDF.to_hdf(designMatrixPath, 'allTargets')
-        htmlPath = os.path.join(figureOutputFolder, '{}.html'.format(designMatrixDatasetName))
-        allTargetsDF.to_html(htmlPath)
+        if savingResults:
+            print('Saving list of all targets to {}'.format(designMatrixPath))
+            allTargetsDF.to_hdf(designMatrixPath, 'allTargets')
+            htmlPath = os.path.join(figureOutputFolder, '{}.html'.format(designMatrixDatasetName))
+            allTargetsDF.to_html(htmlPath)
         ##-----##  sourceFactorDict = {}
         ##-----##  for parentFormulaIdx, parentFormula in enumerate(masterExogFormulas):
         ##-----##      prf.print_memory_usage('calculating exog terms for: {}'.format(parentFormula))
