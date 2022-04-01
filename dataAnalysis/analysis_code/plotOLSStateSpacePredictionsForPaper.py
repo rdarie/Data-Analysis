@@ -540,7 +540,7 @@ if __name__ == '__main__':
             thisPalette = thisPalette.set_index('index')[0]
             thisPalette = thisPalette.loc[thisPalette.index.isin(plotScores.loc[:, 'target'])]
             # thisPalette = trialTypePalette.loc[trialTypePalette.index.isin(plotScores['trialType'])]
-            height =  2.
+            height = 2.
             aspect = 1.
             g = sns.relplot(
                 data=plotScores, kind='scatter',
@@ -594,15 +594,14 @@ if __name__ == '__main__':
                 g=g, labelOverrides=prettyNameLookup,
                 styleOpts=styleOpts, shorten=6)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            pdf.savefig(
-                bbox_inches='tight',
-                )
+            pdf.savefig(bbox_inches='tight',)
             if arguments['showFigures']:
                 plt.show()
             else:
                 plt.close()
             #########################################################################################################
             for lhsMaskIdx, plotGroup0 in predGroup0.groupby('lhsMaskIdx'):
+                print('lhsMaskIdx = {}'.format(lhsMaskIdx))
                 if lhsMaskIdx not in [3, 5]:
                     continue
                 else:
@@ -612,7 +611,7 @@ if __name__ == '__main__':
                 plotMask0 = (
                         (trialMetadata['trialType'] == 'train') &
                         (trialMetadata['target'].isin([targetsByAverageScore[tIdx] for tIdx in [-1]])) &
-                        (trialMetadata['trialAmplitude'].isin([500])) &
+                        (trialMetadata['trialAmplitude'].isin([np.unique(trialMetadata['trialAmplitude'])[-2]])) &
                         (trialMetadata['kinCondition'].isin(['outbound_CW'])) &
                         (trialMetadata['trialRateInHz'] != 50)
                     ).to_numpy()
@@ -673,4 +672,5 @@ if __name__ == '__main__':
                             plotContext=pdf,
                             showFigures=arguments['showFigures']
                             )
+                        print('Plotted {}'.format(name2))
     print('\n' + '#' * 50 + '\n{}\nCompleted.\n'.format(__file__) + '#' * 50 + '\n')

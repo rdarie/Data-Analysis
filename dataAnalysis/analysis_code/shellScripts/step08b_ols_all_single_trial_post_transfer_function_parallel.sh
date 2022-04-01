@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s08b_ols_tf_rc_201901_27
+#SBATCH -J s08b_ols_tf_rc_202101_22
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/job_arrays/s08b_ols_tf_rc_201901_27-%a.out
-#SBATCH -e ../../batch_logs/regression/job_arrays/s08b_ols_tf_rc_201901_27-%a.out
+#SBATCH -o ../../batch_logs/regression/job_arrays/s08b_ols_tf_rc_202101_22-%a.out
+#SBATCH -e ../../batch_logs/regression/job_arrays/s08b_ols_tf_rc_202101_22-%a.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,7 +28,7 @@
 
 # exps=(201902_03 201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 #    SLURM_ARRAY_TASK_ID=12
-exps=(201901_27)
+exps=(202101_22)
 for A in "${exps[@]}"
 do
   echo "step 08 transfer function calc, on $A"

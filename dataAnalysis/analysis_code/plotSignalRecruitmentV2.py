@@ -70,10 +70,6 @@ except:
     pass
 for arg in sys.argv:
     print(arg)
-# sns.set(
-#     context='talk', style='darkgrid',
-#     palette='dark', font='sans-serif',
-#     font_scale=.8, color_codes=True)
 useDPI = 200
 dpiFactor = 72 / useDPI #
 snsRCParams = {
@@ -145,12 +141,6 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-# sns.set(
-#     context='paper', style='whitegrid',
-#     palette='dark', font='sans-serif',
-#     font_scale=1., color_codes=True, rc={
-#         'figure.dpi': 200, 'savefig.dpi': 200})
-#
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName'])
 alignSubFolder = os.path.join(

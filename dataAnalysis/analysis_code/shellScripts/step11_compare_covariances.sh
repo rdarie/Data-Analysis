@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s11_compare_covariances_202101_27
+#SBATCH -J s11_compare_covariances_202101_25_28_02
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/covariance/s11_compare_covariances_202101_27.out
-#SBATCH -e ../../batch_logs/covariance/s11_compare_covariances_202101_27.out
+#SBATCH -o ../../batch_logs/covariance/s11_compare_covariances_202101_25_28_02.out
+#SBATCH -e ../../batch_logs/covariance/s11_compare_covariances_202101_25_28_02.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -28,7 +28,7 @@
 
 # exps=(201901_25 201902_03 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 
-exps=(202101_27)
+exps=(202101_25 202101_28 202102_02)
 for A in "${exps[@]}"
 do
   echo "step 10 compare covariances, on $A"

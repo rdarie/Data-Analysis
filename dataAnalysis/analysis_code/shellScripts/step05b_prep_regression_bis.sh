@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s05b_prep_regression_rc_202101_20
+#SBATCH -J s05b_prep_regression_rc_202101_22
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/regression/s05b_prep_regression_rc_202101_20.out
-#SBATCH -e ../../batch_logs/regression/s05b_prep_regression_rc_202101_20.out
+#SBATCH -o ../../batch_logs/regression/s05b_prep_regression_rc_202101_22.out
+#SBATCH -e ../../batch_logs/regression/s05b_prep_regression_rc_202101_22.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,7 +29,7 @@
 # SLURM_ARRAY_TASK_ID=2
 # 201902_03
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_20)
+exps=(202101_22)
 # export CCV_HEADLESS=1
 for A in "${exps[@]}"
 do
