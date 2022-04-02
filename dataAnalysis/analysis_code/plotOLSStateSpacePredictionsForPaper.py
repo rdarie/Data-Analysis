@@ -312,12 +312,12 @@ if __name__ == '__main__':
                 data=ddf, x=x, order=order, y=y,
                 hue=hue, hue_order=hue_order, palette=palette,
                 ax=axIns, *args, **kwargs)
-            if  x == 'xDummy':
+            if x == 'xDummy':
                 axIns.set_xticks([])
                 axIns.set_xticklabels([])
             if not legend:
                 axIns.get_legend().remove()
-            if  len(keysForNewLabels):
+            if len(keysForNewLabels):
                 newNames = ddf.loc[:, keysForNewLabels].drop_duplicates()
                 assert newNames.shape[0] == 1
                 newNamesDict = newNames.iloc[0, :].to_dict()

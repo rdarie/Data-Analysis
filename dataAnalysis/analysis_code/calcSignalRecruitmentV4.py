@@ -431,7 +431,6 @@ if __name__ == "__main__":
     ##
     sdThresh = 5.
     clippedScaledRaucDF = scaledRaucDF.clip(upper=sdThresh)
-    # pdb.set_trace()
     clippedRaucDF = pd.DataFrame(
         qScaler.inverse_transform(clippedScaledRaucDF),
         index=rawRaucDF.index,
@@ -550,14 +549,19 @@ if __name__ == "__main__":
                 tt = pg.ttest(
                     group.loc[maxAmpMask, colName], refGroup[colName],
                     #  group.loc[maxAmpMask, colName], group.loc[refMask, colName],
-                    confidence=confidence_alpha)
+                    confidence=1 - confidence_alpha)
                 u1 = np.mean(group.loc[maxAmpMask, colName])
                 # u2 = np.mean(group.loc[refMask, colName])
                 # s2 = np.std(group.loc[refMask, colName])
                 u2 = np.mean(refGroup[colName])
                 s2 = np.std(refGroup[colName])
-                tt.loc[:, 'glass'] = (u1 - u2) / s2
+                nx = group.loc[maxAmpMask, colName].shape[0]
+                ny = refGroup[colName].shape[0]
+                tt.loc[:, 'nx'] = nx
+                tt.loc[:, 'ny'] = ny
                 tt.loc[:, 'cohen-d'] = np.sign(tt['T']) * tt['cohen-d']
+                tt.loc[:, 'cohen_ci'] = tt.apply(lambda dfr: pg.compute_esci(dfr['cohen-d'], nx=dfr['nx'], ny=dfr['nx'], eftype='cohen', confidence=1 - confidence_alpha), axis='columns')
+                tt.loc[:, 'glass'] = (u1 - u2) / s2
                 tt.loc[:, 'critical_T_max'] = tt['dof'].apply(lambda x: stats.t(x).isf((1 - confidence_alpha) / 2))
                 tt.loc[:, 'critical_T_min'] = tt['critical_T_max'] * (-1)
                 tt.rename(columns={'p-val': 'pval'}, inplace=True)
@@ -617,6 +621,9 @@ if __name__ == "__main__":
             s2 = dataNoStim.loc[dataNoStim['kinematicCondition'] == x['B'], featName].std()
             return (u1 - u2) / s2
         tt.loc[:, 'glass'] = tt.apply(glass, axis='columns')
+        tt.loc[:, 'nx'] = tt.apply(lambda x: dataNoStim.loc[dataNoStim['kinematicCondition'] == x['A'], :].shape[0], axis='columns')
+        tt.loc[:, 'ny'] = tt.apply(lambda x: dataNoStim.loc[dataNoStim['kinematicCondition'] == x['B'], :].shape[0], axis='columns')
+        tt.loc[:, 'cohen_ci'] = tt.apply(lambda dfr: pg.compute_esci(dfr['cohen-d'], nx=dfr['nx'], ny=dfr['ny'], eftype='cohen', confidence=1 - confidence_alpha), axis='columns')
         ###
         noStimTTestDict[colName] = tt
         noStimAnovaDict[colName] = anovaRes
@@ -696,14 +703,17 @@ if __name__ == "__main__":
                 #####
                 tt = pg.ttest(
                     freqGroupStack.loc[maxAmpMask, 'rauc'], freqRefGroupStack['rauc'],
-                    confidence=confidence_alpha)
+                    confidence=1 - confidence_alpha)
                 u1 = np.mean(freqGroupStack.loc[maxAmpMask, 'rauc'])
                 u2 = np.mean(freqRefGroupStack['rauc'])
                 s2 = np.std(freqRefGroupStack['rauc'])
                 tt.loc[:, 'glass'] = (u1 - u2) / s2
                 tt.loc[:, 'critical_T_max'] = tt['dof'].apply(lambda x: stats.t(x).isf((1 - confidence_alpha) / 2))
                 tt.loc[:, 'critical_T_min'] = tt['critical_T_max'] * (-1)
+                tt.loc[:, 'nx'] = nx
+                tt.loc[:, 'ny'] = ny
                 tt.loc[:, 'cohen-d'] = np.sign(tt['T']) * tt['cohen-d']
+                tt.loc[:, 'cohen_ci'] = tt.apply(lambda dfr: pg.compute_esci(dfr['cohen-d'], nx=dfr['nx'], ny=dfr['nx'], eftype='cohen', confidence=1 - confidence_alpha), axis='columns')
                 tt.loc[:, 'hedges'] = pg.convert_effsize(
                     tt['cohen-d'], 'cohen', 'hedges',
                     nx=freqGroupStack.loc[maxAmpMask, 'rauc'].shape[0],

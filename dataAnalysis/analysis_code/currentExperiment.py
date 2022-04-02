@@ -1003,6 +1003,7 @@ def parseAnalysisOptions(
         'clippedRAUC': 'AUC (a.u.)',
         'T': 'T',
         'hedges': 'T-test effect size, Hedges\' g',
+        'cohen-d': 'T-test effect size, Cohen\' d',
         'coef': r"$\beta$",
         'coefStd': 'Standardized regression coefficient, {}'.format(r"$\beta$"),
         'electrode = NA': 'No stim.',

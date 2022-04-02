@@ -11,7 +11,7 @@ Options:
     --verbose=verbose                              print diagnostics? [default: 0]
     --debugging                                    print diagnostics? [default: False]
     --estimatorName=estimatorName                  filename for resulting estimator (cross-validated n_comps)
-    --datasetPrefix=datasetPrefix                  filename for resulting estimator (cross-validated n_comps)
+    --datasetPrefix=datasetPrefix                  filename for resulting estimator (cross-validated n_comps) [default: Block_XL_df]
     --selectionName=selectionName                  filename for resulting estimator (cross-validated n_comps)
     --analysisName=analysisName                    append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName              append a name to the resulting blocks? [default: motion]
@@ -36,53 +36,53 @@ for font_file in font_files:
         pass
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.colors import LogNorm, Normalize
-from matplotlib.ticker import MaxNLocator
-from matplotlib.patches import Rectangle
-from matplotlib.collections import PatchCollection
+# from matplotlib.colors import LogNorm, Normalize
+# from matplotlib.ticker import MaxNLocator
+# from matplotlib.patches import Rectangle
+# from matplotlib.collections import PatchCollection
 import seaborn as sns
 import os, sys
 from itertools import combinations, permutations, product
-import pingouin as pg
-from sklearn.pipeline import make_pipeline, Pipeline
-import dataAnalysis.helperFunctions.profiling as prf
-import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
-import dataAnalysis.helperFunctions.probe_metadata as prb_meta
+# import pingouin as pg
+# from sklearn.pipeline import make_pipeline, Pipeline
+# import dataAnalysis.helperFunctions.profiling as prf
+# import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+# import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
-from dataAnalysis.analysis_code.namedQueries import namedQueries
+# from dataAnalysis.analysis_code.namedQueries import namedQueries
 from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
 import pdb, traceback
 import numpy as np
 import pandas as pd
 import colorsys
-import dataAnalysis.preproc.ns5 as ns5
+# import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
-from sklearn.covariance import EmpiricalCovariance
-from sklearn.metrics import explained_variance_score
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
-from sklearn.decomposition import PCA, FactorAnalysis
-from sklearn.manifold import MDS
-import joblib as jb
+# from sklearn.covariance import EmpiricalCovariance
+# from sklearn.metrics import explained_variance_score
+# from sklearn.linear_model import LinearRegression
+# from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
+# from sklearn.decomposition import PCA, FactorAnalysis
+# from sklearn.manifold import MDS
+# import joblib as jb
 import dill as pickle
-import gc
-import vg
+# import gc
+# import vg
 from statannotations.Annotator import Annotator
-from statannotations.stats.StatResult import StatResult
-from statannotations.PValueFormat import PValueFormat
+# from statannotations.stats.StatResult import StatResult
+# from statannotations.PValueFormat import PValueFormat
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
-from numpy.random import default_rng
-from itertools import product
-from scipy import stats
-import scipy
-import umap
-import umap.plot
-from tqdm import tqdm
+# from numpy.random import default_rng
+# from itertools import product
+# from scipy import stats
+# import scipy
+# import umap
+# import umap.plot
+# from tqdm import tqdm
 from sklearn.metrics import silhouette_samples, silhouette_score
 #
 idxSl = pd.IndexSlice
@@ -488,7 +488,7 @@ distanceStackDF.loc[:, 'test_ref_elec_label'] = distanceStackDF.apply(lambda x: 
 distanceStackDF.loc[:, 'category_elec'] = distanceStackDF.apply(lambda x: '{} ({})'.format(x['category'], x['electrode']), axis='columns')
 distanceStackDF.loc[:, 'category_label'] = distanceStackDF['category'].map(categoryLabels)
 distanceStackDF.loc[:, 'category_elec_label'] = distanceStackDF.apply(lambda x: '{} ({})'.format(x['category_label'], x['electrode']), axis='columns')
-
+# distanceStackDF.loc[:, ['expName', 'distanceType', 'electrode']].drop_duplicates()
 plotOnlyTheseBands = ['all', 'beta', 'gamma', 'higamma']
 masterDF = distanceStackDF.loc[distanceStackDF['freqBandName'].isin(plotOnlyTheseBands), :]
 #
@@ -676,10 +676,13 @@ with PdfPages(pdfPath) as pdf:
                                 )
                                 pvalAnns.append(row['pval'])
                     if len(pairs):
-                        annotator = Annotator(
-                            ax, pairs,
-                            data=dataSubset, plot='boxplot',
-                            **argsForCatPlot)
+                        try:
+                            annotator = Annotator(
+                                ax, pairs,
+                                data=dataSubset, plot='boxplot',
+                                **argsForCatPlot)
+                        except:
+                            pdb.set_trace()
                         annotator.configure(
                             test=None, test_short_name='',
                             line_width=0.5,

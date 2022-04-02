@@ -213,7 +213,7 @@ if __name__ == '__main__':
             )
         cvScoresDF = pd.DataFrame(cvScores)
         cvScoresDF.index.name = 'fold'
-        cvScoresDF.dropna(axis='columns', inplace=True)
+        cvScoresDF.dropna(axis='index', inplace=True)
         cvScoresDict[maskParams['freqBandName']] = cvScoresDF
         #
         lastFoldIdx = cvScoresDF.index.get_level_values('fold').max()
