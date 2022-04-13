@@ -53,7 +53,7 @@ done
 # python -u './compareSignalCovarianceMatrices.py' --estimatorName=$ESTIMATOR --iteratorSuffixList="a, b, c, d, e, f" --datasetPrefix="Synthetic_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 
 
-python -u './prepSignalsAsRegressor.py' --estimatorName='regressor' --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName='rig' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# python -u './prepSignalsAsRegressor.py' --estimatorName='regressor' --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName='rig' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 #
 
 ITERATOR="g"
@@ -62,7 +62,7 @@ RHSOPTS="--datasetNameRhs=Synthetic_${WINDOWTERM}_df_${ITERATOR} --selectionName
 LHSOPTS="--datasetNameLhs=Synthetic_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig_regressor"
 
 # python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca' --debugging --estimatorName='enr3' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca_ta' --debugging --estimatorName='enr3_ta' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca_ta' --debugging --estimatorName='enr3_ta' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 
 # python './processOrdinaryLeastSquares.py' --estimatorName='enr3' --datasetName=Synthetic_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-python './processOrdinaryLeastSquares.py' --estimatorName='enr3_ta' --datasetName=Synthetic_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# python './processOrdinaryLeastSquares.py' --estimatorName='enr3_ta' --datasetName=Synthetic_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
