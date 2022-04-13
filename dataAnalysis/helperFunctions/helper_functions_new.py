@@ -73,29 +73,43 @@ def printProgress(passIdx, nPasses, message=''):
 
 
 def animateDFSubset3D(
-        unpackedFeatures, dataQuery, winWidth, nFrames, fps=100,
+        unpackedFeatures=None, dataQuery=None, winWidth=10, nFrames=None, fps=100,
         xyzList=['PC1', 'PC2', 'PC3'], showNow=False, ax=None,
-        colorCol='tdAmplitude', saveToFile='', pltKws=None, extraAni=False):
+        colorCol='tdAmplitude', saveToFile='', lineKws={}, markerKws={}, extraAni=False):
 
     colorOpts = sns.cubehelix_palette(128)
+    cometMarkerSize = markerKws['markersize'] if 'markersize' in markerKws else 6
 
-    def update_lines(idx, data, colorData, lines):
+    def update_lines(idx, data, colorData, lines, comet):
         # print(lines)
+        colorIdx = colorData.iloc[idx]
+        rgbaColor = np.zeros((4))
+        rgbaColor[:3] = colorOpts[colorIdx]
+        rgbaColor[3] = 1
+        #
+        comet.set_data(data[0:2, idx])
+        comet.set_3d_properties(data[2, idx])
+        comet.set_color(rgbaColor)
+        comet.set_markersize(cometMarkerSize)
+        #
         if idx >= winWidth:
             for ptIdx in range(winWidth):
-                lines[ptIdx].set_data(
-                    data[0:2, idx - ptIdx - 1:idx - ptIdx + 1])
-                lines[ptIdx].set_3d_properties(
-                    data[2, idx - ptIdx - 1:idx - ptIdx + 1])
-                
                 colorIdx = colorData.iloc[idx - ptIdx]
                 rgbaColor = np.zeros((4))
                 rgbaColor[:3] = colorOpts[colorIdx]
                 rgbaColor[3] = (winWidth - ptIdx) / winWidth
+                #
+                lines[ptIdx].set_data(
+                    data[0:2, idx - ptIdx - 1:idx - ptIdx + 1])
+                lines[ptIdx].set_3d_properties(
+                    data[2, idx - ptIdx - 1:idx - ptIdx + 1])
                 lines[ptIdx].set_color(rgbaColor)
         return lines
-    
-    featSubset = unpackedFeatures.query(dataQuery)
+
+    if dataQuery is not None:
+        featSubset = unpackedFeatures.query(dataQuery)
+    else:
+        featSubset = unpackedFeatures
     data = featSubset.loc[:, xyzList].transpose().values
 
     _, colorBins = pd.cut(
@@ -110,56 +124,62 @@ def animateDFSubset3D(
         fig = ax.figure
     # initialize the line
     lines = [None for i in range(winWidth)]
+    comet = ax.plot(
+            data[0, 0],
+            data[1, 0],
+            data[2, 0],
+            **markerKws)[0]
     for idx in range(winWidth):
-        # print(idx)
-        # 
         lines[idx] = ax.plot(
             data[0, idx: idx + 2],
             data[1, idx: idx + 2],
             data[2, idx: idx + 2],
-            **pltKws)[0]
+            **lineKws)[0]
         lines[idx].set_color([0, 0, 0, 0])
-
     #  Setting the axes properties
-    
-    nuMax = featSubset[xyzList[0]].quantile(0.99)
-    nuMin = featSubset[xyzList[0]].quantile(0.01)
-    sigSpread = nuMax - nuMin
-    nuMax += sigSpread * 1e-2
-    nuMin -= sigSpread * 1e-2
-    ax.set_xlim3d([nuMin, nuMax])
-    ax.set_xticklabels([])
-    ax.set_xlabel(xyzList[0])
+    if False:
+        nuMax = featSubset[xyzList[0]].quantile(0.99)
+        nuMin = featSubset[xyzList[0]].quantile(0.01)
+        sigSpread = nuMax - nuMin
+        nuMax += sigSpread * 1e-2
+        nuMin -= sigSpread * 1e-2
+        ax.set_xlim3d([nuMin, nuMax])
+        ax.set_xticklabels([])
+        ax.set_xlabel(xyzList[0])
 
-    nuMax = featSubset[xyzList[1]].quantile(0.99)
-    nuMin = featSubset[xyzList[1]].quantile(0.01)
-    sigSpread = nuMax - nuMin
-    nuMax += sigSpread * 1e-2
-    nuMin -= sigSpread * 1e-2
-    ax.set_ylim3d([nuMin, nuMax])
-    ax.set_yticklabels([])
-    ax.set_ylabel(xyzList[1])
+        nuMax = featSubset[xyzList[1]].quantile(0.99)
+        nuMin = featSubset[xyzList[1]].quantile(0.01)
+        sigSpread = nuMax - nuMin
+        nuMax += sigSpread * 1e-2
+        nuMin -= sigSpread * 1e-2
+        ax.set_ylim3d([nuMin, nuMax])
+        ax.set_yticklabels([])
+        ax.set_ylabel(xyzList[1])
 
-    nuMax = featSubset[xyzList[2]].quantile(0.99)
-    nuMin = featSubset[xyzList[2]].quantile(0.01)
-    sigSpread = nuMax - nuMin
-    nuMax += sigSpread * 1e-2
-    nuMin -= sigSpread * 1e-2
-    ax.set_zlim3d([nuMin, nuMax])
-    ax.set_zticklabels([])
-    ax.set_zlabel(xyzList[2])
+        nuMax = featSubset[xyzList[2]].quantile(0.99)
+        nuMin = featSubset[xyzList[2]].quantile(0.01)
+        sigSpread = nuMax - nuMin
+        nuMax += sigSpread * 1e-2
+        nuMin -= sigSpread * 1e-2
+        ax.set_zlim3d([nuMin, nuMax])
+        ax.set_zticklabels([])
+        ax.set_zlabel(xyzList[2])
 
     # Creating the Animation object
     ani = animation.FuncAnimation(
         fig, update_lines, frames=nFrames,
-        fargs=(data, colorData, lines),
+        fargs=(data, colorData, lines, comet),
         interval=int(1e3/fps), blit=False)
     
     if saveToFile:
         writer = FFMpegWriter(fps=int(fps), metadata=dict(artist='Me'), bitrate=3600)
-        ani.save(saveToFile, writer=writer, extra_anim=extraAni)
+        if extraAni:
+            ani.save(saveToFile, writer=writer, extra_anim=extraAni)
+        else:
+            ani.save(saveToFile, writer=writer)
     elif showNow:
         plt.show()
+
     return ani
 
 

@@ -34,9 +34,11 @@ if 'DISPLAY' in os.environ:
     matplotlib.use('QT5Agg')   # generate postscript output
 else:
     matplotlib.use('PS')   # generate postscript output
-from mpl_toolkits.mplot3d import proj3d
+from mpl_toolkits.mplot3d import proj3d, axes3d
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.patches import Ellipse
+import matplotlib.transforms as transforms
 import seaborn as sns
 import os
 import dataAnalysis.helperFunctions.profiling as prf
@@ -51,7 +53,7 @@ import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
-# from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
+from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import ElasticNet, ElasticNetCV, SGDRegressor
 from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
 from sklego.preprocessing import PatsyTransformer
@@ -92,10 +94,10 @@ styleOpts = {
 sns.set(
     context='paper', style='white',
     palette='dark', font='sans-serif',
-    font_scale=.8, color_codes=True, rc=snsRCParams)
+    font_scale=1., color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
-
+plt.style.use('seaborn-white')
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 # if debugging in a console:
 '''
@@ -224,9 +226,12 @@ if __name__ == '__main__':
     electrodeRatio = 3.
     naRatio = 1.
     baseNTrials = 40
+    latentNoiseStd = 0.5
+    residualStd = 0.1
     bins = np.arange(-100e-3, 510e-3, iteratorOpts['forceBinInterval'])
     kinWindow = (0., 500e-3)
     kinWindowJitter = 50e-3
+    kinWindowRamp = 100e-3
     stimWindow = (0., 500e-3)
     stimWindowJitter = 100e-3
     velocityLookup = {
@@ -296,17 +301,41 @@ if __name__ == '__main__':
         for col in toyLhsFeatures
         ], names=lhsDF.columns.names)'''
     # bins = np.arange(min(origBins), max(origBins) + 20e-3, 20e-3)
+
+    def velRamp(t, kw, rt, pk):
+        if t < kw[0]:
+            return 0
+        elif (t >= kw[0]) and (t < (kw[0] + rt)):
+            return pk * (t - kw[0]) / rt
+        elif (t >= (kw[0] + rt)) and (t < (kw[1] - rt)):
+            return pk
+        elif (t >= (kw[1] - rt)) and (t < kw[1]):
+            return pk * (1 - (t - kw[1] + rt) / rt)
+        else:
+            return 0
+
     toyLhsList = []
     toyInfoPerTrial.drop(columns=['bin'], inplace=True)
     for rowIdx, row in toyInfoPerTrial.iterrows():
         thisIdx = pd.MultiIndex.from_tuples([tuple(row)], names=row.index)
-        vel = pd.DataFrame(0., index=thisIdx, columns=bins)
+        thisKW = (
+            kinWindow[0] + rng.random() * kinWindowJitter,
+            kinWindow[1] + rng.random() * kinWindowJitter)
+        thisSW = (
+            stimWindow[0] + rng.random() * stimWindowJitter,
+            stimWindow[1] + rng.random() * stimWindowJitter)
+        ##
+        vel = pd.DataFrame(
+            np.asarray([
+                velRamp(
+                    tb, kinWindow, kinWindowRamp,
+                    velocityLookup[(row['pedalMovementCat'], row['pedalDirection'])])
+                for tb in bins]).reshape(1, -1),
+            index=thisIdx, columns=bins)
         vel.columns.name = 'bin'
-        thisKW = (kinWindow[0] + rng.random() * kinWindowJitter, kinWindow[1] + rng.random() * kinWindowJitter)
-        thisSW = (stimWindow[0] + rng.random() * stimWindowJitter, stimWindow[1] + rng.random() * stimWindowJitter)
-        kBinMask = (bins >= thisKW[0]) & (bins < thisKW[1])
-        vel.loc[:, kBinMask] = velocityLookup[(row['pedalMovementCat'], row['pedalDirection'])]
-        vel = vel.abs() # velocity_abs
+        # kBinMask = (bins >= thisKW[0]) & (bins < thisKW[1])
+        # vel.loc[:, kBinMask] = velocityLookup[(row['pedalMovementCat'], row['pedalDirection'])]
+        # vel = vel.abs() # velocity_abs
         amp = pd.DataFrame(0., index=thisIdx, columns=bins)
         amp.columns.name = 'bin'
         rate = pd.DataFrame(0., index=thisIdx, columns=bins)
@@ -317,14 +346,13 @@ if __name__ == '__main__':
             rate.loc[:, :] = stimMask * row['trialRateInHz']
         toyLhsList.append(
             pd.concat([
-                vel.stack('bin').to_frame(name='velocity_abs'),
+                vel.stack('bin').to_frame(name='velocity'),
                 amp.stack('bin').to_frame(name='amplitude'),
                 rate.stack('bin').to_frame(name='RateInHz'),
                 ], axis='columns'))
     toyLhsDF = pd.concat(toyLhsList)
     colsToScale = ['amplitude', 'RateInHz']
     saveIndex = toyLhsDF.index.copy()
-    # pdb.set_trace()
     toyTrialInfo = toyLhsDF.index.to_frame().reset_index(drop=True)
     lOfTransformers = [
         (['amplitude'], MinMaxScaler(feature_range=(0., 1)),),
@@ -342,7 +370,7 @@ if __name__ == '__main__':
     scaledLhsDF.reset_index(inplace=True, drop=True)
     scaledLhsDF.index.name = 'trial'
     #
-    designFormula = "velocity_abs + electrode:(amplitude/RateInHz)"
+    designFormula = "velocity + electrode:(amplitude/RateInHz)"
     pt = PatsyTransformer(designFormula, return_type="matrix")
     designMatrix = pt.fit_transform(scaledLhsDF)
     designInfo = designMatrix.design_info
@@ -369,16 +397,16 @@ if __name__ == '__main__':
             })
         #####
         mu = np.asarray([2., 3., 1.])
-        phi, theta, psi = 30, 10, 20
+        phi, theta, psi = 10, 5, 0
         r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
-        explainedVar = np.diag([5, 3, 0])
+        explainedVar = np.diag([10, 6, 1])
         # W = wRot @ var
-        S = np.eye(nDim) * 2.
+        residualCovariance = np.eye(nDim) * residualStd ** 2
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity_abs': 2.,
+            'velocity': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -400,21 +428,21 @@ if __name__ == '__main__':
             kinDirection, vg.basis.z, 90)  # perpendicular
         rotCoeffs = pd.Series({
             'electrode[+ E16 - E9]:amplitude': [80., 40., 0.],  # out of plane
-            'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
+            'electrode[+ E16 - E5]:amplitude': [0., 0., 0.], # paralel
             'electrode[NA]:amplitude': [0., 0., 0.],
             })
         #####
         mu = np.asarray([2., 3., 1.])
-        phi, theta, psi = 30, 10, 20
+        phi, theta, psi = 10, 5, 0
         r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
-        explainedVar = np.diag([5, 3, 0])
+        explainedVar = np.diag([10, 6, 1])
         # W = wRot @ var
-        S = np.eye(nDim) * 2.
+        residualCovariance = np.eye(nDim) * residualStd ** 2
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity_abs': 2.,
+            'velocity': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -441,16 +469,16 @@ if __name__ == '__main__':
             })
         #####
         mu = np.asarray([2., 3., 1.])
-        phi, theta, psi = 30, 10, 20
+        phi, theta, psi = 10, 5, 0
         r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
-        explainedVar = np.diag([5, 3, 0])
+        explainedVar = np.diag([10, 6, 1])
         # W = wRot @ var
-        S = np.eye(nDim) * 2.
+        residualCovariance = np.eye(nDim) * residualStd ** 2
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity_abs': 2.,
+            'velocity': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -477,15 +505,15 @@ if __name__ == '__main__':
             })
         #####
         mu = np.asarray([2., 3., 1.])
-        phi, theta, psi = 30, 10, 20
+        phi, theta, psi = 10, 5, 0
         r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
-        explainedVar = np.diag([5, 3, 0])
-        S = np.eye(nDim) * 2.
+        explainedVar = np.diag([10, 6, 1])
+        residualCovariance = np.eye(nDim) * residualStd ** 2
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity_abs': 2.,
+            'velocity': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -512,16 +540,16 @@ if __name__ == '__main__':
             })
         #####
         mu = np.asarray([2., 3., 1.])
-        phi, theta, psi = 30, 10, 20
+        phi, theta, psi = 10, 5, 0
         r = Rot.from_euler('xyz', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
-        explainedVar = np.diag([5, 3, 0])
+        explainedVar = np.diag([10, 6, 1])
         # W = wRot @ var
-        S = np.eye(nDim) * 2.
+        residualCovariance = np.eye(nDim) * residualStd ** 2
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity_abs': 2.,
+            'velocity': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 0.,
             'electrode[+ E16 - E9]:amplitude': 0.,
@@ -550,15 +578,15 @@ if __name__ == '__main__':
             })
         #####
         mu = np.asarray([2., 3., 1.])
-        phi, theta, psi = 30, 10, 20
+        phi, theta, psi = 10, 5, 0
         r = Rot.from_euler('xyz', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
-        explainedVar = np.diag([5, 3, 0])
-        S = np.eye(nDim) * 2.
+        explainedVar = np.diag([10, 6, 1])
+        residualCovariance = np.eye(nDim) * residualStd ** 2
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity_abs': 0.,
+            'velocity': 0.,
             #
             'electrode[+ E16 - E5]:amplitude': 0.,
             'electrode[+ E16 - E9]:amplitude': 0.,
@@ -579,22 +607,22 @@ if __name__ == '__main__':
         stimDirection = vg.rotate(
             kinDirection, vg.basis.z, 90)  # perpendicular
         rotCoeffs = pd.Series({
-            'electrode[+ E16 - E9]:amplitude': [40., 20., 0.],  # out of plane
+            'electrode[+ E16 - E9]:amplitude': [80., 40., 0.],  # out of plane
             'electrode[+ E16 - E5]:amplitude': [20., 0., 0.],
             'electrode[NA]:amplitude': [0., 0., 0.],
         })
         #####
         mu = np.asarray([2., 3., 1.])
-        phi, theta, psi = 30, 10, 20
+        phi, theta, psi = 10, 5, 0
         r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
-        explainedVar = np.diag([5, 3, 0])
+        explainedVar = np.diag([10, 6, 1])
         # W = wRot @ var
-        S = np.eye(nDim) * 2.
+        residualCovariance = np.eye(nDim) * residualStd ** 2
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity_abs': 2.,
+            'velocity': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 4.,
             'electrode[+ E16 - E9]:amplitude': 4.,
@@ -609,7 +637,7 @@ if __name__ == '__main__':
     ################################################################
     projectionLookup = {
         'Intercept': kinDirection,
-        'velocity_abs': kinDirection,
+        'velocity': kinDirection,
         'electrode:amplitude': stimDirection,
         'electrode:amplitude:RateInHz': stimDirection
         }
@@ -617,7 +645,7 @@ if __name__ == '__main__':
     # sanity check
     sanityCheckThis = False
     if sanityCheckThis:
-        fig, ax = plt.subplots(2, 1, figsize=(12, 12), sharex=True)
+        fig, ax = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
         for cN in magnitudes.columns:
             ax[0].plot(magnitudes[cN], label=cN)
         ax[0].legend()
@@ -638,7 +666,12 @@ if __name__ == '__main__':
     for termName, termSlice in designInfo.term_name_slices.items():
         termValues = termMagnitudes[termName].to_numpy().reshape(-1, 1) * projectionLookup[termName]
         latentRhsDF.loc[:, :] += termValues[:, :nDimLatent]
-    latentNoise = rng.normal(0, 1., size=(scaledLhsDF.shape[0], nDimLatent))
+    #
+    latentCovariance = np.eye(nDimLatent) * (latentNoiseStd ** 2)
+    # pdb.set_trace()
+    latentNoiseDistr = stats.multivariate_normal(mean=np.zeros(nDimLatent), cov=latentCovariance)
+    latentNoise = latentNoiseDistr.rvs(latentRhsDF.shape[0])
+    # latentNoise = rng.normal(0, latentNoiseStd, size=(scaledLhsDF.shape[0], nDimLatent))
     latentRhsDF += latentNoise
     # latentRhsDF.loc[:, :] = StandardScaler().fit_transform(latentRhsDF)
     latentRhsDF.columns.name = 'feature'
@@ -653,7 +686,7 @@ if __name__ == '__main__':
     movementInfluence = pd.Series(
         MinMaxScaler(feature_range=(defaultMS, defaultMS * 2))
         .fit_transform(
-            termMagnitudes['velocity_abs']
+            termMagnitudes['velocity']
             .to_numpy().reshape(-1, 1))
         .flatten(), index=termMagnitudes.index)
     #
@@ -662,13 +695,15 @@ if __name__ == '__main__':
     latentPlotDF.loc[:, 'restrictMask'] = restrictMask
     latentPlotDF.loc[:, 'electrodeInfluence'] = electrodeInfluence
     latentPlotDF.loc[:, 'movementInfluence'] = movementInfluence
-    latentPlotDF.loc[:, 'limbState'] = toyLhsDF['velocity_abs'].map({-1: 'flexion', 0:'rest', 1:'extension'}).to_numpy()
-    latentPlotDF.loc[:, 'limbState x electrode'] = ' '
-    for name, group in latentPlotDF.groupby(['limbState', 'electrode']):
-        latentPlotDF.loc[group.index, 'limbState x electrode'] = '{} {}'.format(*name)
+    latentPlotDF.loc[:, 'moving'] = (np.sign(toyLhsDF['velocity']) * (toyLhsDF['velocity'].abs() > 0)).to_numpy()
+    latentPlotDF.loc[:, 'limbState'] = latentPlotDF['moving'].map({-1: 'moving', 0: 'at rest', 1: 'moving'}).to_numpy()
+    latentPlotDF.loc[:, 'activeElectrode'] = latentPlotDF['electrode']
+    latentPlotDF.loc[latentPlotDF['amplitude'] == 0, 'activeElectrode'] = 'NA'
+    latentPlotDF.loc[:, 'limbState x activeElectrode'] = latentPlotDF.apply(lambda x: '{} {}'.format(x['limbState'], x['activeElectrode']), axis='columns')
+    latentPlotDF.loc[:, 'pedalMovementCat x electrode'] = latentPlotDF.apply(lambda x: '{} {}'.format(x['pedalMovementCat'], x['electrode']), axis='columns')
+    #
     toyRhsDF = pd.DataFrame(
-        0.,
-        index=latentRhsDF.index,
+        0., index=latentRhsDF.index,
         columns=['data{}'.format(cN) for cN in range(nDim)])
     for name, group in scaledLhsDF.groupby(['electrode', 'amplitude']):
         elecName, amp = name
@@ -677,11 +712,12 @@ if __name__ == '__main__':
         factorName = 'electrode[{}]:amplitude'.format(elecName)
         nPoints = group.index.shape[0]
         extraRotMat = Rot.from_euler('XYZ', [beta for beta in rotCoeffs[factorName]], degrees=True).as_matrix()
-        augL = np.concatenate([latentRhsDF.loc[group.index, :].to_numpy(), np.zeros([nPoints, 1])], axis=1).T
-        toyRhsDF.loc[group.index, :] += (wRot @ extraRotMat @ explainedVar @ augL).T
-    #
-    noiseDistr = stats.multivariate_normal(mean=mu, cov=S)
-    noiseTerm = noiseDistr.rvs(latentRhsDF.shape[0])
+        augmentedLatent = np.concatenate([latentRhsDF.loc[group.index, :].to_numpy(), np.zeros([nPoints, 1])], axis=1).T
+        # augmented
+        toyRhsDF.loc[group.index, :] += (wRot @ extraRotMat @ explainedVar @ augmentedLatent).T
+
+    noiseDistr = stats.multivariate_normal(mean=mu, cov=residualCovariance)
+    noiseTerm = noiseDistr.rvs(toyRhsDF.shape[0])
     toyRhsDF += noiseTerm
     #
     rhsPlotDF = pd.concat([toyRhsDF, scaledLhsDF], axis='columns')
@@ -689,203 +725,339 @@ if __name__ == '__main__':
     rhsPlotDF.loc[:, 'restrictMask'] = restrictMask
     rhsPlotDF.loc[:, 'electrodeInfluence'] = electrodeInfluence
     rhsPlotDF.loc[:, 'movementInfluence'] = movementInfluence
-    rhsPlotDF.loc[:, 'limbState'] = latentPlotDF['limbState']
-    rhsPlotDF.loc[:, 'limbState x electrode'] = ' '
-    for name, group in rhsPlotDF.groupby(['limbState', 'electrode']):
-        rhsPlotDF.loc[group.index, 'limbState x electrode'] = '{} {}'.format(*name)
+    for cN in [
+        'limbState', 'activeElectrode',
+        'limbState x activeElectrode', 'pedalMovementCat x electrode']:
+        rhsPlotDF.loc[:, cN] = latentPlotDF[cN]
+        toyTrialInfo.loc[:, cN] = latentPlotDF[cN]
     markerStyles = ['o', 'd', 's']
-    msDict = {key: markerStyles[idx] for idx, key in enumerate(latentPlotDF['velocity_abs'].unique())}
+    # msDict = {
+    #     key: markerStyles[idx]
+    #     for idx, key in enumerate(latentPlotDF['velocity'].unique())}
     maskOpts = {
-        0: dict(alpha=0.2, linewidths=0),
-        1: dict(alpha=0.3, linewidths=1)
+        0: dict(alpha=0.1, linewidths=0, s=2),
+        1: dict(alpha=0.2, linewidths=1, s=2)
         }
     lOfMasksForBreakdown = [
         {
             'mask': ((toyTrialInfo['electrode'] == 'NA') & (toyTrialInfo['pedalMovementCat'] == 'NA')).to_numpy(),
             'label': 'At rest, no stim'},
         {
-            'mask': (toyTrialInfo['electrode'] == 'NA').to_numpy(),
-            'label': 'Movement, no stim'},
+            'mask': (toyTrialInfo['electrode'] == 'NA').to_numpy() & (toyTrialInfo['pedalMovementCat'] == 'outbound').to_numpy(),
+            'label': 'Extension, no stim'},
         {
-            'mask': toyTrialInfo['electrode'].isin(['NA', '+ E16 - E5']).to_numpy(),
-            'label': 'Movement, stim 1'},
+            'mask': toyTrialInfo['electrode'].isin(['NA', '+ E16 - E5']).to_numpy() & (toyTrialInfo['pedalMovementCat'] == 'outbound').to_numpy(),
+            'label': 'Extension, stim 1'},
         {
-            'mask': toyTrialInfo['electrode'].isin(['NA', '+ E16 - E9']).to_numpy(),
-            'label': 'Movement, stim 2'},
-    ]
-    pdfPath = os.path.join(
-        figureOutputFolder, 'synthetic_dataset_latent_{}.pdf'.format(iteratorSuffix)
-        )
-        
-    with PdfPages(pdfPath) as pdf:
-        extentLatent = (
-            latentPlotDF.loc[:, latentRhsDF.columns].quantile(1 - 1e-3) -
-            latentPlotDF.loc[:, latentRhsDF.columns].quantile(1e-3)).max()
-        fig, ax = plt.subplots(figsize=(12, 12))
-        for name, group in latentPlotDF.groupby('velocity_abs'):
-            ax.scatter(
-                group.iloc[:, 0], group.iloc[:, 1], cmap='viridis',
-                c=group['electrodeInfluence'],
-                # s=group['movementInfluence'],
-                marker=msDict[name], rasterized=True, **maskOpts[0])
-        xMid = (ax.get_xlim()[1] + ax.get_xlim()[0]) / 2
-        ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
-        yMid = (ax.get_ylim()[1] + ax.get_ylim()[0]) / 2
-        ax.set_ylim([yMid - extentLatent/2, yMid + extentLatent/2])
-        fig.tight_layout()
-        pdf.savefig()
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
-        fig, ax = plt.subplots(figsize=(12, 12))
-        sns.kdeplot(
-            x='latent0', y='latent1', hue='limbState x electrode',
-            levels=20, fill=True, thresh=.1, palette='Set1',
-            common_norm=False, alpha=.5,
-            data=latentPlotDF, ax=ax)
-        ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
-        ax.set_ylim([yMid - extentLatent/2, yMid + extentLatent/2])
-        fig.tight_layout()
-        pdf.savefig()
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
-        if iteratorSuffix in ['a', 'b', 'g']:
-            for maskDict in lOfMasksForBreakdown:
-                thisMask = maskDict['mask']
-                fig, ax = plt.subplots(figsize=(12, 12))
-                for name, group in latentPlotDF.loc[thisMask, :].groupby('velocity_abs'):
-                    ax.scatter(
-                        group['latent0'], group['latent1'], cmap='viridis',
-                        c=group['electrodeInfluence'],
-                        # s=group['movementInfluence'],
-                        marker=msDict[name], rasterized=True, **maskOpts[0])
-                ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
-                ax.set_ylim([yMid - extentLatent/2, yMid + extentLatent/2])
-                fig.suptitle(maskDict['label'])
+            'mask': toyTrialInfo['electrode'].isin(['NA', '+ E16 - E9']).to_numpy() & (toyTrialInfo['pedalMovementCat'] == 'outbound').to_numpy(),
+            'label': 'Extension, stim 2'},
+        ]
+    #
+    uEll = np.linspace(0, 2 * np.pi, 100)
+    vEll = np.linspace(0, np.pi, 100)
+    xEll = np.outer(np.cos(uEll), np.sin(vEll))
+    yEll = np.outer(np.sin(uEll), np.sin(vEll))
+    zEll = np.outer(np.ones_like(uEll), np.cos(vEll))
+    unitSphere = np.stack((xEll, yEll, zEll), 0).reshape(3, -1)
+    ellipsoidDict = {}
+    ellipsoidTheoryDict = {}
+    #
+    covPatternPalette = pd.Series(
+        sns.color_palette(
+            'Set2', n_colors=latentPlotDF['limbState x activeElectrode'].unique().shape[0]),
+              index=np.unique(latentPlotDF['limbState x activeElectrode']))
+    # latentPlotDF['limbState x activeElectrode'].unique()
+    for name, group in latentPlotDF.groupby('limbState x activeElectrode'):
+        # for maskDict in lOfMasksForBreakdown:
+        # thisMask = maskDict['mask']
+        # name = maskDict['label']
+        # pdb.set_trace()
+        emp_cov = LedoitWolf().fit(toyRhsDF.loc[group.index, :])
+        ellipsoidDict[name] = (
+            (
+                emp_cov.covariance_ @ unitSphere +
+                emp_cov.location_.reshape(3, 1))
+            .reshape(3, *xEll.shape))
+        elecName = toyTrialInfo.loc[group.index, 'electrode'].unique()[0]
+        factorName = 'electrode[{}]:amplitude'.format(elecName)
+        extraRotMat = Rot.from_euler('XYZ', [beta for beta in rotCoeffs[factorName]], degrees=True).as_matrix()
+        augmentedLatentCovariance = np.diag([latentNoiseStd ** 2 for i in range(nDimLatent)] + [0 for i in range(nDim - nDimLatent)])
+        #
+        theoretical_cov = wRot @ extraRotMat @ explainedVar @ augmentedLatentCovariance + residualCovariance
+        theoretical_cov = wRot @ extraRotMat @ explainedVar + residualCovariance  ## DEBUGGING
+        ellipsoidTheoryDict[name] = (theoretical_cov @ unitSphere + mu.reshape(3, 1)).reshape(3, *xEll.shape)
+    makeKDEPlot = False
+    makeLatentPDF = False
+    if makeLatentPDF:
+        pdfPath = os.path.join(
+            figureOutputFolder,
+            'synthetic_dataset_latent_{}.pdf'.format(iteratorSuffix)
+            )
+        with PdfPages(pdfPath) as pdf:
+            extentLatent = (
+                latentPlotDF.loc[:, latentRhsDF.columns].quantile(1 - 1e-2) -
+                latentPlotDF.loc[:, latentRhsDF.columns].quantile(1e-2))
+            #
+            xExtentLatent, yExtentLatent = extentLatent['latent0'], extentLatent['latent1']
+            midPointsLatent = latentPlotDF.loc[:, latentRhsDF.columns].median()
+            #
+            fig, ax = plt.subplots(figsize=(6, 6))
+            for name, group in latentPlotDF.groupby('velocity'):
+                ax.scatter(
+                    group.iloc[:, 0], group.iloc[:, 1], cmap='viridis',
+                    c=group['electrodeInfluence'],
+                    # marker=msDict[name], s=group['movementInfluence'],
+                    rasterized=True, **maskOpts[0])
+            ax.set_xlim([
+                midPointsLatent['latent0'] - xExtentLatent,
+                midPointsLatent['latent0'] + xExtentLatent])
+            ax.set_ylim([
+                midPointsLatent['latent1'] - yExtentLatent,
+                midPointsLatent['latent1'] + yExtentLatent])
+            fig.tight_layout()
+            pdf.savefig()
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+            if makeKDEPlot:
+                fig, ax = plt.subplots(figsize=(6, 6))
+                sns.kdeplot(
+                    x='latent0', y='latent1', hue='limbState x activeElectrode',
+                    levels=20, fill=True, thresh=.1, palette='Set1',
+                    common_norm=False, alpha=.5,
+                    data=latentPlotDF, ax=ax)
+                ax.set_xlim([
+                    midPointsLatent['latent0'] - xExtentLatent, midPointsLatent['latent0'] + xExtentLatent])
+                ax.set_ylim([
+                    midPointsLatent['latent1'] - yExtentLatent, midPointsLatent['latent1'] + yExtentLatent])
                 fig.tight_layout()
                 pdf.savefig()
+                #
                 if arguments['showFigures']:
                     plt.show()
                 else:
                     plt.close()
+            if iteratorSuffix in ['a', 'b', 'g']:
+                for maskDict in lOfMasksForBreakdown:
+                    thisMask = maskDict['mask']
+                    fig, ax = plt.subplots(figsize=(6, 6))
+                    for name, group in latentPlotDF.loc[thisMask, :].groupby('velocity'):
+                        ax.scatter(
+                            group['latent0'], group['latent1'], cmap='viridis',
+                            c=group['electrodeInfluence'],
+                            # s=group['movementInfluence'],
+                            # marker=msDict[name],
+                            rasterized=True, **maskOpts[0])
+                    ax.set_xlim([
+                        midPointsLatent['latent0'] - xExtentLatent,
+                        midPointsLatent['latent0'] + xExtentLatent])
+                    ax.set_ylim([
+                        midPointsLatent['latent1'] - yExtentLatent,
+                        midPointsLatent['latent1'] + yExtentLatent])
+                    fig.suptitle(maskDict['label'])
+                    fig.tight_layout()
+                    pdf.savefig()
+                    if arguments['showFigures']:
+                        plt.show()
+                    else:
+                        plt.close()
     ####
     pdfPath = os.path.join(
         figureOutputFolder, 'synthetic_dataset_{}.pdf'.format(iteratorSuffix)
         )
+    extent = (
+        rhsPlotDF.loc[:, toyRhsDF.columns].quantile(1 - 1e-2) -
+        rhsPlotDF.loc[:, toyRhsDF.columns].quantile(1e-2))
+    xExtent, yExtent, zExtent = extent['data0'], extent['data1'], extent['data2']
+    midPoints = rhsPlotDF.loc[:, toyRhsDF.columns].median()
     with PdfPages(pdfPath) as pdf:
-        extent = (
-            rhsPlotDF.loc[:, toyRhsDF.columns].quantile(1 - 1e-3) -
-            rhsPlotDF.loc[:, toyRhsDF.columns].quantile(1e-3)).max()
+        #
         fig = plt.figure()
-        fig.set_size_inches((12, 12))
+        fig.set_size_inches((6, 6))
         ax = fig.add_subplot(projection='3d')
         ax.set_proj_type('ortho')
-        for name, group in rhsPlotDF.groupby('velocity_abs'):
+        for name, group in rhsPlotDF.groupby('velocity'):
+         # for name, group in rhsPlotDF.groupby('electrode'):
             ax.scatter(
-                group.iloc[:, 0], group.iloc[:, 1], group.iloc[:, 2], cmap='plasma',
-                c=group['electrodeInfluence'],
-                # s=group['movementInfluence'],
-                marker=msDict[name], rasterized=True, **maskOpts[0])
-        #
-        xMid = (ax.get_xlim()[1] + ax.get_xlim()[0]) / 2
-        ax.set_xlim([xMid - extent/2, xMid + extent/2])
-        #
-        yMid = (ax.get_ylim()[1] + ax.get_ylim()[0]) / 2
-        ax.set_ylim([yMid - extent/2, yMid + extent/2])
-        #
-        zMid = (ax.get_zlim()[1] + ax.get_zlim()[0]) / 2
-        ax.set_xlim([zMid - extent/2, zMid + extent/2])
+                group.iloc[:, 0], group.iloc[:, 1], group.iloc[:, 2],
+                cmap=sns.color_palette("ch:0.6,-.3,dark=.1,light=0.7,reverse=1", as_cmap=True),
+                c=group['electrodeInfluence'], # s=group['movementInfluence'],
+                # marker=msDict[name],
+                rasterized=True,
+                **maskOpts[0])
         #
         ax.view_init(azim=-120., elev=30.)
+        ax.set_xlim3d([midPoints['data0'] - xExtent, midPoints['data0'] + xExtent])
+        ax.set_ylim3d([midPoints['data1'] - yExtent, midPoints['data1'] + yExtent])
+        ax.set_zlim3d([midPoints['data2'] - zExtent, midPoints['data2'] + zExtent])
+        #
         fig.tight_layout()
         pdf.savefig()
         if arguments['showFigures']:
             plt.show()
         else:
             plt.close()
-        #
         rhsPlotDF.loc[:, 'x2'], rhsPlotDF.loc[:, 'y2'], _ = proj3d.proj_transform(
             rhsPlotDF.iloc[:, 0], rhsPlotDF.iloc[:, 1], rhsPlotDF.iloc[:, 2], ax.get_proj())
         #####
-        ####
-        fig, ax = plt.subplots(figsize=(12, 12))
-        sns.kdeplot(
-            x='x2', y='y2', hue='limbState x electrode',
-            levels=20, fill=True, thresh=.1, palette='Set2',
-            common_norm=False, linewidth=0., alpha=.5,
-            data=rhsPlotDF, ax=ax)
-        fig.tight_layout()
-        pdf.savefig()
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
+        if makeKDEPlot:
+            ####
+            fig, ax = plt.subplots(figsize=(6, 6))
+            sns.kdeplot(
+                x='x2', y='y2', hue='limbState x activeElectrode',
+                levels=20, fill=True, thresh=.1, palette='Set2',
+                common_norm=False, linewidth=0., alpha=.5,
+                data=rhsPlotDF, ax=ax)
+            fig.tight_layout()
+            pdf.savefig()
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+        ########
         if iteratorSuffix in ['a', 'b', 'g']:
-            tempCols = [cN for cN in toyRhsDF.columns] + ['limbState x electrode']
-            rhsPlotDFStack = pd.DataFrame(
-                rhsPlotDF.loc[:, tempCols].to_numpy(),
-                columns=tempCols,
-                index=pd.MultiIndex.from_frame(toyTrialInfo.loc[:, ['electrode', 'bin', 'pedalMovementCat', 'trialAmplitude']])
-                )
-            rhsPlotDFStack = rhsPlotDFStack.set_index('limbState x electrode', append=True)
-            rhsPlotDFStack.columns.name = 'feature'
-            rhsPlotDFStack = rhsPlotDFStack.stack().to_frame(name='signal').reset_index()
-            g = sns.relplot(
-                row='feature', col='limbState x electrode',
-                x='bin', y='signal', hue='trialAmplitude',
-                data=rhsPlotDFStack, palette='plasma',
-                errorbar='se', kind='line',
-                height=2, aspect=3
-                )
-            g.tight_layout()
-            pdf.savefig()
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            g = sns.displot(
-                row='feature', col='limbState x electrode',
-                y='signal', hue='trialAmplitude',
-                data=rhsPlotDFStack, palette='plasma',
-                kind='kde', common_norm=False,
-                height=2, aspect=3
-                )
-            g.tight_layout()
-            pdf.savefig()
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            for maskDict in lOfMasksForBreakdown:
-                fig = plt.figure()
-                fig.set_size_inches((12, 12))
-                ax = fig.add_subplot(projection='3d')
-                ax.set_proj_type('ortho')
-                thisMask = maskDict['mask']
-                for name, group in rhsPlotDF.loc[thisMask, :].groupby('velocity_abs'):
-                    ax.scatter(
-                        group['data0'], group['data1'], group['data2'], cmap='plasma',
-                        c=group['electrodeInfluence'],
-                        # s=group['movementInfluence'],
-                        marker=msDict[name], rasterized=True, **maskOpts[0])
-                #
-                ax.set_xlim([xMid - extent/2, xMid + extent/2])
-                ax.set_ylim([yMid - extent/2, yMid + extent/2])
-                ax.set_xlim([zMid - extent/2, zMid + extent/2])
-                #
-                ax.view_init(azim=-120., elev=30.)
-                fig.suptitle(maskDict['label'])
-                fig.tight_layout()
+            plotRelPlots = False
+            if plotRelPlots:
+                tempCols = [cN for cN in toyRhsDF.columns] + [
+                    'limbState x activeElectrode', 'pedalMovementCat x electrode']
+                rhsPlotDFStack = pd.DataFrame(
+                    rhsPlotDF.loc[:, tempCols].to_numpy(),
+                    columns=tempCols,
+                    index=pd.MultiIndex.from_frame(toyTrialInfo.loc[
+                        :, [
+                            'electrode', 'bin', 'pedalMovementCat', 'trialAmplitude']])
+                        )
+                rhsPlotDFStack = rhsPlotDFStack.set_index('limbState x activeElectrode', append=True)
+                rhsPlotDFStack = rhsPlotDFStack.set_index('pedalMovementCat x electrode', append=True)
+                rhsPlotDFStack.columns.name = 'feature'
+                rhsPlotDFStack = rhsPlotDFStack.stack().to_frame(name='signal').reset_index()
+                g = sns.relplot(
+                    row='feature', col='pedalMovementCat x electrode',
+                    x='bin', y='signal', hue='trialAmplitude',
+                    data=rhsPlotDFStack,
+                    palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
+                    errorbar='se', kind='line',
+                    height=3, aspect=1
+                    )
+                g.tight_layout()
                 pdf.savefig()
                 if arguments['showFigures']:
                     plt.show()
                 else:
                     plt.close()
+                g = sns.displot(
+                    row='feature', col='pedalMovementCat x electrode',
+                    y='signal', hue='trialAmplitude',
+                    data=rhsPlotDFStack,
+                    palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
+                    kind='kde', common_norm=False,
+                    height=3, aspect=1
+                    )
+                g.tight_layout()
+                pdf.savefig()
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                #
+                tempCols = [cN for cN in toyLhsDF.columns] + [
+                    'limbState x activeElectrode', 'pedalMovementCat x electrode']
+                lhsPlotDFStack = pd.DataFrame(
+                    rhsPlotDF.loc[:, tempCols].to_numpy(),
+                    columns=tempCols,
+                    index=pd.MultiIndex.from_frame(toyTrialInfo.loc[
+                        :, [
+                            'electrode', 'bin', 'pedalMovementCat', 'trialAmplitude']])
+                    )
+                lhsPlotDFStack = lhsPlotDFStack.set_index('limbState x activeElectrode', append=True)
+                lhsPlotDFStack = lhsPlotDFStack.set_index('pedalMovementCat x electrode', append=True)
+                lhsPlotDFStack.columns.name = 'feature'
+                lhsPlotDFStack = lhsPlotDFStack.stack().to_frame(name='signal').reset_index()
+                ###
+                g = sns.relplot(
+                    row='feature', col='pedalMovementCat x electrode',
+                    x='bin', y='signal', hue='trialAmplitude',
+                    data=lhsPlotDFStack, palette='viridis',
+                    errorbar='se', kind='line', height=3, aspect=1
+                    )
+                g.tight_layout()
+                #
+                pdf.savefig()
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                ###
+            plotMaskedScatters = True
+            if plotMaskedScatters:
+                for maskDict in lOfMasksForBreakdown:
+                    fig = plt.figure()
+                    fig.set_size_inches((6, 6))
+                    ax = fig.add_subplot(projection='3d')
+                    ax.set_proj_type('ortho')
+                    thisMask = maskDict['mask']
+                    for name in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique():
+                        ax.plot_surface(
+                            *ellipsoidTheoryDict[name],
+                            rstride=4, cstride=4,
+                            color=covPatternPalette[name], alpha=0.5, linewidths=0)
+                    # for name, group in rhsPlotDF.loc[thisMask, :].groupby('velocity'):
+                    ax.scatter(
+                        rhsPlotDF.loc[thisMask, 'data0'],
+                        rhsPlotDF.loc[thisMask, 'data1'],
+                        rhsPlotDF.loc[thisMask, 'data2'],
+                        cmap=sns.color_palette("ch:0.6,-.3,dark=.1,light=0.7,reverse=1", as_cmap=True),
+                        c=rhsPlotDF.loc[thisMask, 'electrodeInfluence'],
+                        # marker=msDict[name], s=group['movementInfluence'],
+                        rasterized=True, **maskOpts[0])
+                    fig.suptitle(maskDict['label'])
+                    ax.view_init(azim=-120., elev=30.)
+                    ax.set_xlim3d([midPoints['data0'] - xExtent, midPoints['data0'] + xExtent])
+                    ax.set_ylim3d([midPoints['data1'] - yExtent, midPoints['data1'] + yExtent])
+                    ax.set_zlim3d([midPoints['data2'] - zExtent, midPoints['data2'] + zExtent])
+                    fig.tight_layout()
+                    pdf.savefig()
+                    if arguments['showFigures']:
+                        plt.show()
+                    else:
+                        plt.close()
     ####
-    outputDatasetName = 'Synthetic_{}_df_{}'.format(loadingMeta['arguments']['window'], iteratorSuffix)
+    saveAnimations = False
+    if saveAnimations:
+        for maskIdx, maskDict in enumerate(lOfMasksForBreakdown):
+            aniPath = os.path.join(
+                figureOutputFolder, 'synthetic_dataset_{}_mask_{}.mp4'.format(iteratorSuffix, maskIdx)
+                )
+            fig = plt.figure()
+            fig.set_size_inches((6, 6))
+            ax = fig.add_subplot(projection='3d')
+            ax.set_proj_type('ortho')
+            thisMask = maskDict['mask']
+            for name in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique():
+                ax.plot_surface(
+                    *ellipsoidTheoryDict[name],
+                    rstride=4, cstride=4,
+                    color=covPatternPalette[name], alpha=0.5, linewidths=0)
+            ax.set_xlim3d([midPoints['data0'] - xExtent, midPoints['data0'] + xExtent])
+            ax.set_ylim3d([midPoints['data1'] - yExtent, midPoints['data1'] + yExtent])
+            ax.set_zlim3d([midPoints['data2'] - zExtent, midPoints['data2'] + zExtent])
+            ax.view_init(azim=-120., elev=30.)
+            aniLineKws = {'linestyle': '-', 'linewidth': 2}
+            aniMarkerKws = {'marker': 'o', 'markersize': 6, 'linewidth': 0}
+            aniFeat = hf.animateDFSubset3D(
+                rhsPlotDF.loc[thisMask, :],
+                dataQuery=None, winWidth=5, fps=int(iteratorOpts['forceBinInterval'] ** (-1)),
+                nFrames=min(1000, rhsPlotDF.loc[thisMask, :].shape[0]),
+                xyzList=['data0', 'data1', 'data2'], ax=ax,
+                colorCol='electrodeInfluence', lineKws=aniLineKws,
+                markerKws=aniMarkerKws, showNow=True
+                # saveToFile=aniPath
+                )
+            print('made animation for {}'.format(maskDict['label']))
+    ##########
+    outputDatasetName = 'Synthetic_{}_df_{}'.format(
+        loadingMeta['arguments']['window'], iteratorSuffix)
     outputLoadingMeta = loadingMeta.copy()
     outputLoadingMetaPath = os.path.join(
         dataFramesFolder,
