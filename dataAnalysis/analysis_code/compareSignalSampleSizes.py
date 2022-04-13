@@ -209,4 +209,5 @@ for iterIdx, iteratorSuffix in enumerate(listOfIteratorSuffixes):
 #
 allSummariesDF = pd.concat(summariesDict, names=['iterator'])
 allSummariesDF.to_hdf(resultPath, 'sampleCount')
+pdb.set_trace()
 print('Done saving summary of sample nums to {}:sampleCount'.format(resultPath))

@@ -591,10 +591,12 @@ def genNumSigAnnotatorV2(
         palette=None, fontOpts={}, width=0.9, nudgeFactor=1.2):
     def numSigAnnotator(g, theAx, rowVar, colVar):
         if not hasattr(theAx, 'pvalsAnnotated'):
-            if not hasattr(g, 'nudgedAxesForPValAnnotation') or (not g._sharey):
+            axesNeedNudging = (not hasattr(g, 'nudgedAxesForPValAnnotation')) or (not g._sharey)
+            if axesNeedNudging:
                 yLim = theAx.get_ylim()
                 yExt = yLim[1] - yLim[0]
                 theAx.set_ylim([yLim[1] - nudgeFactor * yExt, yLim[1]])
+                print('numSigAnnotator: extended ylims to make room')
                 if not hasattr(g, 'nudgedAxesForPValAnnotation'):
                     g.nudgedAxesForPValAnnotation = True
             trans = transforms.blended_transform_factory(
@@ -619,6 +621,7 @@ def genNumSigAnnotatorV2(
                         assert thisEntry.shape[0] == 1
                         thisEntry = thisEntry.iloc[0, :]
                         if (thisEntry.loc[['under', 'ns', 'over']].sum()) == 0:
+                            print('Warning!\n{}'.format(thisEntry.loc[['under', 'ns', 'over']]))
                             continue
                         message = '{}/{}/{}'.format(
                             int(thisEntry['under']), int(thisEntry['ns']), int(thisEntry['over']))
@@ -628,7 +631,12 @@ def genNumSigAnnotatorV2(
                             x, y, message,
                             transform=trans, color=huePalette[hLabel],
                             **fontOpts)
+                        print('numSigAnnotator: annotating axes')
+                    else:
+                        print('Warning! No matches for\n{} == {} (columns)\n{} == {}(row)\n{} == {} (hue)'.format(g._col_var, colVar, g._row_var, rowVar, hueVar, hLabel))
             theAx.pvalsAnnotated = True
+        else:
+            print('numSigAnnotator: axes already annotated')
         return
     return numSigAnnotator
 
@@ -899,6 +907,7 @@ with PdfPages(pdfPath) as pdf:
             )
         stripplotKWArgsMahal = stripplotKWArgs.copy()
         stripplotKWArgsMahal['size'] = 2 * snsRCParams['lines.markersize']
+        stripplotKWArgsMahal['jitter'] = False
         boxplotKWArgs = dict(
             dodge=True,
             whis=np.inf,
@@ -1165,9 +1174,23 @@ with PdfPages(pdfPath) as pdf:
                 rowName, colName = name
                 if colName == 'NA':
                     thisPalette = thisNoStimPalette
-                    thisPaletteMahal = thisNoStimPaletteMahal
+                    expandDays = True
+                    if expandDays:
+                        stripHue = 'expName'
+                        presentExps = plotRelativeStatsDF['expName'].unique().tolist()
+                        stripHueOrder = presentExps
+                        stripHueOrderMahal = presentExps
+                        stripPalette = {expN: sns.utils.alter_color(allRelPalette['0.0'], h=-0.01 * expIdx, s=0.1 * expIdx, l=0.1 * expIdx) for expIdx, expN in enumerate(presentExps)}
+                        stripPaletteMahal = {expN: sns.utils.alter_color(allRelPalette['0.0_md'], h=-0.01 * expIdx, s=0.1 * expIdx, l=0.1 * expIdx) for expIdx, expN in enumerate(presentExps)}
+                    else:
+                        stripHue = 'trialRateInHzStr'
+                        stripHueOrder = thisNoStimPalette.index.to_list()
+                        stripPalette = thisNoStimPalette.to_dict()
+                        stripPaletteMahal = thisNoStimPaletteMahal.to_dict()
+                        stripHueOrderMahal = thisNoStimPaletteMahal.index.to_list()
                     subSetMask = (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) & plotRelativeStatsDF[yVar].notna()
                     if subSetMask.any():
+                        #could turn off as it isn't very visible anyway
                         sns.boxplot(
                             data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
@@ -1176,7 +1199,12 @@ with PdfPages(pdfPath) as pdf:
                             **boxplotKWArgs)
                 else:
                     thisPalette = thisStimPalette
-                    thisPaletteMahal = thisStimPaletteMahal
+                    # thisPaletteMahal = thisStimPaletteMahal
+                    stripHue = 'trialRateInHzStr'
+                    stripHueOrder = thisStimPalette.index.to_list()
+                    stripPalette = thisStimPalette.to_dict()
+                    stripPaletteMahal = thisStimPaletteMahal.to_dict()
+                    stripHueOrderMahal = thisStimPaletteMahal.index.to_list()
                 # plot non-significant observations with transparency
                 subSetMask = (
                         (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
@@ -1186,7 +1214,7 @@ with PdfPages(pdfPath) as pdf:
                         sns.stripplot(
                             data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(), palette=thisPalette.to_dict(),
+                            hue=stripHue, hue_order=stripHueOrder, palette=stripPalette,
                             alpha=0.5, **stripplotKWArgs)
                 # plot significant observations fully opaque
                 subSetMask = (
@@ -1197,9 +1225,10 @@ with PdfPages(pdfPath) as pdf:
                         sns.stripplot(
                             data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(), palette=thisPalette.to_dict(),
+                            hue=stripHue, hue_order=stripHueOrder, palette=stripPalette,
                             **stripplotKWArgs
                             )
+                #####
                 # plot non-significant observations with transparency (mahal)
                 subSetMaskMahal = (
                         (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
@@ -1209,7 +1238,7 @@ with PdfPages(pdfPath) as pdf:
                         sns.stripplot(
                             data=plotRelativeStatsDF.loc[subSetMaskMahal, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue='trialRateInHzStr', hue_order=thisPaletteMahal.index.to_list(), palette=thisPaletteMahal.to_dict(),
+                            hue=stripHue, hue_order=stripHueOrderMahal, palette=stripPaletteMahal,
                             alpha=0.7, **stripplotKWArgsMahal)
                 # plot significant observations fully opaque (mahal)
                 subSetMaskMahal = (
@@ -1220,12 +1249,13 @@ with PdfPages(pdfPath) as pdf:
                         sns.stripplot(
                             data=plotRelativeStatsDF.loc[subSetMaskMahal, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue='trialRateInHzStr', hue_order=thisPaletteMahal.index.to_list(), palette=thisPaletteMahal.to_dict(),
+                            hue=stripHue, hue_order=stripHueOrderMahal, palette=stripPaletteMahal,
                             **stripplotKWArgsMahal
                             )
                 nSigAnnotator = genNumSigAnnotatorV2(
                     pvalDF.reset_index(),
-                    xOrder=thisFreqBandOrder, hueVar='trialRateInHzStr', palette=thisPalette,
+                    xOrder=thisFreqBandOrder,
+                    hueVar='trialRateInHzStr', palette=thisPalette,
                     fontOpts=dict(
                         va='bottom', ha='center',
                         fontsize=snsRCParams["font.size"],
@@ -1239,8 +1269,9 @@ with PdfPages(pdfPath) as pdf:
                     ax.set_xticklabels(newXTickLabels, rotation=90, va='top', ha='right')
                 for xJ in range(0, len(thisFreqBandOrder), 2):
                     ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
-                if ax.get_legend() is not None:
+                if (ax.get_legend() is not None):
                     ax.get_legend().remove()
+                ax.set_xlim([-0.5, len(thisFreqBandOrder) - 0.5])
             plotProcFuns = [
                 asp.genTitleChanger(prettyNameLookup),
                 ]

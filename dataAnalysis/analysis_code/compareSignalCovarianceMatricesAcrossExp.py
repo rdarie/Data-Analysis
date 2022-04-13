@@ -18,6 +18,7 @@ Options:
     --targetList=targetList                        which iterators to compare
     --iteratorSuffixList=iteratorSuffixList        which iterators to compare
     --expList=expList                              which experiments to compare
+    --plotSuffix=plotSuffix                        switches between a few different processing options [default: all]
 """
 
 import logging
@@ -90,9 +91,9 @@ useDPI = 200
 dpiFactor = 72 / useDPI
 snsRCParams = {
         'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': .5,
+        'lines.linewidth': .25,
         'lines.markersize': 2.5,
-        'patch.linewidth': .5, # snsRCParams
+        'patch.linewidth': .25, # snsRCParams
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
@@ -191,10 +192,9 @@ for expName in listOfExpSuffixes:
         remoteBasePath, 'figures', 'dimensionality_across_exp')
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder)
-    pdfNameSuffix = '_all_elec'
     pdfPath = os.path.join(
-        figureOutputFolder, '{}_covMatSimilarity_comparison{}.pdf'.format(
-            subjectName, pdfNameSuffix))
+        figureOutputFolder, '{}_covMatSimilarity_comparison_{}.pdf'.format(
+            subjectName, arguments['plotSuffix']))
     #
     estimatorsSubFolder = os.path.join(
         analysisSubFolder, 'estimators')
@@ -377,6 +377,22 @@ del distancesStackDict, elecNames
 estimatorsSrs = pd.concat(estimatorsDict, names=['expName', 'selectionName', 'iterator'])
 lastFoldIdx = estimatorsSrs.index.get_level_values('fold').max()
 estimatorsSrs.drop(lastFoldIdx, axis='index', level='fold', inplace=True)
+
+if arguments['plotSuffix'] == 'all':
+    if subjectName == 'Rupert':
+        lOfElectrodes = ['NA', '-E13+E16', '-E09+E16', '-E11+E16', '-E02+E16', '-E05+E16', '-E04+E16']
+    elif subjectName == 'Murdoc':
+        lOfElectrodes = []
+    distanceStackDF = distanceStackDF.loc[distanceStackDF['electrode'].isin(lOfElectrodes), :]
+    estimatorsSrs = estimatorsSrs.loc[estimatorsSrs.index.get_level_values('expName').isin(distanceStackDF['expName'].unique())]
+elif arguments['plotSuffix'] == 'best_three':
+    if subjectName == 'Rupert':
+        lOfElectrodes = ['NA', '-E09+E16', '-E11+E16', '-E04+E16']
+    elif subjectName == 'Murdoc':
+        lOfElectrodes = []
+    distanceStackDF = distanceStackDF.loc[distanceStackDF['electrode'].isin(lOfElectrodes), :]
+    estimatorsSrs = estimatorsSrs.loc[estimatorsSrs.index.get_level_values('expName').isin(distanceStackDF['expName'].unique())]
+
 freqBandOrderExtended = ['NA', 'all', 'broadband', 'cross_frequency'] + freqBandOrder
 freqBandNameList = [
     bn
@@ -489,8 +505,10 @@ distanceStackDF.loc[:, 'category_elec'] = distanceStackDF.apply(lambda x: '{} ({
 distanceStackDF.loc[:, 'category_label'] = distanceStackDF['category'].map(categoryLabels)
 distanceStackDF.loc[:, 'category_elec_label'] = distanceStackDF.apply(lambda x: '{} ({})'.format(x['category_label'], x['electrode']), axis='columns')
 # distanceStackDF.loc[:, ['expName', 'distanceType', 'electrode']].drop_duplicates()
-plotOnlyTheseBands = ['all', 'beta', 'gamma', 'higamma']
-masterDF = distanceStackDF.loc[distanceStackDF['freqBandName'].isin(plotOnlyTheseBands), :]
+
+# plotOnlyTheseBands = ['all', 'beta', 'gamma', 'higamma']
+# masterDF = distanceStackDF.loc[distanceStackDF['freqBandName'].isin(plotOnlyTheseBands), :]
+masterDF = distanceStackDF
 #
 highLightGroups = {
     'Relative to baseline': masterDF['test_ref_label'].isin(['B-B', 'B-M', 'B-S', 'B-C']) & masterDF['freqBandName'].isin(['all']),
@@ -511,19 +529,19 @@ numHues = uniqueHues.shape[0]
 #
 rawGroupPalette = sns.color_palette(colorMaps['distHist'])
 rawGroupColors = {
-    'B-B': rawGroupPalette[7],
-    'M-M': sns.utils.alter_color(rawGroupPalette[7], l=-.3),
-    'S-S': sns.utils.alter_color(rawGroupPalette[7], l=-.6),
-    'C-C': sns.utils.alter_color(rawGroupPalette[7], l=-.9),
+    'B-B': sns.utils.alter_color(rawGroupPalette[7], l=.6), # gray
+    'M-M': sns.utils.alter_color(rawGroupPalette[7], l=.3),
+    'S-S': sns.utils.alter_color(rawGroupPalette[7], l=-.3),
+    'C-C': sns.utils.alter_color(rawGroupPalette[7], l=-.6),
     #
-    'B-M': rawGroupPalette[3],
+    'B-M': rawGroupPalette[3],  # red
     #
-    'B-S': rawGroupPalette[0],
-    'M-S': sns.utils.alter_color(rawGroupPalette[0], l=-.3),
+    'B-S': rawGroupPalette[0],  # blue
+    'M-S': sns.utils.alter_color(rawGroupPalette[4]),  # purple
     #
-    'B-C': sns.utils.alter_color(rawGroupPalette[2]),
-    'M-C': sns.utils.alter_color(rawGroupPalette[2], l=-.3),
-    'C-S': sns.utils.alter_color(rawGroupPalette[2], l=-.6),
+    'B-C': sns.utils.alter_color(rawGroupPalette[2]),  # green
+    'M-C': sns.utils.alter_color(rawGroupPalette[9], l=-.3),  # light blue
+    'C-S': sns.utils.alter_color(rawGroupPalette[8], l=-.3),  # yellow
 }
 subCategoryPalette = pd.DataFrame(
     rawGroupColors).T
@@ -564,57 +582,97 @@ with PdfPages(pdfPath) as pdf:
                     normFactor = group.loc[group['test_ref_label'] == 'B-B', 'distance'].median()
                     rescaled = group['distance'] / normFactor
                     plotDF.loc[group.index, 'distance'] = rescaled
-                height = 1.5
-                width = 4
+                if arguments['plotSuffix'] == 'all':
+                    figHeight = 2.5
+                    figWidth = 5
+                else:
+                    figHeight = 2.5
+                    figWidth = 3
                 thisHueOrder = ['B-B', 'B-M', 'B-S', 'B-C']
                 rowVar = 'xDummy'
                 rowOrder = [0.]
+                # rowVar = None
+                # rowOrder = None
+                colWrap = None
                 colVar = 'freqBandName'
                 colOrder = [fbn for fbn in freqBandNameList if fbn in plotDF['freqBandName'].to_list()]
                 xVar = 'electrode'
+                shareY = True
                 xOrder = [eN for eN in subCategoryLookup[xVar].sort_values().unique() if eN in plotDF[xVar].to_list()]
+                width = figWidth / max(1, len(colOrder))
+                height = figHeight / max(1, len(rowOrder))
             elif (distanceType == 'frobenius') and (hgName == 'Everything'):
                 for _, group in plotDF.groupby(['freqBandName', 'expName']):
                     normFactor = group.loc[group['test_ref_label'] == 'B-B', 'distance'].median()
                     rescaled = group['distance'] / normFactor
                     plotDF.loc[group.index, 'distance'] = rescaled
-                height = 1.5
-                width = 4
+                if arguments['plotSuffix'] == 'all':
+                    figHeight = 2.5
+                    figWidth = 10
+                else:
+                    figHeight = 2.5
+                    figWidth = 5
                 thisHueOrder = subCategoryLookup[hueVar].unique()
                 rowVar = 'xDummy'
                 rowOrder = [0.]
+                # rowVar = None
+                # rowOrder = None
+                colWrap = None
                 colVar = 'freqBandName'
                 colOrder = [fbn for fbn in freqBandNameList if fbn in plotDF['freqBandName'].to_list()]
                 xVar = 'electrode'
+                shareY = True
                 xOrder = [eN for eN in subCategoryLookup[xVar].sort_values().unique() if eN in plotDF[xVar].to_list()]
+                width = figWidth / max(1, len(colOrder))
+                height = figHeight / max(1, len(rowOrder))
             elif (distanceType == 'frobenius') and (hgName == 'Relative to movement'):
                 for _, group in plotDF.groupby(['freqBandName', 'expName']):
                     normFactor = group.loc[group['test_ref_label'] == 'B-M', 'distance'].median()
                     rescaled = group['distance'] / normFactor
                     plotDF.loc[group.index, 'distance'] = rescaled
-                height = 1.25
-                width = 1.
+                if arguments['plotSuffix'] == 'all':
+                    figHeight = 1.5
+                    figWidth = 5
+                else:
+                    figHeight = 1.5
+                    figWidth = 3
                 thisHueOrder = ['B-M', 'B-S', 'M-S']
                 rowVar = 'xDummy'
                 rowOrder = [0.]
+                # rowVar = None
+                # rowOrder = None
+                colWrap = None
                 xVar = 'freqBandName'
+                shareY = True
                 xOrder = [fbn for fbn in freqBandNameList if fbn in plotDF['freqBandName'].to_list()]
                 colVar = 'electrode'
                 colOrder = [eN for eN in subCategoryLookup[colVar].sort_values().unique() if eN in plotDF[colVar].to_list()]
+                width = figWidth / max(1, len(colOrder))
+                height = figHeight / max(1, len(rowOrder))
             elif (distanceType == 'frobenius') and (hgName == 'Stim. motion interaction'):
                 for _, group in plotDF.groupby(['freqBandName', 'expName']):
                     normFactor = group.loc[group['test_ref_label'] == 'M-S', 'distance'].median()
                     rescaled = group['distance'] / normFactor
                     plotDF.loc[group.index, 'distance'] = rescaled
-                height = 1.25
-                width = 1.
+                if arguments['plotSuffix'] == 'all':
+                    figHeight = 1.5
+                    figWidth = 5
+                else:
+                    figHeight = 1.5
+                    figWidth = 3
                 thisHueOrder = ['M-S', 'M-C', 'C-S']
                 rowVar = 'xDummy'
                 rowOrder = [0.]
+                # rowVar = None
+                # rowOrder = None
+                colWrap = None
                 xVar = 'freqBandName'
+                shareY = False
                 xOrder = [fbn for fbn in freqBandNameList if fbn in plotDF[xVar].to_list()]
                 colVar = 'electrode'
                 colOrder = [eN for eN in subCategoryLookup[colVar].sort_values().unique() if eN in plotDF[colVar].to_list()]
+                width = figWidth / max(1, len(colOrder))
+                height = figHeight / max(1, len(rowOrder))
             argsForBoxPlot = dict(whis=np.inf)
             thisPalette = (
                 subCategoryLookup
@@ -626,9 +684,9 @@ with PdfPages(pdfPath) as pdf:
             aspect = width / height
             g = sns.catplot(
                 row=rowVar, row_order=rowOrder,
-                col=colVar, col_order=colOrder,
+                col=colVar, col_order=colOrder, col_wrap=colWrap,
                 data=plotDF, height=height, aspect=aspect,
-                margin_titles=True, sharey=False, kind='box',
+                margin_titles=True, sharey=shareY, kind='box',
                 **argsForCatPlot, **argsForBoxPlot)
             g.set_titles(row_template="", col_template="{col_var} = {col_name}")
             plotProcFuns = [
@@ -694,7 +752,8 @@ with PdfPages(pdfPath) as pdf:
                     newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
                     ax.set_xticklabels(newXTickLabels, rotation=90, va='top', ha='right')
                 if (distanceType == 'frobenius') and not (hgName == 'Relative to baseline'):
-                    ax.axvspan(-0.45, 0.45, color="0.1", alpha=0.1, zorder=1.)
+                    for xJ in range(0, len(xOrder), 2):
+                        ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
                 # ax.axhline(1., c='0.1', lw=1., ls='--', zorder=1.)
                 ax.set_xlim([-0.5, 0.5 + len(xOrder) - 1])
                 if not ax.is_first_col():
@@ -710,7 +769,7 @@ with PdfPages(pdfPath) as pdf:
                         # g.axes[ro, co].set_ylim(g.axes[ro, 0].get_ylim())
             # g.axes[0, 0].set_xticks([])
             # g.axes[0, 0].set_xlim([-0.5, 0.5])
-            g.suptitle('Relative {} distance'.format(distanceType.capitalize()))
+            g.suptitle('Relative {} distance ({})'.format(distanceType.capitalize(), hgName))
             g.set_axis_labels(applyPrettyNameLookup(xVar), 'Normalized distance (a.u.)')
             g.resize_legend(adjust_subtitles=True)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])

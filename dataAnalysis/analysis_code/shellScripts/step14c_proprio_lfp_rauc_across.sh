@@ -45,6 +45,17 @@ do
   # exp202101201100, exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100
   # exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100
   # exp202101281100, exp202102021100, exp202101211100,
-  python -u "./plotSignalRecruitmentAcrossExpV2.py" --plotSuffix=rest_stim --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
-  # python -u "./compareSignalCovarianceMatricesAcrossExp.py" --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --targetList="laplace_spectral_scaled, laplace_scaled" --iteratorSuffixList="ca, cb, ccs, ccm" --estimatorName="mahal_ledoit" --datasetPrefix="Block_XL_df" $BLOCKSELECTOR $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR
+  #######
+  ## plotSuffixes=(all move_no_stim rest_stim outbound_stim outbound_no_move)
+  plotSuffixes=(move_no_stim)
+  for PS in "${plotSuffixes[@]}"
+  do
+    python -u "./plotSignalRecruitmentAcrossExpV3.py" --plotSuffix=$PS --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+  done
+  ###
+  ##plotSuffixes=(all best_three)
+  ##for PS in "${plotSuffixes[@]}"
+  ##do
+  ##  python -u "./compareSignalCovarianceMatricesAcrossExp.py" --plotSuffix=$PS --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --targetList="laplace_spectral_scaled, laplace_scaled" --iteratorSuffixList="ca, cb, ccs, ccm" --estimatorName="mahal_ledoit" --datasetPrefix="Block_XL_df" $BLOCKSELECTOR $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR
+  ##done
 done

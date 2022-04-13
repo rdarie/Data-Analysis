@@ -350,6 +350,9 @@ except Exception:
     recCurveFeatureInfo.loc[:, 'xCoords'] = 0.
     recCurveFeatureInfo.loc[:, 'yCoords'] = 0.
 
+# sigAnnFun = lambda x: '{}\n '.format(x['feature'].replace('#0', '')) + r"$\bf{(*)}$" if x['reject'] else '{}\n '.format(x['feature'].replace('#0', ''))
+sigAnnFun = lambda x: r"$\bf{*}$" if x['reject'] else ' '
+
 def genNumSigAnnotator(pvalDF, xOrder=None, hueVar=None, palette=None, fontOpts={}):
     def numSigAnnotator(g, ro, co, hu, dataSubset):
         if not hasattr(g.axes[ro, co], 'pvalsAnnotated'):
@@ -766,6 +769,7 @@ with PdfPages(pdfPath) as pdf:
         ################################################################################
         #
         noStimStatsForPlot = relativeStatsNoStimDF.copy().reset_index()
+        noStimStatsForPlot.loc[:, 'sigAnn'] = noStimStatsForPlot.apply(sigAnnFun, axis='columns')
         pairsToAnnotate = [
             (("CW_outbound", "NA_0.0"), ("NA_NA", "NA_0.0")),
             (("CW_return", "NA_0.0"), ("NA_NA", "NA_0.0")),
@@ -1232,7 +1236,7 @@ with PdfPages(pdfPath) as pdf:
     huePaletteAlpha = {hN: tuple(list(hV) + [0.5]) for hN, hV in huePalette.items()}
     height, width = 3, 4
     aspect = width / height
-    if False:
+    if True:
         ###
         plotAmpStatsDF = ampStatsDF.reset_index()
         plotAmpStatsDF.loc[:, 'namesAndMD'] = plotAmpStatsDF['names']
@@ -1340,8 +1344,7 @@ with PdfPages(pdfPath) as pdf:
         # plotRelativeStatsDF = pd.concat([plotRelativeStatsDF, dummyEntries], ignore_index=True)
         #######
         thisFreqBandOrder = [fN for fN in freqBandOrderExtended if fN in plotRelativeStatsDF['freqBandName'].unique().tolist()]
-        plotRelativeStatsDF.loc[:, 'sigAnn'] = plotRelativeStatsDF.apply(
-            lambda x: '{}\n '.format(x['feature'].replace('#0', '')) + r"$\bf{(*)}$" if x['reject'] else '{}\n '.format(x['feature'].replace('#0', '')), axis='columns')
+        plotRelativeStatsDF.loc[:, 'sigAnn'] = plotRelativeStatsDF.apply(sigAnnFun, axis='columns')
         # thisMaskRel = (plotRelativeStatsDF['reject']) & (plotRelativeStatsDF['kinematicCondition'] != 'NA_NA')
         # thisMaskRel = (plotRelativeStatsDF['kinematicCondition'] != 'NA_NA')
         thisMaskRel = pd.Series(True, index=plotRelativeStatsDF.index)
@@ -1400,7 +1403,7 @@ with PdfPages(pdfPath) as pdf:
             else:
                 plt.close()
             ####
-    if False and (relativeStatsDF.groupby(['xCoords', 'yCoords']).ngroups > 1): # histogram t stats
+    if (relativeStatsDF.groupby(['xCoords', 'yCoords']).ngroups > 1): # histogram t stats
         rowVar = 'feature'
         rowOrder = sorted(np.unique(plotRCPieces[rowVar]))
         colVar = 'stimCondition'
@@ -1452,20 +1455,35 @@ with PdfPages(pdfPath) as pdf:
                 sns.diverging_palette(220, 20, as_cmap=True),
                 sns.diverging_palette(145, 300, s=60, as_cmap=True)
                 ]
-            for freqBandName, statsThisFB in plotRelativeStatsDF.groupby(['freqBandName']):
+            # plotRelativeStatsDF.columns
+            noStimStatsForPlot.loc[:, 'kinematicCondition'] = noStimStatsForPlot.apply(lambda x: '{}_vs_{}'.format(x['A'], x['B']), axis='columns')
+            noStimStatsForPlot.loc[:, 'kinAndElecCondition'] = noStimStatsForPlot.apply(lambda x: '{}_{}'.format(x['electrode'], x['A']), axis='columns')
+            noStimStatsForPlot.loc[:, 'trialRateInHzStr'] = noStimStatsForPlot['trialRateInHz'].apply(lambda x: '{}'.format(x))
+            noStimStatsForPlot.loc[noStimStatsForPlot['isMahalDist'], 'trialRateInHzStr'] += '_md'
+            # pdb.set_trace()
+            # plotRelativeStatsDF.loc[(plotRelativeStatsDF['stimCondition'] == 'NA_0.0').to_numpy(), :]
+            allRelativeStatsForPlot = pd.concat([plotRelativeStatsDF, noStimStatsForPlot.loc[:, plotRelativeStatsDF.columns]], ignore_index=True)
+            # allRelativeStatsForPlot['hedges'].min(), allRelativeStatsForPlot['hedges'].max()
+            vBounds = {
+                'T': [-2.5, 23],
+                'hedges': [-.5, 3],
+            }
+            for freqBandName, statsThisFB in allRelativeStatsForPlot.groupby(['freqBandName']):
                 try:
-                    statsThisFB = statsThisFB.loc[(statsThisFB['stimCondition'] != 'NA_0.0').to_numpy(), :]
+                    # statsThisFB = statsThisFB.loc[(statsThisFB['stimCondition'] != 'NA_0.0').to_numpy(), :]
+                    # statsThisFB.loc[(statsThisFB['stimCondition'] == 'NA_0.0').to_numpy(), :]
                     numStimC = statsThisFB['stimCondition'].unique().size
                     numKinC = statsThisFB['kinematicCondition'].unique().size
                     for statIdx, statName in enumerate(['hedges', 'T']):
                         fig, ax = plt.subplots(
                             numKinC, numStimC + 1,
-                            figsize = (6 * numKinC, 6 * numStimC + .6),
+                            figsize=(6 * numKinC, 6 * numStimC + .6),
                             gridspec_kw={
                                 'width_ratios': [10] * numStimC + [1],
                                 'wspace': 0.1}
                             )
-                        vMin, vMax = statsThisFB[statName].min(), statsThisFB[statName].max()
+                        # vMin, vMax = statsThisFB[statName].min(), statsThisFB[statName].max()
+                        vMin, vMax = vBounds[statName]
                         cBarKinIdx = int(numKinC / 2)
                         cBarStimIdx = int(numStimC)
                         for kinIdx, stimIdx in product(range(numKinC), range(numStimC)):
@@ -1477,7 +1495,7 @@ with PdfPages(pdfPath) as pdf:
                             heatMapKWs = dict(
                                 vmin=vMin, vmax=vMax, center=0.,  fmt='s',
                                 linewidths=0, cmap=statPalettes[statIdx],
-                                annot=ann2D, annot_kws=dict(fontsize=4.),
+                                annot=ann2D, annot_kws=dict(fontsize=5.),
                                 xticklabels=False, yticklabels=False, square=True
                                 )
                             if (kinIdx == cBarKinIdx) and (stimIdx == (cBarStimIdx - 1)):
@@ -1510,6 +1528,7 @@ with PdfPages(pdfPath) as pdf:
                             plt.close()
                 except Exception:
                     traceback.print_exc()
+                    pdb.set_trace()
     if False and arguments['plotTheAverage']:
         colVar = 'stimCondition'
         colOrder = sorted(np.unique(plotRC[colVar]))

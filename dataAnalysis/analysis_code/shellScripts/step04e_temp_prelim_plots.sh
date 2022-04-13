@@ -35,7 +35,7 @@ do
   source ./shellScripts/calc_aligned_stim_preamble.sh
   #
   BLOCKSELECTOR="--blockIdx=2 --processAll"
-  ITERATOR="rd"
+  ITERATOR="rc"
   #
   OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNFOLDER}"
   python -u './plotSignalDataFrameV2.py' --plotSuffix="rig_illustration" --verbose=1 --selectionName="rig" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"

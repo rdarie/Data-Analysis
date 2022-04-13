@@ -29,13 +29,14 @@ source shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="startingNoStim"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-ITERATOR="d"
-WINDOWTERM="XL"
-RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_d --selectionNameRhs=lfp_CAR"
-LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_d --selectionNameLhs=rig"
+ITERATOR="rc"
 ###
-TARGET="lfp_CAR"
+TARGET="laplace_scaled"
 ESTIMATOR="pca"
+###
+WINDOWTERM="XL"
+RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"
+LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
 ###
 # iterators=(a b c d e f)
 iterators=(g)
@@ -46,7 +47,7 @@ do
     # python -u './calcGridSearchSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
     # python -u './processSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
     #
-    python -u './calcGridSearchSignalDimensionality.py' --averageByTrial --estimatorName="${ESTIMATOR}_ta" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+    # python -u './calcGridSearchSignalDimensionality.py' --averageByTrial --estimatorName="${ESTIMATOR}_ta" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
     # python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}_ta" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done
 ###

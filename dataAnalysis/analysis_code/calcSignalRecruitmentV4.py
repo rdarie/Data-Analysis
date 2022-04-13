@@ -524,17 +524,21 @@ if __name__ == "__main__":
     ####
     relativeStatsDict = {}
     for name, group in recCurve.groupby(['stimCondition', 'kinematicCondition']):
+        # group is the set of AUC's belonging to one stimCondition x kinCondition pair
         stimConditionName, kinName = name
         elecName = group['electrode'].unique()[0]
         trialRateInHz = group['trialRateInHz'].unique()[0]
         kinAndElecName = '{}_{}'.format(elecName, kinName)
-        if not ((elecName == 'NA') or (trialRateInHz == 0)) :
+        if not ((elecName == 'NA') or (trialRateInHz == 0)):
+            # find the corresponding no-stim condition
             refMask = (recCurve['electrode'] == 'NA') & (recCurve['kinematicCondition'] == kinName)
             if refMask.any():
                 refGroup = recCurve.loc[refMask, :]
             else:
+                # I actually don't think this would ever happen
                 refMask = (recCurve['electrode'] == 'NA')
                 refGroup = recCurve.loc[refMask, :]
+            #####
             for colName in dfForStats.columns:
                 if isinstance(colName, tuple):
                     thisEntry = tuple([stimConditionName, kinName, kinAndElecName] + [a for a in colName])
@@ -614,12 +618,13 @@ if __name__ == "__main__":
         tt.loc[:, 'pval'] = tt.apply(pUncFun, axis='columns')
         cohenDFun = lambda x: pg.compute_effsize_from_t(x['T'], nx=groupSizes[x['A']], ny=groupSizes[x['B']], eftype='cohen')
         tt.loc[:, 'cohen-d'] = tt.apply(cohenDFun, axis='columns')
-        #
+
         def glass(x):
             u1 = dataNoStim.loc[dataNoStim['kinematicCondition'] == x['A'], featName].mean()
             u2 = dataNoStim.loc[dataNoStim['kinematicCondition'] == x['B'], featName].mean()
             s2 = dataNoStim.loc[dataNoStim['kinematicCondition'] == x['B'], featName].std()
             return (u1 - u2) / s2
+
         tt.loc[:, 'glass'] = tt.apply(glass, axis='columns')
         tt.loc[:, 'nx'] = tt.apply(lambda x: dataNoStim.loc[dataNoStim['kinematicCondition'] == x['A'], :].shape[0], axis='columns')
         tt.loc[:, 'ny'] = tt.apply(lambda x: dataNoStim.loc[dataNoStim['kinematicCondition'] == x['B'], :].shape[0], axis='columns')

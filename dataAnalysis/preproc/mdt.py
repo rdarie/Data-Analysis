@@ -1798,7 +1798,6 @@ def getINSDeviceConfig(
     #         stimLogText = f.read()
     #         stimLogText = fixMalformedJson(stimLogText)
     #         stimLog = json.loads(stimLogText)
-
     progIndices = list(range(4))
     groupIndices = list(range(4))
     elecIndices = list(range(17))
@@ -1823,6 +1822,10 @@ def getINSDeviceConfig(
                 'cycleOnTime': groupTherapyConfig['cycleOnTime'],
                 'cyclingEnabled': groupTherapyConfig['cyclingEnabled']
                 })
+            for key in ['pulseWidthInMicroseconds']:
+                electrodeConfiguration[groupIdx][progIdx][key] = groupTherapyConfig['programs'][progIdx][key]
+            for key in ['activeRechargeRatio']:
+                electrodeConfiguration[groupIdx][progIdx][key] = groupTherapyConfig['programs'][progIdx]['miscSettings'][key]
             for elecIdx in elecIndices:
                 electrodeStatus.loc[(groupIdx, progIdx), elecIdx] =\
                     not groupPrograms[progIdx]['electrodes']['electrodes'][elecIdx]['isOff']

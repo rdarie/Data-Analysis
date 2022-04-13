@@ -423,7 +423,7 @@ for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
         distancesDict[distanceType][freqBandName].to_hdf(resultPath, '/distanceMatrices/{}/{}'.format(freqBandName, distanceType))
         #
         # uMapper = umap.UMAP(metric='precomputed', n_components=2, n_neighbors=2*lastFoldIdx, min_dist=1e-3)
-        uMapper = MDS(metric='dissimilarity', n_components=2)
+        uMapper = MDS(metric='dissimilarity', n_components=2, max_iter=600, n_init=8)
         projectedDict[distanceType][freqBandName] = pd.DataFrame(
             uMapper.fit_transform(theseDistances[distanceType]),
             index=theseDistances[distanceType].index,
@@ -571,19 +571,19 @@ for freqBandName, estimatorGroup in estimatorsSrs.groupby('freqBandName'):
         #     'B-C': rawGroupPalette[2]
         #     }
         rawGroupColors = {
-            'B-B': rawGroupPalette[7],
-            'M-M': sns.utils.alter_color(rawGroupPalette[7], l=-.3),
-            'S-S': sns.utils.alter_color(rawGroupPalette[7], l=-.6),
-            'C-C': sns.utils.alter_color(rawGroupPalette[7], l=-.9),
+            'B-B': sns.utils.alter_color(rawGroupPalette[7], l=.6),  # gray
+            'M-M': sns.utils.alter_color(rawGroupPalette[7], l=.3),
+            'S-S': sns.utils.alter_color(rawGroupPalette[7], l=-.3),
+            'C-C': sns.utils.alter_color(rawGroupPalette[7], l=-.6),
             #
-            'B-M': rawGroupPalette[3],
+            'B-M': rawGroupPalette[3],  # red
             #
-            'B-S': rawGroupPalette[0],
-            'M-S': sns.utils.alter_color(rawGroupPalette[0], l=-.3),
+            'B-S': rawGroupPalette[0],  # blue
+            'M-S': sns.utils.alter_color(rawGroupPalette[4]),  # purple
             #
-            'B-C': sns.utils.alter_color(rawGroupPalette[2]),
-            'M-C': sns.utils.alter_color(rawGroupPalette[2], l=-.3),
-            'C-S': sns.utils.alter_color(rawGroupPalette[2], l=-.6),
+            'B-C': sns.utils.alter_color(rawGroupPalette[2]),  # green
+            'M-C': sns.utils.alter_color(rawGroupPalette[9], l=-.3),  # light blue
+            'C-S': sns.utils.alter_color(rawGroupPalette[8], l=-.3),  # yellow
             }
         groupsPalette = pd.DataFrame(
             rawGroupColors).T

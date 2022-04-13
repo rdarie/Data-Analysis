@@ -127,7 +127,7 @@ mplRCParams = {
     'ps.fonttype': 42,
     }
 sns.set(
-    context='talk', style='whitegrid',
+    context='talk', style='white',
     palette='dark', font='sans-serif',
     font_scale=1, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():

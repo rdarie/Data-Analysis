@@ -163,6 +163,8 @@ def summarizeINSSession(
                 axis='columns')
             summaryText += '<h2>Stim Configuration</h2>\n'
             summaryText += elecConfigDF.loc[elecConfigDF['cathodes'].apply(lambda x: len(x) > 0), :].to_html()
+            summaryText += '<h3>Pulse widths and recharge ratio</h3>\n'
+            elecConfigDF.groupby(['pulseWidthInMicroseconds', 'activeRechargeRatio']).count().index.to_frame().reset_index(drop=True).to_html()
         else:
             elecConfigDF = None
     except Exception:

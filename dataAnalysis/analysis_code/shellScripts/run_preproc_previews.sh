@@ -79,7 +79,7 @@ EXP="exp202101281100"
 # EXP="exp202102101100"
 # EXP="exp202102151100"
 
-# python -u ./previewINSSessionSummary.py --exp=$EXP
+python -u ./previewINSSessionSummary.py --exp=$EXP --reprocessAll
 # python -u ./saveImpedances.py --exp=$EXP --processAll --reprocess
 
 # for BLOCKIDX in 1 2
@@ -87,4 +87,4 @@ EXP="exp202101281100"
 #     python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP
 # done
 #  SLURM_ARRAY_TASK_ID=1
-python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+# python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP

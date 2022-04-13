@@ -199,9 +199,9 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'laplace_spectral_topo_illustration': {
         'recalcStats': True,
-        'winStart': '-150', 'winStop': '250', 'limitPages': None,
+        'winStart': '-200', 'winStop': '300', 'limitPages': None,
         'unitQuery': None,
-        'alignQuery': "(trialRateInHz == 100.) & (pedalMovementCat == 'outbound')",
+        'alignQuery': "((trialRateInHz == 0.) | (trialRateInHz == 100.)) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'yCoords', 'rowControl': '',
@@ -621,17 +621,9 @@ plotProcFunsLookup = {
         ],
     'laplace_topo_illustration': [
         # shadeAUCEpochsPerFacet,
-        asp.xLabelsTime,
+        # asp.xLabelsTime,
         asp.genLegendRounder(decimals=2),
         asp.genVLineAdder([0], {'color': 'y', 'alpha': 0.5}),
-        asp.genGridAnnotator(
-            xpos=.9, ypos=.9, template='{}',
-            colNames=['feature'],
-            textOpts={
-                'fontsize': 10,
-                'verticalalignment': 'top',
-                'horizontalalignment': 'right'
-            }, shared=False)
         # asp.genTitleChanger(titleLabelLookup)
         ],
     'lfp_illustration_topo': [
@@ -782,6 +774,14 @@ unusedPlotProcFuns = [
                 ec=(0., 0., 0., 0.),
                 fc=(1., 1., 1., 0.2))
         )),
+        asp.genGridAnnotator(
+            xpos=.9, ypos=.9, template='{}',
+            colNames=['feature'],
+            textOpts={
+                'fontsize': 10,
+                'verticalalignment': 'top',
+                'horizontalalignment': 'right'
+            }, shared=False),
     # asp.genBlockVertShader([
     #         max(0e-3, alignedAsigsKWargs['windowSize'][0]),
     #         min(.9e-3, alignedAsigsKWargs['windowSize'][1])],
@@ -831,16 +831,18 @@ relPlotKWArgsLookup = {
         'errorbar': None  # 'se'
     },
     'laplace_topo_illustration': {
-        'linewidth': 1., 'height': 1, 'aspect': 1.5,
+        'linewidth': 1.5, 'height': .8, 'aspect': 1,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'facet_kws': {'sharey': True},
-        'errorbar': None  # 'se'
+        'facet_kws': {'sharey': True, 'sharex': True},
+        'errorbar': None,
+        'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
     },
     'laplace_spectral_topo_illustration': {
-        'linewidth': 2., 'height': 2, 'aspect': 1.5,
+        'linewidth': 1.5, 'height': .8, 'aspect': 1,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
-        'facet_kws': {'sharey': False},
-        'errorbar': None  # 'se'
+        'facet_kws': {'sharey': True, 'sharex': True},
+        'errorbar': None,
+        'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
     },
     'factor_illustration': {
         'linewidth': .75, 'height': 2, 'aspect': 1.5,
