@@ -71,9 +71,7 @@ from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 from itertools import product
 from scipy import stats
-from bokeh.models import ColorBar, ColumnDataSource
-from bokeh.palettes import Spectral6
-from bokeh.transform import linear_cmap
+from matplotlib.animation import FFMpegWriter
 from tqdm import tqdm
 from scipy.spatial.transform import Rotation as Rot
 for arg in sys.argv:
@@ -231,7 +229,7 @@ if __name__ == '__main__':
     naRatio = 1.
     baseNTrials = 50
     latentNoiseStd = 1.
-    residualStd = 1.
+    residualStd = 2.
     bins = np.arange(-100e-3, 510e-3, iteratorOpts['forceBinInterval'])
     kinWindow = (0., 500e-3)
     kinWindowJitter = 50e-3
@@ -670,25 +668,6 @@ if __name__ == '__main__':
             columns=toyRhsDF.columns, index=toyRhsDF.index
             )
         latentRhsDF.loc[:, :] += termValues.to_numpy()[:, :nDimLatent]
-        '''
-        for elecName, elecGroup in toyTrialInfo.groupby('electrode'):
-            print('on elec {}, term {}'.format(elecName, termName))
-            extraRotMat = np.eye(nDim)
-            if (termName == 'electrode:amplitude'):
-                elecFactorName = 'electrode[{}]:amplitude'.format(elecName)
-                if elecFactorName in rotCoeffs:
-                    extraRotMat = Rot.from_euler(
-                        'XYZ', [beta for beta in rotCoeffs[elecFactorName]],
-                        degrees=True).as_matrix()
-                    print('applying rotation for {}\nextraRotMat\n{}'.format(elecFactorName, extraRotMat))
-            elif (termName == 'electrode:amplitude:RateInHz'):
-                elecRateFactorName = 'electrode[{}]:amplitude:RateInHz'.format(elecName)
-                if elecRateFactorName in rotCoeffs:
-                    extraRotMat = Rot.from_euler(
-                        'XYZ', [beta for beta in rotCoeffs[elecRateFactorName]],
-                        degrees=True).as_matrix()
-                    print('applying rotation for {}\nextraRotMat\n{}'.format(elecRateFactorName, extraRotMat))
-        '''
         transfTermValues = (wRot @ (explainedVar @ termValues.T.to_numpy())).T
         toyRhsDF.loc[:, :] += transfTermValues
     electrodeInfluence = (
@@ -797,7 +776,6 @@ if __name__ == '__main__':
             'label': 'Extension, stim 2',
             'ellipsoidsToPlot': ['at rest NA', 'moving + E16 - E9']},
         ]
-    #
     uEll = np.linspace(0, 2 * np.pi, 99)
     vEll = np.linspace(0, np.pi, 99)
     xEll = np.outer(np.cos(uEll), np.sin(vEll))
@@ -1115,7 +1093,7 @@ if __name__ == '__main__':
         cMapScaleFun = lambda am: cMap.colors.shape[0] * min(1, max(0, (am - rhsPlotDF['amplitude'].min()) / (rhsPlotDF['amplitude'].max() - rhsPlotDF['amplitude'].min())))
         # cMap(cMapScaleFun(0.2))
         for maskIdx, maskDict in enumerate(lOfMasksForAnim):
-            if maskIdx not in [1, 3]:
+            if maskIdx not in [mi for mi in range(len(lOfMasksForAnim))]:
                 continue
             print('Starting to generate animation for {}'.format(maskDict['label']))
             aniPath = os.path.join(
@@ -1134,9 +1112,10 @@ if __name__ == '__main__':
             ax3d.set_proj_type('ortho')
             ax2d = [fig.add_subplot(gs[i, 1]) for i in range(nRows)]
             #
-            chooseSomeTrials = toyTrialInfo.loc[maskDict['mask'], 'trialUID'].unique()[:3]
+            chooseSomeTrials = toyTrialInfo.loc[maskDict['mask'] & (toyTrialInfo['trialAmplitude'] == toyTrialInfo.loc[maskDict['mask'], 'trialAmplitude'].max()), 'trialUID'].unique()[:3]
             thisMask = maskDict['mask'] & toyTrialInfo['trialUID'].isin(chooseSomeTrials)
             dataDF = rhsPlotDF.loc[thisMask, :].copy()
+            dataFor3D = dataDF.loc[:, ['data0', 'data1', 'data2']].T.to_numpy()
             dataDF.loc[:, 'trialUID'] = toyTrialInfo.loc[thisMask, 'trialUID']
             nFrames = min(500, dataDF.shape[0])
             progBar = tqdm(total=nFrames, mininterval=30., maxinterval=120.)
@@ -1145,7 +1124,7 @@ if __name__ == '__main__':
                     *ellipsoidTheoryDict[name],
                     rstride=3, cstride=3, color=covPatternPalette[name],
                     alpha=0.2, linewidths=0)
-            ax3d.view_init(azim=-120., elev=30.)
+            ax3d.view_init(azim=-60., elev=0.)
             ax3d.set_xlim3d([midPoints['data0'] - xExtent, midPoints['data0'] + xExtent])
             ax3d.set_ylim3d([midPoints['data1'] - yExtent, midPoints['data1'] + yExtent])
             ax3d.set_zlim3d([midPoints['data2'] - zExtent, midPoints['data2'] + zExtent])
@@ -1168,21 +1147,15 @@ if __name__ == '__main__':
             cometTailLines = [None for i in range(winWidth)]
             for idx in range(winWidth):
                 cometTailLines[idx] = ax3d.plot(
-                    dataDF['data0'].iloc[idx: idx + 2],
-                    dataDF['data1'].iloc[idx: idx + 2],
-                    dataDF['data2'].iloc[idx: idx + 2],
+                    [], [], [],
                     **aniLineKws)[0]
                 cometTailLines[idx].set_color([0, 0, 0, 0])
             #
             cometHead = ax3d.plot(
-                dataDF['data0'].iloc[0],
-                dataDF['data1'].iloc[0],
-                dataDF['data2'].iloc[0],
+                [], [], [],
                 **aniMarkerKws)[0]
             mhLine = ax3d.plot(
-                [mu[0], dataDF['data0'].iloc[0]],
-                [mu[0], dataDF['data1'].iloc[0]],
-                [mu[1], dataDF['data2'].iloc[0]],
+                [], [], [],
                 color='g',
                 **aniLineKws)[0]
             #
@@ -1201,36 +1174,35 @@ if __name__ == '__main__':
                 else:
                     thisAx.set_xticklabels([])
             #
-            #
             def animate(idx):
                 colorVal = dataDF['amplitude'].iloc[idx]
                 rgbaColor = np.asarray(cMap(cMapScaleFun(colorVal)))
                 currBin = dataDF['bin'].iloc[idx]
                 currTrialUID = dataDF['trialUID'].iloc[idx]
                 tMask = ((dataDF['trialUID'] == currTrialUID) & (dataDF['bin'] <= currBin)).to_numpy()
+                #
                 for axIdx, thisAx in enumerate(ax2d):
                     thisAx.plotLine.set_data(dataDF.loc[tMask, 'bin'], thisAx.fullTrace.loc[tMask])
                     thisAx.plotLine.set_color(rgbaColor)
                 #
-                cometHead.set_data(dataDF.loc[:, ['data0', 'data1']].to_numpy()[idx].T)
-                cometHead.set_3d_properties(dataDF.loc[:, 'data2'].to_numpy()[idx])
-                cometHead.set_color(rgbaColor)
-                cometHead.set_markersize(aniMarkerKws['markersize'])
-                #
-                mhData = np.stack([dataDF.loc[:, ['data0', 'data1', 'data2']].iloc[idx, :].T, mu], axis=1)
+                mhData = np.stack([dataFor3D[0:3, idx], mu], axis=1)
                 mhLine.set_data(mhData[0:2, :])
                 mhLine.set_3d_properties(mhData[2, :])
                 mhLine.set_color('g')
+                #
+                cometHead.set_data(dataFor3D[0:2, idx])
+                cometHead.set_3d_properties(dataFor3D[2, idx])
+                cometHead.set_color(rgbaColor)
+                cometHead.set_markersize(aniMarkerKws['markersize'])
+                #
                 if idx >= winWidth:
                     for ptIdx in range(winWidth):
                         colorVal = dataDF['amplitude'].iloc[idx - ptIdx]
                         rgbaColor = np.asarray(cMap(cMapScaleFun(colorVal)))
                         rgbaColor[3] = (winWidth - ptIdx) / winWidth
                         #
-                        cometTailLines[ptIdx].set_data(
-                            dataDF.loc[:, ['data0', 'data1']].to_numpy()[idx - ptIdx - 1:idx - ptIdx + 1].T)
-                        cometTailLines[ptIdx].set_3d_properties(
-                            dataDF.loc[:, 'data2'].to_numpy()[idx - ptIdx - 1:idx - ptIdx + 1])
+                        cometTailLines[ptIdx].set_data(dataFor3D[0:2, idx - ptIdx - 1:idx - ptIdx + 1])
+                        cometTailLines[ptIdx].set_3d_properties(dataFor3D[2, idx - ptIdx - 1:idx - ptIdx + 1])
                         cometTailLines[ptIdx].set_color(rgbaColor)
                 if progBar is not None:
                     progBar.update(1)
@@ -1239,20 +1211,10 @@ if __name__ == '__main__':
             ani = animation.FuncAnimation(
                 fig, animate, frames=nFrames,
                 interval=int(1e3 / fps), blit=False)
-            plt.show()
-            '''
-            ani3D = hf.animateDFSubset3D(
-                rhsPlotDF.loc[thisMask, :],
-                dataQuery=None, winWidth=5,
-                fps=int(iteratorOpts['forceBinInterval'] ** (-1)),
-                nFrames=min(500, rhsPlotDF.loc[thisMask, :].shape[0]),
-                xyzList=['data0', 'data1', 'data2'], ax=ax,
-                colorCol='electrodeInfluence', lineKws=aniLineKws,
-                markerKws=aniMarkerKws, showProgBar=True,
-                # showNow=True
-                saveToFile=aniPath
-                )
-            '''
+            saveToFile = True
+            if saveToFile:
+                writer = FFMpegWriter(fps=int(fps), metadata=dict(artist='Me'), bitrate=3600)
+                ani.save(aniPath, writer=writer)
             print('made animation for {}'.format(maskDict['label']))
     ############################################
     savingResults = False
