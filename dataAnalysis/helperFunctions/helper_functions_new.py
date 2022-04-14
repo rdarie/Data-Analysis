@@ -74,13 +74,13 @@ def printProgress(passIdx, nPasses, message=''):
 
 def animateDFSubset3D(
         unpackedFeatures=None, dataQuery=None, winWidth=10, nFrames=None, fps=100,
-        xyzList=['PC1', 'PC2', 'PC3'], showNow=False, ax=None,
+        xyzList=['PC1', 'PC2', 'PC3'], showNow=False, ax=None, showProgBar=False,
         colorCol='tdAmplitude', saveToFile='', lineKws={}, markerKws={}, extraAni=False):
 
     colorOpts = sns.cubehelix_palette(128)
     cometMarkerSize = markerKws['markersize'] if 'markersize' in markerKws else 6
 
-    def update_lines(idx, data, colorData, lines, comet):
+    def update_lines(idx, data, colorData, lines, comet, pbar):
         # print(lines)
         colorIdx = colorData.iloc[idx]
         rgbaColor = np.zeros((4))
@@ -104,6 +104,8 @@ def animateDFSubset3D(
                 lines[ptIdx].set_3d_properties(
                     data[2, idx - ptIdx - 1:idx - ptIdx + 1])
                 lines[ptIdx].set_color(rgbaColor)
+        if pbar is not None:
+            pbar.update(1)
         return lines
 
     if dataQuery is not None:
@@ -111,6 +113,11 @@ def animateDFSubset3D(
     else:
         featSubset = unpackedFeatures
     data = featSubset.loc[:, xyzList].transpose().values
+
+    if nFrames is None:
+        nFrames = data.shape[1]
+    else:
+        nFrames = min(nFrames, data.shape[1])
 
     _, colorBins = pd.cut(
         unpackedFeatures[colorCol], 128, labels=False, retbins=True)
@@ -164,11 +171,14 @@ def animateDFSubset3D(
         ax.set_zlim3d([nuMin, nuMax])
         ax.set_zticklabels([])
         ax.set_zlabel(xyzList[2])
-
+    if showProgBar:
+        progBar = tqdm(total=nFrames, mininterval=30., maxinterval=120.)
+    else:
+        progBar = None
     # Creating the Animation object
     ani = animation.FuncAnimation(
         fig, update_lines, frames=nFrames,
-        fargs=(data, colorData, lines, comet),
+        fargs=(data, colorData, lines, comet, progBar),
         interval=int(1e3/fps), blit=False)
     
     if saveToFile:
