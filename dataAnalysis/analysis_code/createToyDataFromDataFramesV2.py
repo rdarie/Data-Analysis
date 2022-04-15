@@ -772,8 +772,9 @@ if __name__ == '__main__':
         columns=['latent{}'.format(cN) for cN in range(nDim)])
     latentRhsDF.columns.name = 'feature'
     if arguments['lowNoise']:
+        noiseScaleFactor = 1e-6
         cleanLatentRhsDF = pd.DataFrame(
-            latentNoise * 1e-3, index=scaledLhsDF.index,
+            latentNoise * noiseScaleFactor, index=scaledLhsDF.index,
             columns=['latent{}'.format(cN) for cN in range(nDim)])
         cleanLatentRhsDF.columns.name = 'feature'
     #
@@ -859,7 +860,7 @@ if __name__ == '__main__':
         noiseTerm = noiseDistr.rvs(toyRhsDF.shape[0])
         toyRhsDF += noiseTerm
         if arguments['lowNoise']:
-            cleanToyRhsDF += noiseTerm * 1e-3
+            cleanToyRhsDF += noiseTerm * noiseScaleFactor
         # toyRhsDF += ((noiseTerm - noiseTerm.mean(axis=0)) + mu)
     if arguments['lowNoise']:
         rhsPlotDF = pd.concat([cleanToyRhsDF, scaledLhsDF, toyTrialInfo['bin']], axis='columns')
@@ -986,7 +987,7 @@ if __name__ == '__main__':
         # print('Ellipsoid: limbState x activeElectrode: {}\nwRot =\n{}\nextraRotMat=\n{}'.format(name, wRot, extraRotMat))
         # transformation in the latent space
         if arguments['lowNoise']:
-            scaleFactor = 3 * 1e-3
+            scaleFactor = 3 * noiseScaleFactor
         else:
             scaleFactor = 3
         newScale = scaleFactor * np.sqrt(latentCovariance + regressorStretch + residualCovariance)
@@ -1027,13 +1028,11 @@ if __name__ == '__main__':
         if arguments['lowNoise']:
             pdfPath = os.path.join(
                 figureOutputFolder,
-                'synthetic_dataset_latent_{}_lowNoise.pdf'.format(iteratorSuffix)
-                )
+                'synthetic_dataset_latent_{}_lowNoise.pdf'.format(iteratorSuffix))
         else:
             pdfPath = os.path.join(
                 figureOutputFolder,
-                'synthetic_dataset_latent_{}.pdf'.format(iteratorSuffix)
-                )
+                'synthetic_dataset_latent_{}.pdf'.format(iteratorSuffix))
         with PdfPages(pdfPath) as pdf:
             extentLatent = (
                 latentPlotDF.loc[:, latentRhsDF.columns].quantile(1 - 1e-2) -
@@ -1448,10 +1447,14 @@ if __name__ == '__main__':
             print('Starting to generate animation for {}'.format(maskDict['label']))
             if arguments['lowNoise']:
                 aniPath = os.path.join(
-                    figureOutputFolder, 'synthetic_dataset_{}_mask_{}_lowNoise.mp4'.format(iteratorSuffix, maskIdx))
+                    figureOutputFolder,
+                    'synthetic_dataset_{}_mask_{}_lowNoise.mp4'.format(
+                        iteratorSuffix, maskIdx))
             else:
                 aniPath = os.path.join(
-                    figureOutputFolder, 'synthetic_dataset_{}_mask_{}.mp4'.format(iteratorSuffix, maskIdx))
+                    figureOutputFolder,
+                    'synthetic_dataset_{}_mask_{}.mp4'.format(
+                        iteratorSuffix, maskIdx))
             #
             fig = plt.figure()
             nRows = len(whatToPlot)
