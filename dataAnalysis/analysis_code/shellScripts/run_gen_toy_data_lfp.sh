@@ -43,7 +43,7 @@ iterators=(g)
 for ITER in "${iterators[@]}"
 do
     echo "On iterator $ITER"
-    python -u './createToyDataFromDataFrames.py' --iteratorSuffix=$ITER --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+    python -u './createToyDataFromDataFramesV2.py' --iteratorSuffix=$ITER --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
     # python -u './calcGridSearchSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
     # python -u './processSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
     #
