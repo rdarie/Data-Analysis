@@ -37,13 +37,15 @@ ESTIMATOR="pca"
 WINDOWTERM="XL"
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
+DIMRED="select"
 ###
+python -u './plotStateSpace3D.py' --iteratorSuffix=$ITERATOR --transformerNameRhs="${DIMRED}" --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 # iterators=(a b c d e f)
 iterators=(g)
 for ITER in "${iterators[@]}"
 do
     echo "On iterator $ITER"
-    python -u './createToyDataFromDataFramesV2.py' --lowNoise --iteratorSuffix=$ITER --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+    # python -u './createToyDataFromDataFramesV2.py' --iteratorSuffix=$ITER --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
     # python -u './calcGridSearchSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
     # python -u './processSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
     #
@@ -52,10 +54,9 @@ do
 done
 ###
 # python -u './compareSignalCovarianceMatrices.py' --estimatorName=$ESTIMATOR --iteratorSuffixList="a, b, c, d, e, f" --datasetPrefix="Synthetic_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-
-
-# python -u './prepSignalsAsRegressor.py' --estimatorName='regressor' --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName='rig' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 #
+# python -u './prepSignalsAsRegressor.py' --estimatorName='regressor' --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName='rig' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+
 
 ITERATOR="g"
 WINDOWTERM="XL"
