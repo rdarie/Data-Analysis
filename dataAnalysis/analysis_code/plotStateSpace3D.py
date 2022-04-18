@@ -12,8 +12,8 @@ Options:
     --winStart=winStart                    start of window [default: 200]
     --winStop=winStop                      end of window [default: 400]
     --lazy                                 load from raw, or regular? [default: False]
-    --lowNoise                             reduce noise level? [default: False]
-    --forceField                           plot some quivers [default: False]
+    --trialAverageLFP                      trial average the lfp before dimen. red? [default: False]
+    --trialAverageAnimation                trial average the features for the animation? [default: False]
     --plotting                             make plots? [default: False]
     --debugging                            restrict datasets for debugging? [default: False]
     --preScale                             restrict datasets for debugging? [default: False]
@@ -59,13 +59,13 @@ import pdb
 import vg
 import numpy as np
 import pandas as pd
-import dataAnalysis.preproc.ns5 as ns5
-from sklearn.decomposition import PCA, IncrementalPCA
+# import dataAnalysis.preproc.ns5 as ns5
+from sklearn.decomposition import PCA, IncrementalPCA, FactorAnalysis, FastICA
 # from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
-from sklearn.linear_model import ElasticNet, ElasticNetCV, SGDRegressor
+# from sklearn.linear_model import ElasticNet, ElasticNetCV, SGDRegressor
 from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
-from sklego.preprocessing import PatsyTransformer
+# from sklego.preprocessing import PatsyTransformer
 from sklearn_pandas import DataFrameMapper
 # from sklearn.svm import LinearSVR
 # from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
@@ -200,49 +200,82 @@ if __name__ == '__main__':
         dataFramesFolder,
         arguments['datasetNameLhs'] + '_' + arguments['selectionNameLhs'] + '_meta.pickle'
         )
-    designMatrixDatasetName = '{}_{}_{}_{}_regression_design_matrices'.format(
-        arguments['datasetNameLhs'], arguments['selectionNameLhs'], arguments['selectionNameRhs'],
-        arguments['transformerNameRhs'])
-    designMatrixPath = os.path.join(
-        dataFramesFolder,
-        designMatrixDatasetName + '.h5'
-        )
     with open(loadingMetaPathLhs, 'rb') as _f:
         loadingMeta = pickle.load(_f)
         iteratorOpts = loadingMeta['iteratorOpts']
-    lhsDF = pd.read_hdf(designMatrixPath, 'lhsDF')
-    # lhsDF = pd.read_hdf(lhsDatasetPath, '/{}/data'.format(arguments['selectionNameLhs']))
-    rhsDF = pd.read_hdf(rhsDatasetPath, '/{}/data'.format(arguments['selectionNameRhs']))
+    # lhsDF = pd.read_hdf(designMatrixPath, 'lhsDF')
+    lhsDF = pd.read_hdf(lhsDatasetPath, '/{}/data'.format(arguments['selectionNameLhs']))
     lhsMasks = pd.read_hdf(lhsDatasetPath, '/{}/featureMasks'.format(arguments['selectionNameLhs']))
+    rhsDF = pd.read_hdf(rhsDatasetPath, '/{}/data'.format(arguments['selectionNameRhs']))
     #
+    # hack control time base to look like main time base
     trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
+    deltaB = trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'].min() - trialInfo.loc[trialInfo['controlFlag'] == 'main', 'bin'].min()
+    trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'] -= deltaB
+    lhsDF.index = pd.MultiIndex.from_frame(trialInfo)
+    rhsDF.index = pd.MultiIndex.from_frame(trialInfo)
+    # prune out SSEP
+    binMask = ((trialInfo['bin'] > -0.2) & (trialInfo['bin'] < 0.8)).to_numpy()
+    lhsDF = lhsDF.loc[binMask, :]
+    rhsDF = rhsDF.loc[binMask, :]
+    trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
+    #
+    trialCategoryNames = [cN for cN in stimulusConditionNames if cN not in ['pedalSizeCat']]
+    if arguments['trialAverageLFP']:
+        rhsDF = rhsDF.groupby(trialCategoryNames + ['bin']).mean()
+        lhsDF = lhsDF.groupby(trialCategoryNames + ['bin']).mean()
+        trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
+        trialInfo.loc[:, ['trialUID', 'conditionUID']] = np.nan
+        for tUid, (name, group) in enumerate(trialInfo.groupby(trialCategoryNames)):
+            trialInfo.loc[group.index, 'trialUID'] = tUid
+            trialInfo.loc[group.index, 'conditionUID'] = 0
     #
     lhsDF.reset_index(drop=True, inplace=True)
     lhsDF.columns = lhsDF.columns.get_level_values('feature')
+    colsToScale = ['velocity', 'amplitude', 'rate']
+    lOfTransformers = [
+        (['velocity'], MinMaxScaler(feature_range=(-1., 1.)),),
+        (['amplitude'], MinMaxScaler(feature_range=(0., 1)),),
+        (['RateInHz'], MinMaxScaler(feature_range=(0., .5)),)
+        ]
+    for cN in lhsDF.columns:
+        if cN not in colsToScale:
+            lOfTransformers.append(([cN], None,))
+    lhsScaler = DataFrameMapper(lOfTransformers, input_df=True, df_out=True)
+    lhsDF = lhsScaler.fit_transform(lhsDF)
+    #
     rhsDF.reset_index(drop=True, inplace=True)
     rhsDF.columns = rhsDF.columns.get_level_values('feature')
-    lhsDF.loc[:, 'velocity'] = np.sqrt(lhsDF['vx'] ** 2 + lhsDF['vy'] ** 2)
-    lhsDF.rename({'a': 'amplitude', 'r': 'RateInHz'}, axis='columns', inplace=True)
+    # lhsDF.loc[:, 'velocity'] = np.sqrt(lhsDF['vx'] ** 2 + lhsDF['vy'] ** 2)
+    # lhsDF.rename({'a': 'amplitude', 'r': 'RateInHz'}, axis='columns', inplace=True)
     #
-    trialInfo.loc[:, 'moving'] = (lhsDF['velocity'] > 0.25).to_numpy()
-    trialInfo.loc[:, 'limbState'] = lhsDF.apply(lambda x: 'moving' if x['velocity'] > 0.25 else 'baseline', axis='columns')
+    trialInfo.loc[:, 'limbState'] = lhsDF.apply(lambda x: 'moving' if np.abs(x['velocity']) > 0.05 else 'baseline', axis='columns')
     trialInfo.loc[:, 'activeElectrode'] = trialInfo['electrode'].copy()
     trialInfo.loc[lhsDF['amplitude'] == lhsDF['amplitude'].min(), 'activeElectrode'] = 'NA'
     trialInfo.loc[:, 'limbState x activeElectrode'] = trialInfo.apply(
         lambda x: '{} {}'.format(x['limbState'], x['activeElectrode']), axis='columns')
     trialInfo.loc[:, 'pedalMovementCat x electrode'] = trialInfo.apply(
         lambda x: '{} {}'.format(x['pedalMovementCat'], x['electrode']), axis='columns')
+    #
+    specialSuffix = '_FA'
+    if arguments['trialAverageLFP']:
+        specialSuffix += '_ta'
+    if arguments['trialAverageAnimation']:
+        specialSuffix += '_ta_animation'
     nDim = 3
-    pca = PCA(n_components=nDim, svd_solver='full')
+    # dimRed = PCA(n_components=nDim, svd_solver='full')
+    dimRed = FactorAnalysis(n_components=nDim, rotation='quartimax')
+    # dimRed = FastICA(n_components=nDim)
+    dimRed.fit(rhsDF)
     toyRhsDF = pd.DataFrame(
-        pca.fit_transform(rhsDF), index=rhsDF.index,
+        dimRed.transform(rhsDF), index=rhsDF.index,
         columns=['data{}'.format(cN) for cN in range(nDim)]
         )
-    tInfoCols = [
-        'electrode', 'pedalMovementCat',
-        'RateInHz', 'bin', 'limbState', 'activeElectrode',
+    tInfoCols = trialCategoryNames + [
+        'bin', 'limbState', 'activeElectrode',
         'limbState x activeElectrode', 'pedalMovementCat x electrode',]
-    rhsPlotDF = pd.concat([toyRhsDF, trialInfo.loc[:, tInfoCols], lhsDF.loc[:, ['velocity', 'amplitude', 'RateInHz']]], axis='columns')
+    lhsCols = ['velocity', 'amplitude', 'RateInHz']
+    rhsPlotDF = pd.concat([toyRhsDF, trialInfo.loc[:, tInfoCols], lhsDF.loc[:, lhsCols]], axis='columns')
     colorMaps = {
         # coldish
         'covMat': 'crest_r',
@@ -259,11 +292,11 @@ if __name__ == '__main__':
         'ra': 'A'
     })
     prettyNameLookup.update({
-        'data{}'.format(i): 'LFP ch. #{}'.format(i)
+        'data{}'.format(i): 'Latent\nfeat. #{}'.format(i)
         for i in range(3)
         })
     prettyNameLookup.update({
-        'latent{}'.format(i): 'Latent feature #{}'.format(i)
+        'latent{}'.format(i): 'Latent\nfeature #{}'.format(i)
         for i in range(3)
         })
     prettyNameLookup.update({
@@ -317,7 +350,7 @@ if __name__ == '__main__':
         'baseline NA', 'moving NA', 'baseline -E05+E16', 'baseline -E09+E16',
         'moving -E05+E16', 'moving -E09+E16'
         ]
-    defaultAxisOrientation = dict(azim=75., elev=20.)
+    defaultAxisOrientation = dict(azim=20., elev=20.)
 
     ampPaletteStr = "ch:1.6,-.3,dark=.25,light=0.75,reverse=1"
     mahalPaletteStr = "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1"
@@ -325,7 +358,7 @@ if __name__ == '__main__':
     mhDistColor = np.asarray(sns.color_palette('Set3')[6])
     markerStyles = ['o', 'd', 's']
     scatterOpts = dict(
-        alpha=0.5, linewidths=0, s=.8 ** 2,
+        alpha=0.5, linewidths=0, s=2. ** 2,
         rasterized=True)
     ellipsoidPlotOpts = dict(
         rstride=3, cstride=3,
@@ -359,19 +392,17 @@ if __name__ == '__main__':
     legendData.loc['ellipsoid'] = Patch(
         alpha=0, linewidth=0, label='Covariance ellipsoid')
     maskForBaseline = trialInfo['limbState x activeElectrode'] == 'baseline NA'
-    pdb.set_trace()
     baseline_cov = LedoitWolf().fit(
         toyRhsDF.loc[maskForBaseline, :])
     rhsPlotDF.loc[:, 'mahalanobis'] = np.sqrt(baseline_cov.mahalanobis(toyRhsDF))
-    if arguments['lowNoise']:
-        rhsPlotDF.loc[:, 'mahalanobis'] = rhsPlotDF.loc[:, 'mahalanobis'] * 0.
+    #
     lOfMasksForBreakdown = [
         {
-            'mask': trialInfo['electrode'].isin(['NA']).to_numpy() & trialInfo['pedalMovementCat'].isin(['NA']).to_numpy(),
+            'mask': trialInfo['limbState x activeElectrode'].isin(['baseline NA']).to_numpy(),
             'label': 'Baseline',
             'ellipsoidsToPlot': ['baseline NA']},
         {
-            'mask': trialInfo['electrode'].isin(['NA']).to_numpy() & trialInfo['pedalMovementCat'].isin(['outbound', 'return']).to_numpy(),
+            'mask': trialInfo['limbState x activeElectrode'].isin(['moving NA', 'baseline NA']).to_numpy(),
             'label': 'Movement-only',
             'ellipsoidsToPlot': ['baseline NA', 'moving NA']},
         {
@@ -379,21 +410,21 @@ if __name__ == '__main__':
             'label': 'Stim.-only (E05)',
             'ellipsoidsToPlot': ['baseline NA', 'baseline -E05+E16']},
         {
-            'mask': trialInfo['limbState x activeElectrode'].isin(['baseline -E09+E16', 'baseline NA']).to_numpy(),
-            'label': 'Stim.-only (E09)',
-            'ellipsoidsToPlot': ['baseline NA', 'baseline -E09+E16']},
+            'mask': trialInfo['limbState x activeElectrode'].isin(['moving -E05+E16', 'baseline NA']).to_numpy(),
+            'label': 'Stim.-movement (E05)',
+            'ellipsoidsToPlot': ['baseline NA', 'moving -E05+E16']},
         {
-            'mask': trialInfo['limbState x activeElectrode'].isin(['baseline -E09+E16', 'baseline -E05+E16', 'baseline NA', 'moving NA']).to_numpy(),
-            'label': 'Stim.-only (electrodes X, Y)',
-            'ellipsoidsToPlot': ['baseline NA', 'moving NA', 'baseline -E09+E16', 'baseline -E05+E16']},
+            'mask': trialInfo['limbState x activeElectrode'].isin(['baseline -E05+E16', 'moving -E05+E16', 'baseline NA', 'moving NA']).to_numpy(),
+            'label': 'Stim.-only (E05), Movement-only',
+            'ellipsoidsToPlot': ['baseline NA', 'moving NA', 'baseline -E05+E16', 'moving -E05+E16']},
         ]
     lOfMasksForAnim = [
         {
-            'mask': trialInfo['electrode'].isin(['NA']).to_numpy() & trialInfo['pedalMovementCat'].isin(['NA']).to_numpy(),
+            'mask': trialInfo['limbState x activeElectrode'].isin(['baseline NA']).to_numpy(),
             'label': 'Baseline',
             'ellipsoidsToPlot': ['baseline NA']},
         {
-            'mask': trialInfo['electrode'].isin(['NA']).to_numpy() & trialInfo['pedalMovementCat'].isin(['outbound']).to_numpy(),
+            'mask': trialInfo['electrode'].isin(['NA']).to_numpy() & trialInfo['pedalMovementCat'].isin(['outbound', 'return']).to_numpy(),
             'label': 'Movement-only',
             'ellipsoidsToPlot': ['baseline NA']},
         {
@@ -401,8 +432,8 @@ if __name__ == '__main__':
             'label': 'Stim.-only (E05)',
             'ellipsoidsToPlot': ['baseline NA']},
         {
-            'mask': trialInfo['electrode'].isin(['-E09+E16']).to_numpy() & trialInfo['pedalMovementCat'].isin(['NA']).to_numpy(),
-            'label': 'Stim.-only (E09)',
+            'mask': trialInfo['electrode'].isin(['-E05+E16']).to_numpy() & trialInfo['pedalMovementCat'].isin(['outbound', 'return']).to_numpy(),
+            'label': 'Stim.-movement (E05)',
             'ellipsoidsToPlot': ['baseline NA']},
         ]
     lOfMasksByLimbStateActiveElectrode = [
@@ -419,37 +450,36 @@ if __name__ == '__main__':
     yEll = np.outer(np.sin(uEll), np.sin(vEll))
     zEll = np.outer(np.ones_like(uEll), np.cos(vEll))
     unitSphere = np.stack((xEll, yEll, zEll), 0).reshape(3, -1)
-    ellipsoidEmpiricalDict = {}
+    ellipsoidDict = {}
     ellipsoidTheoryDict = {}
     #
-    ellipsoidScaleDict = {
-        'baseline NA': .3,
-        'baseline -E05+E16': .3,
-        'baseline -E09+E16': .3,
-        'moving NA': .3,
-        'moving -E05+E16': .3,
-        'moving -E09+E16': .3,
-        }
+    '''ellipsoidScaleDict = {
+        'baseline NA': 1e-2 if arguments['trialAverageLFP'] else .3,
+        'baseline -E05+E16': 1e-2 if arguments['trialAverageLFP'] else .3,
+        'baseline -E09+E16': 1e-2 if arguments['trialAverageLFP'] else .3,
+        'moving NA': 1e-2 if arguments['trialAverageLFP'] else .3,
+        'moving -E05+E16': 1e-2 if arguments['trialAverageLFP'] else .3,
+        'moving -E09+E16': 1e-2 if arguments['trialAverageLFP'] else .3,
+        }'''
     empCovMats = {}
     #
     for name, group in rhsPlotDF.groupby('limbState x activeElectrode'):
         emp_cov = LedoitWolf().fit(toyRhsDF.loc[group.index, :])
-        ellipsoidEmpiricalDict[name] = (
+        ellipseScale = 3. if arguments['trialAverageLFP'] else 1.
+        ellipsoidDict[name] = (
             (
-                (ellipsoidScaleDict[name] * (emp_cov.covariance_) + 5. * np.eye(nDim)) @ unitSphere +
+                ellipseScale * (emp_cov.covariance_) @ unitSphere +
                 emp_cov.location_.reshape(3, 1))
             .reshape(3, *xEll.shape))
-        # pdb.set_trace()
         u, s, v = np.linalg.svd(emp_cov.covariance_)
         emp_cov.covariance_eigenvalues = s
         emp_cov.covariance_u = u
         empCovMats[name] = emp_cov
-
-    ellipsoidDict = ellipsoidEmpiricalDict
     #
     def drawEllipsoidAxes(theAx, theName):
         x0, y0, z0 = empCovMats[theName].location_
-        sx, sy, sz = np.sqrt(empCovMats[theName].covariance_eigenvalues) * 2
+        ellipseAxesScale = 1. if arguments['trialAverageLFP'] else 1.
+        sx, sy, sz = np.sqrt(empCovMats[theName].covariance_eigenvalues) * ellipseAxesScale
         covarEigPlotOpts = dict(zorder=2.1, linewidth=.75)
         #
         dx, dy, dz = sx * empCovMats[theName].covariance_u[:, 0]
@@ -459,7 +489,6 @@ if __name__ == '__main__':
         dx, dy, dz = sz * empCovMats[theName].covariance_u[:, 2]
         theAx.plot([x0, x0 + dx], [y0, y0 + dy], [z0, z0 + dz], color='y', **covarEigPlotOpts)
         return
-
     extent = (
         rhsPlotDF.loc[:, toyRhsDF.columns.to_list() + ['velocity', 'amplitude', 'RateInHz', 'mahalanobis']].quantile(1 - 1e-2) -
         rhsPlotDF.loc[:, toyRhsDF.columns.to_list() + ['velocity', 'amplitude', 'RateInHz', 'mahalanobis']].quantile(1e-2))
@@ -472,7 +501,7 @@ if __name__ == '__main__':
     #
     def formatTheAxes(
             theAx, customMidPoints=None, customExtents=None,
-            customLabels=None,
+            customLabels=None, hideTickLabels=True,
             showOrigin=False, zoomFactor=1.):
         #
         theAx.view_init(**defaultAxisOrientation)
@@ -490,7 +519,7 @@ if __name__ == '__main__':
         if customLabels is not None:
             xLab, yLab, zLab = customLabels
         else:
-            xLab, yLab, zLab = 'LFP ch. #1 (a.u.)', 'LFP ch. #2 (a.u.)', 'LFP ch. #3 (a.u.)'
+            xLab, yLab, zLab = 'Latent\nfeat. #1 (a.u.)', 'Latent\nfeat. #2 (a.u.)', 'Latent\nfeat. #3 (a.u.)'
         #
         theAx.set_xlim3d([xMid - xExt / zoomFactor, xMid + xExt / zoomFactor])
         theAx.set_ylim3d([yMid - yExt / zoomFactor, yMid + yExt / zoomFactor])
@@ -500,9 +529,10 @@ if __name__ == '__main__':
         theAx.set_yticks([yMid - yExt / zoomFactor / 2, yMid, yMid + yExt / zoomFactor / 2])
         theAx.set_zticks([zMid - zExt / zoomFactor / 2, zMid, zMid + zExt / zoomFactor / 2])
         #
-        theAx.set_xticklabels([])
-        theAx.set_yticklabels([])
-        theAx.set_zticklabels([])
+        if hideTickLabels:
+            theAx.set_xticklabels([])
+            theAx.set_yticklabels([])
+            theAx.set_zticklabels([])
         #
         theAx.set_xlabel(xLab, labelpad=-15, va='top', ha='center')
         theAx.set_ylabel(yLab, labelpad=-15, va='top', ha='center')
@@ -523,7 +553,8 @@ if __name__ == '__main__':
 
     pdfPath = os.path.join(
         figureOutputFolder,
-        'plots3d_{}{}.pdf'.format(iteratorSuffix, specialSuffix))
+        '{}_plots3d_{}{}.pdf'.format(
+            expDateTimePathStr, arguments['iteratorSuffix'], specialSuffix))
     with PdfPages(pdfPath) as pdf:
         plotAllScatter = False
         if plotAllScatter:
@@ -533,14 +564,7 @@ if __name__ == '__main__':
             ax.set_proj_type('ortho')
             ax.scatter(
                 rhsPlotDF.iloc[:, 0], rhsPlotDF.iloc[:, 1], rhsPlotDF.iloc[:, 2],
-                # cmap=sns.color_palette(ampPaletteStr, as_cmap=True),
-                # c=rhsPlotDF.loc[thisMask, 'electrodeInfluence'],
-                #
-                # cmap=covPatternPalette,
-                # c=rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'],
-                #
                 c=lfpColor,
-                # s=group['movementInfluence'],
                 **scatterOpts)
             formatTheAxes(ax)
             fig.tight_layout(pad=styleOpts['tight_layout.pad'])
@@ -552,6 +576,7 @@ if __name__ == '__main__':
             #
             rhsPlotDF.loc[:, 'x2'], rhsPlotDF.loc[:, 'y2'], _ = proj3d.proj_transform(
                 rhsPlotDF.iloc[:, 0], rhsPlotDF.iloc[:, 1], rhsPlotDF.iloc[:, 2], ax.get_proj())
+        makeKDEPlot = False
         if makeKDEPlot and plotAllScatter:
             fig, ax = plt.subplots(figsize=(6, 6))
             sns.kdeplot(
@@ -566,238 +591,202 @@ if __name__ == '__main__':
             else:
                 plt.close()
         ########
-        if iteratorSuffix in ['a', 'b', 'g']:
-            plotRelPlots = False
-            if plotRelPlots:
-                tempCols = [cN for cN in toyRhsDF.columns] + [
-                    'limbState x activeElectrode', 'pedalMovementCat x electrode']
-                rhsPlotDFStack = pd.DataFrame(
-                    rhsPlotDF.loc[:, tempCols].to_numpy(),
-                    columns=tempCols,
-                    index=pd.MultiIndex.from_frame(trialInfo.loc[
-                        :, [
-                            'electrode', 'bin', 'pedalMovementCat', 'trialAmplitude']])
-                        )
-                rhsPlotDFStack = rhsPlotDFStack.set_index('limbState x activeElectrode', append=True)
-                rhsPlotDFStack = rhsPlotDFStack.set_index('pedalMovementCat x electrode', append=True)
-                rhsPlotDFStack.columns.name = 'feature'
-                rhsPlotDFStack = rhsPlotDFStack.stack().to_frame(name='signal').reset_index()
-                g = sns.relplot(
-                    row='feature', col='pedalMovementCat x electrode',
-                    x='bin', y='signal', hue='trialAmplitude',
-                    data=rhsPlotDFStack,
-                    palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
-                    errorbar='se', kind='line',
-                    facet_kws=dict(margin_titles=True),
-                    height=3, aspect=1
+        plotRelPlots = True
+        if plotRelPlots:
+            tempCols = [cN for cN in toyRhsDF.columns] + [
+                'limbState x activeElectrode', 'pedalMovementCat x electrode']
+            rhsPlotDFStack = pd.DataFrame(
+                rhsPlotDF.loc[:, tempCols].to_numpy(),
+                columns=tempCols,
+                index=pd.MultiIndex.from_frame(trialInfo.loc[
+                    :, [
+                        'electrode', 'bin', 'pedalMovementCat', 'trialAmplitude']])
                     )
-                # plotProcFuns = [
-                #     asp.genAxisLabelOverride(
-                #         xTemplate=None, yTemplate=None,
-                #         titleTemplate=None, rowTitleTemplate=None, colTitleTemplate=None,
-                #         prettyNameLookup=None,
-                #         colKeys=None, dropNaNCol='segment')
-                #     ]
-                # for (ro, co, hu), dataSubset in g.facet_data():
-                #     if len(plotProcFuns):
-                #         for procFun in plotProcFuns:
-                #             procFun(g, ro, co, hu, dataSubset)
-                g.tight_layout(pad=styleOpts['tight_layout.pad'])
-                pdf.savefig()
-                if arguments['showFigures']:
-                    plt.show()
+            rhsPlotDFStack = rhsPlotDFStack.set_index('limbState x activeElectrode', append=True)
+            rhsPlotDFStack = rhsPlotDFStack.set_index('pedalMovementCat x electrode', append=True)
+            rhsPlotDFStack.columns.name = 'feature'
+            rhsPlotDFStack = rhsPlotDFStack.stack().to_frame(name='signal').reset_index()
+            g = sns.relplot(
+                row='feature', col='pedalMovementCat x electrode',
+                x='bin', y='signal', hue='trialAmplitude',
+                data=rhsPlotDFStack,
+                palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
+                errorbar='se', kind='line',
+                facet_kws=dict(margin_titles=True),
+                height=3, aspect=1
+                )
+            # plotProcFuns = [
+            #     asp.genAxisLabelOverride(
+            #         xTemplate=None, yTemplate=None,
+            #         titleTemplate=None, rowTitleTemplate=None, colTitleTemplate=None,
+            #         prettyNameLookup=None,
+            #         colKeys=None, dropNaNCol='segment')
+            #     ]
+            # for (ro, co, hu), dataSubset in g.facet_data():
+            #     if len(plotProcFuns):
+            #         for procFun in plotProcFuns:
+            #             procFun(g, ro, co, hu, dataSubset)
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig()
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+        plotDisPlots = False
+        if plotDisPlots:
+            g = sns.displot(
+                row='feature', col='pedalMovementCat x electrode',
+                y='signal', hue='trialAmplitude',
+                data=rhsPlotDFStack,
+                palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
+                kind='kde', common_norm=False,
+                height=3, aspect=1
+                )
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig()
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+            #
+        plotCovMats = False
+        if plotCovMats:
+            nCols = int(np.ceil(np.sqrt(len(limbStateElectrodeNames))))
+            nRows = int(np.floor(len(limbStateElectrodeNames) / nCols))
+            print('Heatmap; nRows = {}, nCols = {}'.format(nRows, nCols))
+            gs = GridSpec(
+                nRows, nCols + 1,
+                width_ratios=[2 for i in range(nCols)] + [.1],
+                height_ratios=[1 for i in range(nRows)]
+                )
+            fig = plt.figure()
+            fig.set_size_inches((2 * nCols + .1, 2 * nRows))
+            covMatIndex = [prettyNameLookup[cN] for cN in toyRhsDF.columns]
+            # pdb.set_trace()
+            vMax = max([ecm.covariance_.max() for _, ecm in empCovMats.items()])
+            vMin = max([ecm.covariance_.min() for _, ecm in empCovMats.items()])
+            for axIdx, name in enumerate(limbStateElectrodeNames):
+                # print('axIdx = {}, (axIdx % nRows) = {}, (axIdx // nRows) = {}'.format(
+                #     axIdx, axIdx % nRows, axIdx // nRows))
+                thisAx = fig.add_subplot(gs[axIdx % nRows, axIdx // nRows])
+                covMatDF = pd.DataFrame(
+                    empCovMats[name].covariance_,
+                    index=covMatIndex, columns=covMatIndex)
+                if axIdx == 0:
+                    cbAx = fig.add_subplot(gs[:, nCols])
+                    cbarOpts = dict(cbar=True, cbar_ax=cbAx)
                 else:
-                    plt.close()
-            plotDisPlots = False
-            if plotDisPlots:
-                g = sns.displot(
-                    row='feature', col='pedalMovementCat x electrode',
-                    y='signal', hue='trialAmplitude',
-                    data=rhsPlotDFStack,
-                    palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
-                    kind='kde', common_norm=False,
-                    height=3, aspect=1
-                    )
-                g.tight_layout(pad=styleOpts['tight_layout.pad'])
-                pdf.savefig()
-                if arguments['showFigures']:
-                    plt.show()
-                else:
-                    plt.close()
-                #
-            plotRegressorRelPlots = False
-            if plotRegressorRelPlots:
-                tempCols = [cN for cN in toyLhsDF.columns] + [
-                    'limbState x activeElectrode', 'pedalMovementCat x electrode']
-                lhsPlotDFStack = pd.DataFrame(
-                    rhsPlotDF.loc[:, tempCols].to_numpy(),
-                    columns=tempCols,
-                    index=pd.MultiIndex.from_frame(trialInfo.loc[
-                        :, [
-                            'electrode', 'bin', 'pedalMovementCat', 'trialAmplitude']])
-                    )
-                lhsPlotDFStack = lhsPlotDFStack.set_index('limbState x activeElectrode', append=True)
-                lhsPlotDFStack = lhsPlotDFStack.set_index('pedalMovementCat x electrode', append=True)
-                lhsPlotDFStack.columns.name = 'feature'
-                lhsPlotDFStack = lhsPlotDFStack.stack().to_frame(name='signal').reset_index()
-                ###
-                g = sns.relplot(
-                    row='feature', col='pedalMovementCat x electrode',
-                    x='bin', y='signal', hue='trialAmplitude',
-                    data=lhsPlotDFStack, palette='viridis',
-                    errorbar='se', kind='line', height=3, aspect=1
-                    )
-                g.tight_layout(pad=styleOpts['tight_layout.pad'])
-                #
-                pdf.savefig()
-                if arguments['showFigures']:
-                    plt.show()
-                else:
-                    plt.close()
-                ###
-            plotCovMats = False
-            if plotCovMats:
-                nCols = int(np.ceil(np.sqrt(len(limbStateElectrodeNames))))
-                nRows = int(np.floor(len(limbStateElectrodeNames) / nCols))
-                print('Heatmap; nRows = {}, nCols = {}'.format(nRows, nCols))
-                gs = GridSpec(
-                    nRows, nCols + 1,
-                    width_ratios=[2 for i in range(nCols)] + [.1],
-                    height_ratios=[1 for i in range(nRows)]
-                    )
+                    cbarOpts = dict(cbar=False)
+                sns.heatmap(
+                    covMatDF, ax=thisAx,
+                    cmap='crest_r', vmin=vMin, vmax=vMax,
+                    **cbarOpts)
+                thisAx.set_title(prettyNameLookup[name])
+            figTitle = fig.suptitle('Covariance matrices')
+            fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(
+                bbox_inches='tight', pad_inches=0,
+                bbox_extra_artists=[figTitle])
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+        plotMaskedScatters = True
+        markersByLimbStateElectrode = False
+        # pdb.set_trace()
+        if plotMaskedScatters:
+            for maskDict in lOfMasksForBreakdown:
+                # for maskDict in lOfMasksByLimbStateActiveElectrode:
+                # for maskDict in lOfMasksForBreakdown:
+                # lOfMasksForAnim
                 fig = plt.figure()
-                fig.set_size_inches((2 * nCols + .1, 2 * nRows))
-                covMatIndex = [prettyNameLookup[cN] for cN in toyRhsDF.columns]
-                # pdb.set_trace()
-                vMax = max([ecm.covariance_.max() for _, ecm in empCovMats.items()])
-                vMin = max([ecm.covariance_.min() for _, ecm in empCovMats.items()])
-                for axIdx, name in enumerate(limbStateElectrodeNames):
-                    # print('axIdx = {}, (axIdx % nRows) = {}, (axIdx // nRows) = {}'.format(
-                    #     axIdx, axIdx % nRows, axIdx // nRows))
-                    thisAx = fig.add_subplot(gs[axIdx % nRows, axIdx // nRows])
-                    covMatDF = pd.DataFrame(
-                        empCovMats[name].covariance_,
-                        index=covMatIndex, columns=covMatIndex)
-                    if axIdx == 0:
-                        cbAx = fig.add_subplot(gs[:, nCols])
-                        cbarOpts = dict(cbar=True, cbar_ax=cbAx)
-                    else:
-                        cbarOpts = dict(cbar=False)
-                    sns.heatmap(
-                        covMatDF, ax=thisAx,
-                        cmap='crest_r', vmin=vMin, vmax=vMax,
-                        **cbarOpts)
-                    thisAx.set_title(prettyNameLookup[name])
-                figTitle = fig.suptitle('Covariance matrices')
+                fig.set_size_inches((4, 4))
+                ax = fig.add_subplot(projection='3d')
+                ax.set_proj_type('ortho')
+                #
+                thisMask = maskDict['mask']
+                if 'ellipsoidsToPlot' in maskDict:
+                    ellipsoidsToPlot = maskDict['ellipsoidsToPlot']
+                else:
+                    ellipsoidsToPlot = rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique()
+                for name in ellipsoidsToPlot:
+                    ax.plot_surface(
+                        *ellipsoidDict[name],
+                        color=sns.utils.alter_color(covPatternPalette[name], l=.3),
+                        **ellipsoidPlotOpts
+                        )
+                    drawEllipsoidAxes(ax, name)
+                if markersByLimbStateElectrode:
+                    for name in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique():
+                        nameMask = rhsPlotDF['limbState x activeElectrode'] == name
+                        ax.scatter(
+                            rhsPlotDF.loc[(thisMask & nameMask), 'data0'],
+                            rhsPlotDF.loc[(thisMask & nameMask), 'data1'],
+                            rhsPlotDF.loc[(thisMask & nameMask), 'data2'],
+                            c=covPatternPalette[name],
+                            ##
+                            marker=limbStateElectrodeMarkerDict[name],
+                            # s=group['movementInfluence'],
+                            **scatterOpts)
+                else:
+                    ax.scatter(
+                        rhsPlotDF.loc[thisMask, 'data0'],
+                        rhsPlotDF.loc[thisMask, 'data1'],
+                        rhsPlotDF.loc[thisMask, 'data2'],
+                        # cmap=sns.color_palette(ampPaletteStr, as_cmap=True),
+                        # c=rhsPlotDF.loc[thisMask, 'electrodeInfluence'],
+                        c=[covPatternPalette[lse] for lse in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode']],
+                        # c=lfpColor, s=group['movementInfluence'],
+                        **scatterOpts)
+                theseLegendEntries = legendData.loc[
+                    ['ellipsoid'] + ellipsoidsToPlot +
+                    ['blank'] + legendPcaDirs]
+                ax.legend(
+                    handles=theseLegendEntries.to_list(),
+                    loc='center right')
+                #
+                figTitleStr = 'Experimental data'
+                figTitle = fig.suptitle(figTitleStr, x=0.3, y=0.9, fontsize=9, fontweight='bold')
+                ##
+                # zF = 1.8 if (maskDict['label'] == 'Baseline') else 1.
+                # formatTheAxes(ax, zoomFactor=zF, showOrigin=False)
+                ##
+                formatTheAxes(ax, zoomFactor=1.2)
                 fig.tight_layout(pad=styleOpts['tight_layout.pad'])
                 pdf.savefig(
                     bbox_inches='tight', pad_inches=0,
-                    bbox_extra_artists=[figTitle])
+                    bbox_extra_artists=[figTitle]
+                    )
                 if arguments['showFigures']:
                     plt.show()
                 else:
                     plt.close()
-            plotMaskedScatters = True
-            markersByLimbStateElectrode = False
-            if plotMaskedScatters:
-                for maskDict in lOfMasksForBreakdown:
-                    # for maskDict in lOfMasksByLimbStateActiveElectrode:
-                    # for maskDict in lOfMasksForBreakdown:
-                    # lOfMasksForAnim
-                    with matplotlib.rc_context({'axes.titlepad': -20}):
-                        fig = plt.figure()
-                        fig.set_size_inches((6, 6))
-                        ax = fig.add_subplot(projection='3d')
-                        ax.set_proj_type('ortho')
-                        #
-                        thisMask = maskDict['mask']
-                        if 'ellipsoidsToPlot' in maskDict:
-                            ellipsoidsToPlot = maskDict['ellipsoidsToPlot']
-                        else:
-                            ellipsoidsToPlot = rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique()
-                        for name in ellipsoidsToPlot:
-                            ax.plot_surface(
-                                *ellipsoidDict[name],
-                                color=sns.utils.alter_color(covPatternPalette[name], l=.3),
-                                **ellipsoidPlotOpts
-                                )
-                            if not arguments['lowNoise']:
-                                drawEllipsoidAxes(ax, name)
-                            if arguments['forceField']:
-                                drawForceField(ax)
-                        if markersByLimbStateElectrode:
-                            for name in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique():
-                                nameMask = rhsPlotDF['limbState x activeElectrode'] == name
-                                ax.scatter(
-                                    rhsPlotDF.loc[(thisMask & nameMask), 'data0'],
-                                    rhsPlotDF.loc[(thisMask & nameMask), 'data1'],
-                                    rhsPlotDF.loc[(thisMask & nameMask), 'data2'],
-                                    ##
-                                    # c=rhsPlotDF.loc[(thisMask & nameMask), 'electrodeInfluence'],
-                                    # cmap=sns.color_palette(ampPaletteStr, as_cmap=True),
-                                    c=covPatternPalette[name],
-                                    ##
-                                    marker=limbStateElectrodeMarkerDict[name],
-                                    # s=group['movementInfluence'],
-                                    **scatterOpts)
-                        else:
-                            ax.scatter(
-                                rhsPlotDF.loc[thisMask, 'data0'],
-                                rhsPlotDF.loc[thisMask, 'data1'],
-                                rhsPlotDF.loc[thisMask, 'data2'],
-                                # cmap=sns.color_palette(ampPaletteStr, as_cmap=True),
-                                # c=rhsPlotDF.loc[thisMask, 'electrodeInfluence'],
-                                c=[covPatternPalette[lse] for lse in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode']],
-                                # c=lfpColor, s=group['movementInfluence'],
-                                **scatterOpts)
-                        theseLegendEntries = legendData.loc[
-                            ['ellipsoid'] + ellipsoidsToPlot +
-                            ['blank'] + legendPcaDirs]
-                        ax.legend(
-                            handles=theseLegendEntries.to_list(),
-                            loc='center right')
-                        # fig.suptitle(
-                        #     maskDict['label'] + '\n\n' + '\n'.join(rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique()))
-                        # figTitle = fig.suptitle(maskDict['label'], y=0.9)
-                        ##
-                        # zF = 1.8 if (maskDict['label'] == 'Baseline') else 1.
-                        # formatTheAxes(ax, zoomFactor=zF, showOrigin=False)
-                        ##
-                        formatTheAxes(ax, zoomFactor=1.2)
-                        fig.tight_layout(pad=styleOpts['tight_layout.pad'])
-                        pdf.savefig(
-                            bbox_inches='tight', pad_inches=0, # bbox_extra_artists=[figTitle]
-                            )
-                        if arguments['showFigures']:
-                            plt.show()
-                        else:
-                            plt.close()
     ############################################
     makeAnimations = True
     if makeAnimations:
+        overlayMhDist = False
+        consistentAxes = True
         slowFactor = 10
         fps = int(iteratorOpts['forceBinInterval'] ** (-1) / slowFactor)
         tailLength = 3
         aniLineKws = {'linestyle': '-', 'linewidth': 1.5}
         cometLineKws = {'linestyle': '-', 'linewidth': 1.}
         mhLineKws = {'linestyle': '-', 'linewidth': 2.}
-        aniMarkerKws = {'marker': 'o', 'markersize': 2, 'linewidth': 0}
-        whatToPlot = ['data0', 'data1', 'data2', 'amplitude']
-        if not arguments['lowNoise']:
-            whatToPlot += ['mahalanobis']
+        aniMarkerKws = {'marker': 'o', 'markersize': 3, 'linewidth': 0}
+        whatToPlot = ['data0', 'data1', 'data2', 'amplitude', 'velocity', 'mahalanobis']
         cMap = sns.color_palette(ampPaletteStr, as_cmap=True)
         cMapScaleFun = lambda am: cMap.colors.shape[0] * min(1, max(0, (am - rhsPlotDF['amplitude'].min()) / (rhsPlotDF['amplitude'].max() - rhsPlotDF['amplitude'].min())))
         cMapMahal = sns.color_palette(mahalPaletteStr, as_cmap=True)
         cMapMahalScaleFun = lambda am: cMapMahal.colors.shape[0] * min(1, max(0, (am - rhsPlotDF['mahalanobis'].min()) / (
                     rhsPlotDF['mahalanobis'].max() - rhsPlotDF['mahalanobis'].min())))
         for maskIdx, maskDict in enumerate(lOfMasksForAnim):
-            if maskIdx not in [mi for mi in range(len(lOfMasksForAnim))]:
-                continue
+            # if maskIdx not in [1]:
+            #     continue
             print('Starting to generate animation for {}'.format(maskDict['label']))
             aniPath = os.path.join(
                 figureOutputFolder,
-                'plots3d_{}_mask_{}{}.mp4'.format(
-                    iteratorSuffix, maskIdx, specialSuffix))
+                '{}_anim3d_{}_mask_{}{}.mp4'.format(
+                    expDateTimePathStr, arguments['iteratorSuffix'], maskIdx, specialSuffix))
             fig = plt.figure()
             nRows = len(whatToPlot)
             nCols = 2
@@ -813,40 +802,39 @@ if __name__ == '__main__':
             ax3d.set_proj_type('ortho')
             ax2d = [fig.add_subplot(gs[i, 1]) for i in range(nRows)]
             #
-            chooseSomeTrials = trialInfo.loc[maskDict['mask'] & (trialInfo['trialAmplitude'] == trialInfo.loc[maskDict['mask'], 'trialAmplitude'].max()), 'trialUID'].unique()[:3]
-            thisMask = maskDict['mask'] & trialInfo['trialUID'].isin(chooseSomeTrials)
-            dataDF = rhsPlotDF.loc[thisMask, :].copy()
+            if arguments['trialAverageAnimation']:
+                assert (not arguments['trialAverageLFP'])
+                dataDF = rhsPlotDF.loc[maskDict['mask'], :].groupby(trialCategoryNames + ['bin']).mean()[whatToPlot].reset_index()
+                dataDF = dataDF.loc[:, [cN for cN in rhsPlotDF.columns if cN in dataDF.columns]]
+                # reorder columns to match nonaveraged case
+                dataDF.loc[:, 'trialUID'] = np.nan
+                for tUid, (name, group) in enumerate(dataDF.groupby(trialCategoryNames)):
+                    dataDF.loc[group.index, 'trialUID'] = tUid
+                # choose max amp
+                chooseSomeTrials = dataDF.loc[(dataDF['trialAmplitude'] == dataDF['trialAmplitude'].max()), 'trialUID'].unique()[:3]
+                dataDF = dataDF.loc[dataDF['trialUID'].isin(chooseSomeTrials), :]
+            else:
+                chooseSomeTrials = trialInfo.loc[maskDict['mask'] & (trialInfo['trialAmplitude'] == trialInfo.loc[maskDict['mask'], 'trialAmplitude'].max()), 'trialUID'].unique()[:3]
+                thisMask = maskDict['mask'] & trialInfo['trialUID'].isin(chooseSomeTrials)
+                dataDF = rhsPlotDF.loc[thisMask, :].copy()
+                dataDF.loc[:, 'trialUID'] = trialInfo.loc[thisMask, 'trialUID']
+            #
             dataFor3D = dataDF.loc[:, ['data0', 'data1', 'data2']].T.to_numpy()
-            dataDF.loc[:, 'trialUID'] = trialInfo.loc[thisMask, 'trialUID']
             nFrames = min(500, dataDF.shape[0])
             progBar = tqdm(total=nFrames, mininterval=30., maxinterval=120.)
-
             customMidPoints = (
-                  toyRhsDF.loc[maskDict['mask'], :].quantile(1 - 1e-2) +
-                  toyRhsDF.loc[maskDict['mask'], :].quantile(1e-2)) / 2
+                toyRhsDF.loc[maskDict['mask'], :].quantile(1 - 1e-2) +
+                toyRhsDF.loc[maskDict['mask'], :].quantile(1e-2)) / 2
             customExtents = (
-                    toyRhsDF.loc[maskDict['mask'], :].quantile(1 - 1e-2) -
-                    toyRhsDF.loc[maskDict['mask'], :].quantile(1e-2))
-
+                toyRhsDF.loc[maskDict['mask'], :].quantile(1 - 1e-2) -
+                toyRhsDF.loc[maskDict['mask'], :].quantile(1e-2))
+            #
             for name in maskDict['ellipsoidsToPlot']:
                 ax3d.plot_surface(
                     *ellipsoidDict[name],
                     color=sns.utils.alter_color(covPatternPalette[name], l=.5),
                     **ellipsoidPlotOpts)
-                if not arguments['lowNoise']:
-                    drawEllipsoidAxes(ax3d, name)
-                if arguments['forceField']:
-                    drawForceField(
-                        ax3d,
-                        customMidPoints=[
-                            customMidPoints['data0'],
-                            customMidPoints['data1'],
-                            customMidPoints['data2']],
-                        customExtents=[
-                            customExtents.max(),
-                            customExtents.max(),
-                            customExtents.max()],
-                            )
+                drawEllipsoidAxes(ax3d, name)
             #
             cometTailLines = [None for i in range(tailLength)]
             for idx in range(tailLength):
@@ -879,29 +867,39 @@ if __name__ == '__main__':
                 else:
                     thisAx.set_xticklabels([])
             #
-            # fig.suptitle(figTitleStr)
-            # figTitleStr = maskDict['label']
+            figTitleStr = 'Experimental data: ' + maskDict['label']
+            figTitle = fig.suptitle(figTitleStr, x=0.3, y=0.9, fontsize=9, fontweight='bold')
+            #
             # ax3d.set_title(figTitleStr)
             # zF = 1.9 if name == 'baseline NA' else 1.2
-            # formatTheAxes(ax3d, zoomFactor=zF)
-            #
-            formatTheAxes(
-                ax3d,
-                customMidPoints=[
-                    customMidPoints['data0'],
-                    customMidPoints['data1'],
-                    customMidPoints['data2']],
-                customExtents=[
-                    customExtents.max() * 0.5,
-                    customExtents.max() * 0.5,
-                    customExtents.max() * 0.5],
-                )
+            if consistentAxes:
+                formatTheAxes(ax3d, zoomFactor=1.2)
+            else:
+                formatTheAxes(
+                    ax3d,
+                    customMidPoints=[
+                        customMidPoints['data0'],
+                        customMidPoints['data1'],
+                        customMidPoints['data2']],
+                    customExtents=[
+                        customExtents.max() * 0.5,
+                        customExtents.max() * 0.5,
+                        customExtents.max() * 0.5],
+                    )
             sns.despine(fig=fig)
-            theseLegendEntries = legendData.loc[
-                ['ellipsoid'] + maskDict['ellipsoidsToPlot'] + ['blank'] +
-                legendPcaDirs +
-                ['blank'] + ['data', 'mahalanobis']]
-            ax3d.legend(handles=theseLegendEntries.to_list(), loc='lower right')
+            if overlayMhDist:
+                theseLegendEntries = legendData.loc[
+                    ['ellipsoid'] + maskDict['ellipsoidsToPlot'] + ['blank'] +
+                    legendPcaDirs +
+                    ['blank'] + ['data', 'mahalanobis']]
+            else:
+                theseLegendEntries = legendData.loc[
+                    ['ellipsoid'] + maskDict['ellipsoidsToPlot'] + ['blank'] +
+                    legendPcaDirs +
+                    ['blank'] + ['data']]
+            ax3d.legend(
+                handles=theseLegendEntries.to_list(),
+                loc='center right')
             #
             def animate(idx):
                 colorVal = dataDF['amplitude'].iloc[idx]
@@ -925,8 +923,8 @@ if __name__ == '__main__':
                     else:
                         thisAx.plotLine.set_color('k')
                 #
-                mhData = np.stack([dataFor3D[0:3, idx], baseline_cov.location_], axis=1)
-                if not arguments['lowNoise']:
+                if overlayMhDist:
+                    mhData = np.stack([dataFor3D[0:3, idx], baseline_cov.location_], axis=1)
                     mhLine.set_data(mhData[0:2, :])
                     mhLine.set_3d_properties(mhData[2, :])
                     mhLine.set_color(rgbaColorMahal)
@@ -953,106 +951,15 @@ if __name__ == '__main__':
             ani = animation.FuncAnimation(
                 fig, animate, frames=nFrames,
                 interval=int(1e3 / fps), blit=False)
-            saveToFile = False
+            saveToFile = True
             if saveToFile:
                 writer = FFMpegWriter(
                     fps=int(fps), metadata=dict(artist='Me'), bitrate=7200)
                 ani.save(aniPath, writer=writer)
-            showNow = True
+            showNow = False
             if showNow:
                 plt.show()
             else:
                 plt.close()
             print('made animation for {}'.format(maskDict['label']))
     ############################################
-    savingResults = False
-    if savingResults:
-        outputDatasetName = 'Synthetic_{}_df_{}'.format(
-            loadingMeta['arguments']['window'], iteratorSuffix)
-        outputLoadingMeta = loadingMeta.copy()
-        outputLoadingMetaPath = os.path.join(
-            dataFramesFolder,
-            outputDatasetName + '_' + arguments['selectionNameRhs'] + '_meta.pickle'
-            )
-        cvIterator = tdr.trainTestValidationSplitter(
-            dataDF=toyLhsDF.loc[restrictMask, :], **cvKWArgs)
-        #
-        outputLoadingMeta['iteratorsBySegment'] = [cvIterator]
-        outputLoadingMeta['iteratorOpts'] = iteratorOpts
-        outputLoadingMeta.pop('normalizationParams')
-        outputLoadingMeta.pop('normalizeDataset')
-        outputLoadingMeta.pop('unNormalizeDataset')
-        outputLoadingMeta.pop('arguments')
-        #####
-        featureColumns = pd.DataFrame(
-            np.nan,
-            index=range(toyRhsDF.shape[1]),
-            columns=rhsDF.columns.names)
-        for fcn in rhsDF.columns.names:
-            if fcn == 'feature':
-                featureColumns.loc[:, fcn] = toyRhsDF.columns
-            elif fcn == 'lag':
-                featureColumns.loc[:, fcn] = 0
-            else:
-                featureColumns.loc[:, fcn] = ns5.metaFillerLookup[fcn]
-        toyRhsDF.columns = pd.MultiIndex.from_frame(featureColumns)
-        toyRhsDF.index = saveIndex
-        allGroupIdx = pd.MultiIndex.from_tuples(
-            [tuple('all' for fgn in rhsDF.columns.names)],
-            names=rhsDF.columns.names)
-        allMask = pd.Series(True, index=toyRhsDF.columns).to_frame()
-        allMask.columns = allGroupIdx
-        maskDF = allMask.T
-        maskParams = [
-            {k: v for k, v in zip(maskDF.index.names, idxItem)}
-            for idxItem in maskDF.index]
-        maskParamsStr = [
-            '{}'.format(idxItem).replace("'", '')
-            for idxItem in maskParams]
-        maskDF.loc[:, 'maskName'] = maskParamsStr
-        maskDF.set_index('maskName', append=True, inplace=True)
-        rhsOutputLoadingMeta = outputLoadingMeta.copy()
-        rhsOutputLoadingMeta['arguments'] = arguments
-        rhsOutputLoadingMeta['arguments']['selectionName'] = arguments['selectionNameRhs']
-        hf.exportNormalizedDataFrame(
-            dataDF=toyRhsDF.loc[restrictMask, :], loadingMeta=rhsOutputLoadingMeta, featureInfoMask=maskDF,
-            # arguments=arguments, selectionName=arguments['selectionNameRhs'],
-            dataFramesFolder=dataFramesFolder, datasetName=outputDatasetName,
-            )
-        ###########
-        featureColumns = pd.DataFrame(
-            np.nan,
-            index=range(toyLhsDF.shape[1]),
-            columns=lhsDF.columns.names)
-        for fcn in lhsDF.columns.names:
-            if fcn == 'feature':
-                featureColumns.loc[:, fcn] = toyLhsDF.columns
-            elif fcn == 'lag':
-                featureColumns.loc[:, fcn] = 0
-            else:
-                featureColumns.loc[:, fcn] = ns5.metaFillerLookup[fcn]
-        toyLhsDF.columns = pd.MultiIndex.from_frame(featureColumns)
-        toyLhsDF.index = saveIndex
-        allGroupIdx = pd.MultiIndex.from_tuples(
-            [tuple('all' for fgn in lhsDF.columns.names)],
-            names=lhsDF.columns.names)
-        allMask = pd.Series(True, index=toyLhsDF.columns).to_frame()
-        allMask.columns = allGroupIdx
-        maskDF = allMask.T
-        maskParams = [
-            {k: v for k, v in zip(maskDF.index.names, idxItem)}
-            for idxItem in maskDF.index
-            ]
-        maskParamsStr = [
-            '{}'.format(idxItem).replace("'", '')
-            for idxItem in maskParams]
-        maskDF.loc[:, 'maskName'] = maskParamsStr
-        maskDF.set_index('maskName', append=True, inplace=True)
-        lhsOutputLoadingMeta = outputLoadingMeta.copy()
-        lhsOutputLoadingMeta['arguments'] = arguments
-        lhsOutputLoadingMeta['arguments']['selectionName'] = arguments['selectionNameLhs']
-        hf.exportNormalizedDataFrame(
-            dataDF=toyLhsDF.loc[restrictMask, :], loadingMeta=lhsOutputLoadingMeta, featureInfoMask=maskDF,
-            # arguments=arguments, selectionName=arguments['selectionNameLhs'],
-            dataFramesFolder=dataFramesFolder, datasetName=outputDatasetName,
-            )

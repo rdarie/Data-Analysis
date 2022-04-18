@@ -191,7 +191,7 @@ if __name__ == '__main__':
         'covariateHistoryLen': .50,
         'nHistoryBasisTerms': 1,
         'nCovariateBasisTerms': 1,
-        'forceBinInterval': 5e-3,
+        'forceBinInterval': 3e-3,
         'minBinCount': 5,
         'calcTimeROI': True,
         'controlProportion': None,
@@ -295,7 +295,8 @@ if __name__ == '__main__':
     prettyNameLookup.update({
         'amplitude': 'Stim.\namplitude',
         'velocity': 'Pedal\nangular\nvelocity',
-        'mahalanobis': 'Mh. dist.',
+        'mahalanobis': 'Mahalanobis\ndistance',
+        'euclidean': 'Euclidean\ndistance',
     })
     pickingColors = False
     singlesPalette = pd.DataFrame(
@@ -351,10 +352,11 @@ if __name__ == '__main__':
     #
     #
     nDim = 3
+    dataColNames = ['data{}'.format(cN) for cN in range(nDim)]
     rotationOffset = 0 * np.asarray([1., 1., 1.]).reshape(3, 1)
     #
     latentMu = 0. * np.asarray([1., 1., 1.])
-    latentNoiseStd = 1.
+    latentNoiseStd = .5
     latentCovariance = np.eye(nDim) * (latentNoiseStd ** 2)
     #
     mu = np.asarray([0., 0., 0.])
@@ -370,7 +372,7 @@ if __name__ == '__main__':
     bins = np.arange(-100e-3, 510e-3, iteratorOpts['forceBinInterval'])
     kinWindow = (0., 500e-3)
     kinWindowJitter = 50e-3
-    kinWindowRamp = 150e-3
+    kinWindowRamp = 100e-3
     stimWindow = (0., 500e-3)
     stimWindowJitter = 100e-3
     stimWindowRamp = 50e-3
@@ -386,6 +388,7 @@ if __name__ == '__main__':
     mahalPaletteStr = "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1"
     lfpColor = np.asarray(sns.color_palette('Set3')[4])
     mhDistColor = np.asarray(sns.color_palette('Set3')[6])
+    euDistColor = np.asarray(sns.color_palette('Set3')[8])
     markerStyles = ['o', 'd', 's']
     scatterOpts = dict(
         alpha=0.5, linewidths=0, s=.8 ** 2,
@@ -407,11 +410,14 @@ if __name__ == '__main__':
     legendPcaDirs = ['pcaDir0', 'pcaDir1', 'pcaDir2']
     #
     legendData.loc['data'] = Line2D(
-        [0], [0], linestyle='-', linewidth=2, color=lfpColor,
+        [0], [0], linestyle='-', linewidth=1.5, color=lfpColor,
         label='LFP state')
     legendData.loc['mahalanobis'] = Line2D(
-        [0], [0], linestyle='-', linewidth=2, color=mhDistColor,
+        [0], [0], linestyle='-', linewidth=1.5, color=mhDistColor,
         label='Mh. dist.')
+    legendData.loc['euclidean'] = Line2D(
+        [0], [0], linestyle='-', linewidth=1.5, color=euDistColor,
+        label='Euclidean dist.')
     #
     legendData.loc['blank'] = Patch(alpha=0, linewidth=0, label=' ')
     #
@@ -743,7 +749,7 @@ if __name__ == '__main__':
             })
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 5.,
+            'velocity': 10.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -770,7 +776,7 @@ if __name__ == '__main__':
         ax[0].legend()
 
     latentNoiseDistr = stats.multivariate_normal(
-        mean=latentMu, cov=latentCovariance)
+        mean=latentMu, cov=latentCovariance, seed=42)
     latentNoise = latentNoiseDistr.rvs(scaledLhsDF.shape[0])
     # (latentNoise - latentNoise.mean(axis=0)) + latentMu
     latentRhsDF = pd.DataFrame(
@@ -796,7 +802,7 @@ if __name__ == '__main__':
             plt.show()
         termValues = pd.DataFrame(
             termMagnitudes[termName].to_numpy().reshape(-1, 1) * projectionLookup[termName],
-            columns=['data{}'.format(cN) for cN in range(nDim)], index=latentRhsDF.index
+            columns=dataColNames, index=latentRhsDF.index
             )
         latentRhsDF.loc[:, :] += termValues.to_numpy()
         if arguments['lowNoise']:
@@ -807,13 +813,13 @@ if __name__ == '__main__':
     toyRhsDF = pd.DataFrame(
         (wRot @ (embeddedDF - rotationOffset) + rotationOffset).T,
         index=latentRhsDF.index,
-        columns=['data{}'.format(cN) for cN in range(nDim)])
+        columns=dataColNames)
     if arguments['lowNoise']:
         cleanEmbeddedDF = (np.sqrt(explainedVar) @ cleanLatentRhsDF.to_numpy().T)
         cleanToyRhsDF = pd.DataFrame(
             (wRot @ (cleanEmbeddedDF - rotationOffset) + rotationOffset).T,
             index=cleanLatentRhsDF.index,
-            columns=['data{}'.format(cN) for cN in range(nDim)])
+            columns=dataColNames)
     #
     electrodeInfluence = (
             termMagnitudes['electrode:amplitude'] +
@@ -850,7 +856,7 @@ if __name__ == '__main__':
             extraRotMat = Rot.from_euler(
                 eulerOrder, [beta for beta in rotCoeffs[elecFactorName]],
                 degrees=True).as_matrix()
-            print('applying rotation for {}\nextraRotMat\n{}'.format(elecFactorName, extraRotMat))
+            # print('applying rotation for {}\nextraRotMat\n{}'.format(elecFactorName, extraRotMat))
             rotateMask = toyRhsDF.index.isin(group.index)
             tempToyData = toyRhsDF.loc[rotateMask, :].T.to_numpy()
             rotatedToyData = extraRotMat @ (tempToyData - rotationOffset) + rotationOffset
@@ -862,7 +868,7 @@ if __name__ == '__main__':
     #
     if not np.allclose(np.zeros((nDim, nDim)), residualCovariance):
         noiseDistr = stats.multivariate_normal(
-            mean=mu, cov=residualCovariance)
+            mean=mu, cov=residualCovariance, seed=42)
         noiseTerm = noiseDistr.rvs(toyRhsDF.shape[0])
         toyRhsDF += noiseTerm
         if arguments['lowNoise']:
@@ -883,21 +889,29 @@ if __name__ == '__main__':
         toyTrialInfo.loc[:, cN] = latentPlotDF[cN]
     maskForBaseline = toyTrialInfo['limbState x activeElectrode'] == 'baseline NA'
     # baseline_cov = LedoitWolf().fit(
-    #     rhsPlotDF.loc[maskForBaseline, toyRhsDF.columns])
+    #     rhsPlotDF.loc[maskForBaseline, dataColNames])
     baseline_cov = LedoitWolf().fit(
         toyRhsDF.loc[maskForBaseline, :])
+    #
+    u, s, v = np.linalg.svd(baseline_cov.covariance_)
+    baseline_cov.covariance_eigenvalues = s
+    baseline_cov.covariance_u = u
     rhsPlotDF.loc[:, 'mahalanobis'] = np.sqrt(baseline_cov.mahalanobis(toyRhsDF))
+    for i in range(nDim):
+        rhsPlotDF.loc[:, 'pc{}'.format(i)] = rhsPlotDF.apply(
+            lambda x: vg.scalar_projection((x[:3] - baseline_cov.location_), baseline_cov.covariance_u[:, i]),
+            axis='columns', raw=True)
+    rhsPlotDF.loc[:, 'euclidean'] = vg.euclidean_distance(rhsPlotDF.loc[:, dataColNames].to_numpy(), baseline_cov.location_)
     if arguments['lowNoise']:
         rhsPlotDF.loc[:, 'mahalanobis'] = rhsPlotDF.loc[:, 'mahalanobis'] * 0.
     #
-    pdb.set_trace()
     lOfMasksForBreakdown = [
         {
-            'mask': toyTrialInfo['electrode'].isin(['NA']).to_numpy() & toyTrialInfo['pedalMovementCat'].isin(['NA']).to_numpy(),
+            'mask': toyTrialInfo['limbState x activeElectrode'].isin(['baseline NA']).to_numpy(),
             'label': 'Baseline',
             'ellipsoidsToPlot': ['baseline NA']},
         {
-            'mask': toyTrialInfo['electrode'].isin(['NA']).to_numpy() & toyTrialInfo['pedalMovementCat'].isin(['outbound', 'return']).to_numpy(),
+            'mask': toyTrialInfo['limbState x activeElectrode'].isin(['baseline NA', 'moving NA']).to_numpy(),
             'label': 'Movement-only',
             'ellipsoidsToPlot': ['baseline NA', 'moving NA']},
         {
@@ -912,6 +926,22 @@ if __name__ == '__main__':
             'mask': toyTrialInfo['limbState x activeElectrode'].isin(['baseline + E16 - E9', 'baseline + E16 - E5', 'baseline NA', 'moving NA']).to_numpy(),
             'label': 'Stim.-only (electrodes X, Y)',
             'ellipsoidsToPlot': ['baseline NA', 'moving NA', 'baseline + E16 - E9', 'baseline + E16 - E5']},
+        {
+            'mask': toyTrialInfo['limbState x activeElectrode'].isin(['baseline + E16 - E9', 'baseline + E16 - E5', 'baseline NA', 'moving NA']).to_numpy(),
+            'label': 'Stim.-only (electrodes X, Y)',
+            'ellipsoidsToPlot': ['baseline NA', 'moving NA', 'baseline + E16 - E9', 'baseline + E16 - E5']},
+        {
+            'mask': toyTrialInfo['limbState x activeElectrode'].isin(['moving NA']).to_numpy(),
+            'label': 'Movement-only',
+            'ellipsoidsToPlot': ['moving NA']},
+        {
+            'mask': toyTrialInfo['limbState x activeElectrode'].isin(['baseline + E16 - E9']).to_numpy(),
+            'label': 'Stim.-only (electrode Y)',
+            'ellipsoidsToPlot': ['baseline + E16 - E9']},
+        {
+            'mask': toyTrialInfo['limbState x activeElectrode'].isin(['moving + E16 - E5']).to_numpy(),
+            'label': 'Stim.-movement (electrode X)',
+            'ellipsoidsToPlot': ['moving + E16 - E5']},
         ]
     lOfMasksForAnim = [
         {
@@ -919,7 +949,7 @@ if __name__ == '__main__':
             'label': 'Baseline',
             'ellipsoidsToPlot': ['baseline NA']},
         {
-            'mask': toyTrialInfo['electrode'].isin(['NA']).to_numpy() & toyTrialInfo['pedalMovementCat'].isin(['outbound']).to_numpy(),
+            'mask': toyTrialInfo['electrode'].isin(['NA']).to_numpy() & toyTrialInfo['pedalMovementCat'].isin(['outbound', 'return']).to_numpy(),
             'label': 'Movement-only',
             'ellipsoidsToPlot': ['baseline NA']},
         {
@@ -965,7 +995,6 @@ if __name__ == '__main__':
                 (ellipsoidScaleDict[name] * (emp_cov.covariance_) + 5. * np.eye(nDim)) @ unitSphere +
                 emp_cov.location_.reshape(3, 1))
             .reshape(3, *xEll.shape))
-        # pdb.set_trace()
         u, s, v = np.linalg.svd(emp_cov.covariance_)
         emp_cov.covariance_eigenvalues = s
         emp_cov.covariance_u = u
@@ -1021,7 +1050,7 @@ if __name__ == '__main__':
     def drawEllipsoidAxes(theAx, theName):
         x0, y0, z0 = empCovMats[theName].location_
         sx, sy, sz = np.sqrt(empCovMats[theName].covariance_eigenvalues) * 2
-        covarEigPlotOpts = dict(zorder=2.1, linewidth=.75)
+        covarEigPlotOpts = dict(zorder=2.1, linewidth=.5)
         #
         dx, dy, dz = sx * empCovMats[theName].covariance_u[:, 0]
         theAx.plot([x0, x0 + dx], [y0, y0 + dy], [z0, z0 + dz], color='c', **covarEigPlotOpts)
@@ -1032,14 +1061,14 @@ if __name__ == '__main__':
         return
 
     extent = (
-        rhsPlotDF.loc[:, toyRhsDF.columns.to_list() + colsToScale + ['mahalanobis']].quantile(1 - 1e-2) -
-        rhsPlotDF.loc[:, toyRhsDF.columns.to_list() + colsToScale + ['mahalanobis']].quantile(1e-2))
+        rhsPlotDF.loc[:, dataColNames + colsToScale + ['euclidean', 'mahalanobis']].quantile(1 - 1e-2) -
+        rhsPlotDF.loc[:, dataColNames + colsToScale + ['euclidean', 'mahalanobis']].quantile(1e-2))
     # xExtent, yExtent, zExtent = extent['data0'], extent['data1'], extent['data2']
-    masterExtent = extent.loc[toyRhsDF.columns.to_list()].max() * 0.5
+    masterExtent = extent.loc[dataColNames].max() * 0.5
     xExtent, yExtent, zExtent = masterExtent, masterExtent, masterExtent
     midPoints = (
-        rhsPlotDF.loc[:, toyRhsDF.columns.to_list() + colsToScale + ['mahalanobis']].quantile(1 - 1e-2) +
-        rhsPlotDF.loc[:, toyRhsDF.columns.to_list() + colsToScale + ['mahalanobis']].quantile(1e-2)) / 2
+        rhsPlotDF.loc[:, dataColNames + colsToScale + ['euclidean', 'mahalanobis']].quantile(1 - 1e-2) +
+        rhsPlotDF.loc[:, dataColNames + colsToScale + ['euclidean', 'mahalanobis']].quantile(1e-2)) / 2
     #
     def formatTheAxes(
             theAx, customMidPoints=None, customExtents=None,
@@ -1121,7 +1150,6 @@ if __name__ == '__main__':
         wQ[tooSmallMask] = 0.
         normsQ[tooSmallMask] = 0.
         #
-        # pdb.set_trace()
         cmapQ = sns.color_palette('flare_r', as_cmap=True)
         colorsQ = np.asarray([cmapQ(n) for n in normsQ])
         wQ *= 2
@@ -1141,9 +1169,9 @@ if __name__ == '__main__':
             #
 
             theAx.quiver(
-                xQ * xExt / 2 + xMid,
-                yQ * yExt / 2 + yMid,
-                zQ * zExt / 2 + zMid,
+                xQ * xExt + xMid,
+                yQ * yExt + yMid,
+                zQ * zExt + zMid,
                 uQ, vQ, wQ,
                 length=3., normalize=True, arrow_length_ratio=0.3,
                 colors=(.1, .1, .1, .3), linewidths=0.5,
@@ -1276,9 +1304,9 @@ if __name__ == '__main__':
                 plt.close()
         ########
         if iteratorSuffix in ['a', 'b', 'g']:
-            plotRelPlots = False
+            plotRelPlots = True
             if plotRelPlots:
-                tempCols = [cN for cN in toyRhsDF.columns] + [
+                tempCols = [cN for cN in dataColNames] + [
                     'limbState x activeElectrode', 'pedalMovementCat x electrode']
                 rhsPlotDFStack = pd.DataFrame(
                     rhsPlotDF.loc[:, tempCols].to_numpy(),
@@ -1364,7 +1392,7 @@ if __name__ == '__main__':
                 else:
                     plt.close()
                 ###
-            plotCovMats = False
+            plotCovMats = True
             if plotCovMats:
                 nCols = int(np.ceil(np.sqrt(len(limbStateElectrodeNames))))
                 nRows = int(np.floor(len(limbStateElectrodeNames) / nCols))
@@ -1376,8 +1404,7 @@ if __name__ == '__main__':
                     )
                 fig = plt.figure()
                 fig.set_size_inches((2 * nCols + .1, 2 * nRows))
-                covMatIndex = [prettyNameLookup[cN] for cN in toyRhsDF.columns]
-                # pdb.set_trace()
+                covMatIndex = [prettyNameLookup[cN] for cN in dataColNames]
                 vMax = max([ecm.covariance_.max() for _, ecm in empCovMats.items()])
                 vMin = max([ecm.covariance_.min() for _, ecm in empCovMats.items()])
                 for axIdx, name in enumerate(limbStateElectrodeNames):
@@ -1413,105 +1440,154 @@ if __name__ == '__main__':
                     # for maskDict in lOfMasksByLimbStateActiveElectrode:
                     # for maskDict in lOfMasksForBreakdown:
                     # lOfMasksForAnim
-                    with matplotlib.rc_context({'axes.titlepad': -20}):
-                        fig = plt.figure()
-                        fig.set_size_inches((6, 6))
-                        ax = fig.add_subplot(projection='3d')
-                        ax.set_proj_type('ortho')
-                        #
-                        thisMask = maskDict['mask']
-                        if 'ellipsoidsToPlot' in maskDict:
-                            ellipsoidsToPlot = maskDict['ellipsoidsToPlot']
-                        else:
-                            ellipsoidsToPlot = rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique()
-                        for name in ellipsoidsToPlot:
-                            ax.plot_surface(
-                                *ellipsoidDict[name],
-                                color=sns.utils.alter_color(covPatternPalette[name], l=.3),
-                                **ellipsoidPlotOpts
-                                )
-                            if not arguments['lowNoise']:
-                                drawEllipsoidAxes(ax, name)
-                            if arguments['forceField']:
-                                drawForceField(ax)
-                        if markersByLimbStateElectrode:
-                            for name in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique():
-                                nameMask = rhsPlotDF['limbState x activeElectrode'] == name
-                                ax.scatter(
-                                    rhsPlotDF.loc[(thisMask & nameMask), 'data0'],
-                                    rhsPlotDF.loc[(thisMask & nameMask), 'data1'],
-                                    rhsPlotDF.loc[(thisMask & nameMask), 'data2'],
-                                    ##
-                                    # c=rhsPlotDF.loc[(thisMask & nameMask), 'electrodeInfluence'],
-                                    # cmap=sns.color_palette(ampPaletteStr, as_cmap=True),
-                                    c=covPatternPalette[name],
-                                    ##
-                                    marker=limbStateElectrodeMarkerDict[name],
-                                    # s=group['movementInfluence'],
-                                    **scatterOpts)
-                        else:
-                            ax.scatter(
-                                rhsPlotDF.loc[thisMask, 'data0'],
-                                rhsPlotDF.loc[thisMask, 'data1'],
-                                rhsPlotDF.loc[thisMask, 'data2'],
-                                # cmap=sns.color_palette(ampPaletteStr, as_cmap=True),
-                                # c=rhsPlotDF.loc[thisMask, 'electrodeInfluence'],
-                                c=[covPatternPalette[lse] for lse in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode']],
-                                # c=lfpColor, s=group['movementInfluence'],
-                                **scatterOpts)
-                        theseLegendEntries = legendData.loc[
-                            ['ellipsoid'] + ellipsoidsToPlot +
-                            ['blank'] + legendPcaDirs]
-                        ax.legend(
-                            handles=theseLegendEntries.to_list(),
-                            loc='center right')
-                        # fig.suptitle(
-                        #     maskDict['label'] + '\n\n' + '\n'.join(rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique()))
-                        # figTitle = fig.suptitle(maskDict['label'], y=0.9)
-                        ##
-                        # zF = 1.8 if (maskDict['label'] == 'Baseline') else 1.
-                        # formatTheAxes(ax, zoomFactor=zF, showOrigin=False)
-                        ##
-                        formatTheAxes(ax, zoomFactor=1.2)
-                        fig.tight_layout(pad=styleOpts['tight_layout.pad'])
-                        pdf.savefig(
-                            bbox_inches='tight', pad_inches=0, # bbox_extra_artists=[figTitle]
+                    fig = plt.figure()
+                    fig.set_size_inches((4, 4))
+                    ax = fig.add_subplot(projection='3d')
+                    ax.set_proj_type('ortho')
+                    #
+                    thisMask = maskDict['mask']
+                    if 'ellipsoidsToPlot' in maskDict:
+                        ellipsoidsToPlot = maskDict['ellipsoidsToPlot']
+                    else:
+                        ellipsoidsToPlot = rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique()
+                    for name in ellipsoidsToPlot:
+                        ax.plot_surface(
+                            *ellipsoidDict[name],
+                            color=sns.utils.alter_color(covPatternPalette[name], l=.3),
+                            **ellipsoidPlotOpts
                             )
-                        if arguments['showFigures']:
-                            plt.show()
-                        else:
-                            plt.close()
+                        if not arguments['lowNoise']:
+                            drawEllipsoidAxes(ax, name)
+                    if arguments['forceField']:
+                        drawForceField(ax)
+                    if markersByLimbStateElectrode:
+                        for name in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique():
+                            nameMask = rhsPlotDF['limbState x activeElectrode'] == name
+                            ax.scatter(
+                                rhsPlotDF.loc[(thisMask & nameMask), 'data0'],
+                                rhsPlotDF.loc[(thisMask & nameMask), 'data1'],
+                                rhsPlotDF.loc[(thisMask & nameMask), 'data2'],
+                                ##
+                                # c=rhsPlotDF.loc[(thisMask & nameMask), 'electrodeInfluence'],
+                                # cmap=sns.color_palette(ampPaletteStr, as_cmap=True),
+                                c=covPatternPalette[name],
+                                ##
+                                marker=limbStateElectrodeMarkerDict[name],
+                                # s=group['movementInfluence'],
+                                **scatterOpts)
+                    else:
+                        ax.scatter(
+                            rhsPlotDF.loc[thisMask, 'data0'],
+                            rhsPlotDF.loc[thisMask, 'data1'],
+                            rhsPlotDF.loc[thisMask, 'data2'],
+                            # cmap=sns.color_palette(ampPaletteStr, as_cmap=True),
+                            # c=rhsPlotDF.loc[thisMask, 'electrodeInfluence'],
+                            c=[covPatternPalette[lse] for lse in rhsPlotDF.loc[thisMask, 'limbState x activeElectrode']],
+                            # c=lfpColor, s=group['movementInfluence'],
+                            **scatterOpts)
+                    theseLegendEntries = legendData.loc[
+                        ['ellipsoid'] + ellipsoidsToPlot +
+                        ['blank'] + legendPcaDirs]
+                    ax.legend(
+                        handles=theseLegendEntries.to_list(),
+                        loc='lower right')
+                    figTitleStr = 'Synthetic data'
+                    figTitle = fig.suptitle(figTitleStr, x=0.3, y=0.9, fontsize=9, fontweight='bold')
+                    # fig.suptitle(
+                    #     maskDict['label'] + '\n\n' + '\n'.join(rhsPlotDF.loc[thisMask, 'limbState x activeElectrode'].unique()))
+                    # figTitle = fig.suptitle(maskDict['label'], y=0.9)
+                    ##
+                    # zF = 1.8 if (maskDict['label'] == 'Baseline') else 1.
+                    # formatTheAxes(ax, zoomFactor=zF, showOrigin=False)
+                    ##
+                    formatTheAxes(ax, zoomFactor=1.2)
+                    fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+                    pdf.savefig(
+                        bbox_inches='tight', pad_inches=0,
+                        bbox_extra_artists=[figTitle]
+                        )
+                    if arguments['showFigures']:
+                        plt.show()
+                    else:
+                        plt.close()
     ############################################
     makeAnimations = True
     if makeAnimations:
-        slowFactor = 10
+        overlayMhDist = False
+        slowFactor = 20
         fps = int(iteratorOpts['forceBinInterval'] ** (-1) / slowFactor)
         tailLength = 3
-        aniLineKws = {'linestyle': '-', 'linewidth': 1.5}
-        cometLineKws = {'linestyle': '-', 'linewidth': 1.}
-        mhLineKws = {'linestyle': '-', 'linewidth': 2.}
-        aniMarkerKws = {'marker': 'o', 'markersize': 2, 'linewidth': 0}
-        whatToPlot = ['data0', 'data1', 'data2', 'amplitude']
-        if not arguments['lowNoise']:
-            whatToPlot += ['mahalanobis']
+        aniLineKws = {'linestyle': '-', 'linewidth': 1.}
+        cometLineKws = {'linestyle': '-', 'linewidth': 0.7}
+        mhLineKws = {'linestyle': '-', 'linewidth': 1.}
+        aniMarkerKws = {'marker': 'o', 'markersize': 1., 'linewidth': 0}
         cMap = sns.color_palette(ampPaletteStr, as_cmap=True)
         cMapScaleFun = lambda am: cMap.colors.shape[0] * min(1, max(0, (am - rhsPlotDF['amplitude'].min()) / (rhsPlotDF['amplitude'].max() - rhsPlotDF['amplitude'].min())))
+        #
         cMapMahal = sns.color_palette(mahalPaletteStr, as_cmap=True)
         cMapMahalScaleFun = lambda am: cMapMahal.colors.shape[0] * min(1, max(0, (am - rhsPlotDF['mahalanobis'].min()) / (
-                    rhsPlotDF['mahalanobis'].max() - rhsPlotDF['mahalanobis'].min())))
+            rhsPlotDF['mahalanobis'].max() - rhsPlotDF['mahalanobis'].min())))
         for maskIdx, maskDict in enumerate(lOfMasksForAnim):
-            if maskIdx not in [mi for mi in range(len(lOfMasksForAnim))]:
-                continue
+            # if maskIdx not in [mi for mi in range(len(lOfMasksForAnim))]:
+            #     continue
+            whatToPlot = ['data0', 'data1', 'data2']
+            if maskIdx in [1]:
+                whatToPlot += ['velocity']
+            if maskIdx in [2, 3]:
+                whatToPlot += ['amplitude']
+            if (not arguments['lowNoise']) and (maskIdx in [1, 2, 3]):
+                whatToPlot += ['mahalanobis', 'euclidean']
+
+            customMidPoints = (
+                rhsPlotDF.loc[maskDict['mask'], whatToPlot].quantile(1 - 1e-2) +
+                rhsPlotDF.loc[maskDict['mask'], whatToPlot].quantile(1e-2)) / 2
+            customExtents = (
+                rhsPlotDF.loc[maskDict['mask'], whatToPlot].quantile(1 - 1e-2) -
+                rhsPlotDF.loc[maskDict['mask'], whatToPlot].quantile(1e-2))
+            #
+            print(customExtents)
+
+            chooseSomeTrials = toyTrialInfo.loc[
+                maskDict['mask'] & (toyTrialInfo['trialAmplitude'] == toyTrialInfo.loc[
+                    maskDict['mask'], 'trialAmplitude'].max()), 'trialUID'].unique()[:2]
+            thisMask = maskDict['mask'] & toyTrialInfo['trialUID'].isin(chooseSomeTrials)
+            dataDF = rhsPlotDF.loc[thisMask, :].copy().reset_index(drop=True)
+            dataFor3D = dataDF.loc[:, ['data0', 'data1', 'data2']].T.to_numpy()
+            dataDF.loc[:, 'trialUID'] = toyTrialInfo.loc[thisMask, 'trialUID'].to_numpy()
+            nFrames = min(500, dataDF.shape[0])
+            #
+            if maskIdx in [0]:
+                distanceSamples = (
+                    dataDF.loc[:, ['euclidean', 'mahalanobis']]
+                        .sort_values(by='mahalanobis', ascending=False).iloc[:10, :])
+                stillsToSave = [
+                    distanceSamples['euclidean'].idxmax(),
+                    distanceSamples['euclidean'].idxmin(),
+                    ]
+            elif maskIdx in [2, 3]:
+                stillsToSave = [int(bins.shape[0] - 1)]
+            else:
+                stillsToSave = []
+            progBar = tqdm(total=nFrames, mininterval=1., maxinterval=30.)
             print('Starting to generate animation for {}'.format(maskDict['label']))
+            print(whatToPlot)
+            print(dataDF)
+            consistentAxes = (not (maskDict['label'] == 'Baseline'))
             aniPath = os.path.join(
                 figureOutputFolder,
-                'synthetic_dataset_{}_mask_{}{}.mp4'.format(
+                'synthetic_animation_{}_mask_{}{}.mp4'.format(
                     iteratorSuffix, maskIdx, specialSuffix))
+            stillPath = os.path.join(
+                figureOutputFolder,
+                'synthetic_stills_XXX_{}_mask_{}{}.pdf'.format(
+                    iteratorSuffix, maskIdx, specialSuffix))
+            #
             fig = plt.figure()
             nRows = len(whatToPlot)
             nCols = 2
-            inchesPerRow = .8
-            fig.set_size_inches((inchesPerRow * nCols * nRows, inchesPerRow * nRows))
+            # inchesPerRow = .7
+            # fig.set_size_inches((inchesPerRow * nCols * nRows, inchesPerRow * nRows))
+            fig.set_size_inches((8, 4))
             gs = GridSpec(
                 nRows, nCols,
                 width_ratios=[3, 2],
@@ -1521,21 +1597,6 @@ if __name__ == '__main__':
             ax3d = fig.add_subplot(gs[:, 0], projection='3d')
             ax3d.set_proj_type('ortho')
             ax2d = [fig.add_subplot(gs[i, 1]) for i in range(nRows)]
-            #
-            chooseSomeTrials = toyTrialInfo.loc[maskDict['mask'] & (toyTrialInfo['trialAmplitude'] == toyTrialInfo.loc[maskDict['mask'], 'trialAmplitude'].max()), 'trialUID'].unique()[:3]
-            thisMask = maskDict['mask'] & toyTrialInfo['trialUID'].isin(chooseSomeTrials)
-            dataDF = rhsPlotDF.loc[thisMask, :].copy()
-            dataFor3D = dataDF.loc[:, ['data0', 'data1', 'data2']].T.to_numpy()
-            dataDF.loc[:, 'trialUID'] = toyTrialInfo.loc[thisMask, 'trialUID']
-            nFrames = min(500, dataDF.shape[0])
-            progBar = tqdm(total=nFrames, mininterval=30., maxinterval=120.)
-
-            customMidPoints = (
-                  toyRhsDF.loc[maskDict['mask'], :].quantile(1 - 1e-2) +
-                  toyRhsDF.loc[maskDict['mask'], :].quantile(1e-2)) / 2
-            customExtents = (
-                    toyRhsDF.loc[maskDict['mask'], :].quantile(1 - 1e-2) -
-                    toyRhsDF.loc[maskDict['mask'], :].quantile(1e-2))
 
             for name in maskDict['ellipsoidsToPlot']:
                 ax3d.plot_surface(
@@ -1544,7 +1605,10 @@ if __name__ == '__main__':
                     **ellipsoidPlotOpts)
                 if not arguments['lowNoise']:
                     drawEllipsoidAxes(ax3d, name)
-                if arguments['forceField']:
+            if arguments['forceField']:
+                if consistentAxes:
+                    drawForceField(ax3d)
+                else:
                     drawForceField(
                         ax3d,
                         customMidPoints=[
@@ -1552,9 +1616,9 @@ if __name__ == '__main__':
                             customMidPoints['data1'],
                             customMidPoints['data2']],
                         customExtents=[
-                            customExtents.max(),
-                            customExtents.max(),
-                            customExtents.max()],
+                            customExtents.max() / 2,
+                            customExtents.max() / 2,
+                            customExtents.max() / 2],
                             )
             #
             cometTailLines = [None for i in range(tailLength)]
@@ -1573,44 +1637,68 @@ if __name__ == '__main__':
                 **mhLineKws)[0]
             #
             for axIdx, thisAx in enumerate(ax2d):
-                thisAx.fullTrace = dataDF[whatToPlot[axIdx]]
                 thisLine, = thisAx.plot([], [], **aniLineKws)
                 thisAx.plotLine = thisLine
                 newXLims = (dataDF['bin'].min(), dataDF['bin'].max())
                 thisAx.set_xlim(newXLims)
                 thisAx.set_ylabel(prettyNameLookup[whatToPlot[axIdx]])
                 thisAx.set_yticklabels([])
+                #
+                if consistentAxes:
+                    midP = midPoints[whatToPlot[axIdx]]
+                    if whatToPlot[axIdx] == 'mahalanobis':
+                        thisExt = extent[whatToPlot[axIdx]] * 0.7
+                    else:
+                        thisExt = extent[whatToPlot[axIdx]]
+                else:
+                    midP = customMidPoints[whatToPlot[axIdx]]
+                    if whatToPlot[axIdx] == 'mahalanobis':
+                        thisExt = customExtents[whatToPlot[axIdx]] * 0.7
+                    else:
+                        thisExt = customExtents[whatToPlot[axIdx]]
                 thisAx.set_ylim(
-                    rhsPlotDF[whatToPlot[axIdx]].min() - extent[whatToPlot[axIdx]] * 1e-2,
-                    rhsPlotDF[whatToPlot[axIdx]].max() + extent[whatToPlot[axIdx]] * 1e-2)
+                    rhsPlotDF[whatToPlot[axIdx]].min() - thisExt * 5e-2,
+                    rhsPlotDF[whatToPlot[axIdx]].max() + thisExt * 5e-2)
+                for dataIdx, dataName in enumerate(dataColNames):
+                    if whatToPlot[axIdx] == dataName:
+                        thisAx.axhline(
+                            baseline_cov.location_[dataIdx],
+                            color='.3', zorder=0.9, lw=0.5, ls='--')
                 if axIdx == (len(ax2d) - 1):
                     thisAx.set_xlabel('Time (sec)')
                 else:
                     thisAx.set_xticklabels([])
             #
-            # fig.suptitle(figTitleStr)
-            # figTitleStr = maskDict['label']
+            annotationText = ax3d.text2D(0.02, 0.90, '', transform=ax3d.transAxes)
+            figTitleStr = 'Synthetic data: ' + maskDict['label']
+            figTitle = fig.suptitle(figTitleStr, x=0.3, y=0.9, fontsize=9, fontweight='bold')
             # ax3d.set_title(figTitleStr)
             # zF = 1.9 if name == 'baseline NA' else 1.2
             # formatTheAxes(ax3d, zoomFactor=zF)
             #
-            formatTheAxes(
-                ax3d,
-                customMidPoints=[
-                    customMidPoints['data0'],
-                    customMidPoints['data1'],
-                    customMidPoints['data2']],
-                customExtents=[
-                    customExtents.max() * 0.5,
-                    customExtents.max() * 0.5,
-                    customExtents.max() * 0.5],
-                )
+            if consistentAxes:
+                formatTheAxes(ax3d)
+            else:
+                formatTheAxes(
+                    ax3d,
+                    customMidPoints=[
+                        customMidPoints['data0'],
+                        customMidPoints['data1'],
+                        customMidPoints['data2']],
+                    customExtents=[
+                        customExtents.max() * 0.5,
+                        customExtents.max() * 0.5,
+                        customExtents.max() * 0.5],
+                    )
             sns.despine(fig=fig)
-            theseLegendEntries = legendData.loc[
-                ['ellipsoid'] + maskDict['ellipsoidsToPlot'] + ['blank'] +
-                legendPcaDirs +
-                ['blank'] + ['data', 'mahalanobis']]
-            ax3d.legend(handles=theseLegendEntries.to_list(), loc='lower right')
+            theseLegendEntries = (
+                ['ellipsoid'] + maskDict['ellipsoidsToPlot'] +
+                ['blank'] + legendPcaDirs + ['blank'] + ['data'])
+            if (not arguments['lowNoise']) and overlayMhDist:
+                theseLegendEntries += ['mahalanobis']
+            ax3d.legend(
+                handles=legendData.loc[theseLegendEntries].to_list(),
+                loc='lower right')
             #
             def animate(idx):
                 colorVal = dataDF['amplitude'].iloc[idx]
@@ -1620,22 +1708,27 @@ if __name__ == '__main__':
                 currTrialUID = dataDF['trialUID'].iloc[idx]
                 #
                 currMHDist = dataDF['mahalanobis'].iloc[idx]
+                currEuDist = dataDF['euclidean'].iloc[idx]
+                #
                 rgbaColorMahal = np.asarray(cMapMahal(cMapMahalScaleFun(currMHDist)))
+                #
                 tMask = ((dataDF['trialUID'] == currTrialUID) & (dataDF['bin'] <= currBin)).to_numpy()
                 #
                 for axIdx, thisAx in enumerate(ax2d):
-                    thisAx.plotLine.set_data(dataDF.loc[tMask, 'bin'], thisAx.fullTrace.loc[tMask])
+                    thisAx.plotLine.set_data(dataDF.loc[tMask, 'bin'], dataDF.loc[tMask, whatToPlot[axIdx]])
                     if whatToPlot[axIdx] in ['amplitude']:
                         thisAx.plotLine.set_color(rgbaColor)
                     elif whatToPlot[axIdx] in ['mahalanobis']:
                         thisAx.plotLine.set_color(rgbaColorMahal)
                     elif 'data' in whatToPlot[axIdx]:
                         thisAx.plotLine.set_color(lfpColor)
+                    elif whatToPlot[axIdx] in ['euclidean']:
+                        thisAx.plotLine.set_color(euDistColor)
                     else:
                         thisAx.plotLine.set_color('k')
                 #
-                mhData = np.stack([dataFor3D[0:3, idx], baseline_cov.location_], axis=1)
-                if not arguments['lowNoise']:
+                if (not arguments['lowNoise']) and overlayMhDist:
+                    mhData = np.stack([dataFor3D[0:3, idx], baseline_cov.location_], axis=1)
                     mhLine.set_data(mhData[0:2, :])
                     mhLine.set_3d_properties(mhData[2, :])
                     mhLine.set_color(rgbaColorMahal)
@@ -1655,13 +1748,24 @@ if __name__ == '__main__':
                         cometTailLines[ptIdx].set_data(dataFor3D[0:2, idx - ptIdx - 1:idx - ptIdx + 1])
                         cometTailLines[ptIdx].set_3d_properties(dataFor3D[2, idx - ptIdx - 1:idx - ptIdx + 1])
                         cometTailLines[ptIdx].set_color(rgbaColor)
+                # annotationText.set_text('idx = {}; Mh. dist. = {:.2f}'.format(idx, currMHDist))
+                if idx in stillsToSave:
+                    print(
+                        'maskIdx {}, saving frame: idx = {};\nMh. dist. = {:.2f}; Euclid. dist. = {:.2f}'
+                            .format(maskIdx, idx, currMHDist, currEuDist))
+                    thisStillPath = stillPath.replace('XXX', '{:02d}'.format(idx))
+                    fig.savefig(
+                        thisStillPath,
+                        bbox_inches='tight', pad_inches=0,
+                        )
                 if progBar is not None:
                     progBar.update(1)
                 return
-
+            #
             ani = animation.FuncAnimation(
                 fig, animate, frames=nFrames,
                 interval=int(1e3 / fps), blit=False)
+            #
             saveToFile = True
             if saveToFile:
                 writer = FFMpegWriter(
@@ -1699,7 +1803,7 @@ if __name__ == '__main__':
             columns=rhsDF.columns.names)
         for fcn in rhsDF.columns.names:
             if fcn == 'feature':
-                featureColumns.loc[:, fcn] = toyRhsDF.columns
+                featureColumns.loc[:, fcn] = dataColNames
             elif fcn == 'lag':
                 featureColumns.loc[:, fcn] = 0
             else:

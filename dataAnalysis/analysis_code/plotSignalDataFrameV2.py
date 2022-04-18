@@ -129,7 +129,7 @@ mplRCParams = {
 sns.set(
     context='talk', style='white',
     palette='dark', font='sans-serif',
-    font_scale=1, color_codes=True, rc=snsRCParams)
+    font_scale=1.5, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
 
@@ -219,6 +219,7 @@ if __name__ == '__main__':
         else:
             normalizeDataset = None
     dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    # np.unique(dataDF.index.get_level_values('bin'))
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     featureInfo = dataDF.columns.to_frame().reset_index(drop=True)
     print('Signal columns are:\n{}'.format(featureInfo))
@@ -263,6 +264,22 @@ if __name__ == '__main__':
             dataDF = dataDF.loc[keepMask, :]
             trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     #
+    if arguments['plotSuffix'] in detrendLookup:
+        detrendType = detrendLookup[arguments['plotSuffix']]
+    else:
+        detrendType = 'noDetrend'
+    if detrendType == 'perTrial':
+        for name, group in dataDF.groupby(['expName', 't']):
+            tBins = group.index.get_level_values('bin')
+            baselineTMask = (tBins >= -400e-3) & (tBins <= -200e-3)
+            baseline = group.loc[baselineTMask, :].median()
+            dataDF.loc[group.index, :] = group - baseline
+    elif detrendType == 'global':
+        tBins = dataDF.index.get_level_values('bin')
+        baselineTMask = (tBins >= -400e-3) & (tBins <= -200e-3)
+        baseline = dataDF.loc[baselineTMask, :].median()
+        dataDF = dataDF - baseline
+    #
     tMask = pd.Series(True, index=trialInfo.index)
     if arguments['winStop'] is not None:
         tMask = tMask & (trialInfo['bin'] < (float(arguments['winStop']) * 1e-3))
@@ -275,7 +292,6 @@ if __name__ == '__main__':
     #
     tBins = trialInfo['bin'].unique()
     targetFrameLen = 2 * useDPI * relplotKWArgs['height'] * relplotKWArgs['aspect'] # nominal num. points per facet
-    # pdb.set_trace()
     if tBins.shape[0] > targetFrameLen:
         skipFactor = int(np.ceil(tBins.shape[0] // targetFrameLen))
         tMask2 = trialInfo['bin'].isin(tBins[::skipFactor])
@@ -400,6 +416,7 @@ if __name__ == '__main__':
                 idxGrouper = [('all', colGroup)]
             else:
                 idxGrouper = colGroup.groupby(groupPagesByIndex, sort=False)
+            #
             if arguments['plotSuffix'] in shareyAcrossPagesLookup:
                 shareyAcrossPages = shareyAcrossPagesLookup[arguments['plotSuffix']]
             else:
@@ -441,6 +458,9 @@ if __name__ == '__main__':
             for idxGroupName, idxGroup in idxGrouper:
                 plotDF = idxGroup.stack(level=idxGroup.columns.names).reset_index(name='signal')
                 # plotDF = dataDF.loc[:, colGroupName].reset_index(name='signal')
+                ####
+                # if plotDF['freqBandName'].unique()[0] != 'beta':
+                #     continue
                 print('plotDF.columns = {}'.format(plotDF.columns))
                 rowColArgs = {}
                 for axn in ['row', 'col']:
@@ -453,9 +473,10 @@ if __name__ == '__main__':
                 g = sns.relplot(
                     x='bin', y='signal',
                     **rowColArgs, **relplotKWArgs, data=plotDF)
-                ##
-                # why is this info missing??
+                ########################################################
+                # TODO: why is this info missing??
                 g._hue_var = hueVar
+                ##########################################################
                 if 'palette' in relplotKWArgs:
                     g.hue_names = [hN for hN in relplotKWArgs['palette'].keys()]
                     g.hue_kws['palette'] = relplotKWArgs['palette']

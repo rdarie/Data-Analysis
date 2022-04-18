@@ -46,11 +46,12 @@ do
   # exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100
   # exp202101281100, exp202102021100, exp202101211100,
   #######
-  ## plotSuffixes=(all move_no_stim rest_stim outbound_stim outbound_no_move)
-  plotSuffixes=(move_no_stim)
+  ## plotSuffixes=(all move_E09 outbound_E04 rest_E04 rest_stim outbound_stim outbound_no_move)
+  plotSuffixes=(move_E09)
+  #
   for PS in "${plotSuffixes[@]}"
   do
-    python -u "./plotSignalRecruitmentAcrossExpV3.py" --plotSuffix=$PS --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+    python -u "./plotSignalRecruitmentAcrossExpV4.py" --plotSuffix=$PS --freqBandGroup=1 --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
   done
   ###
   ##plotSuffixes=(all best_three)

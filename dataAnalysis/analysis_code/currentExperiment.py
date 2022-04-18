@@ -6,6 +6,30 @@ import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
 import pandas as pd
 
+customSeabornContexts = {
+    'talk': {
+        'axes.linewidth': 0.9, 'grid.linewidth': 0.7, 'lines.linewidth': 1.,
+        'lines.markersize': 9., 'patch.linewidth': 0.8,
+        'xtick.major.width': 0.9,
+        'ytick.major.width': 0.9, 'xtick.minor.width': 0.7, 'ytick.minor.width': 0.7,
+        'xtick.major.size': 4.5, 'ytick.major.size': 4.5, 'xtick.minor.size': 3.0,
+        'ytick.minor.size': 3.0,
+        'font.size': 12., 'axes.labelsize': 16., 'axes.titlesize': 16.,
+        'xtick.labelsize': 12., 'ytick.labelsize': 12., 'legend.fontsize': 16.,
+        'legend.title_fontsize': 18.
+        },
+    'paper': {
+        'axes.linewidth': 0.5, 'grid.linewidth': 0.3, 'lines.linewidth': .5,
+        'lines.markersize': 2, 'patch.linewidth': 0.4, 'xtick.major.width': 0.4,
+        'ytick.major.width': 0.4, 'xtick.minor.width': 0.2, 'ytick.minor.width': 0.2,
+        'xtick.major.size': 2., 'ytick.major.size': 2., 'xtick.minor.size': 1.5,
+        'ytick.minor.size': 1.5,
+        'font.size': 5., 'axes.labelsize': 7., 'axes.titlesize': 7.,
+        'xtick.labelsize': 5., 'ytick.labelsize': 5., 'legend.fontsize': 7.,
+        'legend.title_fontsize': 9.
+    }
+}
+
 def parseAnalysisOptions(
         blockIdx=1, experimentShorthand=None):
     plottingFigures = False
@@ -1002,10 +1026,10 @@ def parseAnalysisOptions(
         'scaledRAUC': 'AUC (a.u.)',
         'clippedRAUC': 'AUC (a.u.)',
         'T': 'T',
-        'hedges': 'Hedges\' g',
+        'hedges': 'Effect size (g)',
         'cohen-d': 'Cohen\'s d',
         'coef': r"$\beta$",
-        'coefStd': 'Regr. coef., {}'.format(r"$\beta$"),
+        'coefStd': 'Standardized\nregression\ncoefficient\n({})'.format(r"$\beta$"),
         'electrode = NA': 'No stim.',
         'stimCondition = NA_0.0': 'No stim.',
         'NA': 'No stim.',
@@ -1023,19 +1047,19 @@ def parseAnalysisOptions(
         'return_CCW': 'Return to start\n(flexion)',
         'outbound_CCW': 'Start of movement\n(flexion)',
         'return_CW': 'Return to start\n(extension)',
-        'feature = mahal_ledoit_all': 'Mahal. dist.\n(Broadband)',
-        'feature = mahal_ledoit_alpha': 'Mahal. dist.\n(Alpha)',
-        'feature = mahal_ledoit_beta': 'Mahal. dist.\n(Beta)',
-        'feature = mahal_ledoit_gamma': 'Mahal. dist.\n(Gamma)',
-        'feature = mahal_ledoit_higamma': 'Mahal. dist.\n(High gamma)',
-        'feature = mahal_ledoit_spb': 'Mahal. dist.\n(Spike band)',
+        'feature = mahal_ledoit_all': 'Broadband mh. dist.',
+        'feature = mahal_ledoit_alpha': 'Alpha mh. dist.',
+        'feature = mahal_ledoit_beta': 'Beta mh. dist.',
+        'feature = mahal_ledoit_gamma': 'Gamma mh. dist.',
+        'feature = mahal_ledoit_higamma': 'High gamma\nmh. dist.',
+        'feature = mahal_ledoit_spb': 'Spike band\nmh. dist.',
         #
-        'mahal_ledoit_all': 'Mahal. dist.\n(Broadband)',
-        'mahal_ledoit_alpha': 'Mahal. dist.\n(Alpha)',
-        'mahal_ledoit_beta': 'Mahal. dist.\n(Beta)',
-        'mahal_ledoit_gamma': 'Mahal. dist.\n(Gamma)',
-        'mahal_ledoit_higamma': 'Mahal. dist.\n(High gamma)',
-        'mahal_ledoit_spb': 'Mahal. dist.\n(Spike band)',
+        'mahal_ledoit_all': 'Broadband mh. dist.',
+        'mahal_ledoit_alpha': 'Alpha mh. dist.',
+        'mahal_ledoit_beta': 'Beta mh. dist.',
+        'mahal_ledoit_gamma': 'Gamma mh. dist.',
+        'mahal_ledoit_higamma': 'High gamma\nmh. dist.',
+        'mahal_ledoit_spb': 'Spike band\nmh. dist.',
         #
         'freqBandName': 'Frequency band',
         'electrode': 'Stim. electrode (cathode)',
@@ -1052,17 +1076,17 @@ def parseAnalysisOptions(
         '0.0': 'No stim.',
         '50.0': '50',
         '100.0': '100',
-        '0.0_md': 'No stim. (Mahal. dist.)',
-        '50.0_md': '50 (Mahal. dist.)',
-        '100.0_md': '100 (Mahal. dist.)',
+        '0.0_md': 'No stim. (Mh. dist.)',
+        '50.0_md': '50 (Mh. dist.)',
+        '100.0_md': '100 (Mh. dist.)',
         'namesAndMD': 'Regressors',
         'trialRateInHz': 'Stim. rate (Hz)',
         'trialAmplitude': 'Stim. amplitude (uA)',
         'amplitude': 'Stim. amplitude (uA)',
         'velocity': 'Pedal angular velocity (a.u.)',
         'trialAmplitude:trialRateInHz': 'Stim. rate interaction',
-        'trialAmplitude_md': 'Stim. amplitude (Mahal. dist.)',
-        'trialAmplitude:trialRateInHz_md': 'Stim. rate interaction (Mahal. dist.)',
+        'trialAmplitude_md': 'Stim. amplitude (Mh. dist.)',
+        'trialAmplitude:trialRateInHz_md': 'Stim. rate interaction (Mh. dist.)',
         'stimCondition = NA_0.0': 'No stim.',
         'stimCondition': 'Electrode\nStim. Rate (Hz)',
         'NA_0.0': 'No stim.',
@@ -1084,12 +1108,13 @@ def parseAnalysisOptions(
             prettyNameLookup['freqBandName = {}'.format(fbn)] = prettyNameLookup[fbn]
         for eIdx in range(99):
             fbSuffix = '_{}'.format(fbn) if fbn is not None else ''
-            fbPrettyName = '\n({})'.format(prettyNameLookup[fbn]) if fbn is not None else ''
-            prettyNameLookup['feature = utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
-            prettyNameLookup['utah_csd_{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
+            # fbPrettyName = '\n({})'.format(prettyNameLookup[fbn]) if fbn is not None else ''
+            fbPrettyName = '{} '.format(prettyNameLookup[fbn]) if fbn is not None else ''
+            prettyNameLookup['feature = utah_csd_{}{}'.format(eIdx, fbSuffix)] = '{}LFP\nch. #{}'.format(fbPrettyName, eIdx)
+            prettyNameLookup['utah_csd_{}{}'.format(eIdx, fbSuffix)] = '{}LFP\nch. #{}'.format(fbPrettyName, eIdx)
             #
-            prettyNameLookup['feature = utah{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
-            prettyNameLookup['utah{}{}'.format(eIdx, fbSuffix)] = 'LFP chan. #{}{}'.format(eIdx, fbPrettyName)
+            prettyNameLookup['feature = utah{}{}'.format(eIdx, fbSuffix)] = '{}LFP\nch. #{}'.format(fbPrettyName, eIdx)
+            prettyNameLookup['utah{}{}'.format(eIdx, fbSuffix)] = '{}LFP\nch. #{}'.format(fbPrettyName, eIdx)
     applyPrettyNameLookup = lambda x: prettyNameLookup[x] if x in prettyNameLookup else x
     expNameElectrodeLookup = {
         'Murdoc': {

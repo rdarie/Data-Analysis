@@ -17,6 +17,7 @@ Options:
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --plotSuffix=plotSuffix                switches between a few different processing options [default: all]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
+    --freqBandGroup=freqBandGroup          what will the plot be aligned to? [default: outboundWithStim]
     --maskOutlierBlocks                    delete outlier trials? [default: False]
     --invertOutlierMask                    delete outlier trials? [default: False]
     --showFigures                          show plots interactively? [default: False]
@@ -26,13 +27,14 @@ Options:
 """
 import logging, sys
 logging.captureWarnings(True)
-import matplotlib, os
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
+import os
+import matplotlib as mpl
+mpl.rcParams['pdf.fonttype'] = 42
+mpl.rcParams['ps.fonttype'] = 42
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('Agg')   # generate postscript output
+    mpl.use('Agg')   # generate postscript output
 else:
-    matplotlib.use('QT5Agg')   # generate interactive output
+    mpl.use('QT5Agg')   # generate interactive output
 import matplotlib.font_manager as fm
 font_files = fm.findSystemFonts()
 for font_file in font_files:
@@ -45,7 +47,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.transforms as transforms
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 from dataAnalysis.analysis_code.namedQueries import namedQueries
-from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.currentExperiment import *
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 import pdb, traceback
@@ -70,59 +72,53 @@ except:
     pass
 for arg in sys.argv:
     print(arg)
-useDPI = 200
-dpiFactor = 72 / useDPI #
+useDPI = 300
+dpiFactor = 72 / useDPI
+snsContext = 'talk'
 snsRCParams = {
-        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': .25,
-        'lines.markersize': 1.2,
-        'patch.linewidth': .25,
+        'axes.facecolor': 'w',
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
         "axes.spines.left": True,
         "axes.spines.bottom": True,
         "axes.spines.right": True,
         "axes.spines.top": True,
-        "axes.linewidth": .125,
-        "grid.linewidth": .125,
-        "font.size": 5,
-        "axes.labelsize": 7,
-        "axes.titlesize": 5,
-        'axes.facecolor': 'w',
-        "xtick.labelsize": 5,
-        "ytick.labelsize": 5,
-        "legend.fontsize": 5,
-        "legend.title_fontsize": 7,
         "xtick.bottom": True,
         "xtick.top": True,
         "ytick.left": True,
         "ytick.right": True,
-        "xtick.major.width": .125,
-        "ytick.major.width": .125,
-        "xtick.minor.width": .125,
-        "ytick.minor.width": .125,
-        "xtick.major.size": 2,
-        "ytick.major.size": 2,
-        "xtick.minor.size": 1,
-        "ytick.minor.size": 1,
-        "xtick.direction": 'in',
-        "ytick.direction": 'in',
+        #
     }
+snsRCParams.update(customSeabornContexts[snsContext])
 mplRCParams = {
-    'figure.subplot.left': 0.01,
-    'figure.subplot.right': 0.99,
-    'figure.subplot.bottom': 0.01,
-    'figure.subplot.top': 0.99,
-    'figure.titlesize': 7,
+    'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+    #
     'axes.titlepad': 1.5,
     'axes.labelpad': 0.75,
-    'font.family': "Nimbus Sans",
+    #
+    'figure.subplot.left': 0.02,
+    'figure.subplot.right': 0.98,
+    'figure.subplot.bottom': 0.02,
+    'figure.subplot.top': 0.98,
+    #
     'pdf.fonttype': 42,
     'ps.fonttype': 42,
     }
+
 styleOpts = {
     'legend.lw': 2,
-    'tight_layout.pad': 2e-1,  # units of font size
-    'panel_heading.pad': 0.
+    'tight_layout.pad': 1.,
+    'panel_heading.pad': 1.
     }
+
+for rcK, rcV in mplRCParams.items():
+    mpl.rcParams[rcK] = rcV
+
+sns.set(
+    context=snsContext, style='whitegrid',
+    palette='dark', font='sans-serif',
+    color_codes=True, rc=snsRCParams)
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 consoleDebug = False
@@ -151,20 +147,22 @@ elif arguments['plotSuffix'] == 'rest_stim':
 elif arguments['plotSuffix'] == 'outbound_stim':
     pdfNameSuffix = 'RAUC_outbound_stim'
     lOfKinematicsToPlot = ['CCW_outbound', 'CW_outbound']
+elif arguments['plotSuffix'] == 'outbound_E04':
+    pdfNameSuffix = 'RAUC_outbound_E04'
+    lOfKinematicsToPlot = ['CCW_outbound', 'CW_outbound']
+elif arguments['plotSuffix'] == 'E04':
+    pdfNameSuffix = 'RAUC_E04'
+    lOfKinematicsToPlot = ['NA_NA', 'CCW_outbound', 'CW_outbound']
+elif arguments['plotSuffix'] == 'rest_E04':
+    pdfNameSuffix = 'RAUC_rest_E04'
+    lOfKinematicsToPlot = ['NA_NA']
 elif arguments['plotSuffix'] == 'move_E09':
     pdfNameSuffix = 'RAUC_move_E09'
     lOfKinematicsToPlot = ['CW_outbound', 'CW_return', 'CCW_outbound', 'CCW_return']
-elif arguments['plotSuffix'] == 'outbound_no_move':
-    pdfNameSuffix = 'RAUC_outbound_no_move'
+elif arguments['plotSuffix'] == 'outbound':
+    pdfNameSuffix = 'RAUC_outbound'
     lOfKinematicsToPlot = ['NA_NA', 'CW_outbound', 'CW_return', 'CCW_outbound', 'CCW_return']
 #
-
-sns.set(
-    context='paper', style='whitegrid',
-    palette='dark', font='sans-serif',
-    font_scale=1., color_codes=True, rc=snsRCParams)
-for rcK, rcV in mplRCParams.items():
-    matplotlib.rcParams[rcK] = rcV
 
 basePalette = pd.Series(sns.color_palette('Paired'))
 allAmpPalette = pd.Series(
@@ -223,8 +221,14 @@ for expIdx, expName in enumerate(listOfExpNames):
         elif arguments['plotSuffix'] == 'outbound_stim':
             lOfElectrodesToPlot = [eN for eN in ['NA', '-E05+E16', '-E11+E16', '-E04+E16'] if eN in spinalMapDF.index]
         elif arguments['plotSuffix'] == 'move_E09':
-            lOfElectrodesToPlot = [eN for eN in ['NA', '-E05+E16'] if eN in spinalMapDF.index]
-        elif arguments['plotSuffix'] == 'outbound_no_move':
+            lOfElectrodesToPlot = [eN for eN in ['NA', '-E09+E16'] if eN in spinalMapDF.index]
+        elif arguments['plotSuffix'] == 'outbound_E04':
+            lOfElectrodesToPlot = [eN for eN in ['NA', '-E04+E16'] if eN in spinalMapDF.index]
+        elif arguments['plotSuffix'] == 'rest_E04':
+            lOfElectrodesToPlot = [eN for eN in ['NA', '-E04+E16'] if eN in spinalMapDF.index]
+        elif arguments['plotSuffix'] == 'E04':
+            lOfElectrodesToPlot = [eN for eN in ['NA', '-E04+E16'] if eN in spinalMapDF.index]
+        elif arguments['plotSuffix'] == 'outbound':
             lOfElectrodesToPlot = [eN for eN in ['NA', '-E05+E16', '-E11+E16', '-E04+E16'] if eN in spinalMapDF.index]
     for inputBlockSuffix in listOfSelectionNames:
         resultPath = os.path.join(
@@ -403,13 +407,36 @@ if correctMultiCompHere:
     reject, pval = pg.multicomp(relativeStatsPerFBDF['pval'].to_numpy(), alpha=confidence_alpha, method='fdr_bh')
     relativeStatsPerFBDF.loc[:, 'pval'] = pval
     relativeStatsPerFBDF.loc[:, 'reject'] = reject
+#q
 #
-countAmpStatsSignifDF = ampStatsDF.groupby(['expName', 'electrode', 'kinematicCondition']).sum()['reject']
-print(countAmpStatsSignifDF)
+if arguments['freqBandGroup'] == '0':
+    freqBandOrderExtended = ['broadband']
+elif arguments['freqBandGroup'] == '1':
+    freqBandOrderExtended = ['broadband'] + freqBandOrder
+elif arguments['freqBandGroup'] == '2':
+    freqBandOrderExtended = ['broadband', 'beta', 'gamma']
+elif arguments['freqBandGroup'] == '3':
+    freqBandOrderExtended = ['gamma']
+elif arguments['freqBandGroup'] == '4':
+    freqBandOrderExtended = ['beta']
+akm = ampStatsDF.index.get_level_values('freqBandName').isin(freqBandOrderExtended)
+ampStatsDF = ampStatsDF.loc[akm, :]
+rkm = relativeStatsDF.index.get_level_values('freqBandName').isin(freqBandOrderExtended)
+relativeStatsDF = relativeStatsDF.loc[rkm, :]
+rnskm = relativeStatsNoStimDF.index.get_level_values('freqBandName').isin(freqBandOrderExtended)
+relativeStatsNoStimDF = relativeStatsNoStimDF.loc[rnskm, :]
+rckm = recCurve.index.get_level_values('freqBandName').isin(freqBandOrderExtended)
+recCurve = recCurve.loc[rckm, :]
+# ampStatsDF, relativeStatsDF, relativeStatsNoStimDF
+
 countRelativeStatsSignifDF = relativeStatsDF.groupby(['expName', 'electrode', 'kinematicCondition']).sum()['reject']
-print(countAmpStatsSignifDF)
-#
-freqBandOrderExtended = ['broadband'] + freqBandOrder
+countAmpStatsSignifDF = ampStatsDF.groupby(['expName', 'electrode', 'kinematicCondition']).sum()['reject']
+if arguments['verbose']:
+    print('Significant amp stats:')
+    print(countAmpStatsSignifDF)
+    print('Significant relative stats:')
+    print(countRelativeStatsSignifDF)
+
 whichRAUC = 'rawRAUC'
 # whichRAUC = 'normalizedRAUC'
 # whichRAUC = 'scaledRAUC'
@@ -418,18 +445,17 @@ figureOutputFolder = os.path.join(
     remoteBasePath, 'figures', 'lfp_recruitment_across_exp')
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder, exist_ok=True)
-
+#
 countSummaryHtml = (
         countAmpStatsSignifDF.to_frame(name='significant_stim_effect').to_html() +
         countRelativeStatsSignifDF.to_frame('significant_stim_vs_no_stim').to_html())
-
 countSummaryPath = os.path.join(
-    figureOutputFolder, '{}_{}.html'.format(subjectName, pdfNameSuffix))
+    figureOutputFolder, '{}_fbg{}_{}.html'.format(subjectName, arguments['freqBandGroup'], pdfNameSuffix))
 with open(countSummaryPath, 'w') as _f:
     _f.write(countSummaryHtml)
-
+#
 pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}.pdf'.format(subjectName, pdfNameSuffix))
+    figureOutputFolder, '{}_fbg{}_{}.pdf'.format(subjectName, arguments['freqBandGroup'], pdfNameSuffix))
 plotRC = recCurve.reset_index()
 plotRC = plotRC.loc[plotRC['electrode'].isin(lOfElectrodesToPlot), :]
 ampStatsDF = ampStatsDF.loc[ampStatsDF.index.get_level_values('electrode').isin(lOfElectrodesToPlot), :]
@@ -440,12 +466,15 @@ spinalMapDF.index = pd.Index(spinalMapDF.index, dtype=spinalElecCategoricalDtype
 plotRC.loc[:, 'electrode'] = plotRC['electrode'].astype(spinalElecCategoricalDtype)
 presentElectrodes = [eN for eN in lOfElectrodesToPlot if eN in plotRC['electrode'].unique().tolist()]
 # plotRC.groupby('electrode')['trialAmplitude'].max().dropna()
-# pdb.set_trace()
-# allFilledMarkers = matplotlib.lines.Line2D.filled_markers
+
+# allFilledMarkers = mpl.lines.Line2D.filled_markers
 allFilledMarkers = ('o', '*', 'D', 'X', 'P', 's', 'v', 'H')
 electrodeErrorBarStyles = {}
 for eIdx, eN in enumerate(presentElectrodes):
-    electrodeErrorBarStyles[eN] = dict(marker=allFilledMarkers[eIdx], elinewidth=.3, capsize=1.)
+    electrodeErrorBarStyles[eN] = dict(
+        marker=allFilledMarkers[eIdx],
+        elinewidth=sns.plotting_context()['patch.linewidth'],
+        capsize=sns.plotting_context()['xtick.major.size'])
 electrodeErrorBarStyleDF = pd.DataFrame(electrodeErrorBarStyles)
 keepCols = [
     'segment', 'originalIndex', 't',
@@ -653,6 +682,7 @@ def genMahalSummaryPlotFun(
         dodge=True, width=0.9, jitter=True,
         errorBarOptsDict=None
         ):
+    semanticNames = [n for n in [row, col, x, hue, style] if n is not None]
     legendData = {}
     if jitter:
         rng = np.random.default_rng()
@@ -678,22 +708,33 @@ def genMahalSummaryPlotFun(
             offsets = np.linspace(0, width - width / nHues, nHues)
             offsets -= offsets.mean()
         xHueMappingDict = {}
-        legendData[hue] = matplotlib.patches.Patch(alpha=0, linewidth=0)
+        legendData[hue] = mpl.patches.Patch(
+            alpha=0, linewidth=0)
         for hIdx, hN in enumerate(hueOrder):
             xHueMappingDict[hN] = xMapping.copy()
             if palette is not None:
-                legendData[hN] = matplotlib.patches.Patch(color=palette[hN], linewidth=0)
+                legendData[hN] = mpl.patches.Patch(
+                    color=palette[hN], linewidth=0)
             if dodge:
                 xHueMappingDict[hN] += offsets[hIdx]
         if jitter:
-            xJitters = pd.Series(
-                (rng.random(fullDataset.shape[0]) - 0.5) * width / nHues,
-                index=fullDataset.index)
-
+            panelGroups = [n for n in [row, col, hue] if n is not None]
+            xJitters = pd.Series(0, index=fullDataset.index)
+            if len(panelGroups):
+                grouper = fullDataset.sort_values(semanticNames).groupby(panelGroups)
+            else:
+                grouper = ('all', fullDataset.sort_values(semanticNames))
+            for name, group in grouper:
+                rawJitters = 0.2 * rng.random(group.shape[0]) + 0.8
+                rawJitters = np.cumsum(rawJitters) / np.sum(rawJitters)
+                # rng.shuffle(rawJitters)
+                # pdb.set_trace()
+                xJitters.loc[group.index] = (rawJitters.copy() - 0.5) * width / nHues
+            #
             def xPosFun(dfRow):
                 if dfRow[hue] in xHueMappingDict:
                     if dfRow[x] in xHueMappingDict[dfRow[hue]].index:
-                        return xHueMappingDict[dfRow[hue]][dfRow[x]] + xJitters[dfRow.name]
+                        return xHueMappingDict[dfRow[hue]][dfRow[x]] + xJitters.loc[dfRow.name]
                 else:
                     return np.nan
             allXPos = fullDataset.apply(xPosFun, axis='columns')
@@ -710,8 +751,11 @@ def genMahalSummaryPlotFun(
         hueOrder = None
         xHueMappingDict = None
         if jitter:
+            rawJitters = 0.5 * rng.random(fullDataset.shape[0]) + 0.5
+            rawJitters = np.cumsum(rawJitters) / np.sum(rawJitters)
+            rng.shuffle(rawJitters)
             xJitters = pd.Series(
-                (rng.random(fullDataset.shape[0]) - 0.5) * width,
+                (rawJitters - 0.5) * width,
                 index=fullDataset.index)
             def xPosFun(dfRow):
                 if dfRow[x] in xMapping.index:
@@ -733,13 +777,14 @@ def genMahalSummaryPlotFun(
         else:
             styleOrder = np.unique(fullDataset[style])
         if isinstance(style_palette, pd.DataFrame):
-            legendData[style] = matplotlib.patches.Patch(alpha=0, linewidth=0)
+            legendData[style] = mpl.patches.Patch(alpha=0, linewidth=0)
             if 'marker' in style_palette.index:
                 for styleName, thisStyle in style_palette.T.iterrows():
-                    mSize = 5 * thisStyle['markersize'] if ('markersize' in thisStyle) else 5 * snsRCParams['lines.markersize']
-                    legendData[styleName] = matplotlib.lines.Line2D(
+                    mSize = 2 * thisStyle['markersize'] if ('markersize' in thisStyle) else 2 * sns.plotting_context()['lines.markersize']
+                    legendData[styleName] = mpl.lines.Line2D(
                         [0], [0], marker=thisStyle['marker'],
-                        markerfacecolor='lightgray', markeredgecolor='k', markeredgewidth=0.3,
+                        markerfacecolor='lightgray', markeredgecolor='k',
+                        markeredgewidth=sns.plotting_context()['patch.linewidth'],
                         markersize=mSize, linestyle='none')
     #
     def mahalSummaryPlotFun(
@@ -817,12 +862,8 @@ with PdfPages(pdfPath) as pdf:
     pal = sns.color_palette("Set2")
     huePalette = {hN: pal[hIdx] for hIdx, hN in enumerate(hueOrder)}
     huePaletteAlpha = {hN: tuple(list(hV) + [0.5]) for hN, hV in huePalette.items()}
-    if arguments['plotSuffix'] in ['all', 'rest_stim']:
-        figHeight, figWidth = 3, 8
-    elif arguments['plotSuffix'] in ['outbound_stim', 'outbound_no_move']:
-        figHeight, figWidth = 3, 4
-    elif arguments['plotSuffix'] in ['move_E09']:
-        figHeight, figWidth = 3, 3
+    figHeight = 2. + 2. * len(rowOrder)
+    figWidth = 2. + len(colOrder) * len(freqBandOrderExtended)
     if arguments['plotThePieces']:
         ####
         widthRatios = [3] * np.unique(testGroupPieces[colVar]).shape[0] + [1]
@@ -873,7 +914,7 @@ with PdfPages(pdfPath) as pdf:
                     x=hueName, order=hueOrder,
                     y=whichRAUC, palette=huePalette,
                     hue=hueName, hue_order=hueOrder, data=refData,
-                    ax=ax, size=snsRCParams['lines.markersize'], dodge=True)
+                    ax=ax, size=sns.plotting_context['lines.markersize'], dodge=True)
                 ax.set_xlabel('')
                 ax.set_xticks([])
                 if ax.get_legend() is not None:
@@ -902,18 +943,18 @@ with PdfPages(pdfPath) as pdf:
             plt.close()
     if True:
         stripplotKWArgs = dict(
-            dodge=True, size= 1.5 * snsRCParams['lines.markersize'],
-            rasterized=False, jitter=0.4,
-            linewidth=snsRCParams['lines.linewidth']
+            dodge=True, size=sns.plotting_context()['lines.markersize'],
+            rasterized=False,
+            linewidth=sns.plotting_context()['patch.linewidth'] / 2
             )
         stripplotKWArgsMahal = stripplotKWArgs.copy()
-        stripplotKWArgsMahal['size'] = 3 * snsRCParams['lines.markersize']
+        stripplotKWArgsMahal['size'] = 1.5 * sns.plotting_context()['lines.markersize']
         stripplotKWArgsMahal['jitter'] = False
         boxplotKWArgs = dict(
             dodge=True,
             whis=np.inf,
-            linewidth=snsRCParams['lines.linewidth'],
-            saturation=0.,
+            linewidth=sns.plotting_context()['lines.linewidth'],
+            saturation=0.3,
             )
         colVar = 'electrode'
         rowVar = 'kinematicCondition'
@@ -935,35 +976,34 @@ with PdfPages(pdfPath) as pdf:
             thisMaskAmpMahal = plotAmpStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot) & plotAmpStatsDF['electrode'].isin(lOfElectrodesToPlot) & plotAmpStatsDF['isMahalDist']
             thisFreqBandOrder = [
                 fN for fN in freqBandOrderExtended if fN in plotAmpStatsDF.loc[thisMaskAmp, 'freqBandName'].unique().tolist()]
+
             rowOrder = [rN for rN in lOfKinematicsToPlot if rN in plotAmpStatsDF['kinematicCondition'].to_list()]
             #
             thisPalette = allAmpPalette.loc[allAmpPalette.index.isin(plotAmpStatsDF.loc[thisMaskAmp, 'namesAndMD'])]
             thisPaletteMahal = allAmpPalette.loc[allAmpPalette.index.isin(plotAmpStatsDF.loc[thisMaskAmpMahal, 'namesAndMD'])]
             colOrder = [eN for eN in plotAmpStatsDF[colVar].unique().tolist() if ((eN !='NA') and (eN in lOfElectrodesToPlot))]
-            if arguments['plotSuffix'] in ['all', 'rest_stim']:
-                figHeight, figWidth = 3, 8
-            elif arguments['plotSuffix'] in ['outbound_stim', 'outbound_no_move']:
-                figHeight, figWidth = 3, 4
-            elif arguments['plotSuffix'] in ['move_E09']:
-                figHeight, figWidth = 3, 3
+            #pdb.set_trace()
+            if thisPalette.shape[0] > 1:
+                stripJitter = 0.99 / (thisPalette.shape[0] + 1)
+            else:
+                stripJitter = 0.99
+            # recruitment regression coeffs
+            figHeight = 2 + 2. * len(rowOrder)
+            figWidth = 2 + len(colOrder) * len(freqBandOrderExtended)
             height = figHeight / plotAmpStatsDF.loc[thisMaskAmp, rowVar].nunique()
             width = figWidth / plotAmpStatsDF.loc[thisMaskAmp, colVar].nunique()
             aspect = width / height
-            #
-            # countDF = plotAmpStatsDF.loc[thisMaskAmp].dropna().groupby(['kinematicCondition', 'electrode', 'freqBandName', 'namesAndMD']).count()['reject']
-            # passDF = plotAmpStatsDF.loc[thisMaskAmp].dropna().groupby(['kinematicCondition', 'electrode', 'freqBandName', 'namesAndMD']).sum()['reject']
-            # pvalDF = pd.concat([countDF, passDF], axis='columns')
-            # pvalDF.columns = ['count', 'pass']
             #
             def countOverUnder(df):
                 res = pd.Series({
                     'over': int(((df['coef'] > 0) & df['reject']).sum()),
                     'ns': int((~df['reject']).sum()),
                     'under': int(((df['coef'] < 0) & df['reject']).sum()),
-                })
+                    })
                 return res
             #
-            pvalDF = plotAmpStatsDF.loc[thisMaskAmp].dropna().groupby(['kinematicCondition', 'electrode', 'freqBandName', 'namesAndMD']).apply(countOverUnder).fillna(0)
+            pvalDF = plotAmpStatsDF.loc[thisMaskAmp].dropna().groupby([
+                'kinematicCondition', 'electrode', 'freqBandName', 'namesAndMD']).apply(countOverUnder).fillna(0)
             for yVar in ['coefStd']:
                 g = sns.catplot(
                     y=yVar,
@@ -976,12 +1016,11 @@ with PdfPages(pdfPath) as pdf:
                     height=height, aspect=aspect,
                     sharey=True, sharex=True,  margin_titles=True,
                     kind='box', **boxplotKWArgs
-                    # kind='violin', inner=None, cut=1,
                     )
                 for name, ax in g.axes_dict.items():
                     rowName, colName = name
                     # non-significant are transparent
-                    subSetMask = thisMaskAmp & (plotAmpStatsDF[rowVar] == rowName) & (plotAmpStatsDF[colVar] == colName) & (~plotAmpStatsDF['reject'])#& plotAmpStatsDF[yVar].notna()
+                    subSetMask = thisMaskAmp & (plotAmpStatsDF[rowVar] == rowName) & (plotAmpStatsDF[colVar] == colName) & (~plotAmpStatsDF['reject']) #& plotAmpStatsDF[yVar].notna()
                     if subSetMask.any():
                         if (not plotAmpStatsDF.loc[subSetMask, :].dropna().empty):
                             sns.stripplot(
@@ -990,6 +1029,7 @@ with PdfPages(pdfPath) as pdf:
                                 order=thisFreqBandOrder,
                                 hue='namesAndMD', hue_order=thisPalette.index.to_list(),
                                 palette=thisPalette.to_dict(),
+                                jitter=stripJitter,
                                 alpha=0.3, edgecolor='none', **stripplotKWArgs)
                     # significant are opaque
                     subSetMask = thisMaskAmp & (plotAmpStatsDF[rowVar] == rowName) & (plotAmpStatsDF[colVar] == colName) & plotAmpStatsDF['reject'] # & plotAmpStatsDF[yVar].notna()
@@ -999,7 +1039,9 @@ with PdfPages(pdfPath) as pdf:
                                 data=plotAmpStatsDF.loc[subSetMask, :], ax=ax,
                                 y=yVar, x='freqBandName',
                                 order=thisFreqBandOrder, hue='namesAndMD',
-                                hue_order=thisPalette.index.to_list(), palette=thisPalette.to_dict(),
+                                hue_order=thisPalette.index.to_list(),
+                                palette=thisPalette.to_dict(), edgecolor='k',
+                                jitter=stripJitter,
                                 **stripplotKWArgs
                                 )
                     addMahalGsHere = True
@@ -1022,6 +1064,7 @@ with PdfPages(pdfPath) as pdf:
                                 y=yVar, x='freqBandName',
                                 order=thisFreqBandOrder, hue='namesAndMD',
                                 hue_order=thisPaletteMahal.index.to_list(), palette=thisPaletteMahal.to_dict(),
+                                edgecolor='k',
                                 **stripplotKWArgsMahal
                                 )
                     # ax.tick_params(axis='x', labelrotation=30)
@@ -1029,9 +1072,9 @@ with PdfPages(pdfPath) as pdf:
                     if len(xTickLabels):
                         newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
                         ax.set_xticklabels(
-                            newXTickLabels, rotation=90, va='top', ha='right')
+                            newXTickLabels, rotation=30, va='top', ha='right')
                     ax.axhline(0, c='r', zorder=2.5)
-                    for xJ in range(0, len(thisFreqBandOrder), 2):
+                    for xJ in range(1, len(thisFreqBandOrder), 2):
                         ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
                     if ax.get_legend() is not None:
                         ax.get_legend().remove()
@@ -1043,9 +1086,9 @@ with PdfPages(pdfPath) as pdf:
                         pvalDF.reset_index(),
                         xOrder=thisFreqBandOrder, hueVar='namesAndMD', palette=thisPalette,
                         fontOpts=dict(
-                            va='bottom', ha='center',
-                            fontsize=snsRCParams["font.size"],
-                            fontweight='bold', rotation=45))]
+                            va='top', ha='right',
+                            fontsize=sns.plotting_context()["font.size"],
+                            fontweight='bold', rotation=30))]
                 for (ro, co, hu), dataSubset in g.facet_data():
                     if len(plotProcFuns):
                         for procFun in plotProcFuns:
@@ -1146,12 +1189,9 @@ with PdfPages(pdfPath) as pdf:
         widthRatios = [3] * np.unique(plotRelativeStatsDF[colVar]).shape[0]
         widthRatios[0] = 2
         # plotRelativeStatsDF.loc[plotRelativeStatsDF['electrode'] == 'NA', :]
-        if arguments['plotSuffix'] in ['all', 'rest_stim']:
-            figHeight, figWidth = 3, 12
-        elif arguments['plotSuffix'] in ['outbound_stim', 'outbound_no_move']:
-            figHeight, figWidth = 3, 6
-        elif arguments['plotSuffix'] in ['move_E09']:
-            figHeight, figWidth = 6, 9
+        ### effect size catplot stripplot
+        figHeight = 2 + 2. * len(rowOrder)
+        figWidth = 2 + (len(colOrder) + 1) * len(freqBandOrderExtended)
         height = figHeight / plotRelativeStatsDF.loc[thisMaskRel, rowVar].nunique()
         width = figWidth / plotRelativeStatsDF.loc[thisMaskRel, colVar].nunique()
         aspect = width / height
@@ -1177,6 +1217,7 @@ with PdfPages(pdfPath) as pdf:
             for name, ax in g.axes_dict.items():
                 rowName, colName = name
                 if colName == 'NA':
+                    # movement
                     thisPalette = thisNoStimPalette
                     expandDays = True
                     if expandDays:
@@ -1184,6 +1225,8 @@ with PdfPages(pdfPath) as pdf:
                         presentExps = plotRelativeStatsDF['expName'].unique().tolist()
                         stripHueOrder = presentExps
                         stripHueOrderMahal = presentExps
+                        print('presentExps = {}'.format(presentExps))
+                        stripJitter = thisStimPalette.shape[0] / (len(stripHueOrder) + 1)
                         stripPalette = {expN: sns.utils.alter_color(allRelPalette['0.0'], h=-0.01 * expIdx, s=0.1 * expIdx, l=0.1 * expIdx) for expIdx, expN in enumerate(presentExps)}
                         stripPaletteMahal = {expN: sns.utils.alter_color(allRelPalette['0.0_md'], h=-0.01 * expIdx, s=0.1 * expIdx, l=0.1 * expIdx) for expIdx, expN in enumerate(presentExps)}
                     else:
@@ -1192,6 +1235,7 @@ with PdfPages(pdfPath) as pdf:
                         stripPalette = thisNoStimPalette.to_dict()
                         stripPaletteMahal = thisNoStimPaletteMahal.to_dict()
                         stripHueOrderMahal = thisNoStimPaletteMahal.index.to_list()
+                        stripJitter = thisStimPalette.shape[0] / (len(stripHueOrder) + 1)
                     subSetMask = (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) & plotRelativeStatsDF[yVar].notna()
                     if subSetMask.any():
                         #could turn off as it isn't very visible anyway
@@ -1202,6 +1246,7 @@ with PdfPages(pdfPath) as pdf:
                             palette=thisPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
                             **boxplotKWArgs)
                 else:
+                    # stim
                     thisPalette = thisStimPalette
                     # thisPaletteMahal = thisStimPaletteMahal
                     stripHue = 'trialRateInHzStr'
@@ -1209,6 +1254,7 @@ with PdfPages(pdfPath) as pdf:
                     stripPalette = thisStimPalette.to_dict()
                     stripPaletteMahal = thisStimPaletteMahal.to_dict()
                     stripHueOrderMahal = thisStimPaletteMahal.index.to_list()
+                    stripJitter = 1. / (len(stripHueOrder) + 1)
                 # plot non-significant observations with transparency
                 subSetMask = (
                         (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
@@ -1219,6 +1265,7 @@ with PdfPages(pdfPath) as pdf:
                             data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
                             hue=stripHue, hue_order=stripHueOrder, palette=stripPalette,
+                            jitter=stripJitter,
                             alpha=0.3, edgecolor='none', **stripplotKWArgs)
                 # plot significant observations fully opaque
                 subSetMask = (
@@ -1230,6 +1277,8 @@ with PdfPages(pdfPath) as pdf:
                             data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
                             hue=stripHue, hue_order=stripHueOrder, palette=stripPalette,
+                            jitter=stripJitter,
+                            edgecolor = 'k',
                             **stripplotKWArgs
                             )
                 #####
@@ -1254,6 +1303,7 @@ with PdfPages(pdfPath) as pdf:
                             data=plotRelativeStatsDF.loc[subSetMaskMahal, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
                             hue=stripHue, hue_order=stripHueOrderMahal, palette=stripPaletteMahal,
+                            edgecolor = 'k',
                             **stripplotKWArgsMahal
                             )
                 nSigAnnotator = genNumSigAnnotatorV2(
@@ -1262,7 +1312,6 @@ with PdfPages(pdfPath) as pdf:
                     hueVar='trialRateInHzStr', palette=thisPalette,
                     fontOpts=dict(
                         va='bottom', ha='center',
-                        fontsize=snsRCParams["font.size"],
                         fontweight='bold', rotation=45))
                 if enableNumSigAnnotator:
                     nSigAnnotator(g, ax, rowName, colName)
@@ -1271,8 +1320,8 @@ with PdfPages(pdfPath) as pdf:
                 xTickLabels = ax.get_xticklabels()
                 if len(xTickLabels):
                     newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
-                    ax.set_xticklabels(newXTickLabels, rotation=90, va='top', ha='right')
-                for xJ in range(0, len(thisFreqBandOrder), 2):
+                    ax.set_xticklabels(newXTickLabels, rotation=30, va='top', ha='right')
+                for xJ in range(1, len(thisFreqBandOrder), 2):
                     ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
                 if (ax.get_legend() is not None):
                     ax.get_legend().remove()
@@ -1302,12 +1351,8 @@ with PdfPages(pdfPath) as pdf:
             ######## mahal dist plots
             if plotMahalDistSummary:
                 thisMaskRel = (plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot)) & (plotRelativeStatsDF['electrode'].isin(lOfElectrodesToPlot)) & plotRelativeStatsDF['isMahalDist']
-                if arguments['plotSuffix'] in ['all', 'rest_stim']:
-                    figHeight, figWidth = 3, 4
-                elif arguments['plotSuffix'] in ['outbound_stim', 'outbound_no_move']:
-                    figHeight, figWidth = 3, 3
-                elif arguments['plotSuffix'] in ['move_E09']:
-                    figHeight, figWidth = 3, 2
+                figHeight = 2 + 2. * plotRelativeStatsDF.loc[thisMaskRel, rowVar].nunique()
+                figWidth = 1. + 0.5 * len(freqBandOrderExtended) * len(lOfElectrodesToPlot)
                 height = figHeight / plotRelativeStatsDF.loc[thisMaskRel, rowVar].nunique()
                 width = figWidth
                 aspect = width / height
@@ -1335,7 +1380,10 @@ with PdfPages(pdfPath) as pdf:
                         yerr='cohen_err', error_palette=thisErrPalette.to_dict(),
                         palette=thisPalette.to_dict(),
                         errorBarOptsDict=dict(
-                            markeredgecolor='k', markeredgewidth=.3, markersize=2.5, capsize=1)
+                            markeredgecolor='k',
+                            markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                            markersize=sns.plotting_context()['lines.markersize'],
+                            capsize=sns.plotting_context()['xtick.major.size'])
                             )
                     mapDFProcFuns = [
                         (
@@ -1354,8 +1402,8 @@ with PdfPages(pdfPath) as pdf:
                         xTickLabels = ax.get_xticklabels()
                         if len(xTickLabels):
                             newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
-                            ax.set_xticklabels(newXTickLabels, rotation=90, va='top', ha='right')
-                        for xJ in range(0, len(thisFreqBandOrder), 2):
+                            ax.set_xticklabels(newXTickLabels, rotation=30, va='top', ha='right')
+                        for xJ in range(1, len(thisFreqBandOrder), 2):
                             # for xJ in range(0, plotRelativeStatsDF[colVar].unique().shape[0], 2):
                             ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
                         if ax.get_legend() is not None:
@@ -1398,44 +1446,50 @@ with PdfPages(pdfPath) as pdf:
             )
         g.suptitle('Dummy plot to get full legend from')
         legendData = {}
-        legendData['coefStd'] = matplotlib.patches.Patch(alpha=0, linewidth=0)
+        legendData['coefStd'] = mpl.patches.Patch(alpha=0, linewidth=0)
         for factorName, factorColor in allAmpPalette.items():
             if '_md' in factorName:
-                legendData[factorName] = matplotlib.lines.Line2D(
+                legendData[factorName] = mpl.lines.Line2D(
                     [0], [0], marker='o',
-                    markerfacecolor=factorColor, markeredgecolor='k', markeredgewidth=0.3,
-                    markersize=3 * snsRCParams['lines.markersize'],
+                    markerfacecolor=factorColor, markeredgecolor='k',
+                    markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                    markersize=sns.plotting_context()['lines.markersize'],
                     linestyle='none')
             else:
-                legendData[factorName] = matplotlib.lines.Line2D(
+                legendData[factorName] = mpl.lines.Line2D(
                     [0], [0], marker='o',
-                    markerfacecolor=factorColor, markeredgecolor='k', markeredgewidth=0.3,
-                    markersize=2 * snsRCParams['lines.markersize'],
+                    markerfacecolor=factorColor, markeredgecolor='k',
+                    markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                    markersize=sns.plotting_context()['lines.markersize'],
                     linestyle='none')
-        legendData['trialRateInHzStr'] = matplotlib.patches.Patch(alpha=0, linewidth=0)
+        legendData['trialRateInHzStr'] = mpl.patches.Patch(alpha=0, linewidth=0)
         for rateName, rateColor in allRelPalette.items():
             if '_md' in rateName:
-                legendData[rateName] = matplotlib.lines.Line2D(
+                legendData[rateName] = mpl.lines.Line2D(
                     [0], [0], marker='o',
-                    markerfacecolor=rateColor, markeredgecolor='k', markeredgewidth=0.3,
-                    markersize=3 * snsRCParams['lines.markersize'],
+                    markerfacecolor=rateColor, markeredgecolor='k',
+                    markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                    markersize=1.5 * sns.plotting_context()['lines.markersize'],
                     linestyle='none')
             else:
-                legendData[rateName] = matplotlib.lines.Line2D(
+                legendData[rateName] = mpl.lines.Line2D(
                     [0], [0], marker='o',
-                    markerfacecolor=rateColor, markeredgecolor='k', markeredgewidth=0.3,
-                    markersize=2 * snsRCParams['lines.markersize'],
+                    markerfacecolor=rateColor, markeredgecolor='k',
+                    markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                    markersize=sns.plotting_context()['lines.markersize'],
                     linestyle='none')
-        legendData['p-value significance'] = matplotlib.patches.Patch(alpha=0, linewidth=0)
-        legendData['p < {:.2f}'.format(confidence_alpha)] = matplotlib.lines.Line2D(
+        legendData['p-value significance'] = mpl.patches.Patch(alpha=0, linewidth=0)
+        legendData['p < {:.2f}'.format(confidence_alpha)] = mpl.lines.Line2D(
             [0], [0], marker='o',
-            markerfacecolor='darkgray', markeredgecolor='k', markeredgewidth=0.3,
-            markersize=2 * snsRCParams['lines.markersize'],
+            markerfacecolor='darkgray', markeredgecolor='k',
+            markeredgewidth=sns.plotting_context()['patch.linewidth'],
+            markersize=sns.plotting_context()['lines.markersize'],
             linestyle='none')
-        legendData['p > {:.2f} (n.s.)'.format(confidence_alpha)] = matplotlib.lines.Line2D(
+        legendData['p > {:.2f} (n.s.)'.format(confidence_alpha)] = mpl.lines.Line2D(
             [0], [0], marker='o',
-            markerfacecolor='lightgray', markeredgecolor='k', markeredgewidth=0.3,
-            markersize=2 * snsRCParams['lines.markersize'],
+            markerfacecolor='lightgray', markeredgecolor='k',
+            markeredgewidth=sns.plotting_context()['patch.linewidth'],
+            markersize=sns.plotting_context()['lines.markersize'],
             linestyle='none')
         g.add_legend(
             legend_data=legendData, label_order=list(legendData.keys()), title='dummy legends')
@@ -1542,7 +1596,7 @@ with PdfPages(pdfPath) as pdf:
                                 vmin=vMin, vmax=vMax, center=0.,  fmt='s',
                                 linewidths=0, cmap=statPalettes[statIdx],
                                 annot=ann2D,
-                                annot_kws=dict(fontsize=snsRCParams["font.size"]),
+                                annot_kws=dict(fontsize=sns.plotting_context()["font.size"]),
                                 xticklabels=False, yticklabels=False, square=True
                                 )
                             if (kinIdx == cBarKinIdx) and (stimIdx == (cBarStimIdx - 1)):
@@ -1575,102 +1629,4 @@ with PdfPages(pdfPath) as pdf:
                             plt.close()
                 except Exception:
                     traceback.print_exc()
-    if arguments['plotTheAverage']:
-        colVar = 'stimCondition'
-        colOrder = sorted(np.unique(plotRC[colVar]))
-        hueName = 'kinematicCondition'
-        hueOrder = sorted(np.unique(plotRC[hueName]))
-        pal = sns.color_palette("Set2")
-        huePalette = {hN: pal[hIdx] for hIdx, hN in enumerate(hueOrder)}
-        #
-        rowVar = 'freqBandName'
-        rowOrder = sorted(np.unique(plotRC[rowVar]))
-        colWrap = min(3, len(colOrder))
-        height, width = 3, 3
-        aspect = width / height
-        widthRatios = [3] * np.unique(testGroup[colVar]).shape[0] + [1]
-        '''
-        g = sns.relplot(
-            col=colVar, col_order=colOrder,
-            row=rowVar,
-            x=amplitudeFieldName, y=whichRAUC,
-            hue=hueName, hue_order=hueOrder, palette=huePalette,
-            data=testGroup,
-            height=height, aspect=aspect,
-            # kind='line',
-            # errorbar='sd', estimator='mean', lw=1,
-            kind='scatter',
-            facet_kws=dict(
-                sharey=True, sharex=False, margin_titles=True,
-                gridspec_kws=dict(width_ratios=widthRatios)),
-            )'''
-        plotLimsMin = plotRC.groupby(rowVar).min()[whichRAUC]
-        plotLimsMax = plotRC.groupby(rowVar).max()[whichRAUC]
-        plotLimsRange = plotLimsMax - plotLimsMin
-        plotLimsMin -= plotLimsRange / 100
-        plotLimsMax += plotLimsRange / 100
-        xJ = testGroup[amplitudeFieldName].diff().dropna().abs().unique().mean() / 20
-        g = sns.lmplot(
-            col=colVar, col_order=colOrder,
-            row=rowVar,
-            x=amplitudeFieldName, y=whichRAUC,
-            hue=hueName, hue_order=hueOrder, palette=huePalette,
-            data=testGroup,
-            ci=95, n_boot=100,
-            x_jitter=xJ,
-            scatter_kws=dict(s=2.5),
-            height=height, aspect=aspect,
-            facet_kws=dict(
-                sharey=False, sharex=False, margin_titles=True,
-                gridspec_kws=dict(width_ratios=widthRatios)),
-            )
-        plotProcFuns = [
-            genStatsAnnotator(ampStatsPerFBDF, relativeStatsPerFBDF, hueName, huePalette),
-            asp.genTitleChanger(prettyNameLookup)]
-        for (ro, co, hu), dataSubset in g.facet_data():
-            if len(plotProcFuns):
-                for procFun in plotProcFuns:
-                    procFun(g, ro, co, hu, dataSubset)
-        for (row_val, col_val), ax in g.axes_dict.items():
-            if col_val == 'NA_0.0':
-                refMask = (refGroup[rowVar] == row_val)
-                if refMask.any():
-                    refData = refGroup.loc[refMask, :]
-                else:
-                    refData = refGroup
-                sns.violinplot(
-                    x=hueName, order=hueOrder,
-                    y=whichRAUC, palette=huePalette,
-                    data=refData,
-                    linewidth=0.,
-                    cut=0, inner='box', saturation=0.25,
-                    ax=ax)
-                # sns.swarmplot(
-                #     x=hueName, order=hueOrder,
-                #     y=whichRAUC, palette=huePalette,
-                #     hue=hueName, hue_order=hueOrder, data=refData,
-                #     ax=ax, size=1.)
-                ax.set_xlabel('')
-                ax.set_xticks([])
-                if ax.get_legend() is not None:
-                    ax.get_legend().remove()
-        g.set_axis_labels('Stimulation amplitude (uA)', 'Normalized AUC')
-        asp.reformatFacetGridLegend(
-            g, titleOverrides={
-                'kinematicCondition': 'Movement type'
-            },
-            contentOverrides={
-                'NA_NA': 'No movement',
-                'CW_outbound': 'Start of movement (extension)',
-                'CW_return': 'Return to start (flexion)'
-            },
-            styleOpts=styleOpts)
-        g.resize_legend(adjust_subtitles=True)
-        g.axes[0, 0].set_ylim(plotLims)
-        if not consoleDebug:
-            pdf.savefig(bbox_inches='tight',)
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
 print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

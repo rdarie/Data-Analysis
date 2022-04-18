@@ -827,7 +827,6 @@ def genGridAnnotator(
             (dataSubset[dropNaNCol].isna().all()))
         alreadyHasGridAnnotation = hasattr(g.axes[ro, co], 'isGridAnnotated')
         if ((topLeftCol) or (not shared)) and (not emptySubset) and (not alreadyHasGridAnnotation):
-            # pdb.set_trace()
             dataEntries = []
             for cn in colNames:
                 if dropna:
@@ -861,6 +860,7 @@ def genTitleChanger(newLookup):
             if g._margin_titles:
                 for t in g._margin_titles_texts:
                     tContent = t.get_text()
+                    t.set(ma='center')
                     if tContent in newLookup:
                         t.set_text(newLookup[tContent])
         if not hasattr(g.axes[ro, co], 'titleChangerCheckedMargins'):
@@ -895,9 +895,11 @@ def genTitleAnnotator(
                         '{}'.format(entry)
                         for entry in dataSubset[cn].unique()
                         ]))
+            defTextOpts = dict(ma='center')
+            defTextOpts.update(textOpts)
             xText = template.format(*dataEntries)
             g.axes[ro, co].set_title(
-                xText, **textOpts)
+                xText, **defTextOpts)
         return
     return titleAnnotator
 
@@ -1160,8 +1162,13 @@ def genXLimSetter(
     return xLimSetter
 
 
-def genYLimSetter(newLims=None, quantileLims=None, forceLims=False):
+def genYLimSetter(
+        newLims=None,
+        quantileLims=None, zoomFactor=1.,
+        forceLims=False, axisShared=False):
     def yLimSetter(g, ro, co, hu, dataSubset):
+        if hasattr(g.axes[ro, co], 'areYAxesChanged'):
+            return
         oldLims = g.axes[ro, co].get_ylim()
         if newLims is not None:
             if forceLims:
@@ -1174,16 +1181,25 @@ def genYLimSetter(newLims=None, quantileLims=None, forceLims=False):
                 )
         if quantileLims is not None:
             quantileFrac = (1 - quantileLims) / 2
-            qLims = g.data[g._y_var].quantile(
+            #
+            if axisShared:
+                thisData = g.data[g._y_var]
+            else:
+                thisData = dataSubset[g._y_var]
+            #
+            qLims = thisData.quantile(
                 [quantileFrac, 1 - quantileFrac]).to_list()
+            qMid = (qLims[1] + qLims[0]) / 2
+            qExt = zoomFactor * (qLims[1] - qLims[0]) / 2
             if forceLims:
-                g.axes[ro, co].set_ylim(qLims)
+                g.axes[ro, co].set_ylim([qMid - qExt, qMid + qExt])
             else:
                 g.axes[ro, co].set_ylim(
                     [
-                        max(oldLims[0], qLims[0]),
-                        min(oldLims[1], qLims[1])]
+                        max(oldLims[0], qMid - qExt),
+                        min(oldLims[1], qMid + qExt)]
                 )
+        g.axes[ro, co].areYAxesChanged = True
         return
     return yLimSetter
 
@@ -1197,6 +1213,53 @@ def genYLimSetterTwin(newLims):
         return
     return yLimSetter
 
+def genAxLimShiftScale(
+        xScale=1., xShift=0., xIsShared=False,
+        yScale=1., yShift=0., yIsShared=False,
+        dropNaNCol='segment', verbose=False
+        ):
+    #
+    def axLimShiftScaler(g, ro, co, hu, dataSubset):
+        if hasattr(g.axes[ro, co], 'areAxLimsShifted'):
+            return
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if not emptySubset:
+            transf = g.axes[ro, co].transLimits.inverted()
+            # 0, 0 scaled shifted
+            newMin = transf.transform(
+                (xShift * xScale, yShift * yScale))
+            # 1, 1 shifted, scaled
+            newMax = transf.transform(((1 + xShift) * xScale, (1 + yShift) * yScale))
+            # pdb.set_trace()
+            if (g._sharex) or xIsShared:
+                # only do it once
+                checkX = not hasattr(g, 'anyXAxisShiftedScaled')
+            else:
+                checkX = True
+            if checkX:
+                if verbose:
+                    print(
+                        'axLimShiftScaler() resetting x lims\nold = {}\nnew = {}'.format(
+                            g.axes[ro, co].get_xlim(), [newMin[0], newMax[0]]))
+                g.axes[ro, co].set_xlim([newMin[0], newMax[0]])
+                g.anyXAxisShiftedScaled = True
+            if (g._sharey) or yIsShared:
+                # only do it once
+                checkY = (not hasattr(g, 'anyYAxisShiftedScaled'))
+            else:
+                checkY = True
+            if checkY:
+                if verbose:
+                    print(
+                        'axLimShiftScaler() resetting y lims\nold = {}\nnew = {}'.format(
+                            g.axes[ro, co].get_ylim(), [newMin[1], newMax[1]]))
+                g.axes[ro, co].set_ylim([newMin[1], newMax[1]])
+                g.anyYAxisShiftedScaled = True
+            g.axes[ro, co].areAxLimsShifted = True
+        return
+    return axLimShiftScaler
 
 def genAxisLabelOverride(
         xTemplate=None, yTemplate=None,
@@ -1248,14 +1311,33 @@ def xLabelsTime(g, ro, co, hu, dataSubset):
 
 def genVLineAdder(posList, patchOpts, dropNaNCol='segment'):
     def addVline(g, ro, co, hu, dataSubset):
+        if hasattr(g.axes[ro, co], 'isVLineAdded'):
+            return
         emptySubset = (
             (dataSubset.empty) or
             (dataSubset[dropNaNCol].isna().all()))
         if not emptySubset:
             for pos in posList:
                 g.axes[ro, co].axvline(pos, **patchOpts)
+                g.axes[ro, co].isVLineAdded = True
         return
     return addVline
+
+def genHLineAdder(
+        posList, patchOpts, dropNaNCol='segment'):
+
+    def addHline(g, ro, co, hu, dataSubset):
+        if hasattr(g.axes[ro, co], 'isHLineAdded'):
+            return
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if not emptySubset:
+            for pos in posList:
+                g.axes[ro, co].axhline(pos, **patchOpts)
+                g.axes[ro, co].isHLineAdded = True
+        return
+    return addHline
 
 
 def genStimVLineAdder(
@@ -1276,7 +1358,7 @@ def genStimVLineAdder(
         }
     }
     delayLookup = defaultDelayMap.copy()
-    if delayMap is  not None:
+    if delayMap is not None:
         delayLookup.update(delayMap)
     #
     def addVline(g, ro, co, hu, dataSubset):
@@ -1287,10 +1369,7 @@ def genStimVLineAdder(
         if not (emptySubset or alreadyAnnotated):
             pulseRates = dataSubset[rateFieldName]
             pulseRate = pulseRates[pulseRates.notna()].unique()
-            # try:
             assert pulseRate.size == 1, 'facet has more than one stim rate: {}'.format(pulseRate)
-            # except:
-            #     traceback.print_exc()
             thesePatchOpts = patchOpts.copy()
             yMin = thesePatchOpts.pop('ymin', 0.9)
             yMax = thesePatchOpts.pop('ymax', 0.95)
@@ -1306,8 +1385,8 @@ def genStimVLineAdder(
                 yMinData = g.stimVLineInfo['yMinData']
                 yMaxData = g.stimVLineInfo['yMaxData']
             #
-            # axLims = g.axes[ro, co].get_xlim()
             axLims = [dataSubset[g._x_var].min(), dataSubset[g._x_var].max()]
+            axExtent = axLims[1] - axLims[0]
             pulsePeriod = pulseRate[0] ** (-1)
             #
             pulseLims = [
@@ -1329,29 +1408,30 @@ def genStimVLineAdder(
                 for pos in posList:
                     g.axes[ro, co].plot([pos, pos], [yMinData, yMaxData], **thesePatchOpts)
                 if addTitle:
-                    defFontOpts = dict(ha='right', va='top')
+                    defFontOpts = dict(
+                        x=axLims[0] + 0.05 * axExtent,
+                        y=yMinData, s='stim. ',
+                        ha='right', va='top')
                     defFontOpts.update(titleFontOpts)
-                    g.axes[ro, co].text(axLims[0], yMinData, 'stim.', **defFontOpts)
+                    g.axes[ro, co].text(**defFontOpts)
             g.axes[ro, co].isStimVLineAdded = True
         return
     return addVline
 
 def genPedalPosAdder(
-        movementField='pedalMovementCat', directionField='pedalDirection',
+        movementField='pedalMovementCat',directionField='pedalDirection',
         plotOptsMain=dict(lw=1, c='k'),
         plotOptsBounds=dict(lw=1, c='k', alpha=0.5, ls='--'),
         tStart=None, tChange=0., tStop=None, autoscale=True,
-        yMin=0.9, yMax=0.95, # in ax coordinates
-        addTitle=False, titleFontOpts={},
-        dropNaNCol='segment'):
+        yMin=0.9, yMax=0.95,  # in ax coordinates
+        addTitle=False, titleFontOpts={}, dropNaNCol='segment'):
+    #
     def addPedalAnn(g, ro, co, hu, dataSubset):
         emptySubset = (
-            (dataSubset.empty) or
-            (dataSubset[dropNaNCol].isna().all()))
+            (dataSubset.empty) or (dataSubset[dropNaNCol].isna().all()))
         annAlreadyHere = hasattr(g.axes[ro, co], 'isPedalAnnAdded')
         if not (emptySubset or annAlreadyHere):
             movementCats = list(dataSubset.groupby([movementField, directionField]).groups.keys())
-            # try:
             assert len(movementCats) == 1, 'facet has more than one movement type: {}'.format(movementCats)
             moveCat, direction = movementCats[0][0], movementCats[0][1]
             if tStart is not None:
@@ -1400,7 +1480,7 @@ def genPedalPosAdder(
             if addTitle:
                 defFontOpts = dict(ha='right', va='top')
                 defFontOpts.update(titleFontOpts)
-                g.axes[ro, co].text(xx[0], yMidData, 'pedal', **defFontOpts)
+                g.axes[ro, co].text(xx[0], yMidData, 'pedal ', **defFontOpts)
             g.axes[ro, co].isPedalAnnAdded = True
         return
     return addPedalAnn
@@ -1571,7 +1651,6 @@ def reformatFacetGridLegendV2(
         originalTitle = leg.get_title().get_text()
         if originalTitle in labelOverrides:
             originalTitle = labelOverrides[originalTitle]
-        # pdb.set_trace()
         legendData = pd.Series(g._legend_data)
         legendData.index = [
             (labelOverrides[label] if label in labelOverrides else label)
