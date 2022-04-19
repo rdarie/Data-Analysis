@@ -26,7 +26,7 @@
 # SLURM_ARRAY_TASK_ID=2
 # exps=(201901_25 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 
-exps=(202101_21 202102_02)
+exps=(202101_21)
 for A in "${exps[@]}"; do
   echo "step 12 lfp rauc, on $A"
   source ./shellScripts/run_exp_preamble_$A.sh
@@ -86,17 +86,17 @@ for A in "${exps[@]}"; do
   ######
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_auc_illustration" --verbose=1 --selectionName="laplace_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_aucNoStim_illustration" --verbose=1 --selectionName="laplace_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_auc_illustration" --verbose=1 --selectionName="laplace_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_std_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_topo_illustration" --verbose=1 --selectionName="laplace_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   ##
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_aucNoStim_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
-  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_auc_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_aucNoStim_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+  python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_auc_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   #
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_topo_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_spectral_std_topo_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   #
+  # python -u './plotSignalDataFrameV2.py' --plotSuffix="laplace_std_illustration" --verbose=1 --selectionName="laplace_spectral_scaled" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
+
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="mahal_auc_illustration" --verbose=1 --selectionName="laplace_spectral_scaled_mahal_ledoit" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="mahal_aucNoStim_illustration" --verbose=1 --selectionName="laplace_spectral_scaled_mahal_ledoit" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"
   # python -u './plotSignalDataFrameV2.py' --plotSuffix="mahal_auc_illustration" --verbose=1 --selectionName="laplace_scaled_mahal_ledoit" $OPTS --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}"

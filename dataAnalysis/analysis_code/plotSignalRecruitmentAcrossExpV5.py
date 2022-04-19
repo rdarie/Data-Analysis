@@ -76,24 +76,26 @@ useDPI = 300
 dpiFactor = 72 / useDPI
 snsContext = 'talk'
 snsRCParams = {
-        'axes.facecolor': 'w',
-        "xtick.direction": 'in',
-        "ytick.direction": 'in',
-        "axes.spines.left": True,
-        "axes.spines.bottom": True,
-        "axes.spines.right": True,
-        "axes.spines.top": True,
-        "xtick.bottom": True,
-        "xtick.top": True,
-        "ytick.left": True,
-        "ytick.right": True,
-        #
+    'axes.facecolor': 'w',
+    #
+    "xtick.direction": 'in',
+    "ytick.direction": 'in',
+    #
+    "axes.spines.left": False,
+    "axes.spines.bottom": True,
+    "axes.spines.right": True,
+    "axes.spines.top": False,
+    #
+    "xtick.bottom": True,
+    "xtick.top": False,
+    "ytick.left": True,
+    "ytick.right": False,
     }
 snsRCParams.update(customSeabornContexts[snsContext])
 mplRCParams = {
     'figure.dpi': useDPI, 'savefig.dpi': useDPI,
     #
-    'axes.titlepad': 1.5,
+    'axes.titlepad': customSeabornContexts[snsContext]['font.size'] * 0.5 + 2.,
     'axes.labelpad': 0.75,
     #
     'figure.subplot.left': 0.02,
@@ -115,7 +117,7 @@ for rcK, rcV in mplRCParams.items():
     mpl.rcParams[rcK] = rcV
 
 sns.set(
-    context=snsContext, style='whitegrid',
+    context=snsContext, style='white',
     palette='dark', font='sans-serif',
     color_codes=True, rc=snsRCParams)
 
@@ -152,7 +154,7 @@ elif arguments['plotSuffix'] == 'outbound_E04':
     lOfKinematicsToPlot = ['CCW_outbound', 'CW_outbound']
 elif arguments['plotSuffix'] == 'E04':
     pdfNameSuffix = 'RAUC_E04'
-    lOfKinematicsToPlot = ['NA_NA', 'CCW_outbound', 'CW_outbound']
+    lOfKinematicsToPlot = ['NA_NA', 'CW_outbound', 'CW_return']
 elif arguments['plotSuffix'] == 'rest_E04':
     pdfNameSuffix = 'RAUC_rest_E04'
     lOfKinematicsToPlot = ['NA_NA']
@@ -366,8 +368,7 @@ if hackMask6.any():
     relativeStatsDF = relativeStatsDF.loc[~hackMask6, :]
 del dfTI
 #
-if subjectName == 'Rupert':
-    relativeStatsDF.xs(['exp202101251100', 'broadband'], level=['expName', 'freqBandName']).sort_values('hedges')
+if (subjectName == 'Rupert') and False:
     dfTI = relativeStatsDF.index.to_frame().reset_index(drop=True)
     hackMask7 = (
             dfTI['expName'].isin(['exp202101251100']) &
@@ -382,6 +383,7 @@ if subjectName == 'Rupert':
     ).to_numpy()
     if hackMask8.any():
         ampStatsDF = ampStatsDF.loc[~hackMask8, :]
+
 ########################################################################################################################
 ########################################################################################################################
 
@@ -429,7 +431,7 @@ elif arguments['freqBandGroup'] == '2':
 elif arguments['freqBandGroup'] == '3':
     freqBandOrderExtended = ['gamma', 'higamma']
 elif arguments['freqBandGroup'] == '4':
-    freqBandOrderExtended = ['beta']
+    freqBandOrderExtended = ['broadband', 'beta']
 #
 akm = ampStatsDF.index.get_level_values('freqBandName').isin(freqBandOrderExtended)
 ampStatsDF = ampStatsDF.loc[akm, :]
@@ -440,14 +442,7 @@ relativeStatsNoStimDF = relativeStatsNoStimDF.loc[rnskm, :]
 rckm = recCurve.index.get_level_values('freqBandName').isin(freqBandOrderExtended)
 recCurve = recCurve.loc[rckm, :]
 # ampStatsDF, relativeStatsDF, relativeStatsNoStimDF
-# pdb.set_trace()
-countRelativeStatsSignifDF = relativeStatsDF.groupby(['expName', 'electrode', 'kinematicCondition']).sum()['reject']
-countAmpStatsSignifDF = ampStatsDF.groupby(['expName', 'electrode', 'kinematicCondition']).sum()['reject']
-if arguments['verbose']:
-    print('Significant amp stats:')
-    print(countAmpStatsSignifDF)
-    print('Significant relative stats:')
-    print(countRelativeStatsSignifDF)
+
 
 whichRAUC = 'rawRAUC'
 # whichRAUC = 'normalizedRAUC'
@@ -457,14 +452,6 @@ figureOutputFolder = os.path.join(
     remoteBasePath, 'figures', 'lfp_recruitment_across_exp')
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder, exist_ok=True)
-#
-countSummaryHtml = (
-        countAmpStatsSignifDF.to_frame(name='significant_stim_effect').to_html() +
-        countRelativeStatsSignifDF.to_frame('significant_stim_vs_no_stim').to_html())
-countSummaryPath = os.path.join(
-    figureOutputFolder, '{}_fbg{}_{}.html'.format(subjectName, arguments['freqBandGroup'], pdfNameSuffix))
-with open(countSummaryPath, 'w') as _f:
-    _f.write(countSummaryHtml)
 #
 pdfPath = os.path.join(
     figureOutputFolder, '{}_fbg{}_{}.pdf'.format(subjectName, arguments['freqBandGroup'], pdfNameSuffix))
@@ -516,19 +503,57 @@ relativeStatsIndex = relativeStatsDF.index.to_frame().reset_index(drop=True)
 relativeStatsIndex.loc[:, 'referenceKinematicCondition'] = relativeStatsIndex['kinematicCondition']
 relativeStatsDF.index = pd.MultiIndex.from_frame(relativeStatsIndex)
 dummyRelativeStats = relativeStatsDF.copy()
+dummyRelativeStats.loc[:, ['T', 'dof', 'pval', 'cohen-d', 'hedges', 'T_abs']] = np.nan
 
 relativeStatsNoStimDF.loc[:, 'hedgesSign'] = np.sign(relativeStatsNoStimDF['hedges'])
 relativeStatsNoStimIndex = relativeStatsNoStimDF.index.to_frame().reset_index(drop=True)
 #
 relativeStatsNoStimIndex.loc[:, 'kinematicCondition'] = relativeStatsNoStimDF['A'].to_numpy()
+relativeStatsNoStimIndex.loc[:, 'referenceKinematicCondition'] = relativeStatsNoStimDF['B'].to_numpy()
+#
+maskForExtVsFlex = ((relativeStatsNoStimDF['A'] != 'NA_NA') & (relativeStatsNoStimDF['B'] != 'NA_NA')).to_numpy()
+#
+relativeStatsNoStimIndex.loc[maskForExtVsFlex, 'kinematicCondition'] = relativeStatsNoStimDF.loc[maskForExtVsFlex, 'B'].to_numpy()
+relativeStatsNoStimIndex.loc[maskForExtVsFlex, 'referenceKinematicCondition'] = relativeStatsNoStimDF.loc[maskForExtVsFlex, 'A'].to_numpy()
+relativeStatsNoStimDF.loc[maskForExtVsFlex, 'hedges'] *= -1
+relativeStatsNoStimDF.loc[maskForExtVsFlex, 'hedgesSign'] *= -1
+relativeStatsNoStimDF.loc[maskForExtVsFlex, 'T'] *= -1
+#
 relativeStatsNoStimIndex.loc[:, 'electrode'] = 'NA'
 relativeStatsNoStimIndex.loc[:, 'kinAndElecCondition'] = relativeStatsNoStimIndex.apply(lambda x: 'NA_{}'.format(x['kinematicCondition']), axis=1)
 relativeStatsNoStimIndex.loc[:, 'stimCondition'] = 'NA_0.0'
 relativeStatsNoStimIndex.loc[:, 'trialRateInHz'] = 0.
-relativeStatsNoStimIndex.loc[:, 'referenceKinematicCondition'] = relativeStatsNoStimDF['B'].to_numpy()
+
 relativeStatsNoStimDF.index = pd.MultiIndex.from_frame(relativeStatsNoStimIndex.loc[:, relativeStatsDF.index.names])
 dummyRelativeStatsNoStim = relativeStatsNoStimDF.copy()
+dummyRelativeStatsNoStim.loc[:, ['T', 'dof', 'pval', 'cohen-d', 'hedges', 'T_abs']] = np.nan
 
+relevantColumns = [cN for cN in relativeStatsDF.columns if cN in relativeStatsNoStimDF.columns]
+refToBaselineMask = relativeStatsNoStimDF.index.get_level_values('referenceKinematicCondition') == 'NA_NA'
+#
+combinedStatsDF = pd.concat([relativeStatsDF, relativeStatsNoStimDF.loc[:, relevantColumns]])
+dummyCombinedStats = combinedStatsDF.copy()
+dummyCombinedStats.loc[:, ['T', 'dof', 'pval', 'cohen-d', 'hedges', 'T_abs']] = np.nan
+####
+countRelativeStatsSignifDF = relativeStatsDF.groupby(['expName', 'electrode', 'kinematicCondition']).sum()['reject']
+countAmpStatsSignifDF = ampStatsDF.groupby(['expName', 'electrode', 'kinematicCondition']).sum()['reject']
+countRelativeStatsNoStimSignifDF = relativeStatsNoStimDF.groupby(['expName', 'referenceKinematicCondition', 'kinematicCondition']).sum()['reject']
+if arguments['verbose']:
+    print('Significant amp stats:')
+    print(countAmpStatsSignifDF)
+    print('Significant relative stats:')
+    print(countRelativeStatsSignifDF)
+
+countSummaryHtml = (
+    countAmpStatsSignifDF.to_frame(name='significant_stim_effect').to_html() +
+    countRelativeStatsSignifDF.to_frame('significant_stim_vs_no_stim').to_html() +
+    countRelativeStatsNoStimSignifDF.to_frame('significant_across_movements').to_html()
+    )
+countSummaryPath = os.path.join(
+    figureOutputFolder, '{}_fbg{}_{}.html'.format(subjectName, arguments['freqBandGroup'], pdfNameSuffix))
+with open(countSummaryPath, 'w') as _f:
+    _f.write(countSummaryHtml)
+####
 nFeats = plotRC['feature'].unique().shape[0]
 nFeatsToPlot = max(min(3, int(np.floor(nFeats/2))), 1)
 keepTopIdx = (
@@ -616,7 +641,8 @@ def genNumSigAnnotator(pvDF, xOrder=None, hueVar=None, palette=None, fontOpts={}
             hueOrder = palette.index.to_list()
             huePalette = palette.to_dict()
             nHues = max(len(hueOrder), 1)
-            offsets = np.linspace(0, width - width / nHues, nHues)
+            # offsets = np.linspace(0, width - width / nHues, nHues)
+            offsets = np.linspace(0, width, nHues)
             offsets -= offsets.mean()
             # print(['offsets from {} to {}'.format(offsets[0], offsets[-1])])
             thisMask = pvDF.notna().all(axis='columns')
@@ -638,13 +664,14 @@ def genNumSigAnnotator(pvDF, xOrder=None, hueVar=None, palette=None, fontOpts={}
                         thisEntry = thisEntry.iloc[0, :]
                         if (thisEntry.loc[['under', 'ns', 'over']].sum()) == 0:
                             continue
-                        message = '{}/{}/{}'.format(int(thisEntry['under']), int(thisEntry['ns']), int(thisEntry['over']))
-                        x = xIdx + offsets[hIdx]
-                        y = 0
+                        message = '{}/{}/{}'.format(
+                            int(thisEntry['under']), int(thisEntry['ns']), int(thisEntry['over']))
+                        defFontOpts = dict(x=xIdx + offsets[hIdx], y=0.9)
+                        defFontOpts.update(fontOpts)
                         g.axes[ro, co].text(
-                            x, y, message,
+                            s=message,
                             transform=trans, color=huePalette[hLabel],
-                            **fontOpts)
+                            **defFontOpts)
             g.axes[ro, co].pvalsAnnotated = True
         else:
             print('ro {} co {} g.axes[ro, co].pvalsAnnotated {}'.format(ro, co, g.axes[ro, co].pvalsAnnotated))
@@ -690,13 +717,13 @@ def genNumSigAnnotatorV2(
                             continue
                         message = '{}/{}/{}'.format(
                             int(thisEntry['under']), int(thisEntry['ns']), int(thisEntry['over']))
-                        x = xIdx + offsets[hIdx]
-                        y = 0
+                        defFontOpts = dict(x=xIdx + offsets[hIdx], y=0.9)
+                        defFontOpts.update(fontOpts)
                         theAx.text(
-                            x, y, message,
+                            s=message,
                             transform=trans, color=huePalette[hLabel],
-                            **fontOpts)
-                        print('numSigAnnotator: annotating axes')
+                            **defFontOpts)
+                        # print('numSigAnnotator: annotating axes')
                     else:
                         print('Warning! No matches for\n{} == {} (columns)\n{} == {}(row)\n{} == {} (hue)'.format(g._col_var, colVar, g._row_var, rowVar, hueVar, hLabel))
             theAx.pvalsAnnotated = True
@@ -716,9 +743,12 @@ def genMahalSummaryPlotFun(
         hue=None, hue_order=None, palette=None,
         error_palette=None,
         dodge=True, width=0.9, jitter=True,
-        errorBarOptsDict=None
+        errorBarOptsDict=None, verbose=False
         ):
+    if verbose:
+        print('genMahalSummaryPlotFun() width = {}'.format(width))
     semanticNames = [n for n in [row, col, x, hue, style] if n is not None]
+    fullDataset.sort_values(semanticNames, inplace=True)
     legendData = {}
     if jitter:
         rng = np.random.default_rng()
@@ -743,6 +773,8 @@ def genMahalSummaryPlotFun(
         if dodge:
             offsets = np.linspace(0, width - width / nHues, nHues)
             offsets -= offsets.mean()
+            if verbose:
+                print('genMahalSummaryPlotFun() offsets: {}'.format(offsets))
         xHueMappingDict = {}
         legendData[hue] = mpl.patches.Patch(
             alpha=0, linewidth=0)
@@ -753,34 +785,36 @@ def genMahalSummaryPlotFun(
                     color=palette[hN], linewidth=0)
             if dodge:
                 xHueMappingDict[hN] += offsets[hIdx]
+        if verbose:
+            print('xHueMappingDict:\n{}'.format(pd.concat(xHueMappingDict).sort_values()))
+        def xPosFun(dfRow):
+            if dfRow[hue] in xHueMappingDict:
+                if dfRow[x] in xHueMappingDict[dfRow[hue]]:
+                    return xHueMappingDict[dfRow[hue]][dfRow[x]]
+            else:
+                return np.nan
         if jitter:
-            panelGroups = [n for n in [row, col, hue] if n is not None]
+            panelGroups = [n for n in [row, col, x, hue] if n is not None]
             xJitters = pd.Series(0, index=fullDataset.index)
             if len(panelGroups):
-                grouper = fullDataset.sort_values(semanticNames).groupby(panelGroups)
+                grouper = fullDataset.dropna().groupby(panelGroups)
             else:
-                grouper = ('all', fullDataset.sort_values(semanticNames))
+                grouper = ('all', fullDataset.dropna())
             for name, group in grouper:
                 rawJitters = 0.2 * rng.random(group.shape[0]) + 0.8
                 rawJitters = np.cumsum(rawJitters) / np.sum(rawJitters)
-                # rng.shuffle(rawJitters)
-                # pdb.set_trace()
-                xJitters.loc[group.index] = (rawJitters.copy() - 0.5) * width / nHues
-            #
-            def xPosFun(dfRow):
-                if dfRow[hue] in xHueMappingDict:
-                    if dfRow[x] in xHueMappingDict[dfRow[hue]].index:
-                        return xHueMappingDict[dfRow[hue]][dfRow[x]] + xJitters.loc[dfRow.name]
-                else:
-                    return np.nan
-            allXPos = fullDataset.apply(xPosFun, axis='columns')
+                scaledJitters = (rawJitters.copy() - 0.5) * width / nHues
+                # rng.shuffle(scaledJitters)
+                if verbose:
+                    print('genMahalSummaryPlotFun()\n    raw jitters min = {} max = {}'.format(
+                        scaledJitters.min(), scaledJitters.max()))
+                xJitters.loc[group.index] = scaledJitters
+            allXPos = fullDataset.apply(xPosFun, axis='columns') + xJitters
+            # pdb.set_trace()
+            # plt.plot(fullDataset.apply(xPosFun, axis='columns'), xJitters ** 0, 'ro')
+            # plt.plot(allXPos, allXPos  ** 0, 'kd'); plt.show()
+            # plt.plot(xJitters, xJitters ** 0, 'k.'); plt.show()
         else:
-            def xPosFun(dfRow):
-                if dfRow[hue] in xHueMappingDict:
-                    if dfRow[x] in xHueMappingDict[dfRow[hue]]:
-                        return xHueMappingDict[dfRow[hue]][dfRow[x]]
-                else:
-                    return np.nan
             allXPos = fullDataset.apply(xPosFun, axis='columns')
     else:
         # hue is none
@@ -816,7 +850,7 @@ def genMahalSummaryPlotFun(
             legendData[style] = mpl.patches.Patch(alpha=0, linewidth=0)
             if 'marker' in style_palette.index:
                 for styleName, thisStyle in style_palette.T.iterrows():
-                    mSize = 2 * thisStyle['markersize'] if ('markersize' in thisStyle) else 2 * sns.plotting_context()['lines.markersize']
+                    mSize = 1.5 * thisStyle['markersize'] if ('markersize' in thisStyle) else 1.5 * sns.plotting_context()['lines.markersize']
                     legendData[styleName] = mpl.lines.Line2D(
                         [0], [0], marker=thisStyle['marker'],
                         markerfacecolor='lightgray', markeredgecolor='k',
@@ -880,8 +914,8 @@ def genMahalSummaryPlotFun(
 print('Saving plots to {}'.format(pdfPath))
 with PdfPages(pdfPath) as pdf:
     # with contextlib.nullcontext() as pdf:
+    gridSpecDefault = dict(wspace=0.05, hspace=0.05)
     rowVar = 'feature'
-    rowOrder = sorted(np.unique(plotRC[rowVar]))
     colVar = 'stimCondition'
     colOrder = (
         plotRC.loc[
@@ -898,102 +932,55 @@ with PdfPages(pdfPath) as pdf:
     pal = sns.color_palette("Set2")
     huePalette = {hN: pal[hIdx] for hIdx, hN in enumerate(hueOrder)}
     huePaletteAlpha = {hN: tuple(list(hV) + [0.5]) for hN, hV in huePalette.items()}
-    figHeight = 2. + 2. * len(rowOrder)
-    figWidth = 2. + len(colOrder) * len(freqBandOrderExtended)
-    if arguments['plotThePieces']:
-        ####
-        widthRatios = [3] * np.unique(testGroupPieces[colVar]).shape[0] + [1]
-        plotLimsMin = plotRCPieces.groupby(rowVar).min()[whichRAUC]
-        plotLimsMax = plotRCPieces.groupby(rowVar).max()[whichRAUC]
-        plotLimsRange = plotLimsMax - plotLimsMin
-        plotLimsMin -= plotLimsRange / 100
-        plotLimsMax += plotLimsRange / 100
-        xJ = testGroupPieces[amplitudeFieldName].diff().dropna().abs().unique().mean() / 20
-        height = figHeight / testGroupPieces[rowVar].nunique()
-        width = figWidth / testGroupPieces[colVar].nunique()
-        aspect = width / height
-        g = sns.lmplot(
-            col=colVar, col_order=colOrder,
-            row=rowVar,
-            x=amplitudeFieldName, y=whichRAUC,
-            hue=hueName, hue_order=hueOrder, palette=huePalette,
-            data=testGroupPieces,
-            ci=95, n_boot=100,
-            x_jitter=xJ,
-            scatter_kws=dict(s=2.5),
-            height=height, aspect=aspect,
-            facet_kws=dict(
-                sharey=False, sharex=False, margin_titles=True,
-                gridspec_kws=dict(width_ratios=widthRatios)),
-            )
-        plotProcFuns = [
-            genStatsAnnotator(ampStatsDF, relativeStatsDF, hueName, huePalette),
-            asp.genTitleChanger(prettyNameLookup)]
-        for (ro, co, hu), dataSubset in g.facet_data():
-            if len(plotProcFuns):
-                for procFun in plotProcFuns:
-                    procFun(g, ro, co, hu, dataSubset)
-        for (row_val, col_val), ax in g.axes_dict.items():
-            if col_val == 'NA_0.0':
-                refMask = (refGroupPieces[rowVar] == row_val)
-                if refMask.any():
-                    refData = refGroupPieces.loc[refMask, :]
-                else:
-                    refData = refGroupPieces
-                sns.boxplot(
-                    x=hueName, order=hueOrder,
-                    y=whichRAUC,
-                    hue=hueName, hue_order=hueOrder, palette=huePaletteAlpha,
-                    data=refData, saturation=0.,
-                    ax=ax, whis=np.inf, dodge=True)
-                sns.stripplot(
-                    x=hueName, order=hueOrder,
-                    y=whichRAUC, palette=huePalette,
-                    hue=hueName, hue_order=hueOrder, data=refData,
-                    ax=ax, size=sns.plotting_context['lines.markersize'], dodge=True)
-                ax.set_xlabel('')
-                ax.set_xticks([])
-                if ax.get_legend() is not None:
-                    ax.get_legend().remove()
-        g.set_axis_labels('Stimulation amplitude (uA)', 'Normalized AUC')
-        asp.reformatFacetGridLegend(
-            g, titleOverrides={
-                'kinematicCondition': 'Movement type'
-            },
-            contentOverrides={
-                'NA_NA': 'No movement',
-                'CW_outbound': 'Start of movement (extension)',
-                'CW_return': 'Return to start (flexion)'
-            },
-            styleOpts=styleOpts)
-        g.resize_legend(adjust_subtitles=True)
-        for (rN, cN), ax in g.axes_dict.items():
-            ax.set_ylim([plotLimsMin.loc[rN], plotLimsMax.loc[rN]])
-        # g.axes[0, 0].set_ylim(plotLims)
-        g.tight_layout(pad=styleOpts['tight_layout.pad'])
-        if not consoleDebug:
-            pdf.savefig(bbox_inches='tight', pad_inches=0,)
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
     if True:
         stripplotKWArgs = dict(
-            dodge=True, size=sns.plotting_context()['lines.markersize'],
-            rasterized=False,
-            linewidth=sns.plotting_context()['patch.linewidth'] / 2
+            dodge=True, rasterized=False,
+            marker='o'
             )
+        goodStripKWArgs = dict(
+            edgecolor='k',
+            size=sns.plotting_context()['lines.markersize'] / 2,
+            linewidth=sns.plotting_context()['patch.linewidth'] / 2)
+        badStripKWArgs = dict(
+            alpha=0.3, edgecolor='none',
+            size=sns.plotting_context()['lines.markersize'] / 4,
+            linewidth=0.)
+        #
         stripplotKWArgsMahal = stripplotKWArgs.copy()
-        stripplotKWArgsMahal['size'] = 1.5 * sns.plotting_context()['lines.markersize']
         stripplotKWArgsMahal['jitter'] = False
+        stripplotKWArgsMahal['marker'] = 'd'
+        goodStripKWArgsMahal = dict(
+            edgecolor='k',
+            size=1.2 * sns.plotting_context()['lines.markersize'],
+            linewidth=sns.plotting_context()['patch.linewidth'])
+        badStripKWArgsMahal = dict(
+            alpha=0.4, edgecolor='none',
+            size=1.5 * sns.plotting_context()['lines.markersize'],
+            linewidth=0.)
+        #
         boxplotKWArgs = dict(
             dodge=True,
             whis=np.inf,
             linewidth=sns.plotting_context()['lines.linewidth'],
-            saturation=0.3,
+            width=0.9,
+            # saturation=0.3,
             )
         colVar = 'electrode'
         rowVar = 'kinematicCondition'
+        #
+        addMahalGsHere = False
+        addChannelGsHere = False
+        addNonSigObs = False
+        addNonSigObsMahal = True
+        enableNumSigAnnotator = True
+        figWidthPerBand = 0.5
+        #
+        prettyNameLookup.update({
+            'NA_NA': 'Baseline',
+            'CW_outbound': 'Extension',
+            'CW_return': 'Flexion',
+            'NA': 'No stim.'
+            })
         ################################################################################################################
         # add dummies to make sure plotting functions allocate all appropriate spaces even if there is no data
         dictWithDummies = {'dummy{}'.format(i): dummyAmpStats.reset_index() for i in range(3)}
@@ -1022,57 +1009,30 @@ with PdfPages(pdfPath) as pdf:
 
         plotAmpStatsDF.loc[:, 'reject'] = plotAmpStatsDF.loc[:, 'reject'].astype(bool)
         plotAmpStatsDF.loc[:, 'isMahalDist'] = plotAmpStatsDF.loc[:, 'isMahalDist'].astype(bool)
-        # pdb.set_trace()
         plotAmpStatsDF.loc[:, 'electrode'] = plotAmpStatsDF['electrode'].astype(spinalElecCategoricalDtype)
         plotAmpStatsDF.loc[:, 'namesAndMD'] = plotAmpStatsDF['names']
         plotAmpStatsDF.loc[plotAmpStatsDF['isMahalDist'], 'namesAndMD'] += '_md'
-        ################################################################################################################
-        '''
-        genDummiesBy = [
-            'freqBandName', 'electrode', 'namesAndMD',
-            'kinematicCondition', 'expName', 'selectionName',
-            'kinAndElecCondition', 'feature', 'lag',
-            'parentFeature', 'names', 'isMahalDist'
-            ]
-        dummyNames = [
-            idn
-            for idn in product(*[
-                np.unique(plotAmpStatsDF[cN]).tolist()
-                for cN in genDummiesBy])]
-
-        dummyEntriesReject = pd.DataFrame(
-            dummyNames, index=range(len(dummyNames)), columns=genDummiesBy)
-        # dummyEntriesReject = plotAmpStatsDF.drop_duplicates(subset=['freqBandName', 'electrode', 'namesAndMD', 'kinematicCondition']).copy()
-        dummyEntriesReject.loc[:, 'reject'] = True
-        # fill missing cols
-        # dummyEntriesReject.loc[:, ['coef', 'coefStd', 'se', 'T', 'pval', 'r2', 'adj_r2', 'relimp', 'relimp_perc']] = np.nan
-        dummyEntriesReject.loc[:, [cN for cN in plotAmpStatsDF.columns if cN not in dummyEntriesReject.columns]] = np.nan
-        pdb.set_trace()
-        dummyEntriesReject = dummyEntriesReject.loc[:, plotAmpStatsDF.columns]
-        dummyEntriesDoNotReject = dummyEntriesReject.copy()
-        dummyEntriesDoNotReject.loc[:, 'reject'] = False
-        plotAmpStatsDF = pd.concat([plotAmpStatsDF, dummyEntriesReject, dummyEntriesDoNotReject], ignore_index=True)
-        '''
         #######
         thisMaskAmp = plotAmpStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot) & plotAmpStatsDF['electrode'].isin(lOfElectrodesToPlot) & ~plotAmpStatsDF['isMahalDist']
         if thisMaskAmp.any():
             thisMaskAmpMahal = plotAmpStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot) & plotAmpStatsDF['electrode'].isin(lOfElectrodesToPlot) & plotAmpStatsDF['isMahalDist']
             thisFreqBandOrder = [
                 fN for fN in freqBandOrderExtended if fN in plotAmpStatsDF.loc[thisMaskAmp, 'freqBandName'].unique().tolist()]
-
+            #
             rowOrder = [rN for rN in lOfKinematicsToPlot if rN in plotAmpStatsDF['kinematicCondition'].to_list()]
             #
             thisPalette = allAmpPalette.loc[allAmpPalette.index.isin(plotAmpStatsDF.loc[thisMaskAmp, 'namesAndMD'])]
             thisPaletteMahal = allAmpPalette.loc[allAmpPalette.index.isin(plotAmpStatsDF.loc[thisMaskAmpMahal, 'namesAndMD'])]
             colOrder = [eN for eN in plotAmpStatsDF[colVar].unique().tolist() if ((eN !='NA') and (eN in lOfElectrodesToPlot))]
-            #pdb.set_trace()
+
             if thisPalette.shape[0] > 1:
-                stripJitter = 1. / (thisPalette.shape[0] + 1)
+                stripJitter = 0.9 / (thisPalette.shape[0] + 1)
             else:
-                stripJitter = 1/3
+                stripJitter = 0.3
+            #######################################################################
             # recruitment regression coeffs
-            figHeight = 2 + 2. * len(rowOrder)
-            figWidth = 2 + len(colOrder) * len(freqBandOrderExtended)
+            figHeight = 0.75 + 2. * len(rowOrder)
+            figWidth = 0.5 + figWidthPerBand * len(colOrder) * len(freqBandOrderExtended) * thisPalette.shape[0]
             height = figHeight / plotAmpStatsDF.loc[thisMaskAmp, rowVar].nunique()
             width = figWidth / plotAmpStatsDF.loc[thisMaskAmp, colVar].nunique()
             aspect = width / height
@@ -1088,101 +1048,133 @@ with PdfPages(pdfPath) as pdf:
             pvalDF = plotAmpStatsDF.loc[thisMaskAmp].dropna().groupby([
                 'kinematicCondition', 'electrode', 'freqBandName', 'namesAndMD']).apply(countOverUnder).fillna(0)
             for yVar in ['coefStd']:
+                boxPlotMask = (
+                    thisMaskAmp &
+                    (plotAmpStatsDF['coefSign'] > 0) &
+                    plotAmpStatsDF['reject']
+                    )
                 g = sns.catplot(
                     y=yVar,
                     x='freqBandName', order=thisFreqBandOrder,
                     col=colVar, col_order=colOrder,
                     row=rowVar, row_order=rowOrder,
                     hue='namesAndMD', hue_order=thisPalette.index.to_list(),
-                    palette=thisPalette.apply(sns.utils.alter_color, l=0.5).to_dict(), color='w',
-                    data=plotAmpStatsDF.loc[thisMaskAmp, :],  # & plotAmpStatsDF['reject']
+                    # palette=thisPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
+                    palette=thisPalette.to_dict(),
+                    color='w',
+                    data=plotAmpStatsDF.loc[boxPlotMask, :],  # & plotAmpStatsDF['reject']
                     height=height, aspect=aspect,
                     sharey=True, sharex=True,  margin_titles=True,
+                    facet_kws=dict(gridspec_kws=gridSpecDefault),
                     kind='box', **boxplotKWArgs
                     )
                 for name, ax in g.axes_dict.items():
                     rowName, colName = name
                     # non-significant are transparent
-                    subSetMask = thisMaskAmp & (plotAmpStatsDF[rowVar] == rowName) & (plotAmpStatsDF[colVar] == colName) & (~plotAmpStatsDF['reject']) #& plotAmpStatsDF[yVar].notna()
-                    if subSetMask.any():
-                        if (not plotAmpStatsDF.loc[subSetMask, :].dropna().empty):
-                            sns.stripplot(
-                                data=plotAmpStatsDF.loc[subSetMask, :], ax=ax,
-                                y=yVar, x='freqBandName',
-                                order=thisFreqBandOrder,
-                                hue='namesAndMD', hue_order=thisPalette.index.to_list(),
-                                palette=thisPalette.to_dict(),
-                                jitter=stripJitter,
-                                alpha=0.3, edgecolor='none', **stripplotKWArgs)
+                    subSetMask = (
+                        thisMaskAmp &
+                        (plotAmpStatsDF[rowVar] == rowName) &
+                        (plotAmpStatsDF[colVar] == colName) &
+                        (~plotAmpStatsDF['reject']))
+                    subSetMaskNegative = subSetMask & (plotAmpStatsDF['coefSign'] < 0)
+                    subSetMaskNegativeNotNa = subSetMask & plotAmpStatsDF[yVar].notna()
+                    subSetMaskNotNa = subSetMask & plotAmpStatsDF[yVar].notna()
+                    if subSetMaskNotNa.any() and addNonSigObs and addChannelGsHere:
+                        sns.stripplot(
+                            data=plotAmpStatsDF.loc[subSetMask, :], ax=ax,
+                            y=yVar, x='freqBandName',
+                            order=thisFreqBandOrder,
+                            hue='namesAndMD', hue_order=thisPalette.index.to_list(),
+                            palette=thisPalette.to_dict(),
+                            jitter=stripJitter,
+                            **stripplotKWArgs, **badStripKWArgs)
                     # significant are opaque
-                    subSetMask = thisMaskAmp & (plotAmpStatsDF[rowVar] == rowName) & (plotAmpStatsDF[colVar] == colName) & plotAmpStatsDF['reject'] # & plotAmpStatsDF[yVar].notna()
-                    if subSetMask.any():
-                        if (not plotAmpStatsDF.loc[subSetMask, :].dropna().empty):
-                            sns.stripplot(
-                                data=plotAmpStatsDF.loc[subSetMask, :], ax=ax,
-                                y=yVar, x='freqBandName',
-                                order=thisFreqBandOrder, hue='namesAndMD',
-                                hue_order=thisPalette.index.to_list(),
-                                palette=thisPalette.to_dict(), edgecolor='k',
-                                jitter=stripJitter,
-                                **stripplotKWArgs
-                                )
-                    addMahalGsHere = True
-                    '''
-                    ## add dummies to prevent nans from messing it up
-                    subSetMaskMahal = thisMaskAmpMahal & (plotAmpStatsDF[rowVar] == rowName) & (plotAmpStatsDF[colVar] == colName) & plotAmpStatsDF[yVar].notna()
-                    if subSetMaskMahal.any() and addMahalGsHere:
+                    subSetMask = (
+                            thisMaskAmp &
+                            (plotAmpStatsDF[rowVar] == rowName) &
+                            (plotAmpStatsDF[colVar] == colName) &
+                            plotAmpStatsDF['reject'])
+                    subSetMaskNegative = subSetMask & (plotAmpStatsDF['coefSign'] < 0)
+                    subSetMaskNegativeNotNa = subSetMask & plotAmpStatsDF[yVar].notna()
+                    subSetMaskNotNa = subSetMask & plotAmpStatsDF[yVar].notna()
+                    if subSetMaskNegativeNotNa.any():
+                        sns.boxplot(
+                            data=plotAmpStatsDF.loc[subSetMaskNegative, :], ax=ax,
+                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
+                            hue='namesAndMD', hue_order=thisPalette.index.to_list(),
+                            # palette=thisPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
+                            palette=thisPalette.to_dict(),
+                            **boxplotKWArgs
+                            )
+                    if subSetMaskNotNa.any() and addChannelGsHere:
+                        sns.stripplot(
+                            data=plotAmpStatsDF.loc[subSetMask, :], ax=ax,
+                            y=yVar, x='freqBandName',
+                            order=thisFreqBandOrder, hue='namesAndMD',
+                            hue_order=thisPalette.index.to_list(),
+                            palette=thisPalette.to_dict(),
+                            jitter=stripJitter,
+                            **stripplotKWArgs, **goodStripKWArgs
+                            )
+                    # non-significant are transparent (mahal)
+                    subSetMaskMahal = (
+                            thisMaskAmpMahal &
+                            (plotAmpStatsDF[rowVar] == rowName) &
+                            (plotAmpStatsDF[colVar] == colName) &
+                            (~plotAmpStatsDF['reject']))
+                    subSetMaskMahalNegative = subSetMask & (plotAmpStatsDF['coefSign'] < 0)
+                    subSetMaskMahalNegativeNotNa = subSetMask & plotAmpStatsDF[yVar].notna()
+                    subSetMaskMahalNotNa = subSetMaskMahal & plotAmpStatsDF[yVar].notna()
+                    if subSetMaskMahalNotNa.any() and addMahalGsHere and addNonSigObsMahal:
                         sns.stripplot(
                             data=plotAmpStatsDF.loc[subSetMaskMahal, :], ax=ax,
                             y=yVar, x='freqBandName',
                             order=thisFreqBandOrder,
-                            hue='namesAndMD', hue_order=thisPaletteMahal.index.to_list(), palette=thisPaletteMahal.to_dict(),
-                            alpha=0., edgecolor='face', **stripplotKWArgsMahal)
-                        '''
-                    # non-significant are transparent (mahal)
-                    subSetMaskMahal = thisMaskAmpMahal & (plotAmpStatsDF[rowVar] == rowName) & (plotAmpStatsDF[colVar] == colName) & (~plotAmpStatsDF['reject'])  # & plotAmpStatsDF[yVar].notna()
-                    if subSetMaskMahal.any() and addMahalGsHere:
-                        if (not plotAmpStatsDF.loc[subSetMaskMahal, :].dropna().empty):
-                            sns.stripplot(
-                                data=plotAmpStatsDF.loc[subSetMaskMahal, :], ax=ax,
-                                y=yVar, x='freqBandName',
-                                order=thisFreqBandOrder,
-                                hue='namesAndMD', hue_order=thisPaletteMahal.index.to_list(), palette=thisPaletteMahal.to_dict(),
-                                alpha=0.5, edgecolor='none', **stripplotKWArgsMahal)
+                            hue='namesAndMD', hue_order=thisPaletteMahal.index.to_list(),
+                            palette=thisPaletteMahal.to_dict(),
+                            **stripplotKWArgsMahal, **badStripKWArgsMahal)
                     # significant are opaque (mahal)
-                    subSetMaskMahal = thisMaskAmpMahal & (plotAmpStatsDF[rowVar] == rowName) & (plotAmpStatsDF[colVar] == colName) & plotAmpStatsDF['reject']  # & plotAmpStatsDF[yVar].notna()
-                    if subSetMaskMahal.any() and addMahalGsHere:
-                        if (not plotAmpStatsDF.loc[subSetMaskMahal, :].dropna().empty):
-                            sns.stripplot(
-                                data=plotAmpStatsDF.loc[subSetMaskMahal, :], ax=ax,
-                                y=yVar, x='freqBandName',
-                                order=thisFreqBandOrder, hue='namesAndMD',
-                                hue_order=thisPaletteMahal.index.to_list(), palette=thisPaletteMahal.to_dict(),
-                                edgecolor='k',
-                                **stripplotKWArgsMahal
-                                )
-                    # ax.tick_params(axis='x', labelrotation=30)
+                    subSetMaskMahal = (
+                        thisMaskAmpMahal &
+                        (plotAmpStatsDF[rowVar] == rowName) &
+                        (plotAmpStatsDF[colVar] == colName) &
+                        plotAmpStatsDF['reject'])
+                    subSetMaskMahalNegative = subSetMask & (plotAmpStatsDF['coefSign'] < 0)
+                    subSetMaskMahalNegativeNotNa = subSetMask & plotAmpStatsDF[yVar].notna()
+                    subSetMaskMahalNotNa = subSetMaskMahal & plotAmpStatsDF[yVar].notna()
+                    if subSetMaskMahalNotNa.any() and addMahalGsHere:
+                        sns.stripplot(
+                            data=plotAmpStatsDF.loc[subSetMaskMahal, :], ax=ax,
+                            y=yVar, x='freqBandName',
+                            order=thisFreqBandOrder, hue='namesAndMD',
+                            hue_order=thisPaletteMahal.index.to_list(), palette=thisPaletteMahal.to_dict(),
+                            **stripplotKWArgsMahal, **goodStripKWArgsMahal
+                            )
                     xTickLabels = ax.get_xticklabels()
                     if len(xTickLabels):
                         newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
                         ax.set_xticklabels(
-                            newXTickLabels, rotation=30, va='top', ha='right')
-                    ax.axhline(0, c='r', zorder=2.5)
+                            newXTickLabels, rotation=30, va='top', ha='center')
+                    ax.axhline(0, c="0.5", ls='--', zorder=0.9)
                     for xJ in range(1, len(thisFreqBandOrder), 2):
-                        ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
+                        ax.axvspan(
+                            -0.5 + xJ, 0.5 + xJ,
+                            color="0.1", alpha=0.1, zorder=1.)
                     if ax.get_legend() is not None:
                         ax.get_legend().remove()
-                enableNumSigAnnotator = False
+                g.set_titles(col_template='{col_name}', row_template='{row_name}')
                 plotProcFuns = [asp.genTitleChanger(prettyNameLookup)]
                 if enableNumSigAnnotator:
                     plotProcFuns += [
                     genNumSigAnnotator(
                         pvalDF.reset_index(),
                         xOrder=thisFreqBandOrder, hueVar='namesAndMD', palette=thisPalette,
+                        width=boxplotKWArgs['width'],
                         fontOpts=dict(
-                            va='top', ha='right',
-                            fontsize=sns.plotting_context()["font.size"],
-                            fontweight='bold', rotation=30))]
+                            va='bottom', ha='center', y=1.01,
+                            fontsize=sns.plotting_context()["font.size"] * 0.5,
+                            fontweight='bold', rotation=0
+                            ))]
                 for (ro, co, hu), dataSubset in g.facet_data():
                     if len(plotProcFuns):
                         for procFun in plotProcFuns:
@@ -1194,10 +1186,10 @@ with PdfPages(pdfPath) as pdf:
                     },
                     contentOverrides={
                         'namesAndMD': 'Regressors',
-                        'trialAmplitude': 'Stimulation amplitude',
-                        'trialAmplitude:trialRateInHz': 'Stimulation rate interaction',
-                        'trialAmplitude_md': 'Stimulation amplitude (Mahal. dist.)',
-                        'trialAmplitude:trialRateInHz_md': 'Stimulation rate interaction (Mahal. dist.)',
+                        'trialAmplitude': 'Stimulation\namplitude',
+                        'trialAmplitude:trialRateInHz': 'Stimulation-rate\ninteraction',
+                        'trialAmplitude_md': 'Stimulation\namplitude\n(Mahal. dist.)',
+                        'trialAmplitude:trialRateInHz_md': 'Stimulation-rate\ninteraction\n(Mahal. dist.)',
                     },
                 styleOpts=styleOpts)
                 g.set_axis_labels(prettyNameLookup['freqBandName'], prettyNameLookup[yVar])
@@ -1211,15 +1203,9 @@ with PdfPages(pdfPath) as pdf:
                 else:
                     plt.close()
             ######
-        #
-        relevantColumns = [cN for cN in relativeStatsDF.columns if cN in relativeStatsNoStimDF.columns]
-        refToBaselineMask = relativeStatsNoStimDF.index.get_level_values('referenceKinematicCondition') == 'NA_NA'
-        combinedStatsDF = pd.concat([relativeStatsDF, relativeStatsNoStimDF.loc[refToBaselineMask, relevantColumns]])
-        dummyCombinedDF = combinedStatsDF.copy()
-        dummyCombinedDF.loc[:, ['T', 'pval', 'hedges', 'T_abs', 'glass']] = np.nan
         ################################################################################################################
         # add dummies to make sure plotting functions allocate all appropriate spaces even if there is no data
-        dictWithDummies = {'dummy{}'.format(i): dummyCombinedDF.reset_index() for i in range(3)}
+        dictWithDummies = {'dummy{}'.format(i): dummyCombinedStats.reset_index() for i in range(3)}
         dictWithDummies['original'] = combinedStatsDF.reset_index()
         # plotRelativeStatsDF = ampStatsDF.reset_index()
         plotRelativeStatsDF = pd.concat(dictWithDummies, names=['isDummy', 'originalIndex']).reset_index()
@@ -1243,76 +1229,49 @@ with PdfPages(pdfPath) as pdf:
         plotRelativeStatsDF.loc[plotRelativeStatsDF['isDummy'] == 'dummy2', 'isMahalDist'] = plotRelativeStatsDF.loc[
             plotRelativeStatsDF['isDummy'] == 'original', 'isMahalDist'].to_numpy(dtype=bool)
         #
+        crossMovementComparisons = (
+            (plotRelativeStatsDF['electrode'] == 'NA') &
+            (plotRelativeStatsDF['referenceKinematicCondition'] != 'NA_NA')).to_numpy()
+        #
         plotRelativeStatsDF.loc[:, 'reject'] = plotRelativeStatsDF.loc[:, 'reject'].astype(bool)
         plotRelativeStatsDF.loc[:, 'isMahalDist'] = plotRelativeStatsDF.loc[:, 'isMahalDist'].astype(bool)
-        '''
-        plotRelativeStatsDF = relativeStatsDF.reset_index()
-        plotStatsList = [plotRelativeStatsDF]
-        for cN in plotRelativeStatsDF['kinematicCondition'].unique():
-            if cN == 'NA_NA':
-                continue
-            noStimMask = (relativeStatsNoStimDF['A'] == cN) & (relativeStatsNoStimDF['B'] == 'NA_NA')
-            if noStimMask.any():
-                takeThese = relativeStatsNoStimDF.loc[noStimMask, :].reset_index()
-                takeThese.loc[:, 'kinematicCondition'] = cN
-                takeThese.loc[:, 'kinAndElecCondition'] = 'NA_{}'.format(cN)
-                takeThese.loc[:, 'stimCondition'] = 'NA_0.0'
-                takeThese.loc[:, 'electrode'] = 'NA'
-                takeThese.loc[:, 'trialRateInHz'] = 0.
-                # drop duplicates to avoid having multiple mahalanobis distances?
-                # takeThese.drop_duplicates(subset=['feature'], inplace=True)
-                relevantColumns = [cN for cN in plotRelativeStatsDF.columns if cN in takeThese.columns]
-                try:
-                    plotStatsList.append(takeThese.loc[:, relevantColumns].copy())
-                except Exception:
-                    traceback.print_exc()
-        plotRelativeStatsDF = pd.concat(plotStatsList)
-        '''
+        #
         plotRelativeStatsDF.loc[:, 'trialRateInHzStr'] = plotRelativeStatsDF['trialRateInHz'].apply(lambda x: '{}'.format(x))
         plotRelativeStatsDF.loc[:, 'electrode'] = plotRelativeStatsDF['electrode'].astype(spinalElecCategoricalDtype)
         plotRelativeStatsDF.loc[plotRelativeStatsDF['isMahalDist'], 'trialRateInHzStr'] += '_md'
-        '''
-        #####
-        dummyEntriesReject = plotRelativeStatsDF.drop_duplicates(subset=['freqBandName', 'electrode', 'trialRateInHz', 'isMahalDist', 'kinematicCondition']).copy()
-        dummyEntriesReject.loc[:, ['hedges', 'T', 'pval', 'cohen-d']] = np.nan
-        dummyEntriesReject.loc[:, 'reject'] = True
-        dummyEntriesDoNotReject = dummyEntriesReject.copy()
-        dummyEntriesDoNotReject.loc[:, 'reject'] = False
-        plotRelativeStatsDF = pd.concat([plotRelativeStatsDF, dummyEntriesReject, dummyEntriesDoNotReject], ignore_index=True)
-        '''
+
         plotRelativeStatsDF.loc[:, 'sigAnn'] = plotRelativeStatsDF.apply(
             lambda x: '{}\n '.format(x['feature'].replace('#0', '')) + r"$\bf{(*)}$" if x['reject'] else '{}\n '.format(x['feature'].replace('#0', '')), axis='columns')
         ###
-        thisMaskRel = (plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot)) & (plotRelativeStatsDF['electrode'].isin(lOfElectrodesToPlot)) & ~plotRelativeStatsDF['isMahalDist']
+        lOfStimElectrodesToPlot = [eN for eN in lOfElectrodesToPlot if eN != 'NA']
+        thisMaskRel = (
+            plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot) &
+            (plotRelativeStatsDF['electrode'].isin(lOfStimElectrodesToPlot)) &
+            ~plotRelativeStatsDF['isMahalDist'])
         #
-        thisMaskRelStimOnly = thisMaskRel & (plotRelativeStatsDF['stimCondition'] != 'NA_0.0')
-        #
-        thisMaskRelNoStim = thisMaskRel & (plotRelativeStatsDF['stimCondition'] == 'NA_0.0')
-        thisMaskRelMahal = (plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot)) & (plotRelativeStatsDF['electrode'].isin(lOfElectrodesToPlot)) & plotRelativeStatsDF['isMahalDist']
-        #
-        thisMaskRelStimOnlyMahal = thisMaskRelMahal & (plotRelativeStatsDF['stimCondition'] != 'NA_0.0')
-        thisMaskRelNoStimMahal = thisMaskRelMahal & (plotRelativeStatsDF['stimCondition'] == 'NA_0.0')
+        thisMaskRelMahal = (
+            plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot) &
+            plotRelativeStatsDF['electrode'].isin(lOfStimElectrodesToPlot) &
+            plotRelativeStatsDF['isMahalDist'])
         #
         thisFreqBandOrder = [
             fN
             for fN in freqBandOrderExtended
             if fN in plotRelativeStatsDF.loc[thisMaskRel, 'freqBandName'].unique().tolist()]
         ####
-        thisFullPalette = allRelPalette.loc[allRelPalette.index.isin(plotRelativeStatsDF.loc[(plotRelativeStatsDF['electrode'].isin(lOfElectrodesToPlot)), 'trialRateInHzStr'])]
-        thisStimPalette = allRelPalette.loc[allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRelStimOnly, 'trialRateInHzStr'])]
-        thisNoStimPalette = allRelPalette.loc[allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRelNoStim, 'trialRateInHzStr'])]
+        thisPalette = allRelPalette.loc[allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRel, 'trialRateInHzStr'])]
         ######
-        thisFullPaletteMahal = allRelPalette.loc[allRelPalette.index.isin(plotRelativeStatsDF.loc[(plotRelativeStatsDF['electrode'].isin(lOfElectrodesToPlot)), 'trialRateInHzStr'])]
-        thisStimPaletteMahal = allRelPalette.loc[allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRelStimOnlyMahal, 'trialRateInHzStr'])]
-        thisNoStimPaletteMahal = allRelPalette.loc[allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRelNoStimMahal, 'trialRateInHzStr'])]
-        # thisPalette = pd.Series(sns.color_palette('Set2_r', 4), index=['50.0', '50.0_md', '100.0', '100.0_md'])
-        colOrder = ['NA'] + [eN for eN in plotRelativeStatsDF[colVar].sort_values().unique().tolist() if ((eN !='NA') and (eN in lOfElectrodesToPlot))]
-        #
-        ## countDF = plotRelativeStatsDF.loc[thisMaskRel, :].dropna().groupby(['kinematicCondition', colVar, 'freqBandName', 'trialRateInHzStr']).count()['reject']
-        ## passDF = plotRelativeStatsDF.loc[thisMaskRel, :].dropna().groupby(['kinematicCondition', colVar, 'freqBandName', 'trialRateInHzStr']).sum()['reject']
-        ## pvalDF = pd.concat([countDF, passDF], axis='columns')
-        ## pvalDF.columns = ['count', 'pass']
-        #
+        thisPaletteMahal = allRelPalette.loc[allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRelMahal, 'trialRateInHzStr'])]
+        colOrder = [
+            eN for eN in plotRelativeStatsDF[colVar].sort_values().unique().tolist() if (eN in lOfStimElectrodesToPlot)]
+
+        stripHue = 'trialRateInHzStr'
+        stripHueOrder = thisPalette.index.to_list()
+        stripPalette = thisPalette.to_dict()
+        stripPaletteMahal = thisPaletteMahal.to_dict()
+        stripHueOrderMahal = thisPaletteMahal.index.to_list()
+        stripJitter = 0.9 / (len(stripHueOrder) + 1)
+
         def countOverUnder(df):
             res = pd.Series({
                 'over': int(((df['T'] > 0) & df['reject']).sum()),
@@ -1321,175 +1280,387 @@ with PdfPages(pdfPath) as pdf:
             })
             return res
         #
-        pvalDF = plotRelativeStatsDF.loc[thisMaskRel, :].dropna().groupby(['kinematicCondition', colVar, 'freqBandName', 'trialRateInHzStr']).apply(countOverUnder).fillna(0)
-        widthRatios = [3] * np.unique(plotRelativeStatsDF[colVar]).shape[0]
-        widthRatios[0] = 3
-        # plotRelativeStatsDF.loc[plotRelativeStatsDF['electrode'] == 'NA', :]
-        ### effect size catplot stripplot
-        figHeight = 2 + 2. * len(rowOrder)
-        figWidth = 2 + len(colOrder) * len(freqBandOrderExtended)
+        pvalDF = plotRelativeStatsDF.loc[thisMaskRel, :].dropna().groupby([
+            'kinematicCondition', colVar, 'freqBandName', 'trialRateInHzStr']).apply(countOverUnder).fillna(0)
+        ### effect size cat plot stripplot
+        figHeight = 0.75 + 2. * len(rowOrder)
+        figWidth = 0.5 + figWidthPerBand * len(colOrder) * len(freqBandOrderExtended) * len(stripHueOrder)
         height = figHeight / plotRelativeStatsDF.loc[thisMaskRel, rowVar].nunique()
         width = figWidth / plotRelativeStatsDF.loc[thisMaskRel, colVar].nunique()
         aspect = width / height
-        for yVar in ['hedges']:
-            g = sns.catplot(
-                y=yVar,
-                x='freqBandName',
-                order=thisFreqBandOrder,
-                col=colVar, col_order=colOrder,
-                row=rowVar, row_order=rowOrder,
-                height=height, aspect=aspect,
-                sharey=True, sharex=True, margin_titles=True,
-                hue='trialRateInHzStr', hue_order=thisStimPalette.index.to_list(),
-                palette=thisStimPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
-                data=plotRelativeStatsDF.loc[thisMaskRelStimOnly, :],  # & plotRelativeStatsDF['reject']
-                facet_kws=dict(
-                    gridspec_kws=dict(width_ratios=widthRatios)),
-                kind='box',
-                # kind='violin', inner=None, cut=1, width=0.9,
-                # saturation=0.2,
-                **boxplotKWArgs
+        figTitleStr = 'Effect size distribution for stim vs no-stim comparisons'
+        #
+        def plotThisThing():
+            boxPlotMask = (
+                thisMaskRel &
+                (plotRelativeStatsDF['hedgesSign'] > 0) &
+                plotRelativeStatsDF['reject']
                 )
-            for name, ax in g.axes_dict.items():
-                rowName, colName = name
-                if colName == 'NA':
-                    # movement
-                    thisPalette = thisNoStimPalette
-                    expandDays = False
-                    if expandDays:
-                        stripHue = 'expName'
-                        presentExps = plotRelativeStatsDF['expName'].unique().tolist()
-                        stripHueOrder = presentExps
-                        stripHueOrderMahal = presentExps
-                        print('presentExps = {}'.format(presentExps))
-                        stripJitter = thisStimPalette.shape[0] / (len(stripHueOrder) + 1)
-                        stripPalette = {expN: sns.utils.alter_color(allRelPalette['0.0'], h=-0.01 * expIdx, s=0.1 * expIdx, l=0.1 * expIdx) for expIdx, expN in enumerate(presentExps)}
-                        stripPaletteMahal = {expN: sns.utils.alter_color(allRelPalette['0.0_md'], h=-0.01 * expIdx, s=0.1 * expIdx, l=0.1 * expIdx) for expIdx, expN in enumerate(presentExps)}
-                        stripplotKWArgsMahal['jitter'] = True
-                    else:
-                        stripHue = 'trialRateInHzStr'
-                        stripHueOrder = thisNoStimPalette.index.to_list()
-                        stripPalette = thisNoStimPalette.to_dict()
-                        stripPaletteMahal = thisNoStimPaletteMahal.to_dict()
-                        stripHueOrderMahal = thisNoStimPaletteMahal.index.to_list()
-                        # stripJitter = thisStimPalette.shape[0] / (len(stripHueOrder) + 1)
-                        stripJitter = 1/3
-                    subSetMask = (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) & plotRelativeStatsDF[yVar].notna()
-                    if subSetMask.any():
-                        #could turn off as it isn't very visible anyway
-                        sns.boxplot(
+            for yVar in ['hedges']:
+                g = sns.catplot(
+                    y=yVar,
+                    x='freqBandName',
+                    order=thisFreqBandOrder,
+                    col=colVar, col_order=colOrder,
+                    row=rowVar, row_order=rowOrder,
+                    height=height, aspect=aspect,
+                    sharey=True, sharex=True, margin_titles=True,
+                    hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
+                    # palette=thisPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
+                    palette=thisPalette.to_dict(),
+                    data=plotRelativeStatsDF.loc[boxPlotMask, :],
+                    kind='box', facet_kws=dict(gridspec_kws=gridSpecDefault),
+                    **boxplotKWArgs
+                    )
+                for name, ax in g.axes_dict.items():
+                    rowName, colName = name
+                    # plot non-significant observations with transparency
+                    subSetMask = (
+                            (plotRelativeStatsDF[rowVar] == rowName) &
+                            (plotRelativeStatsDF[colVar] == colName) &
+                            (~plotRelativeStatsDF['reject']) &
+                            thisMaskRel)
+                    subSetMaskNegative = subSetMask & (plotRelativeStatsDF['hedgesSign'] < 0)
+                    subSetMaskNegativeNotNa = subSetMask & plotRelativeStatsDF[yVar].notna()
+                    subSetMaskNotNa = subSetMask & plotRelativeStatsDF[yVar].notna()
+                    if subSetMaskNotNa.any() and addNonSigObs and addChannelGsHere:
+                        sns.stripplot(
                             data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
+                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
+                            hue=stripHue, hue_order=stripHueOrder, palette=stripPalette,
+                            jitter=stripJitter,
+                            **stripplotKWArgs, **badStripKWArgs)
+                    # plot significant observations fully opaque
+                    subSetMask = (
+                            (plotRelativeStatsDF[rowVar] == rowName) &
+                            (plotRelativeStatsDF[colVar] == colName) &
+                            plotRelativeStatsDF['reject']& thisMaskRel)
+                    subSetMaskNegative = subSetMask & (plotRelativeStatsDF['hedgesSign'] < 0)
+                    subSetMaskNegativeNotNa = subSetMask & plotRelativeStatsDF[yVar].notna()
+                    subSetMaskNotNa = subSetMask & plotRelativeStatsDF[yVar].notna()
+                    if subSetMaskNegativeNotNa.any():
+                        sns.boxplot(
+                            data=plotRelativeStatsDF.loc[subSetMaskNegative, :], ax=ax,
                             y=yVar, x='freqBandName', order=thisFreqBandOrder,
                             hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
-                            palette=thisPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
-                            **boxplotKWArgs)
+                            # palette=thisPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
+                            palette=thisPalette.to_dict(),
+                            **boxplotKWArgs
+                            )
+                    if subSetMaskNotNa.any() and addChannelGsHere:
+                        sns.stripplot(
+                            data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
+                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
+                            hue=stripHue, hue_order=stripHueOrder, palette=stripPalette,
+                            jitter=stripJitter,
+                            **stripplotKWArgs, **goodStripKWArgs
+                            )
+                    #####
+                    # plot non-significant observations with transparency (mahal)
+                    subSetMaskMahal = (
+                        (plotRelativeStatsDF[rowVar] == rowName) &
+                        (plotRelativeStatsDF[colVar] == colName) &
+                        (~plotRelativeStatsDF['reject']) &
+                        thisMaskRelMahal)
+                    subSetMaskMahalNegative = subSetMask & (plotRelativeStatsDF['hedgesSign'] < 0)
+                    subSetMaskMahalNegativeNotNa = subSetMask & plotRelativeStatsDF[yVar].notna()
+                    subSetMaskMahalNotNa = subSetMaskMahal & plotRelativeStatsDF[yVar].notna()
+                    if subSetMaskMahalNotNa.any() and addMahalGsHere and addNonSigObsMahal:
+                        sns.stripplot(
+                            data=plotRelativeStatsDF.loc[subSetMaskMahal, :], ax=ax,
+                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
+                            hue=stripHue, hue_order=stripHueOrderMahal, palette=stripPaletteMahal,
+                            **stripplotKWArgsMahal, **badStripKWArgsMahal)
+                    # plot significant observations fully opaque (mahal)
+                    subSetMaskMahal = (
+                            (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
+                            plotRelativeStatsDF['reject'] & thisMaskRelMahal)
+                    subSetMaskMahalNegative = subSetMask & (plotRelativeStatsDF['hedgesSign'] < 0)
+                    subSetMaskMahalNegativeNotNa = subSetMask & plotRelativeStatsDF[yVar].notna()
+                    subSetMaskMahalNotNa = subSetMaskMahal & plotRelativeStatsDF[yVar].notna()
+                    if subSetMaskMahalNotNa.any() and addMahalGsHere:
+                        sns.stripplot(
+                            data=plotRelativeStatsDF.loc[subSetMaskMahal, :], ax=ax,
+                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
+                            hue=stripHue, hue_order=stripHueOrderMahal, palette=stripPaletteMahal,
+                            **stripplotKWArgsMahal, **goodStripKWArgsMahal
+                            )
+                    #
+                    nSigAnnotator = genNumSigAnnotatorV2(
+                        pvalDF.reset_index(),
+                        xOrder=thisFreqBandOrder,
+                        hueVar='trialRateInHzStr', palette=thisPalette,
+                        width=boxplotKWArgs['width'],
+                        fontOpts=dict(
+                            va='bottom', ha='center', y=1.01,
+                            fontsize=sns.plotting_context()["font.size"] * 0.5,
+                            fontweight='bold', rotation=0))
+                    if enableNumSigAnnotator:
+                        nSigAnnotator(g, ax, rowName, colName)
+                    ax.axhline(0, c="0.5", ls='--', zorder=0.9)
+                    xTickLabels = ax.get_xticklabels()
+                    if len(xTickLabels):
+                        newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
+                        ax.set_xticklabels(
+                            newXTickLabels, rotation=30,
+                            va='top', ha='center')
+                    for xJ in range(1, len(thisFreqBandOrder), 2):
+                        ax.axvspan(-0.5 + xJ, 0.5 + xJ, color="0.1", alpha=0.1, zorder=1.)
+                    if (ax.get_legend() is not None):
+                        ax.get_legend().remove()
+                    ax.set_xlim([-0.5, len(thisFreqBandOrder) - 0.5])
+                g.set_titles(col_template='{col_name}', row_template='{row_name}')
+                plotProcFuns = [
+                    asp.genTitleChanger(prettyNameLookup),
+                    ]
+                for (ro, co, hu), dataSubset in g.facet_data():
+                    if len(plotProcFuns):
+                        for procFun in plotProcFuns:
+                            procFun(g, ro, co, hu, dataSubset)
+                g.suptitle(figTitleStr)
+                asp.reformatFacetGridLegend(
+                    g, titleOverrides=prettyNameLookup,
+                    contentOverrides=prettyNameLookup,
+                styleOpts=styleOpts)
+                g.set_axis_labels(prettyNameLookup['freqBandName'], prettyNameLookup[yVar])
+                g.resize_legend(adjust_subtitles=True)
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                if not consoleDebug:
+                    pdf.savefig(bbox_inches='tight', pad_inches=0,)
+                if arguments['showFigures']:
+                    plt.show()
                 else:
-                    # stim
-                    thisPalette = thisStimPalette
-                    # thisPaletteMahal = thisStimPaletteMahal
-                    stripHue = 'trialRateInHzStr'
-                    stripHueOrder = thisStimPalette.index.to_list()
-                    stripPalette = thisStimPalette.to_dict()
-                    stripPaletteMahal = thisStimPaletteMahal.to_dict()
-                    stripHueOrderMahal = thisStimPaletteMahal.index.to_list()
-                    stripJitter = 1. / (len(stripHueOrder) + 1)
-                # plot non-significant observations with transparency
-                subSetMask = (
-                        (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
-                        (~plotRelativeStatsDF['reject']) & thisMaskRel) #  & plotRelativeStatsDF[yVar].notna()
-                if subSetMask.any():
-                    if not (plotRelativeStatsDF.loc[subSetMask, :].dropna().empty):
-                        sns.stripplot(
-                            data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
-                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue=stripHue, hue_order=stripHueOrder, palette=stripPalette,
-                            jitter=stripJitter,
-                            alpha=0.3, edgecolor='none', **stripplotKWArgs)
-                # plot significant observations fully opaque
-                subSetMask = (
-                        (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
-                        plotRelativeStatsDF['reject']& thisMaskRel) #  & plotRelativeStatsDF[yVar].notna()
-                if subSetMask.any():
-                    if not (plotRelativeStatsDF.loc[subSetMask, :].dropna().empty):
-                        sns.stripplot(
-                            data=plotRelativeStatsDF.loc[subSetMask, :], ax=ax,
-                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue=stripHue, hue_order=stripHueOrder, palette=stripPalette,
-                            jitter=stripJitter,
-                            edgecolor='k',
-                            **stripplotKWArgs
-                            )
-                #####
-                # plot dummies to keep nans away
-                '''
-                subSetMaskMahal = (
-                        (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
-                        (~plotRelativeStatsDF['reject']) & thisMaskRelMahal)
-                if subSetMaskMahal.any() and addMahalGsHere:
-                    if not (plotRelativeStatsDF.loc[subSetMaskMahal, :].dropna().empty):
-                        sns.stripplot(
-                            data=plotRelativeStatsDF.loc[subSetMaskMahal, :], ax=ax,
-                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue=stripHue, hue_order=stripHueOrderMahal, palette=stripPaletteMahal,
-                            alpha=0., edgecolor='face', **stripplotKWArgsMahal)
-                        '''
-                # plot non-significant observations with transparency (mahal)
-                subSetMaskMahal = (
-                        (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
-                        (~plotRelativeStatsDF['reject']) & thisMaskRelMahal) #  & plotRelativeStatsDF[yVar].notna()
-                if subSetMaskMahal.any() and addMahalGsHere:
-                    if not (plotRelativeStatsDF.loc[subSetMaskMahal, :].dropna().empty):
-                        sns.stripplot(
-                            data=plotRelativeStatsDF.loc[subSetMaskMahal, :], ax=ax,
-                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue=stripHue, hue_order=stripHueOrderMahal, palette=stripPaletteMahal,
-                            alpha=0.5, edgecolor='none', **stripplotKWArgsMahal)
-                # plot significant observations fully opaque (mahal)
-                subSetMaskMahal = (
-                        (plotRelativeStatsDF[rowVar] == rowName) & (plotRelativeStatsDF[colVar] == colName) &
-                        plotRelativeStatsDF['reject'] & thisMaskRelMahal) #  & plotRelativeStatsDF[yVar].notna()
-                if subSetMaskMahal.any() and addMahalGsHere:
-                    if not (plotRelativeStatsDF.loc[subSetMaskMahal, :].dropna().empty):
-                        sns.stripplot(
-                            data=plotRelativeStatsDF.loc[subSetMaskMahal, :], ax=ax,
-                            y=yVar, x='freqBandName', order=thisFreqBandOrder,
-                            hue=stripHue, hue_order=stripHueOrderMahal, palette=stripPaletteMahal,
-                            edgecolor = 'k',
-                            **stripplotKWArgsMahal
-                            )
-                nSigAnnotator = genNumSigAnnotatorV2(
-                    pvalDF.reset_index(),
-                    xOrder=thisFreqBandOrder,
-                    hueVar='trialRateInHzStr', palette=thisPalette,
-                    fontOpts=dict(
-                        va='bottom', ha='center',
-                        fontweight='bold', rotation=45))
-                if enableNumSigAnnotator:
-                    nSigAnnotator(g, ax, rowName, colName)
-                ax.axhline(0, c='r', zorder=2.5)
-                # ax.tick_params(axis='x', labelrotation=30)
-                xTickLabels = ax.get_xticklabels()
-                if len(xTickLabels):
-                    newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
-                    ax.set_xticklabels(newXTickLabels, rotation=30, va='top', ha='right')
-                for xJ in range(1, len(thisFreqBandOrder), 2):
-                    ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
-                if (ax.get_legend() is not None):
-                    ax.get_legend().remove()
-                ax.set_xlim([-0.5, len(thisFreqBandOrder) - 0.5])
-            plotProcFuns = [
-                asp.genTitleChanger(prettyNameLookup),
-                ]
-            for (ro, co, hu), dataSubset in g.facet_data():
-                if len(plotProcFuns):
-                    for procFun in plotProcFuns:
-                        procFun(g, ro, co, hu, dataSubset)
-            g.suptitle('Effect size distribution for stim vs no-stim comparisons')
+                    plt.close()
+            return
+        #
+        plotThisThing()
+        #
+        thisMaskRel = (
+                plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot) &
+                (plotRelativeStatsDF['electrode'].isin(['NA'])) &
+                (plotRelativeStatsDF['expName'].isin(['exp202101211100'])) &
+                ~plotRelativeStatsDF['isMahalDist'])
+        thisMaskRelMahal = (
+                plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot) &
+                plotRelativeStatsDF['electrode'].isin(['NA']) &
+                (plotRelativeStatsDF['expName'].isin(['exp202101211100'])) &
+                plotRelativeStatsDF['isMahalDist'])
+        #
+        thisFreqBandOrder = [
+            fN
+            for fN in freqBandOrderExtended
+            if fN in plotRelativeStatsDF.loc[thisMaskRel, 'freqBandName'].unique().tolist()]
+        ####
+        thisPalette = allRelPalette.loc[
+            allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRel, 'trialRateInHzStr'])]
+        ######
+        thisPaletteMahal = allRelPalette.loc[
+            allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRelMahal, 'trialRateInHzStr'])]
+        #
+        colVar = 'kinematicCondition'
+        colOrder = [
+            cN
+            for cN in lOfKinematicsToPlot
+            if cN in plotRelativeStatsDF.loc[thisMaskRel, colVar].to_list()]
+        rowVar = 'referenceKinematicCondition'
+        rowOrder = [
+            cN
+            for cN in ['NA_NA', 'CW_outbound', 'CW_return']
+            if cN in plotRelativeStatsDF.loc[thisMaskRel, rowVar].to_list()]
+
+        stripHue = 'trialRateInHzStr'
+        stripHueOrder = thisPalette.index.to_list()
+        stripPalette = thisPalette.to_dict()
+        stripPaletteMahal = thisPaletteMahal.to_dict()
+        stripHueOrderMahal = thisPaletteMahal.index.to_list()
+
+        if thisPalette.shape[0] > 1:
+            stripJitter = .9 / (thisPalette.shape[0] + 1)
+        else:
+            stripJitter = .3
+        #
+        stripplotKWArgsMahal['jitter'] = stripJitter
+        #
+        pvalDF = plotRelativeStatsDF.loc[thisMaskRel, :].dropna().groupby(
+            [rowVar, colVar, 'freqBandName', 'trialRateInHzStr']).apply(countOverUnder).fillna(0)
+        figHeight = 0.75 + 2. * len(rowOrder)
+        figWidth = 0.5 + figWidthPerBand * len(colOrder) * len(freqBandOrderExtended)
+        #
+        height = figHeight / plotRelativeStatsDF.loc[thisMaskRel, rowVar].nunique()
+        width = figWidth / plotRelativeStatsDF.loc[thisMaskRel, colVar].nunique()
+        aspect = width / height
+        figTitleStr = 'Effect size distribution across movement comparisons'
+        #
+        plotThisThing()
+        #####
+        ######## mahal dist plots
+        plotMahalDistSummary = True
+        if plotMahalDistSummary:
+            thisMaskRel = (
+                ~crossMovementComparisons &
+                plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot) &
+                plotRelativeStatsDF['electrode'].isin(lOfElectrodesToPlot) &
+                (plotRelativeStatsDF['isDummy'] == 'original') &
+                plotRelativeStatsDF['isMahalDist'])
+            #
+            rowVar = 'kinematicCondition'
+            rowOrder = [
+                cN
+                for cN in lOfKinematicsToPlot
+                if cN in plotRelativeStatsDF.loc[thisMaskRel, rowVar].to_list()]
+            #
+            figHeight = 2. * len(rowOrder)
+            figWidth = figWidthPerBand * len(freqBandOrderExtended) * len(lOfElectrodesToPlot)
+            height = figHeight / plotRelativeStatsDF.loc[thisMaskRel, rowVar].nunique()
+            width = figWidth
+            aspect = width / height
+            #
+            if thisMaskRel.any():
+                thisPalette = allRelPalette.loc[
+                    allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRel, 'trialRateInHzStr'])]
+                thisErrPalette = thisPalette.apply(sns.utils.alter_color, l=-0.5)
+                yVar = 'hedges'
+                #
+                g = sns.FacetGrid(
+                    ##y=yVar,
+                    ### x=colVar, order=colOrder,
+                    ##x='freqBandName', order=thisFreqBandOrder,
+                    row=rowVar, row_order=rowOrder,
+                    height=height, aspect=aspect,
+                    sharey=True, sharex=True, margin_titles=True,
+                    hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
+                    palette=thisPalette.to_dict(),
+                    gridspec_kws=gridSpecDefault,
+                    data=plotRelativeStatsDF.loc[thisMaskRel, :])
+                #
+                legendData, mDSummaryPlotFun = genMahalSummaryPlotFun(
+                    fullDataset=plotRelativeStatsDF.loc[thisMaskRel, :].copy(),
+                    x='freqBandName', order=thisFreqBandOrder, y=yVar,
+                    row=rowVar, row_order=rowOrder,
+                    hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
+                    style='electrode', style_palette=electrodeErrorBarStyleDF,
+                    yerr='cohen_err', error_palette=thisErrPalette.to_dict(),
+                    palette=thisPalette.to_dict(),
+                    errorBarOptsDict=dict(
+                        markeredgecolor='k',
+                        markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                        markersize=sns.plotting_context()['lines.markersize'],
+                        capsize=sns.plotting_context()['xtick.major.size'])
+                        )
+                mapDFProcFuns = [
+                    (
+                        mDSummaryPlotFun, [], dict(
+                            x='freqBandName', order=thisFreqBandOrder, y=yVar,
+                            hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
+                            palette=thisPalette.to_dict())),
+                    ]
+                for mpdf in mapDFProcFuns:
+                    mpdf_fun, mpdf_args, mpdf_kwargs = mpdf
+                    g.map_dataframe(mpdf_fun, *mpdf_args, **mpdf_kwargs)
+                for name, ax in g.axes_dict.items():
+                    rowName = name
+                    ax.axhline(0, c="0.5", ls='--', zorder=0.9)
+                    xTickLabels = ax.get_xticklabels()
+                    if len(xTickLabels):
+                        newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
+                        ax.set_xticklabels(
+                            newXTickLabels, rotation=30, va='top', ha='center')
+                    for xJ in range(1, len(thisFreqBandOrder), 2):
+                        # for xJ in range(0, plotRelativeStatsDF[colVar].unique().shape[0], 2):
+                        ax.axvspan(-0.5 + xJ, 0.5 + xJ, color="0.1", alpha=0.1, zorder=1.)
+                    if ax.get_legend() is not None:
+                        ax.get_legend().remove()
+                g.set_titles(col_template='{col_name}', row_template='{row_name}')
+                plotProcFuns = [asp.genTitleChanger(prettyNameLookup),]
+                for (ro, co, hu), dataSubset in g.facet_data():
+                    if len(plotProcFuns):
+                        for procFun in plotProcFuns:
+                            procFun(g, ro, co, hu, dataSubset)
+                g.suptitle(
+                    'Effect size distribution for stim vs no-stim comparisons (Mahal dist)')
+                g.add_legend(legend_data=legendData, label_order=list(legendData.keys()))
+                asp.reformatFacetGridLegend(
+                    g, titleOverrides=prettyNameLookup,
+                    contentOverrides=prettyNameLookup,
+                styleOpts=styleOpts)
+                g.set_axis_labels(prettyNameLookup['freqBandName'], prettyNameLookup[yVar])
+                g.resize_legend(adjust_subtitles=True)
+                g.tight_layout(pad=styleOpts['tight_layout.pad'])
+                if not consoleDebug:
+                    pdf.savefig(bbox_inches='tight', pad_inches=0,)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+        #####################################################################
+        if True:
+            # dummy plot for legends
+            g = sns.catplot(
+                y=yVar,
+                x=colVar, order=colOrder,
+                height=height, aspect=aspect,
+                sharey=True, sharex=True, margin_titles=True,
+                hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
+                # palette=thisPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
+                palette=thisPalette.to_dict(),
+                data=plotRelativeStatsDF, kind='box',
+                facet_kws=dict(gridspec_kws=gridSpecDefault),
+                **boxplotKWArgs
+                )
+            g.suptitle('Dummy plot to get full legend from')
+            legendData = {}
+            legendData['coefStd'] = mpl.patches.Patch(alpha=0, linewidth=0)
+            for factorName, factorColor in allAmpPalette.items():
+                if '_md' in factorName:
+                    legendData[factorName] = mpl.lines.Line2D(
+                        [0], [0], marker='o',
+                        markerfacecolor=factorColor, markeredgecolor='k',
+                        markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                        markersize=sns.plotting_context()['lines.markersize'],
+                        linestyle='none')
+                else:
+                    legendData[factorName] = mpl.lines.Line2D(
+                        [0], [0], marker='o',
+                        markerfacecolor=factorColor, markeredgecolor='k',
+                        markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                        markersize=sns.plotting_context()['lines.markersize'],
+                        linestyle='none')
+            legendData['trialRateInHzStr'] = mpl.patches.Patch(alpha=0, linewidth=0)
+            for rateName, rateColor in allRelPalette.items():
+                if '_md' in rateName:
+                    legendData[rateName] = mpl.lines.Line2D(
+                        [0], [0], marker='d',
+                        markerfacecolor=rateColor, markeredgecolor='k',
+                        markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                        markersize=1.5 * sns.plotting_context()['lines.markersize'],
+                        linestyle='none')
+                else:
+                    legendData[rateName] = mpl.lines.Line2D(
+                        [0], [0], marker='o',
+                        markerfacecolor=rateColor, markeredgecolor='k',
+                        markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                        markersize=sns.plotting_context()['lines.markersize'],
+                        linestyle='none')
+            legendData['p-value significance'] = mpl.patches.Patch(alpha=0, linewidth=0)
+            legendData['p < {:.2f}'.format(confidence_alpha)] = mpl.lines.Line2D(
+                [0], [0], marker='o',
+                markerfacecolor='darkgray', markeredgecolor='k',
+                markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                markersize=sns.plotting_context()['lines.markersize'],
+                linestyle='none')
+            legendData['p > {:.2f} (n.s.)'.format(confidence_alpha)] = mpl.lines.Line2D(
+                [0], [0], marker='o',
+                markerfacecolor='lightgray', markeredgecolor='k',
+                markeredgewidth=sns.plotting_context()['patch.linewidth'],
+                markersize=sns.plotting_context()['lines.markersize'],
+                linestyle='none')
+            g.add_legend(
+                legend_data=legendData, label_order=list(legendData.keys()), title='dummy legends')
             asp.reformatFacetGridLegend(
                 g, titleOverrides=prettyNameLookup,
                 contentOverrides=prettyNameLookup,
             styleOpts=styleOpts)
-            g.set_axis_labels(prettyNameLookup['freqBandName'], prettyNameLookup[yVar])
+            g.set_axis_labels(prettyNameLookup[colVar], prettyNameLookup[yVar])
             g.resize_legend(adjust_subtitles=True)
             g.tight_layout(pad=styleOpts['tight_layout.pad'])
             if not consoleDebug:
@@ -1498,286 +1669,5 @@ with PdfPages(pdfPath) as pdf:
                 plt.show()
             else:
                 plt.close()
-            plotMahalDistSummary = True
-            ######## mahal dist plots
-            if plotMahalDistSummary:
-                thisMaskRel = (plotRelativeStatsDF['kinematicCondition'].isin(lOfKinematicsToPlot)) & (plotRelativeStatsDF['electrode'].isin(lOfElectrodesToPlot)) & plotRelativeStatsDF['isMahalDist']
-                figHeight = 2 + 2. * plotRelativeStatsDF.loc[thisMaskRel, rowVar].nunique()
-                figWidth = 1. + 0.5 * len(freqBandOrderExtended) * len(lOfElectrodesToPlot)
-                height = figHeight / plotRelativeStatsDF.loc[thisMaskRel, rowVar].nunique()
-                width = figWidth
-                aspect = width / height
-                if thisMaskRel.any():
-                    thisPalette = allRelPalette.loc[
-                        allRelPalette.index.isin(plotRelativeStatsDF.loc[thisMaskRel, 'trialRateInHzStr'])]
-                    thisErrPalette = thisPalette.apply(sns.utils.alter_color, l=-0.5)
-                    yVar = 'hedges'
-                    g = sns.FacetGrid(
-                        ##y=yVar,
-                        ### x=colVar, order=colOrder,
-                        ##x='freqBandName', order=thisFreqBandOrder,
-                        row=rowVar, row_order=rowOrder,
-                        height=height, aspect=aspect,
-                        sharey=True, sharex=True, margin_titles=True,
-                        hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
-                        palette=thisPalette.to_dict(),
-                        data=plotRelativeStatsDF.loc[thisMaskRel, :])
-                    legendData, mDSummaryPlotFun = genMahalSummaryPlotFun(
-                        fullDataset=plotRelativeStatsDF.loc[thisMaskRel, :],
-                        x='freqBandName', order=thisFreqBandOrder, y=yVar,
-                        row=rowVar, row_order=rowOrder,
-                        hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
-                        style='electrode', style_palette=electrodeErrorBarStyleDF,
-                        yerr='cohen_err', error_palette=thisErrPalette.to_dict(),
-                        palette=thisPalette.to_dict(),
-                        errorBarOptsDict=dict(
-                            markeredgecolor='k',
-                            markeredgewidth=sns.plotting_context()['patch.linewidth'],
-                            markersize=sns.plotting_context()['lines.markersize'],
-                            capsize=sns.plotting_context()['xtick.major.size'])
-                            )
-                    mapDFProcFuns = [
-                        (
-                            mDSummaryPlotFun, [], dict(
-                                x='freqBandName', order=thisFreqBandOrder, y=yVar,
-                                hue='trialRateInHzStr', hue_order=thisPalette.index.to_list(),
-                                palette=thisPalette.to_dict())),
-                        ]
-                    for mpdf in mapDFProcFuns:
-                        mpdf_fun, mpdf_args, mpdf_kwargs = mpdf
-                        g.map_dataframe(mpdf_fun, *mpdf_args, **mpdf_kwargs)
-                    for name, ax in g.axes_dict.items():
-                        rowName = name
-                        ax.axhline(0, c='.1', zorder=2.5)
-                        # ax.tick_params(axis='x', labelrotation=30)
-                        xTickLabels = ax.get_xticklabels()
-                        if len(xTickLabels):
-                            newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
-                            ax.set_xticklabels(newXTickLabels, rotation=30, va='top', ha='right')
-                        for xJ in range(1, len(thisFreqBandOrder), 2):
-                            # for xJ in range(0, plotRelativeStatsDF[colVar].unique().shape[0], 2):
-                            ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
-                        if ax.get_legend() is not None:
-                            ax.get_legend().remove()
-                    plotProcFuns = [asp.genTitleChanger(prettyNameLookup),]
-                    for (ro, co, hu), dataSubset in g.facet_data():
-                        if len(plotProcFuns):
-                            for procFun in plotProcFuns:
-                                procFun(g, ro, co, hu, dataSubset)
-                    g.suptitle('Effect size distribution for stim vs no-stim comparisons (Mahal dist)')
-                    g.add_legend(legend_data=legendData, label_order=list(legendData.keys()))
-                    asp.reformatFacetGridLegend(
-                        g, titleOverrides=prettyNameLookup,
-                        contentOverrides=prettyNameLookup,
-                    styleOpts=styleOpts)
-                    g.set_axis_labels(prettyNameLookup['freqBandName'], prettyNameLookup[yVar])
-                    g.resize_legend(adjust_subtitles=True)
-                    g.tight_layout(pad=styleOpts['tight_layout.pad'])
-                    if not consoleDebug:
-                        pdf.savefig(bbox_inches='tight', pad_inches=0,)
-                    if arguments['showFigures']:
-                        plt.show()
-                    else:
-                        plt.close()
-        #####################################################################
-        #####################################################################
-        # dummy plot for legends
-        g = sns.catplot(
-            y=yVar,
-            x=colVar, order=colOrder,
-            height=height, aspect=aspect,
-            sharey=True, sharex=True, margin_titles=True,
-            hue='trialRateInHzStr', hue_order=thisFullPalette.index.to_list(),
-            palette=thisFullPalette.apply(sns.utils.alter_color, l=0.5).to_dict(),
-            data=plotRelativeStatsDF, # & plotRelativeStatsDF['reject']
-            kind='box',
-            # kind='violin', inner=None, cut=1, width=0.9,
-            # saturation=0.2,
-            **boxplotKWArgs
-            )
-        g.suptitle('Dummy plot to get full legend from')
-        legendData = {}
-        legendData['coefStd'] = mpl.patches.Patch(alpha=0, linewidth=0)
-        for factorName, factorColor in allAmpPalette.items():
-            if '_md' in factorName:
-                legendData[factorName] = mpl.lines.Line2D(
-                    [0], [0], marker='o',
-                    markerfacecolor=factorColor, markeredgecolor='k',
-                    markeredgewidth=sns.plotting_context()['patch.linewidth'],
-                    markersize=sns.plotting_context()['lines.markersize'],
-                    linestyle='none')
-            else:
-                legendData[factorName] = mpl.lines.Line2D(
-                    [0], [0], marker='o',
-                    markerfacecolor=factorColor, markeredgecolor='k',
-                    markeredgewidth=sns.plotting_context()['patch.linewidth'],
-                    markersize=sns.plotting_context()['lines.markersize'],
-                    linestyle='none')
-        legendData['trialRateInHzStr'] = mpl.patches.Patch(alpha=0, linewidth=0)
-        for rateName, rateColor in allRelPalette.items():
-            if '_md' in rateName:
-                legendData[rateName] = mpl.lines.Line2D(
-                    [0], [0], marker='o',
-                    markerfacecolor=rateColor, markeredgecolor='k',
-                    markeredgewidth=sns.plotting_context()['patch.linewidth'],
-                    markersize=1.5 * sns.plotting_context()['lines.markersize'],
-                    linestyle='none')
-            else:
-                legendData[rateName] = mpl.lines.Line2D(
-                    [0], [0], marker='o',
-                    markerfacecolor=rateColor, markeredgecolor='k',
-                    markeredgewidth=sns.plotting_context()['patch.linewidth'],
-                    markersize=sns.plotting_context()['lines.markersize'],
-                    linestyle='none')
-        legendData['p-value significance'] = mpl.patches.Patch(alpha=0, linewidth=0)
-        legendData['p < {:.2f}'.format(confidence_alpha)] = mpl.lines.Line2D(
-            [0], [0], marker='o',
-            markerfacecolor='darkgray', markeredgecolor='k',
-            markeredgewidth=sns.plotting_context()['patch.linewidth'],
-            markersize=sns.plotting_context()['lines.markersize'],
-            linestyle='none')
-        legendData['p > {:.2f} (n.s.)'.format(confidence_alpha)] = mpl.lines.Line2D(
-            [0], [0], marker='o',
-            markerfacecolor='lightgray', markeredgecolor='k',
-            markeredgewidth=sns.plotting_context()['patch.linewidth'],
-            markersize=sns.plotting_context()['lines.markersize'],
-            linestyle='none')
-        g.add_legend(
-            legend_data=legendData, label_order=list(legendData.keys()), title='dummy legends')
-        asp.reformatFacetGridLegend(
-            g, titleOverrides=prettyNameLookup,
-            contentOverrides=prettyNameLookup,
-        styleOpts=styleOpts)
-        g.set_axis_labels(prettyNameLookup[colVar], prettyNameLookup[yVar])
-        g.resize_legend(adjust_subtitles=True)
-        g.tight_layout(pad=styleOpts['tight_layout.pad'])
-        if not consoleDebug:
-            pdf.savefig(bbox_inches='tight', pad_inches=0,)
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
-    hasTopo = relativeStatsDF.groupby(['xCoords', 'yCoords']).ngroups > 1
-    plotTDist = False
-    if hasTopo: # histogram t stats
-        rowVar = 'feature'
-        rowOrder = sorted(np.unique(plotRC[rowVar]))
-        colVar = 'stimCondition'
-        colOrder = sorted(np.unique(plotRC[colVar]))
-        colWrap = min(3, len(colOrder))
-        hueName = 'kinematicCondition'
-        # hueOrder = sorted(np.unique(plotRC[hueName]))
-        hueOrder = ['NA_NA', 'CW_outbound', 'CW_return']
-        pal = sns.color_palette("Set2")
-        huePalette = {hN: pal[hIdx] for hIdx, hN in enumerate(hueOrder)}
-        huePaletteAlpha = {hN: tuple(list(hV) + [0.5]) for hN, hV in huePalette.items()}
-        height, width = 3, 3
-        aspect = width / height
-        ################################
-        # TODO: I don't remember why I recalculate the relative stats table here
-        plotRelativeStatsDF = relativeStatsDF.reset_index()
-        plotRelativeStatsDF.loc[:, 'electrode'] = plotRelativeStatsDF['electrode'].astype(spinalElecCategoricalDtype)
-        plotRelativeStatsDF = plotRelativeStatsDF.loc[plotRelativeStatsDF['stimCondition'] != 'NA_0.0', :]
-        plotRelativeStatsDF.loc[:, 'sigAnn'] = plotRelativeStatsDF.apply(
-            lambda x: '{}\n '.format(x['feature'].replace('#0', '')) + r"$\bf{(*)}$" if x['reject'] else '{}\n '.format(
-                x['feature'].replace('#0', '')), axis='columns')
-        if plotTDist:
-            g = sns.displot(
-                x='T', hue='freqBandName',
-                data=plotRelativeStatsDF,
-                col=colVar,
-                col_order=[
-                    cn
-                    for cn in colOrder
-                    if cn in plotRelativeStatsDF[colVar].to_list()],
-                row=hueName,
-                row_order=[
-                    cn
-                    for cn in hueOrder
-                    if cn in plotRelativeStatsDF[hueName].to_list()],
-                kind='hist', element='step', stat='density',
-                height=2 * height, aspect=aspect,
-                facet_kws=dict(sharey=False)
-                )
-            for anName, ax in g.axes_dict.items():
-                fillMin, fillMax = (
-                    plotRelativeStatsDF['critical_T_min'].mean(),
-                    plotRelativeStatsDF['critical_T_max'].mean()
-                    )
-                ax.axvspan(fillMin, fillMax, color='r', alpha=0.1, zorder=-100)
-            g.suptitle('T-statistic distribution')
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
-            if not consoleDebug:
-                pdf.savefig(bbox_inches='tight', pad_inches=0,)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            #############
-        if arguments['plotTopoEffectSize']:
-            statPalettes = [
-                sns.diverging_palette(220, 20, as_cmap=True),
-                sns.diverging_palette(145, 300, s=60, as_cmap=True)
-                ]
-            for name, statsThisFB in plotRelativeStatsDF.groupby(['freqBandName', 'isMahalDist']):
-                freqBandName, isMahalDist = name
-                print('plotting topo {}'.format(name))
-                try:
-                    statsThisFB = statsThisFB.loc[(statsThisFB['stimCondition'] != 'NA_0.0').to_numpy(), :]
-                    numStimC = statsThisFB['stimCondition'].unique().size
-                    numKinC = statsThisFB['kinematicCondition'].unique().size
-                    for statIdx, statName in enumerate(['hedges', 'T']):
-                        fig, ax = plt.subplots(
-                            numKinC, numStimC + 1,
-                            figsize = (6 * numKinC, 6 * numStimC + .6),
-                            gridspec_kw={
-                                'width_ratios': [10] * numStimC + [1],
-                                'wspace': 0.1}
-                            )
-                        vMin, vMax = statsThisFB[statName].min(), statsThisFB[statName].max()
-                        cBarKinIdx = int(numKinC / 2)
-                        cBarStimIdx = int(numStimC)
-                        for kinIdx, stimIdx in product(range(numKinC), range(numStimC)):
-                            kinName = np.unique(statsThisFB['kinematicCondition'])[kinIdx]
-                            stimName = np.unique(statsThisFB['stimCondition'])[stimIdx]
-                            thisMask = (statsThisFB['kinematicCondition'] == kinName) & (statsThisFB['stimCondition'] == stimName)
-                            ann2D = statsThisFB.loc[thisMask, :].pivot(index='yCoords', columns='xCoords', values='sigAnn')
-                            stats2D = statsThisFB.loc[thisMask, :].pivot(index='yCoords', columns='xCoords', values=statName)
-                            heatMapKWs = dict(
-                                vmin=vMin, vmax=vMax, center=0.,  fmt='s',
-                                linewidths=0, cmap=statPalettes[statIdx],
-                                annot=ann2D,
-                                annot_kws=dict(fontsize=sns.plotting_context()["font.size"]),
-                                xticklabels=False, yticklabels=False, square=True
-                                )
-                            if (kinIdx == cBarKinIdx) and (stimIdx == (cBarStimIdx - 1)):
-                                heatMapKWs['cbar'] = True
-                                heatMapKWs['cbar_ax'] = ax[cBarKinIdx, cBarStimIdx]
-                            else:
-                                heatMapKWs['cbar'] = False
-                            sns.heatmap(
-                                data=stats2D, ax=ax[kinIdx, stimIdx], ** heatMapKWs)
-                            ax[kinIdx, stimIdx].set_title('{}, {}'.format(kinName, stimName))
-                            ax[kinIdx, stimIdx].set_xlabel('')
-                            ax[kinIdx, stimIdx].set_ylabel('')
-                        for kinIdx in range(numKinC):
-                            if kinIdx != cBarKinIdx:
-                                ax[kinIdx, cBarStimIdx].set_xticks([])
-                                ax[kinIdx, cBarStimIdx].set_yticks([])
-                                sns.despine(
-                                    fig=fig, ax=ax[kinIdx, cBarStimIdx],
-                                    top=True, right=True, left=True, bottom=True,
-                                    offset=None, trim=False)
-                            else:
-                                ax[kinIdx, cBarStimIdx].set_ylabel('{}'.format(statName))
-                        figTitle = fig.suptitle('{} ({})'.format(statName, freqBandName))
-                        fig.tight_layout(pad=styleOpts['tight_layout.pad'])
-                        if not consoleDebug:
-                            pdf.savefig(bbox_inches='tight', pad_inches=0, bbox_extra_artists=[figTitle],)
-                        if arguments['showFigures']:
-                            plt.show()
-                        else:
-                            plt.close()
-                except Exception:
-                    traceback.print_exc()
+#
 print('\n' + '#' * 50 + '\n{}\n{}\nComplete.\n'.format(dt.now().strftime('%Y-%m-%d %H:%M:%S'), __file__) + '#' * 50 + '\n')

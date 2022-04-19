@@ -62,7 +62,7 @@ def shadeTaskEpochsPerFacet(g, ro, co, hu, dataSubset):
 exampleLaplaceChannelListStr = ', '.join([
     "'utah_csd_{}{}#0'".format(cn, fb) for fb, cn in product(
         ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb'],
-        [8] # 2, 8, 17, 35
+        [2, 8] # 2, 8, 17, 35
     )])
 exampleLfpChannelListStr = ', '.join([
     "'utah{}{}#0'".format(cn, fb) for fb, cn in product(
@@ -290,11 +290,19 @@ argumentsLookup = {
         'recalcStats': True,
         'winStart': '-200', 'winStop': '225', 'limitPages': None,
         'unitQuery': "chanName.isin([" + exampleLaplaceChannelListStr + "])",
+        'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
-        'rowName': 'stimCondition', 'rowControl': '',
+        #
+        'colName': 'stimCondition', 'colControl': '',
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'colName': 'feature', 'colControl': '',
-        'groupPagesByColumn': 'parentFeature',
+        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
+        'rowOrder': [
+           'NA_NA',
+            'CW_outbound', 'CW_return',
+            'CCW_outbound', 'CCW_return',
+            ],
+        # 'groupPagesByColumn': 'feature',
+        # 'groupPagesByIndex': 'stimCondition',
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
     'mahal_illustration': {
@@ -350,14 +358,20 @@ argumentsLookup = {
 argumentsLookup['laplace_aucNoStim_illustration'] = argumentsLookup['laplace_auc_illustration'].copy()
 argumentsLookup['laplace_aucNoStim_illustration']['groupPagesByColumn'] = 'feature'
 argumentsLookup['laplace_aucNoStim_illustration']['groupPagesByIndex'] = 'stimCondition'
-argumentsLookup['laplace_aucNoStim_illustration']['alignQuery'] = "(trialRateInHz == 0.) & (pedalMovementCat == 'outbound')"
+argumentsLookup['laplace_aucNoStim_illustration']['alignQuery'] = "(trialRateInHz == 0.)"
+#"(trialRateInHz == 0.) & (pedalMovementCat == 'outbound')"
 #
 argumentsLookup['laplace_spectral_auc_illustration'] = argumentsLookup['laplace_spectral_illustration'].copy()
+argumentsLookup['laplace_spectral_auc_illustration']['groupPagesByColumn'] = 'parentFeature'
+argumentsLookup['laplace_spectral_auc_illustration']['groupPagesByIndex'] = 'stimCondition'
+argumentsLookup['laplace_spectral_auc_illustration']['colName'] = 'feature'
 #
 argumentsLookup['laplace_spectral_aucNoStim_illustration'] = argumentsLookup['laplace_spectral_auc_illustration'].copy()
 argumentsLookup['laplace_spectral_aucNoStim_illustration']['groupPagesByColumn'] = 'parentFeature'
 argumentsLookup['laplace_spectral_aucNoStim_illustration']['groupPagesByIndex'] = 'stimCondition'
-argumentsLookup['laplace_spectral_aucNoStim_illustration']['alignQuery'] = "(trialRateInHz == 0.) & (pedalMovementCat == 'outbound')"
+argumentsLookup['laplace_spectral_aucNoStim_illustration']['colName'] = 'feature'
+argumentsLookup['laplace_spectral_aucNoStim_illustration']['alignQuery'] = "(trialRateInHz == 0.)"
+#"(trialRateInHz == 0.) & (pedalMovementCat == 'outbound')"
 #
 argumentsLookup['mahal_auc_illustration'] = argumentsLookup['mahal_illustration'].copy()
 argumentsLookup['mahal_auc_illustration']['unitQuery'] = None
@@ -1190,15 +1204,15 @@ sharexAcrossPagesLookup = {
 shareyAcrossPagesLookup = {
     'mahal_illustration': False,
     'laplace_illustration': False,
-    'laplace_spectral_illustration': True,
+    'laplace_spectral_illustration': False,
     #
-    'laplace_auc_illustration': True,
+    'laplace_auc_illustration': False,
     'laplace_aucNoStim_illustration': False,
     #
-    'mahal_auc_illustration': True,
+    'mahal_auc_illustration': False,
     'mahal_aucNoStim_illustration': False,
     #
-    'laplace_spectral_auc_illustration': True,
+    'laplace_spectral_auc_illustration': False,
     'laplace_spectral_aucNoStim_illustration': False,
     #
     'laplace_std_illustration': False,
@@ -1241,9 +1255,9 @@ customCodeLookup = {
     'laplace_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'mahal_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'mahal_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
-    'laplace_spectral_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'laplace_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_spectral_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     # 'laplace_spectral_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
-    # 'laplace_spectral_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    # 'laplace_spectral_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'mahal_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     }

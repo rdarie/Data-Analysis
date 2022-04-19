@@ -27,8 +27,8 @@ customSeabornContexts = {
         'font.size': 5., 'axes.labelsize': 7., 'axes.titlesize': 7.,
         'xtick.labelsize': 5., 'ytick.labelsize': 5., 'legend.fontsize': 7.,
         'legend.title_fontsize': 9.
+        }
     }
-}
 
 def parseAnalysisOptions(
         blockIdx=1, experimentShorthand=None):
@@ -1029,7 +1029,7 @@ def parseAnalysisOptions(
         'hedges': 'Effect size (g)',
         'cohen-d': 'Cohen\'s d',
         'coef': r"$\beta$",
-        'coefStd': 'Standardized\nregression\ncoefficient\n({})'.format(r"$\beta$"),
+        'coefStd': 'Standardized\nregression\ncoefficient',  # \n({})'.format(r"$\beta$")
         'electrode = NA': 'No stim.',
         'stimCondition = NA_0.0': 'No stim.',
         'NA': 'No stim.',

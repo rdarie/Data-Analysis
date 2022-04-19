@@ -23,11 +23,12 @@ Options:
 
 import logging
 logging.captureWarnings(True)
-import matplotlib, os
+import matplotlib as mpl
+import os
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('Agg')   # generate postscript output
+    mpl.use('Agg')   # generate postscript output
 else:
-    matplotlib.use('QT5Agg')   # generate interactive output
+    mpl.use('QT5Agg')   # generate interactive output
 import matplotlib.font_manager as fm
 font_files = fm.findSystemFonts()
 for font_file in font_files:
@@ -75,7 +76,7 @@ import dill as pickle
 from statannotations.Annotator import Annotator
 # from statannotations.stats.StatResult import StatResult
 # from statannotations.PValueFormat import PValueFormat
-from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.currentExperiment import *
 from docopt import docopt
 # from numpy.random import default_rng
 # from itertools import product
@@ -87,70 +88,58 @@ from docopt import docopt
 from sklearn.metrics import silhouette_samples, silhouette_score
 #
 idxSl = pd.IndexSlice
-useDPI = 200
+#
+useDPI = 300
 dpiFactor = 72 / useDPI
+snsContext = 'talk'
 snsRCParams = {
-        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': .25,
-        'lines.markersize': 2.5,
-        'patch.linewidth': .25, # snsRCParams
-        "axes.spines.left": True,
-        "axes.spines.bottom": True,
-        "axes.spines.right": True,
-        "axes.spines.top": True,
-        "axes.linewidth": .125,
-        "grid.linewidth": .2,
-        "font.size": 5,
-        "axes.labelsize": 7,
-        "axes.titlesize": 7,
-        "xtick.labelsize": 5,
-        "ytick.labelsize": 5,
-        "legend.fontsize": 5,
-        "legend.title_fontsize": 7,
-        "legend.frameon": True,
-        "xtick.bottom": True,
-        "xtick.top": False,
-        "ytick.left": True,
-        "ytick.right": False,
-        "xtick.major.width": .125,
-        "ytick.major.width": .125,
-        "xtick.minor.width": .125,
-        "ytick.minor.width": .125,
-        "xtick.major.size": 2,
-        "ytick.major.size": 2,
-        "xtick.minor.size": 1,
-        "ytick.minor.size": 1,
-        "xtick.direction": 'in',
-        "ytick.direction": 'in',
+    'axes.facecolor': 'w',
+    #
+    "xtick.direction": 'in',
+    "ytick.direction": 'in',
+    #
+    "axes.spines.left": False,
+    "axes.spines.bottom": True,
+    "axes.spines.right": True,
+    "axes.spines.top": False,
+    #
+    "xtick.bottom": True,
+    "xtick.top": False,
+    "ytick.left": True,
+    "ytick.right": False,
     }
-
+snsRCParams.update(customSeabornContexts[snsContext])
 mplRCParams = {
-    'figure.subplot.left': 0.01,
-    'figure.subplot.right': 0.99,
-    'figure.subplot.bottom': 0.01,
-    'figure.subplot.top': 0.99,
-    'figure.titlesize': 7,
-    'axes.titlepad': 3.5,
-    'axes.labelpad': 2.5,
-    'font.family': "Nimbus Sans",
+    'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+    #
+    'axes.titlepad': 1.5,
+    'axes.labelpad': 0.75,
+    #
+    'figure.subplot.left': 0.02,
+    'figure.subplot.right': 0.98,
+    'figure.subplot.bottom': 0.02,
+    'figure.subplot.top': 0.98,
+    #
     'pdf.fonttype': 42,
     'ps.fonttype': 42,
     }
+
 styleOpts = {
     'legend.lw': 2,
-    'tight_layout.pad': 2e-1,  # units of font size
-    'panel_heading.pad': 0.
+    'tight_layout.pad': 1.,
+    'panel_heading.pad': 1.
     }
-sns.set(
-    context='paper', style='whitegrid',
-    palette='dark', font='sans-serif',
-    font_scale=1., color_codes=True, rc=snsRCParams)
+
 for rcK, rcV in mplRCParams.items():
-    matplotlib.rcParams[rcK] = rcV
+    mpl.rcParams[rcK] = rcV
+
+sns.set(
+    context=snsContext, style='white',
+    palette='dark', font='sans-serif',
+    color_codes=True, rc=snsRCParams)
 
 for arg in sys.argv:
     print(arg)
-
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 # if debugging in a console:
@@ -341,7 +330,7 @@ categoryLabels = pd.Series({
     'deltaSS': '$BE_{\mathbf{SS}}$',
     NACategory: NACategory
     })
-#
+prettyNameLookup['0.'] = ''
 maskNoStimElecNames = False
 spinalMapDF = spinalElectrodeMaps[subjectName].sort_values(['xCoords', 'yCoords'])
 spinalElecCategoricalDtype = pd.CategoricalDtype(spinalMapDF.index.to_list(), ordered=True)
@@ -387,7 +376,14 @@ if arguments['plotSuffix'] == 'all':
     estimatorsSrs = estimatorsSrs.loc[estimatorsSrs.index.get_level_values('expName').isin(distanceStackDF['expName'].unique())]
 elif arguments['plotSuffix'] == 'best_three':
     if subjectName == 'Rupert':
-        lOfElectrodes = ['NA', '-E09+E16', '-E11+E16', '-E04+E16']
+        lOfElectrodes = ['NA', '-E11+E16', '-E05+E16', '-E04+E16']
+    elif subjectName == 'Murdoc':
+        lOfElectrodes = []
+    distanceStackDF = distanceStackDF.loc[distanceStackDF['electrode'].isin(lOfElectrodes), :]
+    estimatorsSrs = estimatorsSrs.loc[estimatorsSrs.index.get_level_values('expName').isin(distanceStackDF['expName'].unique())]
+elif arguments['plotSuffix'] == 'E04':
+    if subjectName == 'Rupert':
+        lOfElectrodes = ['NA', '-E04+E16']
     elif subjectName == 'Murdoc':
         lOfElectrodes = []
     distanceStackDF = distanceStackDF.loc[distanceStackDF['electrode'].isin(lOfElectrodes), :]
@@ -398,6 +394,7 @@ freqBandNameList = [
     bn
     for bn in freqBandOrderExtended
     if bn in estimatorsSrs.index.get_level_values('freqBandName').to_list()]
+freqBandShortList = ['all', 'beta', 'gamma']
 expNameList = estimatorsSrs.index.get_level_values('expName').unique().to_list()
 
 remakePalettes = True
@@ -405,7 +402,9 @@ if remakePalettes:
     pickingColors = False
     singlesPalette = pd.DataFrame(
         sns.color_palette(colorMaps['points'], 5), columns=['r', 'g', 'b'], index=iteratorDescriptions.to_list())
-    singlesPaletteHLS = singlesPalette.apply(lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']), axis='columns')
+    singlesPaletteHLS = singlesPalette.apply(
+        lambda x: pd.Series(colorsys.rgb_to_hls(*x), index=['h', 'l', 's']),
+        axis='columns')
     if pickingColors:
         sns.palplot(singlesPalette.apply(lambda x: tuple(x), axis='columns'))
         palAx = plt.gca()
@@ -416,7 +415,10 @@ if remakePalettes:
     #     for distanceType in ['frobenius']:
     freqBandName = freqBandNameList[0]
     distanceType = 'frobenius'
-    exampleSliceMask = (distanceStackDF['freqBandName'] == freqBandName) & (distanceStackDF['distanceType'] == distanceType)
+    exampleSliceMask = (
+        (distanceStackDF['freqBandName'] == freqBandName) &
+        (distanceStackDF['distanceType'] == distanceType)
+        )
     thisDistanceDF = distanceStackDF.loc[exampleSliceMask].drop(columns=['freqBandName', 'distanceType'])
     groupLookup = thisDistanceDF[['test_iterator', 'ref_iterator']].drop_duplicates().reset_index(drop=True)
     groupLookup.loc[:, 'test_label'] = groupLookup['test_iterator'].map(iteratorDescriptions)
@@ -511,9 +513,9 @@ distanceStackDF.loc[:, 'category_elec_label'] = distanceStackDF.apply(lambda x: 
 masterDF = distanceStackDF
 #
 highLightGroups = {
-    'Relative to baseline': masterDF['test_ref_label'].isin(['B-B', 'B-M', 'B-S', 'B-C']) & masterDF['freqBandName'].isin(['all']),
-    'Relative to movement': masterDF['test_ref_label'].isin(['B-M', 'B-S', 'M-S']),
-    'Stim. motion interaction': masterDF['test_ref_label'].isin(['M-S', 'M-C', 'C-S']),
+    'unscaled': masterDF['test_ref_label'].isin(['B-M', 'B-S', 'B-C', 'M-S', 'M-C', 'C-S']), #  & masterDF['freqBandName'].isin(['all'])
+    'relative to B-M': masterDF['test_ref_label'].isin(['B-M', 'B-S', 'M-S']),
+    'relative to M-S': masterDF['test_ref_label'].isin(['M-S', 'M-C', 'C-S']),
     'Everything': masterDF['test_ref_label'].notna()
     }
 groupPagesBy = ['distanceType']
@@ -552,7 +554,7 @@ if pickingColors:
     for tIdx, tN in enumerate(subCategoryPalette.index):
         palAx.text(tIdx, .5, '{}'.format(tN), fontsize=10)
 subCategoryLookup.loc[:, 'color'] = subCategoryLookup['test_ref_label'].astype(np.object).map(subCategoryPalette.apply(lambda x: tuple(x), axis='columns'))
-
+#
 confidence_alpha = 0.05
 dictForHueStats = {}
 plotDistances = ['frobenius']
@@ -572,108 +574,118 @@ hueStatsDF = pd.concat(dictForHueStats, names=groupPagesBy + [rowVar, colVar, xV
 with PdfPages(pdfPath) as pdf:
     for hgName, hgMask in highLightGroups.items():
         hgDF = masterDF.loc[hgMask, :]
+        print('on highlight group {}'.format(hgName))
         for pageNames, pageGroup in hgDF.groupby(groupPagesBy):
+            print(
+                'grouping pages by {}\non page group {}'.format(
+                    groupPagesBy, pageNames))
             distanceType = pageNames
             if distanceType != 'frobenius':
                 continue
             plotDF = pageGroup.copy()
-            if (distanceType == 'frobenius') and (hgName == 'Relative to baseline'):
-                for _, group in plotDF.groupby(['freqBandName', 'expName']):
-                    normFactor = group.loc[group['test_ref_label'] == 'B-B', 'distance'].median()
-                    rescaled = group['distance'] / normFactor
-                    plotDF.loc[group.index, 'distance'] = rescaled
-                if arguments['plotSuffix'] == 'all':
-                    figHeight = 2.5
-                    figWidth = 5
-                else:
-                    figHeight = 2.5
-                    figWidth = 3
-                thisHueOrder = ['B-B', 'B-M', 'B-S', 'B-C']
+            if (distanceType == 'frobenius') and (hgName == 'unscaled'):
+                ## for _, group in plotDF.groupby(['freqBandName', 'expName']):
+                ##     normFactor = group.loc[group['test_ref_label'] == 'B-B', 'distance'].median()
+                ##    rescaled = group['distance'] / normFactor
+                ##     plotDF.loc[group.index, 'distance'] = rescaled
+                ## thisHueOrder = ['B-B', 'B-M', 'B-S', 'B-C']
+                thisHueOrder = ['B-M', 'B-S', 'B-C', 'M-S', 'M-C', 'C-S']
                 rowVar = 'xDummy'
                 rowOrder = [0.]
-                # rowVar = None
-                # rowOrder = None
+                xVar = 'freqBandName'
+                xOrder = [
+                    fbn
+                    for fbn in freqBandShortList
+                    if fbn in plotDF['freqBandName'].to_list()]
+                colVar = 'electrode'
+                colOrder = [
+                    eN
+                    for eN in subCategoryLookup['electrode'].sort_values().unique()
+                    if eN in plotDF['electrode'].to_list()]
+                shareY = False
                 colWrap = None
-                colVar = 'freqBandName'
-                colOrder = [fbn for fbn in freqBandNameList if fbn in plotDF['freqBandName'].to_list()]
-                xVar = 'electrode'
-                shareY = True
-                xOrder = [eN for eN in subCategoryLookup[xVar].sort_values().unique() if eN in plotDF[xVar].to_list()]
-                width = figWidth / max(1, len(colOrder))
-                height = figHeight / max(1, len(rowOrder))
             elif (distanceType == 'frobenius') and (hgName == 'Everything'):
                 for _, group in plotDF.groupby(['freqBandName', 'expName']):
                     normFactor = group.loc[group['test_ref_label'] == 'B-B', 'distance'].median()
                     rescaled = group['distance'] / normFactor
                     plotDF.loc[group.index, 'distance'] = rescaled
-                if arguments['plotSuffix'] == 'all':
-                    figHeight = 2.5
-                    figWidth = 10
-                else:
-                    figHeight = 2.5
-                    figWidth = 5
-                thisHueOrder = subCategoryLookup[hueVar].unique()
+                thisHueOrder = np.unique(subCategoryLookup[hueVar]).tolist()
+                #
                 rowVar = 'xDummy'
                 rowOrder = [0.]
-                # rowVar = None
-                # rowOrder = None
+                xVar = 'freqBandName'
+                xOrder = [
+                    fbn
+                    for fbn in freqBandShortList
+                    if fbn in plotDF['freqBandName'].to_list()]
+                colVar = 'electrode'
+                colOrder = [
+                    eN for eN in subCategoryLookup['electrode'].sort_values().unique()
+                    if eN in plotDF['electrode'].to_list()]
+                #
                 colWrap = None
-                colVar = 'freqBandName'
-                colOrder = [fbn for fbn in freqBandNameList if fbn in plotDF['freqBandName'].to_list()]
-                xVar = 'electrode'
-                shareY = True
-                xOrder = [eN for eN in subCategoryLookup[xVar].sort_values().unique() if eN in plotDF[xVar].to_list()]
-                width = figWidth / max(1, len(colOrder))
-                height = figHeight / max(1, len(rowOrder))
-            elif (distanceType == 'frobenius') and (hgName == 'Relative to movement'):
+                shareY = False
+            elif (distanceType == 'frobenius') and (hgName == 'relative to B-M'):
                 for _, group in plotDF.groupby(['freqBandName', 'expName']):
                     normFactor = group.loc[group['test_ref_label'] == 'B-M', 'distance'].median()
                     rescaled = group['distance'] / normFactor
                     plotDF.loc[group.index, 'distance'] = rescaled
-                if arguments['plotSuffix'] == 'all':
-                    figHeight = 1.5
-                    figWidth = 5
-                else:
-                    figHeight = 1.5
-                    figWidth = 3
                 thisHueOrder = ['B-M', 'B-S', 'M-S']
+                #
                 rowVar = 'xDummy'
                 rowOrder = [0.]
-                # rowVar = None
-                # rowOrder = None
-                colWrap = None
                 xVar = 'freqBandName'
-                shareY = True
-                xOrder = [fbn for fbn in freqBandNameList if fbn in plotDF['freqBandName'].to_list()]
+                xOrder = [
+                    fbn
+                    for fbn in freqBandShortList
+                    if fbn in plotDF['freqBandName'].to_list()]
+                #
                 colVar = 'electrode'
-                colOrder = [eN for eN in subCategoryLookup[colVar].sort_values().unique() if eN in plotDF[colVar].to_list()]
-                width = figWidth / max(1, len(colOrder))
-                height = figHeight / max(1, len(rowOrder))
-            elif (distanceType == 'frobenius') and (hgName == 'Stim. motion interaction'):
+                colOrder = [
+                    eN
+                    for eN in subCategoryLookup['electrode'].sort_values().unique()
+                    if eN in plotDF['electrode'].to_list()]
+                #
+                colWrap = None
+                shareY = False
+            elif (distanceType == 'frobenius') and (hgName == 'relative to M-S'):
                 for _, group in plotDF.groupby(['freqBandName', 'expName']):
                     normFactor = group.loc[group['test_ref_label'] == 'M-S', 'distance'].median()
                     rescaled = group['distance'] / normFactor
                     plotDF.loc[group.index, 'distance'] = rescaled
-                if arguments['plotSuffix'] == 'all':
-                    figHeight = 1.5
-                    figWidth = 5
-                else:
-                    figHeight = 1.5
-                    figWidth = 3
                 thisHueOrder = ['M-S', 'M-C', 'C-S']
+                #
                 rowVar = 'xDummy'
                 rowOrder = [0.]
-                # rowVar = None
-                # rowOrder = None
-                colWrap = None
                 xVar = 'freqBandName'
-                shareY = False
-                xOrder = [fbn for fbn in freqBandNameList if fbn in plotDF[xVar].to_list()]
+                xOrder = [
+                    fbn
+                    for fbn in freqBandShortList
+                    if fbn in plotDF['freqBandName'].to_list()]
                 colVar = 'electrode'
-                colOrder = [eN for eN in subCategoryLookup[colVar].sort_values().unique() if eN in plotDF[colVar].to_list()]
-                width = figWidth / max(1, len(colOrder))
-                height = figHeight / max(1, len(rowOrder))
-            argsForBoxPlot = dict(whis=np.inf)
+                colOrder = [
+                    eN
+                    for eN in subCategoryLookup['electrode'].sort_values().unique()
+                    if eN in plotDF['electrode'].to_list()]
+                #
+                shareY = False
+                colWrap = None
+            ############################################################
+            if rowOrder is not None:
+                figHeight = 1.5 + 3. * len(rowOrder)
+                height = figHeight / len(rowOrder)
+            else:
+                figHeight = 4.5
+                height = figHeight
+            #
+            if colOrder is not None:
+                figWidth = 1. + .5 * len(thisHueOrder) * len(xOrder) * len(colOrder)
+                width = figWidth / len(colOrder)
+            else:
+                figWidth = 1. + .5 * len(thisHueOrder) * len(xOrder)
+                width = figWidth
+            #
+            argsForBoxPlot = dict(whis=np.inf, width=0.9)
             thisPalette = (
                 subCategoryLookup
                     .loc[subCategoryLookup[hueVar].isin(plotDF.loc[:, hueVar]), [hueVar, 'color']]
@@ -688,7 +700,7 @@ with PdfPages(pdfPath) as pdf:
                 data=plotDF, height=height, aspect=aspect,
                 margin_titles=True, sharey=shareY, kind='box',
                 **argsForCatPlot, **argsForBoxPlot)
-            g.set_titles(row_template="", col_template="{col_var} = {col_name}")
+            g.set_titles(row_template="{row_name}", col_template="{col_name}")
             plotProcFuns = [
                 asp.genTitleChanger(prettyNameLookup)]
             for (ro, co, hu), dataSubset in g.facet_data():
@@ -706,9 +718,11 @@ with PdfPages(pdfPath) as pdf:
                 if g._col_var is not None:
                     dataSubset = dataSubset.loc[dataSubset[g._col_var] == col_val, :]
                     statsSubset = statsSubset.loc[statsSubset[g._col_var] == col_val, :]
-                if (distanceType == 'frobenius') and (hgName == 'Relative to baseline'):
+                elif (distanceType == 'frobenius') and (hgName == 'unscaled'):
                     dataSubset = dataSubset.loc[dataSubset['freqBandName'] == 'all', :]
                     statsSubset = statsSubset.loc[statsSubset['freqBandName'] == 'all', :]
+                else:
+                    pdb.set_trace()
                 enableAnnotations = True
                 if enableAnnotations:
                     pairs = []
@@ -717,11 +731,11 @@ with PdfPages(pdfPath) as pdf:
                         for rowIdx, row in statsSubGroup.iterrows():
                             isThisPlotted = (row['category1'] in thisPalette.index) and (row['category2'] in thisPalette.index)
                             isThisSignificant = row['pval'] < confidence_alpha
-                            if (distanceType == 'frobenius') and (hgName == 'Relative to baseline'):
+                            if (distanceType == 'frobenius') and (hgName == 'unscaled'):
                                 extraCondition = (row['category1'] == 'B-B') or (row['category2'] == 'B-B')
-                            elif (distanceType == 'frobenius') and (hgName == 'Relative to movement'):
+                            elif (distanceType == 'frobenius') and (hgName == 'relative to B-M'):
                                 extraCondition = (row['category1'] == 'B-M') or (row['category2'] == 'B-M')
-                            elif (distanceType == 'frobenius') and (hgName == 'Stim. motion interaction'):
+                            elif (distanceType == 'frobenius') and (hgName == 'relative to M-S'):
                                 extraCondition = ((row['category1'] != 'M-S') and (row['category2'] != 'M-S'))
                             elif (distanceType == 'frobenius') and (hgName == 'Everything'):
                                 extraCondition = False
@@ -739,22 +753,25 @@ with PdfPages(pdfPath) as pdf:
                                 ax, pairs,
                                 data=dataSubset, plot='boxplot',
                                 **argsForCatPlot)
-                        except:
+                        except Exception:
+                            pdb.set_trace()
                             pdb.set_trace()
                         annotator.configure(
                             test=None, test_short_name='',
-                            line_width=0.5,
+                            line_width=sns.plotting_context()['lines.linewidth'],
                             pvalue_format=dict(
-                                fontsize=snsRCParams["font.size"]))
+                                fontsize=sns.plotting_context()["font.size"]))
                         annotator.set_pvalues(pvalAnns).annotate()
                 xTickLabels = ax.get_xticklabels()
                 if len(xTickLabels):
-                    newXTickLabels = [applyPrettyNameLookup(tL.get_text()) for tL in xTickLabels]
-                    ax.set_xticklabels(newXTickLabels, rotation=90, va='top', ha='right')
-                if (distanceType == 'frobenius') and not (hgName == 'Relative to baseline'):
-                    for xJ in range(0, len(xOrder), 2):
-                        ax.axvspan(-0.45 + xJ, 0.45 + xJ, color="0.1", alpha=0.1, zorder=1.)
-                # ax.axhline(1., c='0.1', lw=1., ls='--', zorder=1.)
+                    newXTickLabels = [
+                        applyPrettyNameLookup(tL.get_text())
+                        for tL in xTickLabels]
+                    ax.set_xticklabels(newXTickLabels, rotation=30, va='top', ha='right')
+                if (distanceType == 'frobenius'):
+                    for xJ in range(1, len(xOrder), 2):
+                        ax.axvspan(-0.5 + xJ, 0.5 + xJ, color="0.1", alpha=0.1, zorder=1.)
+                ax.axhline(1., c='0.5', lw=1., ls='--', zorder=.9)
                 ax.set_xlim([-0.5, 0.5 + len(xOrder) - 1])
                 if not ax.is_first_col():
                     ax.set_ylabel(None)
@@ -769,10 +786,8 @@ with PdfPages(pdfPath) as pdf:
                         # g.axes[ro, co].set_ylim(g.axes[ro, 0].get_ylim())
             # g.axes[0, 0].set_xticks([])
             # g.axes[0, 0].set_xlim([-0.5, 0.5])
-            g.suptitle('Relative {} distance ({})'.format(distanceType.capitalize(), hgName))
-            g.set_axis_labels(applyPrettyNameLookup(xVar), 'Normalized distance (a.u.)')
-            g.resize_legend(adjust_subtitles=True)
-            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            g.suptitle('{} distance ({})'.format(distanceType.capitalize(), hgName))
+            g.set_axis_labels(prettyNameLookup[xVar], 'Normalized\ndistance\n(a.u.)')
             contentOverrides = {hueVar: 'Epoch  pair'}
             if hueVarLabel is not None:
                 pass
@@ -790,8 +805,13 @@ with PdfPages(pdfPath) as pdf:
                     ****: p <= 1e-04
                 '''
                 g.axes[0, 0].text(
-                    1, 1, pvalueAnnotLegend, ha='right', va='top', transform=g.fig.transFigure)
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
+                    1, 1, pvalueAnnotLegend, ha='right', va='top',
+                    transform=g.fig.transFigure)
+            g.resize_legend(adjust_subtitles=True)
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
+            pdf.savefig(
+                bbox_inches='tight', pad_inches=0,
+                )
             if arguments['showFigures']:
                 plt.show()
             else:

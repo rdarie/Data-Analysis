@@ -66,7 +66,7 @@ import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.analysis_code.namedQueries import namedQueries
-from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.currentExperiment import *
 from dataAnalysis.analysis_code.plotSignalDataFrame_options import *
 import pdb
 from tqdm import tqdm
@@ -271,13 +271,13 @@ if __name__ == '__main__':
     if detrendType == 'perTrial':
         for name, group in dataDF.groupby(['expName', 't']):
             tBins = group.index.get_level_values('bin')
-            baselineTMask = (tBins >= -400e-3) & (tBins <= -200e-3)
-            baseline = group.loc[baselineTMask, :].median()
+            baselineTMask = (tBins >= -500e-3) & (tBins <= -200e-3)
+            baseline = group.loc[baselineTMask, :].mean()
             dataDF.loc[group.index, :] = group - baseline
     elif detrendType == 'global':
         tBins = dataDF.index.get_level_values('bin')
-        baselineTMask = (tBins >= -400e-3) & (tBins <= -200e-3)
-        baseline = dataDF.loc[baselineTMask, :].median()
+        baselineTMask = (tBins >= -500e-3) & (tBins <= -200e-3)
+        baseline = dataDF.loc[baselineTMask, :].mean()
         dataDF = dataDF - baseline
     #
     tMask = pd.Series(True, index=trialInfo.index)
