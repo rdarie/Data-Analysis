@@ -4,7 +4,7 @@ tzlocal==1.5.1
 tables==3.5.2
 docopt==0.6.2
 dill==0.3.0
-numpy==1.17.2
+numpy==1.22.0
 pandas==0.24.2
 h5py==2.10.0
 lmfit==0.9.14
