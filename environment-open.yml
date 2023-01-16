@@ -5,8 +5,7 @@ channels:
 dependencies:
 - python=3.7.6
 - pip
-- line_profiler=2.1.2
-- brian2
+- line_profiler
 - tzlocal
 - pytables
 - docopt
@@ -32,13 +31,12 @@ dependencies:
 - tqdm
 - openpyxl
 - dask
-- distributed
+# - distributed
 - fastparquet
 - pyarrow
 - python-snappy
-- datashader
-- holoviews
-- tensorflow>2=mkl*
+# - datashader
+# - holoviews
 - pynndescent
 - outdated
 - tabulate
