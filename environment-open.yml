@@ -3,7 +3,7 @@ channels:
 - conda-forge
 - defaults
 dependencies:
-- python=3.7.6
+- python
 - pip
 - line_profiler
 - tzlocal
@@ -31,14 +31,15 @@ dependencies:
 - tqdm
 - openpyxl
 - dask
-# - distributed
+- distributed
 - fastparquet
 - pyarrow
 - python-snappy
-# - datashader
-# - holoviews
+- datashader
+- holoviews
 - pynndescent
 - outdated
 - tabulate
 - numdifftools
 - sklearn-pandas
+- ipykernel
