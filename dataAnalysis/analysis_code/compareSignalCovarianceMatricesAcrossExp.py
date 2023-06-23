@@ -18,6 +18,7 @@ Options:
     --targetList=targetList                        which iterators to compare
     --iteratorSuffixList=iteratorSuffixList        which iterators to compare
     --expList=expList                              which experiments to compare
+    --freqBandGroup=freqBandGroup                  what will the plot be aligned to? [default: outboundWithStim]
     --plotSuffix=plotSuffix                        switches between a few different processing options [default: all]
 """
 
@@ -182,8 +183,8 @@ for expName in listOfExpSuffixes:
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder)
     pdfPath = os.path.join(
-        figureOutputFolder, '{}_covMatSimilarity_comparison_{}.pdf'.format(
-            subjectName, arguments['plotSuffix']))
+        figureOutputFolder, '{}_covMatSimilarity_comparison_fbg{}_{}.pdf'.format(
+            subjectName, arguments['freqBandGroup'], arguments['plotSuffix']))
     #
     estimatorsSubFolder = os.path.join(
         analysisSubFolder, 'estimators')
@@ -394,7 +395,16 @@ freqBandNameList = [
     bn
     for bn in freqBandOrderExtended
     if bn in estimatorsSrs.index.get_level_values('freqBandName').to_list()]
-freqBandShortList = ['all', 'beta', 'gamma']
+if arguments['freqBandGroup'] == '0':
+    freqBandShortList = ['all']
+elif arguments['freqBandGroup'] == '1':
+    freqBandShortList = ['all'] + freqBandOrder
+elif arguments['freqBandGroup'] == '2':
+    freqBandShortList = ['all', 'beta', 'gamma']
+elif arguments['freqBandGroup'] == '3':
+    freqBandShortList = ['gamma', 'higamma']
+elif arguments['freqBandGroup'] == '4':
+    freqBandShortList = ['all', 'beta']
 expNameList = estimatorsSrs.index.get_level_values('expName').unique().to_list()
 
 remakePalettes = True
@@ -513,8 +523,8 @@ distanceStackDF.loc[:, 'category_elec_label'] = distanceStackDF.apply(lambda x: 
 masterDF = distanceStackDF
 #
 highLightGroups = {
-    'unscaled': masterDF['test_ref_label'].isin(['B-M', 'B-S', 'B-C', 'M-S', 'M-C', 'C-S']), #  & masterDF['freqBandName'].isin(['all'])
-    'relative to B-M': masterDF['test_ref_label'].isin(['B-M', 'B-S', 'M-S']),
+    'unscaled': masterDF['test_ref_label'].isin(['B-B', 'B-M', 'B-S', 'B-C', 'M-S', 'M-C', 'C-S']), #  & masterDF['freqBandName'].isin(['all'])
+    'relative to B-M': masterDF['test_ref_label'].isin(['B-M', 'B-S', 'B-C', 'M-S', 'M-C', 'C-S']),
     'relative to M-S': masterDF['test_ref_label'].isin(['M-S', 'M-C', 'C-S']),
     'Everything': masterDF['test_ref_label'].notna()
     }
@@ -584,26 +594,28 @@ with PdfPages(pdfPath) as pdf:
                 continue
             plotDF = pageGroup.copy()
             if (distanceType == 'frobenius') and (hgName == 'unscaled'):
-                ## for _, group in plotDF.groupby(['freqBandName', 'expName']):
-                ##     normFactor = group.loc[group['test_ref_label'] == 'B-B', 'distance'].median()
-                ##    rescaled = group['distance'] / normFactor
-                ##     plotDF.loc[group.index, 'distance'] = rescaled
+                for _, group in plotDF.groupby(['freqBandName', 'expName']):
+                    normFactor = group.loc[group['test_ref_label'] == 'B-B', 'distance'].median()
+                    rescaled = group['distance'] / normFactor
+                    plotDF.loc[group.index, 'distance'] = rescaled
                 ## thisHueOrder = ['B-B', 'B-M', 'B-S', 'B-C']
-                thisHueOrder = ['B-M', 'B-S', 'B-C', 'M-S', 'M-C', 'C-S']
-                rowVar = 'xDummy'
-                rowOrder = [0.]
-                xVar = 'freqBandName'
-                xOrder = [
+                thisHueOrder = ['B-B', 'B-M', 'B-S', 'B-C', 'M-S', 'M-C', 'C-S']
+                xVar = 'xDummy'
+                xOrder = [0.]
+                #
+                colVar = 'freqBandName'
+                colOrder = [
                     fbn
                     for fbn in freqBandShortList
                     if fbn in plotDF['freqBandName'].to_list()]
-                colVar = 'electrode'
-                colOrder = [
+                rowVar = 'electrode'
+                rowOrder = [
                     eN
                     for eN in subCategoryLookup['electrode'].sort_values().unique()
                     if eN in plotDF['electrode'].to_list()]
                 shareY = False
                 colWrap = None
+                shareYByRow = False
             elif (distanceType == 'frobenius') and (hgName == 'Everything'):
                 for _, group in plotDF.groupby(['freqBandName', 'expName']):
                     normFactor = group.loc[group['test_ref_label'] == 'B-B', 'distance'].median()
@@ -611,37 +623,38 @@ with PdfPages(pdfPath) as pdf:
                     plotDF.loc[group.index, 'distance'] = rescaled
                 thisHueOrder = np.unique(subCategoryLookup[hueVar]).tolist()
                 #
-                rowVar = 'xDummy'
-                rowOrder = [0.]
-                xVar = 'freqBandName'
-                xOrder = [
+                xVar = 'xDummy'
+                xOrder = [0.]
+                colVar = 'freqBandName'
+                colOrder = [
                     fbn
                     for fbn in freqBandShortList
                     if fbn in plotDF['freqBandName'].to_list()]
-                colVar = 'electrode'
-                colOrder = [
+                rowVar = 'electrode'
+                rowOrder = [
                     eN for eN in subCategoryLookup['electrode'].sort_values().unique()
                     if eN in plotDF['electrode'].to_list()]
                 #
                 colWrap = None
                 shareY = False
+                shareYByRow = False
             elif (distanceType == 'frobenius') and (hgName == 'relative to B-M'):
                 for _, group in plotDF.groupby(['freqBandName', 'expName']):
                     normFactor = group.loc[group['test_ref_label'] == 'B-M', 'distance'].median()
                     rescaled = group['distance'] / normFactor
                     plotDF.loc[group.index, 'distance'] = rescaled
-                thisHueOrder = ['B-M', 'B-S', 'M-S']
+                thisHueOrder = ['B-M', 'B-S', 'B-C', 'M-S', 'M-C', 'C-S']
                 #
-                rowVar = 'xDummy'
-                rowOrder = [0.]
-                xVar = 'freqBandName'
-                xOrder = [
+                xVar = 'xDummy'
+                xOrder = [0.]
+                colVar = 'freqBandName'
+                colOrder = [
                     fbn
                     for fbn in freqBandShortList
                     if fbn in plotDF['freqBandName'].to_list()]
                 #
-                colVar = 'electrode'
-                colOrder = [
+                rowVar = 'electrode'
+                rowOrder = [
                     eN
                     for eN in subCategoryLookup['electrode'].sort_values().unique()
                     if eN in plotDF['electrode'].to_list()]
@@ -670,6 +683,7 @@ with PdfPages(pdfPath) as pdf:
                 #
                 shareY = False
                 colWrap = None
+                shareYByRow = False
             ############################################################
             if rowOrder is not None:
                 figHeight = 1.5 + 3. * len(rowOrder)
@@ -710,19 +724,26 @@ with PdfPages(pdfPath) as pdf:
             for (row_val, col_val), ax in g.axes_dict.items():
                 statsSubset = hueStatsDF.xs(distanceType, level='distanceType').reset_index()
                 if g._row_var is not None:
+                    print('g._row_var = {}'.format(g._row_var))
                     dataSubset = plotDF.loc[plotDF[g._row_var] == row_val, :]
                     statsSubset = statsSubset.loc[statsSubset[g._row_var] == row_val, :]
                 else:
                     dataSubset = plotDF
                     statsSubset = statsSubset
+                #
                 if g._col_var is not None:
+                    print('g._col_var = {}'.format(g._col_var))
                     dataSubset = dataSubset.loc[dataSubset[g._col_var] == col_val, :]
                     statsSubset = statsSubset.loc[statsSubset[g._col_var] == col_val, :]
                 elif (distanceType == 'frobenius') and (hgName == 'unscaled'):
                     dataSubset = dataSubset.loc[dataSubset['freqBandName'] == 'all', :]
                     statsSubset = statsSubset.loc[statsSubset['freqBandName'] == 'all', :]
-                else:
-                    pdb.set_trace()
+                #
+                if xOrder is not None:
+                    print('xVar = {}'.format(xVar))
+                    dataSubset = dataSubset.loc[dataSubset[xVar].isin(xOrder), :]
+                    statsSubset = statsSubset.loc[statsSubset[xVar].isin(xOrder), :]
+                #
                 enableAnnotations = True
                 if enableAnnotations:
                     pairs = []
@@ -731,12 +752,13 @@ with PdfPages(pdfPath) as pdf:
                         for rowIdx, row in statsSubGroup.iterrows():
                             isThisPlotted = (row['category1'] in thisPalette.index) and (row['category2'] in thisPalette.index)
                             isThisSignificant = row['pval'] < confidence_alpha
-                            if (distanceType == 'frobenius') and (hgName == 'unscaled'):
-                                extraCondition = (row['category1'] == 'B-B') or (row['category2'] == 'B-B')
-                            elif (distanceType == 'frobenius') and (hgName == 'relative to B-M'):
+                            if (distanceType == 'frobenius') and (hgName == 'relative to B-M'):
                                 extraCondition = (row['category1'] == 'B-M') or (row['category2'] == 'B-M')
                             elif (distanceType == 'frobenius') and (hgName == 'relative to M-S'):
                                 extraCondition = ((row['category1'] != 'M-S') and (row['category2'] != 'M-S'))
+                            elif (distanceType == 'frobenius') and (hgName == 'unscaled'):
+                                # extraCondition = (row['category1'] == 'B-B') or (row['category2'] == 'B-B')
+                                extraCondition = False
                             elif (distanceType == 'frobenius') and (hgName == 'Everything'):
                                 extraCondition = False
                             condition = isThisSignificant and isThisPlotted and extraCondition
@@ -753,15 +775,15 @@ with PdfPages(pdfPath) as pdf:
                                 ax, pairs,
                                 data=dataSubset, plot='boxplot',
                                 **argsForCatPlot)
+                            annotator.configure(
+                                test=None, test_short_name='',
+                                line_width=sns.plotting_context()['lines.linewidth'],
+                                pvalue_format=dict(
+                                    fontsize=sns.plotting_context()["font.size"]))
+                            annotator.set_pvalues(pvalAnns).annotate()
                         except Exception:
+                            traceback.print_exc()
                             pdb.set_trace()
-                            pdb.set_trace()
-                        annotator.configure(
-                            test=None, test_short_name='',
-                            line_width=sns.plotting_context()['lines.linewidth'],
-                            pvalue_format=dict(
-                                fontsize=sns.plotting_context()["font.size"]))
-                        annotator.set_pvalues(pvalAnns).annotate()
                 xTickLabels = ax.get_xticklabels()
                 if len(xTickLabels):
                     newXTickLabels = [
@@ -773,17 +795,18 @@ with PdfPages(pdfPath) as pdf:
                         ax.axvspan(-0.5 + xJ, 0.5 + xJ, color="0.1", alpha=0.1, zorder=1.)
                 ax.axhline(1., c='0.5', lw=1., ls='--', zorder=.9)
                 ax.set_xlim([-0.5, 0.5 + len(xOrder) - 1])
-                if not ax.is_first_col():
+                if shareYByRow and (not ax.is_first_col()):
                     ax.set_ylabel(None)
                     ax.set_yticklabels([])
-            for ro in range(g.axes.shape[0]):
-                allYLim = pd.DataFrame([colAx.get_ylim() for colAx in g.axes[ro, :]], columns=['inf', 'sup'])
-                newYLims = [allYLim['inf'].min(), allYLim['sup'].max()]
-                for co in range(g.axes.shape[1]):
-                    g.axes[ro, co].set_ylim(newYLims)
-                    if co > 0:
-                        g.axes[ro, 0].get_shared_y_axes().join(g.axes[ro, 0], g.axes[ro, co])
-                        # g.axes[ro, co].set_ylim(g.axes[ro, 0].get_ylim())
+            if shareYByRow:
+                for ro in range(g.axes.shape[0]):
+                    allYLim = pd.DataFrame([colAx.get_ylim() for colAx in g.axes[ro, :]], columns=['inf', 'sup'])
+                    newYLims = [allYLim['inf'].min(), allYLim['sup'].max()]
+                    for co in range(g.axes.shape[1]):
+                        g.axes[ro, co].set_ylim(newYLims)
+                        if co > 0:
+                            g.axes[ro, 0].get_shared_y_axes().join(g.axes[ro, 0], g.axes[ro, co])
+                            # g.axes[ro, co].set_ylim(g.axes[ro, 0].get_ylim())
             # g.axes[0, 0].set_xticks([])
             # g.axes[0, 0].set_xlim([-0.5, 0.5])
             g.suptitle('{} distance ({})'.format(distanceType.capitalize(), hgName))

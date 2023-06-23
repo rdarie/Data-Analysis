@@ -217,7 +217,11 @@ if __name__ == '__main__':
                             featureLoadingMeta = pickle.load(_flf)
                             print('Loaded meta from {}'.format(featureLoadingMetaCtrlPath))
                     for kN in ['outlierTrials']:
-                        featureLoadingMeta['alignedAsigsKWargs'].pop(kN)
+                        origOutlierTrials = featureLoadingMeta['alignedAsigsKWargs'].pop(kN)
+                        if origOutlierTrials is not None:
+                            ooTI = origOutlierTrials.index.to_frame().reset_index(drop=True)
+                            ooTI.loc[:, 't'] = np.round(ooTI['t'], decimals=6)
+                            origOutlierTrials.index = pd.MultiIndex.from_frame(ooTI)
                     for kN in ['unitQuery', 'selectionName']:
                         if kN in featureLoadingMeta['arguments']:
                             loadingMeta['arguments'][kN] = featureLoadingMeta['arguments'][kN]
@@ -241,7 +245,15 @@ if __name__ == '__main__':
                     continue
                 '''thisDF.loc[:, 'expName'] = expName
                 thisDF.set_index('expName', inplace=True, append=True)'''
-                #
+                if ('isOutlierTrial' not in thisDF.index.names):
+                    ####
+                    if origOutlierTrials is not None:
+                        thisDF.loc[:, 'isOutlierTrial'] = thisDF.index.to_frame().apply(lambda x: origOutlierTrials[(x['segment'], np.round(x['t'], decimals=6))], axis='columns').fillna(False)
+                        print("thisDF['isOutlierTrial'].sum() = {}".format(thisDF['isOutlierTrial'].sum()))
+                    else:
+                        thisDF.loc[:, 'isOutlierTrial'] = False
+                    thisDF.set_index('isOutlierTrial', inplace=True, append=True)
+                ####
                 thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
                 listOfDataFrames.append(thisDF)
                 thisMask = pd.read_hdf(dFPath, '/{}/featureMasks'.format(arguments['selectionName']))

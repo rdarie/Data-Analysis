@@ -44,11 +44,12 @@ Options:
 
 import logging
 logging.captureWarnings(True)
-import matplotlib, os, sys
+import matplotlib as mpl
+import os, sys
 if 'CCV_HEADLESS' in os.environ:
-    matplotlib.use('Agg')   # generate postscript output
+    mpl.use('Agg')   # generate postscript output
 else:
-    matplotlib.use('QT5Agg')   # generate interactive output
+    mpl.use('QT5Agg')   # generate interactive output
 import matplotlib.font_manager as fm
 font_files = fm.findSystemFonts()
 for font_file in font_files:
@@ -85,54 +86,54 @@ import gc
 from docopt import docopt
 #
 idxSl = pd.IndexSlice
-useDPI = 200
+useDPI = 72
 dpiFactor = 72 / useDPI
+snsContext = 'paper'
 snsRCParams = {
-        'figure.dpi': useDPI, 'savefig.dpi': useDPI,
-        'lines.linewidth': .4,
-        'lines.markersize': .8,
-        'patch.linewidth': .5,
-        "axes.spines.left": True,
-        "axes.spines.bottom": True,
-        "axes.spines.right": True,
-        "axes.spines.top": True,
-        "axes.linewidth": .125,
-        "grid.linewidth": .2,
-        "font.size": 7,
-        "axes.labelsize": 9,
-        "axes.titlesize": 9,
-        "xtick.labelsize": 5,
-        "ytick.labelsize": 5,
-        "legend.fontsize": 7,
-        "legend.title_fontsize": 9,
-        "xtick.bottom": True,
-        "xtick.top": False,
-        "ytick.left": True,
-        "ytick.right": False,
-        "xtick.major.width": .125,
-        "ytick.major.width": .125,
-        "xtick.minor.width": .125,
-        "ytick.minor.width": .125,
-        "xtick.major.size": 2,
-        "ytick.major.size": 2,
-        "xtick.minor.size": 1,
-        "ytick.minor.size": 1,
-        "xtick.direction": 'in',
-        "ytick.direction": 'in',
+    'axes.facecolor': 'w',
+    #
+    "xtick.direction": 'in',
+    "ytick.direction": 'in',
+    #
+    "axes.spines.left": False,
+    "axes.spines.bottom": True,
+    "axes.spines.right": True,
+    "axes.spines.top": False,
+    #
+    "xtick.bottom": True,
+    "xtick.top": False,
+    "ytick.left": True,
+    "ytick.right": False,
     }
+snsRCParams.update(customSeabornContexts[snsContext])
 mplRCParams = {
-    'figure.titlesize': 14,
-    'font.family': "Nimbus Sans",
+    'figure.dpi': useDPI, 'savefig.dpi': useDPI,
+    #
+    'axes.titlepad': customSeabornContexts[snsContext]['font.size'] * 0.5 + 2.,
+    'axes.labelpad': 0.75,
+    #
+    'figure.subplot.left': 0.02,
+    'figure.subplot.right': 0.98,
+    'figure.subplot.bottom': 0.02,
+    'figure.subplot.top': 0.98,
+    #
     'pdf.fonttype': 42,
     'ps.fonttype': 42,
     }
-sns.set(
-    context='talk', style='white',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True, rc=snsRCParams)
-for rcK, rcV in mplRCParams.items():
-    matplotlib.rcParams[rcK] = rcV
 
+styleOpts = {
+    'legend.lw': 2,
+    'tight_layout.pad': 2.,
+    'panel_heading.pad': 1.
+    }
+
+for rcK, rcV in mplRCParams.items():
+    mpl.rcParams[rcK] = rcV
+
+sns.set(
+    context=snsContext, style='white',
+    palette='dark', font='sans-serif',
+    color_codes=True, rc=snsRCParams)
 
 print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 for arg in sys.argv:
@@ -268,17 +269,18 @@ if __name__ == '__main__':
         detrendType = detrendLookup[arguments['plotSuffix']]
     else:
         detrendType = 'noDetrend'
-    if detrendType == 'perTrial':
-        for name, group in dataDF.groupby(['expName', 't']):
+    if detrendType != 'noDetrend':
+        if detrendType == 'perTrial':
+            groupNamesForDetrend = ['expName', 't']
+        elif detrendType == 'global':
+            groupNamesForDetrend = ['expName']
+        else:
+            groupNamesForDetrend = ['expName']
+        for name, group in dataDF.groupby(groupNamesForDetrend):
             tBins = group.index.get_level_values('bin')
-            baselineTMask = (tBins >= -500e-3) & (tBins <= -200e-3)
+            baselineTMask = (tBins >= -300e-3) & (tBins <= -150e-3)
             baseline = group.loc[baselineTMask, :].mean()
             dataDF.loc[group.index, :] = group - baseline
-    elif detrendType == 'global':
-        tBins = dataDF.index.get_level_values('bin')
-        baselineTMask = (tBins >= -500e-3) & (tBins <= -200e-3)
-        baseline = dataDF.loc[baselineTMask, :].mean()
-        dataDF = dataDF - baseline
     #
     tMask = pd.Series(True, index=trialInfo.index)
     if arguments['winStop'] is not None:
@@ -291,7 +293,7 @@ if __name__ == '__main__':
         del tMask
     #
     tBins = trialInfo['bin'].unique()
-    targetFrameLen = 2 * useDPI * relplotKWArgs['height'] * relplotKWArgs['aspect'] # nominal num. points per facet
+    targetFrameLen = 2 * useDPI * relplotKWArgs['height'] * relplotKWArgs['aspect']  # nominal num. points per facet
     if tBins.shape[0] > targetFrameLen:
         skipFactor = int(np.ceil(tBins.shape[0] // targetFrameLen))
         tMask2 = trialInfo['bin'].isin(tBins[::skipFactor])
@@ -336,7 +338,7 @@ if __name__ == '__main__':
                     'expName', 'segment',
                     'originalIndex', 't'],
                 textOpts=dict(
-                    ha='left', va='bottom', fontsize=2,
+                    ha='center', va='center', fontsize=2,
                     c=(0., 0., 0., 0.7),
                     bbox=dict(
                         boxstyle="square",
@@ -461,7 +463,7 @@ if __name__ == '__main__':
                 ####
                 # if plotDF['freqBandName'].unique()[0] != 'beta':
                 #     continue
-                print('plotDF.columns = {}'.format(plotDF.columns))
+                # print('plotDF.columns = {}'.format(plotDF.columns))
                 rowColArgs = {}
                 for axn in ['row', 'col']:
                     if rowColOpts['{}Name'.format(axn)] is not None:
@@ -470,6 +472,7 @@ if __name__ == '__main__':
                             rowColArgs['{}_order'.format(axn)] = [n for n in rowColOpts['{}Order'.format(axn)] if n in plotDF[rowColArgs[axn]].to_list()]
                         else:
                             rowColArgs['{}_order'.format(axn)] = [n for n in np.unique(plotDF[rowColArgs[axn]])]
+                # pdb.set_trace()
                 g = sns.relplot(
                     x='bin', y='signal',
                     **rowColArgs, **relplotKWArgs, data=plotDF)
@@ -553,7 +556,8 @@ if __name__ == '__main__':
                 else:
                     plt.close()
                 pageCount += 1
-                print('Plotted page {}: {}, {}'.format(pageCount, colGroupName, idxGroupName))
+                gc.collect()
+                prf.print_memory_usage('Plotted page {}: {}, {}'.format(pageCount, colGroupName, idxGroupName))
                 if limitPages is not None:
                     if pageCount > limitPages:
                         break

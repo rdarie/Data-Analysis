@@ -61,8 +61,9 @@ def shadeTaskEpochsPerFacet(g, ro, co, hu, dataSubset):
 #
 exampleLaplaceChannelListStr = ', '.join([
     "'utah_csd_{}{}#0'".format(cn, fb) for fb, cn in product(
-        ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb'],
-        [2, 8] # 2, 8, 17, 35
+        # ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb'],
+        ['', '_beta', '_gamma'],
+        [8] # 2, 8, 17, 35, 38
     )])
 exampleLfpChannelListStr = ', '.join([
     "'utah{}{}#0'".format(cn, fb) for fb, cn in product(
@@ -203,8 +204,8 @@ argumentsLookup = {
         'recalcStats': True,
         'winStart': '-125', 'winStop': '225', 'limitPages': None,
         'unitQuery': None,
-        # 'alignQuery': "((trialRateInHz == 0.) | (trialRateInHz == 100.)) & (pedalMovementCat == 'outbound')",
-        'alignQuery': "(trialRateInHz == 0.) & (pedalMovementCat == 'outbound')",
+        'alignQuery': "((trialRateInHz == 0.) | (trialRateInHz == 100.)) & (pedalMovementCat == 'outbound')",
+        # 'alignQuery': "(trialRateInHz == 0.) & (pedalMovementCat == 'outbound')",
         'individualTraces': False, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
         'rowName': 'yCoords', 'rowControl': '',
@@ -216,7 +217,7 @@ argumentsLookup = {
     'factor_illustration': {
         'recalcStats': True,
         'winStart': '-200', 'winStop': '300', 'limitPages': None,
-        'unitQuery': "chanName.isin(['fa_all001#0', 'fa_all002#0', 'fa_all003#0', 'fa_all004#0'])",
+        'unitQuery': None,   #  "chanName.isin(['ica_all001#0', 'ica_all002#0', 'ica_all003#0', 'ica_all004#0', 'ica_all005#0'])",
         # 'alignQuery': None,
         # 'unitQuery': None,
         'individualTraces': False, 'overlayStats': False,
@@ -273,11 +274,11 @@ argumentsLookup = {
         # 'alignQuery': "(trialRateInHz.isin([100.])) & (pedalMovementCat == 'outbound')",
         'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
-        'colName': 'stimCondition', 'colControl': '',
+        'rowName': 'stimCondition', 'rowControl': '',
         # 'rowOrder':
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
-        'rowOrder': [
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
            'NA_NA',
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
@@ -301,7 +302,7 @@ argumentsLookup = {
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
             ],
-        # 'groupPagesByColumn': 'feature',
+        'groupPagesByColumn': 'feature',
         # 'groupPagesByIndex': 'stimCondition',
         'sizeName': '', 'sizeControl': '',
         'styleName': '', 'styleControl': ''},
@@ -310,11 +311,10 @@ argumentsLookup = {
         'winStart': '-200', 'winStop': '225', 'limitPages': None,
         'unitQuery': None, 'alignQuery': None,
         'individualTraces': False, 'overlayStats': False,
-        'colName': 'stimCondition', 'colControl': '',
-        # 'rowOrder':
+        'rowName': 'stimCondition', 'rowControl': '',
         'hueName': 'trialAmplitude', 'hueControl': '',
-        'rowName': 'kinematicConditionNoSize', 'rowControl': '',
-        'rowOrder': [
+        'colName': 'kinematicConditionNoSize', 'colControl': '',
+        'colOrder': [
            'NA_NA',
             'CW_outbound', 'CW_return',
             'CCW_outbound', 'CCW_return',
@@ -325,7 +325,7 @@ argumentsLookup = {
         'styleName': '', 'styleControl': ''},
     'mahal_per_trial_illustration': {
         'recalcStats': True,
-        'winStart': '-200', 'winStop': '300', 'limitPages': None,
+        'winStart': '-200', 'winStop': '-20', 'limitPages': None,
         'unitQuery': None, 'alignQuery': None,
         'individualTraces': True, 'overlayStats': False,
         'hueName': 'trialAmplitude', 'hueControl': '',
@@ -362,10 +362,11 @@ argumentsLookup['laplace_aucNoStim_illustration']['alignQuery'] = "(trialRateInH
 #"(trialRateInHz == 0.) & (pedalMovementCat == 'outbound')"
 #
 argumentsLookup['laplace_spectral_auc_illustration'] = argumentsLookup['laplace_spectral_illustration'].copy()
+'''
 argumentsLookup['laplace_spectral_auc_illustration']['groupPagesByColumn'] = 'parentFeature'
 argumentsLookup['laplace_spectral_auc_illustration']['groupPagesByIndex'] = 'stimCondition'
 argumentsLookup['laplace_spectral_auc_illustration']['colName'] = 'feature'
-#
+'''
 argumentsLookup['laplace_spectral_aucNoStim_illustration'] = argumentsLookup['laplace_spectral_auc_illustration'].copy()
 argumentsLookup['laplace_spectral_aucNoStim_illustration']['groupPagesByColumn'] = 'parentFeature'
 argumentsLookup['laplace_spectral_aucNoStim_illustration']['groupPagesByIndex'] = 'stimCondition'
@@ -603,7 +604,8 @@ plotProcFunsLookup = {
                     'CCW_return': 0.}
                 },
             includeLeft=True, includeRight=False,
-            addTitle=True, titleFontOpts=dict(fontweight='bold')),
+            addTitle=True, titleFontOpts=dict(
+                x=-100e-3, fontweight='bold')),
         asp.genPedalPosAdder(
             autoscale=True,
             yMin=1.06, yMax=1.14,
@@ -635,7 +637,8 @@ plotProcFunsLookup = {
                     }
                 },
             includeLeft=True, includeRight=False,
-            addTitle=True, titleFontOpts=dict(fontweight='bold')),
+            addTitle=True, titleFontOpts=dict(
+                x=-100e-3, fontweight='bold')),
         asp.genPedalPosAdder(
             autoscale=True,
             yMin=1.06, yMax=1.14,
@@ -680,6 +683,14 @@ plotProcFunsLookup = {
         asp.genVLineAdder([0], {'color': 'c', 'alpha': 0.5}),
         asp.genHLineAdder([0], {'color': '.1', 'alpha': 0.5, 'ls': '--'}),
         # asp.genTitleChanger(titleLabelLookup)
+        asp.genGridAnnotator(
+            xpos=.9, ypos=.9, template='{}',
+            colNames=['feature'],
+            textOpts={
+                'fontsize': 5,
+                'verticalalignment': 'top',
+                'horizontalalignment': 'right'
+            }, shared=False)
         ],
     'factor_illustration': [
         #shadeAUCEpochsPerFacet,
@@ -717,7 +728,8 @@ plotProcFunsLookup = {
                 'ymin': 0.96, 'ymax': 0.99},
             tOnset=0., tOffset=250e-3,
             includeLeft=True, includeRight=False,
-            addTitle=True, titleFontOpts=dict(fontweight='bold')),
+            addTitle=True, titleFontOpts=dict(
+                x=-100e-3, fontweight='bold')),
         asp.genPedalPosAdder(
             autoscale=True,
             yMin=0.86, yMax=0.94,
@@ -750,9 +762,9 @@ plotProcFunsLookup = {
             tOnset=0., tOffset=250e-3,
             includeLeft=True, includeRight=False,
             addTitle=True, titleFontOpts=dict(
-                x=-125e-3, fontweight='bold', va='center')),
+                x=-100e-3, fontweight='bold', va='center')),
         asp.genPedalPosAdder(
-            autoscale=True, tStart=-125e-3,
+            autoscale=True, tStart=-100e-3,
             yMin=0.86, yMax=0.94,
             plotOptsMain=dict(lw=.5, c='k'),
             plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),
@@ -762,7 +774,9 @@ plotProcFunsLookup = {
     'laplace_spectral_illustration': [
         asp.genAUCEpochShader(
             span=(-100e-3, 200e-3),
-            commonPatchOpts={'alpha': 0.15, 'zorder': -100, 'facecolor': iteratorPalette.loc['B', 'color']}),
+            commonPatchOpts={
+                'alpha': 0.15, 'zorder': -100,
+                'facecolor': iteratorPalette.loc['B', 'color']}),
         asp.genGridFormatter(),
         asp.genXLimSetter(quantileLims=1),
         # asp.genAxTickRemover(y=True),
@@ -775,13 +789,15 @@ plotProcFunsLookup = {
                 'ymin': 0.96, 'ymax': 0.99},
             tOnset=0., tOffset=250e-3,
             includeLeft=True, includeRight=False,
-            addTitle=True, titleFontOpts=dict(fontweight='bold')),
+            addTitle=True, titleFontOpts=dict(
+                x=-100e-3, va='center', fontweight='bold')),
         asp.genPedalPosAdder(
-            autoscale=True,
+            autoscale=True, tStart=-100e-3,
             yMin=0.84, yMax=0.94,
             plotOptsMain=dict(lw=.5, c='k'),
             plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),
-            addTitle=True, titleFontOpts=dict(fontweight='bold')),
+            addTitle=True, titleFontOpts=dict(
+                fontweight='bold')),
         ],
     'mahal_illustration': [
         asp.genAUCEpochShader(
@@ -799,9 +815,10 @@ plotProcFunsLookup = {
                 'ymin': 0.96, 'ymax': 0.99},
             tOnset=0., tOffset=250e-3,
             includeLeft=True, includeRight=False,
-            addTitle=True, titleFontOpts=dict(fontweight='bold')),
+            addTitle=True, titleFontOpts=dict(
+                x=-100e-3, va='center', fontweight='bold')),
         asp.genPedalPosAdder(
-            autoscale=True,
+            autoscale=True, tStart=-100e-3,
             yMin=0.86, yMax=0.94,
             plotOptsMain=dict(lw=.5, c='k'),
             plotOptsBounds=dict(lw=.5, c='k', alpha=0.5, ls='--'),
@@ -894,29 +911,29 @@ relPlotKWArgsLookup = {
         'errorbar': None  # 'se'
     },
     'laplace_topo_illustration': {
-        'linewidth': 1.5, 'height': .8, 'aspect': 1,
+        'linewidth': .5, 'height': 2, 'aspect': 1.2,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'facet_kws': {'sharey': True, 'sharex': True},
         'errorbar': None,
         'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
-    },
+        },
     'factor_illustration': {
         'linewidth': .75, 'height': 2, 'aspect': 1.2,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': 'se'
-    },
+        },
     'laplace_illustration': {
         'linewidth': 1., 'height': 2, 'aspect': 1.2,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': 'se',
         'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
-    },
+        },
     'laplace_auc_illustration': {
-        'linewidth': 1., 'height': 2., 'aspect': 1.2,
+        'linewidth': 1., 'height': 3., 'aspect': 1.2,
         'palette': "ch:1.6,-.3,dark=.25,light=0.75,reverse=1",
         'facet_kws': {'sharey': True, 'sharex': True},
         'errorbar': None, 'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
-    },
+        },
     'laplace_spectral_illustration': {
         'linewidth': 1., 'height': 2, 'aspect': 1.2,
         'palette': "ch:0.,-.3,dark=.25,light=0.75,reverse=1",
@@ -927,31 +944,32 @@ relPlotKWArgsLookup = {
         'linewidth': .75, 'height': 2, 'aspect': 1.2,
         'palette': "ch:0.,-.3,dark=.25,light=0.75,reverse=1",
         'errorbar': 'se'
-    },
+        },
     'laplace_spectral_topo_illustration': {
-        'linewidth': 1.5, 'height': .8, 'aspect': 1,
+        'linewidth': 1., 'height': 2, 'aspect': 1.2,
         'palette': "ch:0.,-.3,dark=.25,light=0.75,reverse=1",
         'facet_kws': {'sharey': True, 'sharex': True},
         'errorbar': None,
         'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
-    },
+        },
     'mahal_illustration': {
-        'linewidth': 1., 'height': 2, 'aspect': 1.2,
+        'linewidth': 1., 'height': 2.5, 'aspect': 1.2,
         'facet_kws': {'sharey': True, 'sharex': True},
         'palette': "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1",
-        'errorbar': 'se', 'rasterized': False, 'solid_joinstyle': 'round', 'solid_capstyle': 'round',
-    },
+        'errorbar': 'se', 'rasterized': False,
+        'solid_joinstyle': 'round', 'solid_capstyle': 'round',
+        },
     'mahal_per_trial_illustration': {
-        'linewidth': .75, 'height': 2, 'aspect': 1.5,
+        'linewidth': .75, 'height': 3, 'aspect': 1.5,
         'palette': "ch:-0.8,-.3,dark=.25,light=0.75,reverse=1",
         'alpha': 0.5, 'errorbar': None,
-    },
+        },
     'rig_per_trial_illustration': {
         'linewidth': .75, 'height': 2, 'aspect': 1.5,
         'palette': "ch:0.8,-.3,dark=.25,light=0.75,reverse=1",
         'alpha': 0.5,
         'errorbar': None
-    }
+        }
     }
 # 'alignQuery': ,
 if argumentsLookup['laplace_spectral_topo_illustration']['alignQuery'] == "(trialRateInHz == 0.) & (pedalMovementCat == 'outbound')":
@@ -973,7 +991,7 @@ relPlotKWArgsLookup['laplace_spectral_auc_illustration']['aspect'] = 1.2
 #
 relPlotKWArgsLookup['mahal_auc_illustration'] = relPlotKWArgsLookup['laplace_auc_illustration'].copy()
 relPlotKWArgsLookup['mahal_auc_illustration']['palette'] = relPlotKWArgsLookup['mahal_illustration']['palette']
-relPlotKWArgsLookup['mahal_auc_illustration']['height'] = 2.
+relPlotKWArgsLookup['mahal_auc_illustration']['height'] = 3.
 relPlotKWArgsLookup['mahal_auc_illustration']['aspect'] = 1.2
 #
 relPlotKWArgsLookup['laplace_aucNoStim_illustration'] = relPlotKWArgsLookup['laplace_auc_illustration'].copy()
@@ -1219,17 +1237,17 @@ shareyAcrossPagesLookup = {
     }
 detrendLookup = {
     #
-    'laplace_illustration': 'perTrial',
-    'laplace_auc_illustration': 'perTrial',
-    'laplace_aucNoStim_illustration': 'perTrial',
+    'laplace_illustration': 'global',
+    'laplace_auc_illustration': 'global',
+    'laplace_aucNoStim_illustration': 'global',
     #
-    'mahal_illustration': 'perTrial',
-    'mahal_auc_illustration': 'perTrial',
-    'mahal_aucNoStim_illustration': 'perTrial',
+    'mahal_illustration': 'global',
+    'mahal_auc_illustration': 'global',
+    'mahal_aucNoStim_illustration': 'global',
     #
-    'laplace_spectral_illustration': 'perTrial',
-    'laplace_spectral_auc_illustration': 'perTrial',
-    'laplace_spectral_aucNoStim_illustration': 'perTrial',
+    'laplace_spectral_illustration': 'global',
+    'laplace_spectral_auc_illustration': 'global',
+    'laplace_spectral_aucNoStim_illustration': 'global',
     #
     'laplace_std_illustration': 'noDetrend',
 }
@@ -1253,11 +1271,11 @@ customCodeLookup = {
     'laplace_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'laplace_std_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'laplace_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
-    'mahal_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
-    'mahal_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
-    'laplace_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'mahal_auc_illustration': "arguments['rowOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'mahal_aucNoStim_illustration': "arguments['rowOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_auc_illustration': "arguments['rowOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'laplace_spectral_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
-    # 'laplace_spectral_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
+    'laplace_spectral_auc_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     # 'laplace_spectral_aucNoStim_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     'mahal_illustration': "arguments['colOrder'] = trialInfo.drop_duplicates().sort_values(['trialRateInHz', 'electrode'])['stimCondition'].unique().tolist()",
     }

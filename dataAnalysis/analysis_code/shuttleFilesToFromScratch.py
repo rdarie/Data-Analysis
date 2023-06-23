@@ -136,7 +136,9 @@ if arguments['fromDataToScratch']:
     originFolder, destinFolder = processedFolder, scratchFolder
 elif arguments['fromScratchToData']:
     originFolder, destinFolder = scratchFolder, processedFolder
-print('Moving items from {} to {}'.format(originFolder, destinFolder))
+
+print('{}\nMoving items from {} to {}\n{}'.format(
+    '*' * 50, originFolder, destinFolder, '*' * 50))
 
 if arguments['excludeSearchTerm'] is not None:
     itemsToExclude = glob.glob(
@@ -152,8 +154,8 @@ if arguments['preprocFolderFiles']:
         for itemName in os.listdir(originFolder)
         if os.path.isfile(os.path.join(originFolder, itemName))
         ]
-    print('\nAbout to move:\n')
-    print('\n'.join(itemsToMove))
+    # print('\nAbout to move:\n')
+    # print('\n'.join(itemsToMove))
     if arguments['requireKeypress']:
         _ = input('\n********\nPress any key to continue.')
     for itemName in os.listdir(originFolder):
@@ -174,8 +176,8 @@ if arguments['preprocFolderSubfolders']:
         for itemName in os.listdir(originFolder)
         if os.path.isdir(os.path.join(originFolder, itemName))
         ]
-    print('\nAbout to move:\n')
-    print('\n'.join(itemsToMove))
+    # print('\nAbout to move:\n')
+    # print('\n'.join(itemsToMove))
     if arguments['requireKeypress']:
         _ = input('\n********\nPress any key to continue.')
     for itemName in os.listdir(originFolder):
@@ -207,9 +209,10 @@ if arguments['searchTerm'] is not None:
         for itemName in itemsToMoveFullPath
         if (itemName not in itemsToExclude) and (os.path.isdir(itemName)) and arguments['foldersIncluded']
         ]
+    # pdb.set_trace()
     if len(folderNamesToMove):
-        print('\nAbout to move:\n')
-        print('\n'.join(folderNamesToMove))
+        # print('\nAbout to move:\n')
+        # print('\n'.join(folderNamesToMove))
         if arguments['requireKeypress']:
             _ = input('\n********\nPress any key to continue.')
         for itemName in folderNamesToMove:
@@ -225,8 +228,8 @@ if arguments['searchTerm'] is not None:
                 shutil.copytree(originPath, destinPath)
             print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
     if len(fileNamesToMove):
-        print('\nAbout to move:\n')
-        print('\n'.join(fileNamesToMove))
+        # print('\nAbout to move:\n')
+        # print('\n'.join(fileNamesToMove))
         if arguments['requireKeypress']:
             _ = input('\n********\nPress any key to continue.')
         for itemName in fileNamesToMove:

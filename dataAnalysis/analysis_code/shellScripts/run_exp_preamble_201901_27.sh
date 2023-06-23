@@ -16,12 +16,6 @@ python --version
 
 export OUTDATED_IGNORE=1
 
-# EXP="exp201901221000"
-# has 1 minirc 2-3 motion
-# EXP="exp201901231000"
-# has 1 motion
-# EXP="exp201901240900"
-# has 1 minirc 2 motion
 # EXP="exp201901251000"
 # has 1 minirc 2 motion
 # EXP="exp201901261000"

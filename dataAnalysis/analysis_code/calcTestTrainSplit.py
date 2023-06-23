@@ -80,7 +80,7 @@ analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
 cvIteratorSubfolder = os.path.join(
     alignSubFolder, 'testTrainSplits')
 if not(os.path.exists(cvIteratorSubfolder)):
-    os.makedirs(cvIteratorSubfolder)
+    os.makedirs(cvIteratorSubfolder, exist_ok=True)
 dataFramesFolder = os.path.join(
     analysisSubFolder, 'dataframes'
     )
@@ -273,9 +273,9 @@ if (not arguments['loadFromFrames']):
                 else:
                     deltaT = 0
                 groupBins = group.index.get_level_values('bin')
-                print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
+                # print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
-                print('targetMask covers {}/{} samples'.format(targetMask.sum(), targetMask.shape[0]))
+                # print('targetMask covers {}/{} samples'.format(targetMask.sum(), targetMask.shape[0]))
             ######## also discard trials labeled as no stim that have stim from previous trials bleeding through
             if 'electrode' in dataDF.index.names:
                 noStimMask = dataDF.index.get_level_values('electrode') == 'NA'

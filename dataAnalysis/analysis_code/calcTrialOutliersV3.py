@@ -392,6 +392,7 @@ if __name__ == "__main__":
         elif mapExt == 'map':
             mapDF = prb_meta.mapToDF(electrodeMapPath)
     print('loading {}'.format(triggeredPath))
+    pdb.set_trace()
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
     dataDF = ns5.alignedAsigsToDF(

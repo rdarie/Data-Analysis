@@ -16,30 +16,13 @@ python --version
 
 export OUTDATED_IGNORE=1
 
-# EXP="exp201901221000"
-# has 1 minirc 2-3 motion
-# EXP="exp201901231000"
-# has 1 motion
-# EXP="exp201901240900"
-# has 1 minirc 2 motion
 # EXP="exp201901251000"
 # has 1 minirc 2 motion
 # EXP="exp201901261000"
 # has 1-3 motion 4 minirc
 # EXP="exp201901271000"
 # has 1-4 motion 5 minirc
-# EXP="exp201901281200"
-# has 1-4 motion
-# EXP="exp201901291000"
-# has 1-3 motion
-# EXP="exp201901301000"
-# has 1-3 motion 4 minirc
-# EXP="exp201901311000"
-# has 1-4 motion 5 minirc
-# EXP="exp201902010900"
-#  has 1-4 motion 5 minirc
-# EXP="exp201902021100"
-# has 3-5 motion 6 minirc; blocks 1 and 2 were bad;
+#
 # EXP="exp201902031100"
 # has 1-4 motion 5 minirc;
 # EXP="exp201902041100"

@@ -26,6 +26,7 @@ if arguments['plotting']:
     sns.set_color_codes("dark")
     sns.set_context("notebook")
     sns.set_style("white")
+
 from tqdm import tqdm
 from neo.io import NixIO, nixio_fr, BlackrockIO
 import pandas as pd

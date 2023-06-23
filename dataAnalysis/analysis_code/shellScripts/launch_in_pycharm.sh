@@ -18,4 +18,4 @@ python --version
 
 export OUTDATED_IGNORE=1
 
-/gpfs/home/rdarie/pycharm/pycharm-community-2020.2.3/bin/pycharm.sh
+/gpfs/home/rdarie/pycharm-community-2022.3.2/bin/pycharm.sh

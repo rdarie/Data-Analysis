@@ -1,11 +1,11 @@
 from sklearn.base import TransformerMixin, BaseEstimator, RegressorMixin
-# from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, FastICA
 from sklearn.model_selection import (
     cross_val_score, cross_validate,
     GridSearchCV, StratifiedKFold, ShuffleSplit, StratifiedShuffleSplit)
 # from imblearn.over_sampling import RandomOverSampler
 # from sklearn.model_selection._split import _BaseKFold
-# from sklearn.metrics import make_scorer
+from sklearn.metrics import make_scorer, get_scorer
 from sklearn.base import clone
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, PowerTransformer
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance, MinCovDet
@@ -1083,7 +1083,6 @@ class trialAwareStratifiedKFold:
         #
         requestedZeroTestSize = (self.sampler.test_size == 0)
         notEnoughSamples = np.around(stratifyGroup.shape[0] * self.sampler.test_size) < stratifyGroup['stratifyGroup'].nunique()
-        # pdb.set_trace()
         if (notEnoughSamples) and (not requestedZeroTestSize):
             print('#' * 50)
             print('Setting sampler to ShuffleSplit')
@@ -1926,6 +1925,38 @@ class MinCovDetTransformer(MinCovDet, TransformerMixin):
 
     def transform(self, X):
         return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
+
+
+class ScoredFastICA(FastICA):
+    def __init__(
+            self, score_fun=None, n_components=None, algorithm='parallel', whiten='warn', fun='logcosh',
+            fun_args=None, max_iter=200, tol=0.0001, w_init=None, random_state=None):
+        if score_fun is None:
+            self.score_fun = r2_score
+        else:
+            self.score_fun = score_fun
+        FastICA.__init__(
+            self, n_components=n_components, algorithm=algorithm, whiten=whiten, fun=fun,
+            fun_args=fun_args, max_iter=max_iter, tol=tol, w_init=w_init, random_state=random_state)
+
+    def score(self, X, y=None):
+        """
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            The data.
+        y : Ignored
+            Ignored.
+        Returns
+        -------
+        goodness_of_fit : float
+            Average goodness of fit of reconstruction using the defined scoring metric
+        """
+        S_ = self.transform(X)  # Reconstruct signals
+        A_ = self.mixing_  # Get estimated mixing matrix
+        X_bar = np.dot(S_, A_.T) + self.mean_
+        goodness_of_fit = self.score_fun(X, X_bar)
+        return goodness_of_fit
 
 class LedoitWolfTransformer(LedoitWolf, TransformerMixin):
     def __init__(self, maxNSamples=None, **kwds):

@@ -24,12 +24,11 @@
 #SBATCH --array=999
 
 # SLURM_ARRAY_TASK_ID=2
-# exps=(201901_25 201902_03)
+# exps=(201901_25 201902)
 # exps=(202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 
 exps=(202102_02)
-for A in "${exps[@]}"
-do
+for A in "${exps[@]}"; do
   source ./shellScripts/run_exp_preamble_$A.sh
   source ./shellScripts/calc_aligned_motion_preamble.sh
   #
@@ -39,30 +38,35 @@ do
   #
   # SELECTIONLIST="laplace_spectral_baseline, laplace_baseline"
   SELECTIONLIST="laplace_spectral_scaled, laplace_scaled, laplace_spectral_scaled_mahal_ledoit, laplace_scaled_mahal_ledoit"
-  #
-  # exp201901251000, exp201902031100
+  EXPLIST_RUPERT="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100"
+  EXPLIST_MURDOC="exp201901271000, exp201902031100"
+  # exp201901271000, exp201902031100
   # exp202101201100, exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100
   # exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100
   # exp202101281100, exp202102021100, exp202101211100,
+
+  EXPLIST_RUPERT="exp202101271100"
+  EXPLIST_MURDOC="exp201901271000"
+  SELECTIONLIST="lfp_spectral, lfp"
   #######
   ## plotSuffixes=(all move_E09 E04 rest_stim outbound_stim outbound_no_move best_three)
   #
-  # python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=all        --freqBandGroup=2 --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
-  # python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=best_three --freqBandGroup=2 --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+  python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=all --freqBandGroup=1 --expList="${EXPLIST_RUPERT}" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+  python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=all --freqBandGroup=1 --expList="${EXPLIST_MURDOC}" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
   #
-  freqBandGroupings=(0 1 2 3 4)
-  for fbg in "${freqBandGroupings[@]}"
-  do
+  freqBandGroupings=(1)
+  for fbg in "${freqBandGroupings[@]}"; do
     echo $fbg
-    # python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=move_E09     --freqBandGroup=$fbg --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
-    # python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=rest_E04     --freqBandGroup=$fbg --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
-    # python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=outbound_E04 --freqBandGroup=$fbg --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+    # python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=move_E09       --freqBandGroup=$fbg --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+    # python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=return_E04     --freqBandGroup=$fbg --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
+    # python -u "./plotSignalRecruitmentAcrossExpV5.py" --plotSuffix=outbound_E04   --freqBandGroup=$fbg --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --selectionList="${SELECTIONLIST}" $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR $ALIGNQUERY
   done
-  ###  all E04
-  plotSuffixes=(best_three all E04)
-  for PS in "${plotSuffixes[@]}"
-  do
-    echo $PS
-    # python -u "./compareSignalCovarianceMatricesAcrossExp.py" --plotSuffix=$PS --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --targetList="laplace_spectral_scaled, laplace_scaled" --iteratorSuffixList="ca, cb, ccs, ccm" --estimatorName="mahal_ledoit" --datasetPrefix="Block_XL_df" $BLOCKSELECTOR $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR
+  ### all E04
+  plotSuffixes=(E04)
+  for fbg in "${freqBandGroupings[@]}"; do
+    for PS in "${plotSuffixes[@]}"; do
+      echo $PS
+      # python -u "./compareSignalCovarianceMatricesAcrossExp.py" --freqBandGroup=$fbg --plotSuffix=$PS --expList="exp202101281100, exp202102021100, exp202101221100, exp202101251100, exp202101271100, exp202101211100" --targetList="laplace_spectral_scaled, laplace_scaled" --iteratorSuffixList="ca, cb, ccs, ccm" --estimatorName="mahal_ledoit" --datasetPrefix="Block_XL_df" $BLOCKSELECTOR $ANALYSISFOLDER $ALIGNFOLDER $UNITSELECTOR
+    done
   done
 done

@@ -27,9 +27,9 @@
 #SBATCH --array=999
 
 # SLURM_ARRAY_TASK_ID=2
-# 201902_03
+# 201902
 # exps=(201901_27 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
-exps=(202101_22)
+exps=(202101_21)
 # export CCV_HEADLESS=1
 for A in "${exps[@]}"
 do
@@ -48,6 +48,6 @@ do
   RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=${TARGET}"
   LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
   #--------------------------------------------------#
-  python -u './prepSignalsAsRegressorBSpline.py' --transformerNameRhs="${DIMRED}" --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
+  # python -u './prepSignalsAsRegressorBSpline.py' --transformerNameRhs="${DIMRED}" --debugging --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=1
   #--------------------------#
   done

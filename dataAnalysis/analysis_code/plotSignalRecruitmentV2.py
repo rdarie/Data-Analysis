@@ -286,21 +286,43 @@ ampStatsDF.loc[:, 'coef_abs'] = ampStatsDF['coef'].abs()
 #     [i for i in range(nFeatsToPlot)] +
 #     [i for i in range(-1 * nFeatsToPlot, 0)]
 #     )
-stimRankDF = ampStatsDF.xs('trialAmplitude', level='names').groupby(['freqBandName', 'feature'])['coefStd'].mean().to_frame(name='stimCoef')
-stimRankDF = stimRankDF / stimRankDF.abs().max()
-interactionRankDF = ampStatsDF.xs('trialAmplitude:trialRateInHz', level='names').groupby(['freqBandName', 'feature'])['coefStd'].mean().to_frame(name='interactCoef')
-interactionRankDF = interactionRankDF / interactionRankDF.abs().max()
-relativeRankDF = relativeStatsDF.groupby(['freqBandName', 'feature'])['T_abs'].max().to_frame(name='relativeAbsT')
-relativeRankDF = relativeRankDF / relativeRankDF.abs().max()
-relativeRankTDF = relativeStatsDF.groupby(['freqBandName', 'feature'])['T'].mean().to_frame(name='relativeT')
-relativeNoStimRankDF = relativeStatsNoStimDF.groupby(['freqBandName', 'feature'])['T_abs'].max().to_frame(name='relativeNoStimAbsT')
-relativeNoStimRankDF = relativeNoStimRankDF / relativeNoStimRankDF.max()
-relativeNoStimTRankDF = relativeStatsNoStimDF.groupby(['freqBandName', 'feature'])['T'].mean().to_frame(name='relativeNoStimT')
-exportRankDF = pd.concat([
-    stimRankDF, interactionRankDF, relativeRankDF, relativeNoStimRankDF, relativeRankTDF, relativeNoStimTRankDF
-    ], axis='columns')
-exportRankDF.loc[:, 'stimSlopeScore'] = (exportRankDF['stimCoef'] * exportRankDF['interactCoef']).abs()
-exportRankDF.sort_values('relativeNoStimT', inplace=True, ascending=False)
+listOfRankDFsToConcat = []
+try:
+    stimRankDF = ampStatsDF.loc[ampStatsDF['reject'], :].xs('trialAmplitude', level='names').groupby(['freqBandName', 'feature'])['coefStd'].mean().to_frame(name='stimCoef')
+    stimRankDF = stimRankDF / stimRankDF.abs().max()
+    listOfRankDFsToConcat.append(stimRankDF)
+except:
+    print('Warning!')
+    traceback.print_exc()
+try:
+    interactionRankDF = ampStatsDF.loc[ampStatsDF['reject'], :].xs('trialAmplitude:trialRateInHz', level='names').groupby(['freqBandName', 'feature'])['coefStd'].mean().to_frame(name='interactCoef')
+    interactionRankDF = interactionRankDF / interactionRankDF.abs().max()
+    listOfRankDFsToConcat.append(interactionRankDF)
+except:
+    print('Warning!')
+    traceback.print_exc()
+try:
+    relativeRankDF = relativeStatsDF.loc[relativeStatsDF['reject'], :].groupby(['freqBandName', 'feature'])['T_abs'].max().to_frame(name='relativeAbsT')
+    relativeRankDF = relativeRankDF / relativeRankDF.abs().max()
+    listOfRankDFsToConcat.append(relativeRankDF)
+    relativeRankTDF = relativeStatsDF.loc[relativeStatsDF['reject'], :].groupby(['freqBandName', 'feature'])['T'].mean().to_frame(name='relativeT')
+    listOfRankDFsToConcat.append(relativeRankTDF)
+except:
+    print('Warning!')
+    traceback.print_exc()
+try:
+    relativeNoStimRankDF = relativeStatsNoStimDF.loc[relativeStatsNoStimDF['reject'], :].groupby(['freqBandName', 'feature'])['T_abs'].max().to_frame(name='relativeNoStimAbsT')
+    relativeNoStimRankDF = relativeNoStimRankDF / relativeNoStimRankDF.max()
+    listOfRankDFsToConcat.append(relativeNoStimRankDF)
+    relativeNoStimTRankDF = relativeStatsNoStimDF.loc[relativeStatsNoStimDF['reject'], :].groupby(['freqBandName', 'feature'])['T'].mean().to_frame(name='relativeNoStimT')
+    listOfRankDFsToConcat.append(relativeNoStimTRankDF)
+except:
+    print('Warning!')
+    traceback.print_exc()
+exportRankDF = pd.concat(listOfRankDFsToConcat, axis='columns')
+if 'interactCoef' in exportRankDF.columns:
+    exportRankDF.loc[:, 'stimSlopeScore'] = (exportRankDF['stimCoef'] * exportRankDF['interactCoef']).abs()
+    exportRankDF.sort_values('interactCoef', inplace=True, ascending=False)
 exportRankDF.to_html(rankHtmlPath)
 # rankHtmlPath
 nFreqs = np.unique(relativeStatsDF.index.get_level_values('freqBandName')).shape[0]
@@ -325,11 +347,19 @@ for freqBandName, relativeStatsThisFB in relativeStatsDF.loc[rankMask, :].groupb
 manualOverride = True
 if manualOverride:
     manualOverrideList = ['mahal_ledoit_{}'.format(sfx) for sfx in ['all', 'alpha', 'beta', 'gamma', 'higamma', 'spb']]
-    manualOverrideList += ['utah_csd_2{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    # manualOverrideList += ['utah_csd_17{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
     manualOverrideList += ['utah_csd_8{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
-    manualOverrideList += ['utah_csd_35{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
-    manualOverrideList += ['utah_csd_17{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
-    keepColsForPlot = [cN for cN in relativeStatsDF.groupby('feature').groups.keys() if cN in manualOverrideList]
+    manualOverrideList += ['utah_csd_2{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    manualOverrideList += ['utah_csd_81{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    manualOverrideList += ['utah_csd_60{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    #
+    manualOverrideList += ['utah8{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    manualOverrideList += ['utah2{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    manualOverrideList += ['utah81{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+    manualOverrideList += ['utah60{}'.format(sfx) for sfx in ['', '_alpha', '_beta', '_gamma', '_higamma', '_spb']]
+
+keepColsForPlot = [cN for cN in relativeStatsDF.groupby('feature').groups.keys() if cN in manualOverrideList]
+# pdb.set_trace()
 ########################################################################################################################
 print('Plotting select features:')
 print(', '.join(["'{}#0'".format(fN) for fN in keepColsForPlot]))
@@ -1460,7 +1490,6 @@ with PdfPages(pdfPath) as pdf:
             noStimStatsForPlot.loc[:, 'kinAndElecCondition'] = noStimStatsForPlot.apply(lambda x: '{}_{}'.format(x['electrode'], x['A']), axis='columns')
             noStimStatsForPlot.loc[:, 'trialRateInHzStr'] = noStimStatsForPlot['trialRateInHz'].apply(lambda x: '{}'.format(x))
             noStimStatsForPlot.loc[noStimStatsForPlot['isMahalDist'], 'trialRateInHzStr'] += '_md'
-            # pdb.set_trace()
             # plotRelativeStatsDF.loc[(plotRelativeStatsDF['stimCondition'] == 'NA_0.0').to_numpy(), :]
             allRelativeStatsForPlot = pd.concat([plotRelativeStatsDF, noStimStatsForPlot.loc[:, plotRelativeStatsDF.columns]], ignore_index=True)
             # allRelativeStatsForPlot['hedges'].min(), allRelativeStatsForPlot['hedges'].max()
@@ -1477,7 +1506,7 @@ with PdfPages(pdfPath) as pdf:
                     for statIdx, statName in enumerate(['hedges', 'T']):
                         fig, ax = plt.subplots(
                             numKinC, numStimC + 1,
-                            figsize=(6 * numKinC, 6 * numStimC + .6),
+                            figsize=(6 * numKinC, 12 * numStimC),
                             gridspec_kw={
                                 'width_ratios': [10] * numStimC + [1],
                                 'wspace': 0.1}
@@ -1495,7 +1524,7 @@ with PdfPages(pdfPath) as pdf:
                             heatMapKWs = dict(
                                 vmin=vMin, vmax=vMax, center=0.,  fmt='s',
                                 linewidths=0, cmap=statPalettes[statIdx],
-                                annot=ann2D, annot_kws=dict(fontsize=5.),
+                                annot=ann2D, annot_kws=dict(fontsize=15),
                                 xticklabels=False, yticklabels=False, square=True
                                 )
                             if (kinIdx == cBarKinIdx) and (stimIdx == (cBarStimIdx - 1)):

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+sbatch shellScripts/step02_loaders/202101_27/alt_step02a_get_tts_stim.sh
+sbatch shellScripts/step02_loaders/202101_27/alt_step02b_get_tts_motion.sh
+sbatch shellScripts/step02_loaders/202101_27/alt_step02c_get_tts_control.sh
+
+sbatch shellScripts/step02_loaders/202101_28/alt_step02a_get_tts_stim.sh
+sbatch shellScripts/step02_loaders/202101_28/alt_step02b_get_tts_motion.sh
+sbatch shellScripts/step02_loaders/202101_28/alt_step02c_get_tts_control.sh

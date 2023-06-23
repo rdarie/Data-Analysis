@@ -95,7 +95,6 @@ globals().update(expOpts)
 globals().update(allOpts)
 #
 
-
 def calcRauc(
         partition,
         tStart=None, tStop=None,
@@ -134,7 +133,6 @@ def calcRauc(
     detrended = partitionData.loc[tMask, :].subtract(baseline, axis='columns')
     # plt.plot(partitionData.loc[tMask, :].abs().to_numpy()); plt.show()
     # plt.plot(detrended.abs().to_numpy(), c='b', alpha=0.3); plt.show()
-    #
     result = detrended.abs().mean()
     resultDF = pd.concat([partitionMeta.iloc[0, :], result]).to_frame(name=partition.index[0]).T
     resultDF.name = 'rauc'
@@ -194,6 +192,15 @@ if __name__ == "__main__":
         maskBaseline=False,
         baselineTStart=-300e-3, baselineTStop=-150e-3)
     #  End Overrides
+    # pdb.set_trace()
+    '''if 'mapDF' not in locals():
+        import dataAnalysis.helperFunctions.probe_metadata as prb_meta
+        electrodeMapPath = spikeSortingOpts['utah']['electrodeMapPath']
+        mapExt = electrodeMapPath.split('.')[-1]
+        if mapExt == 'cmp':
+            mapDF = prb_meta.cmpToDF(electrodeMapPath)
+        elif mapExt == 'map':
+            mapDF = prb_meta.mapToDF(electrodeMapPath)'''
     if not arguments['loadFromFrames']:
         pdfPath = os.path.join(
             figureOutputFolder,
@@ -294,11 +301,14 @@ if __name__ == "__main__":
         trialInfo.loc[trialInfo['controlFlag'] == 'control', 'bin'] -= deltaB
         dataDF.index = pd.MultiIndex.from_frame(trialInfo)
         ### detrend as a group?
-        detrendAsGroup = True
+        detrendAsGroup = False
         if detrendAsGroup:
-            tMask = ((trialInfo['bin'] >= funKWArgs['baselineTStart']) & (trialInfo['bin'] < funKWArgs['baselineTStop']))
-            baseline = dataDF.loc[tMask.to_numpy(), :].median()
-            dataDF = dataDF.subtract(baseline, axis='columns')
+            groupNamesForDetrend = ['expName']
+            for name, group in dataDF.groupby(groupNamesForDetrend):
+                tBins = group.index.get_level_values('bin')
+                baselineTMask = (tBins >= funKWArgs['baselineTStart']) & (tBins <= funKWArgs['baselineTStop'])
+                baseline = group.loc[baselineTMask, :].median()
+                dataDF.loc[group.index, :] = group - baseline
     if os.path.exists(resultPath):
         print('Previous results found at {}. deleting...'.format(resultPath))
         os.remove(resultPath)
@@ -307,8 +317,8 @@ if __name__ == "__main__":
         os.remove(pdfPath)
     groupNames = ['originalIndex', 'segment', 't']
     daskComputeOpts = dict(
-        # scheduler='processes'
-        scheduler='single-threaded'
+        scheduler='processes'
+        # scheduler='single-threaded'
         )
     ####################################################################################
     # Remove amplitudes that were not tested across all movement types
@@ -332,6 +342,24 @@ if __name__ == "__main__":
             # dataDF.loc[maskForAmps.to_numpy(), :].index.to_frame().reset_index(drop=True)
             dataDF = dataDF.loc[~maskForAmps.to_numpy(), :]
     ####################################################################################
+    trimMurdocElectrodes = True
+    if (subjectName == 'Murdoc') and trimMurdocElectrodes:
+        trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+        hackMask1 = trialInfo['expName'].isin(['exp201901251000', 'exp201901261000', 'exp201901271000']).any()
+        if hackMask1:
+            dropMask1 = trialInfo['electrode'].isin(['-E09+E16', '-E00+E16']).to_numpy()
+            dropMask2 = (trialInfo['expName'].isin(['exp201901251000', 'exp201901261000']) & trialInfo['electrode'].isin(['NA'])).to_numpy()
+            dropMask = dropMask1 | dropMask2
+            dataDF = dataDF.loc[~dropMask, :]
+            trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+        hackMask2 = trialInfo['expName'].isin(['exp201902031100', 'exp201902041100', 'exp201902051100']).any()
+        if hackMask2:
+            # dropMask1 = trialInfo['electrode'].isin(['-E00+E16']).to_numpy()
+            dropMask = (trialInfo['expName'].isin(['exp201902031100', 'exp201902051100']) & trialInfo['electrode'].isin(['NA'])).to_numpy()
+            # dropMask = dropMask1 | dropMask2
+            dataDF = dataDF.loc[~dropMask, :]
+            trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+    #
     colFeatureInfo = dataDF.columns.copy()
     dataDF.columns = dataDF.columns.get_level_values('feature')
     rawRaucDF = ash.splitApplyCombine(
@@ -360,7 +388,7 @@ if __name__ == "__main__":
     for cN in dispersionDF.columns:
         dispersionDF.loc[:, cN] = dispersionDF[cN].astype(float)
     trialInfo = rawRaucDF.index.to_frame().reset_index(drop=True)
-    padStimNoMoveControl = True
+    padStimNoMoveControl = False
     if padStimNoMoveControl:
         paddingListRauc = [rawRaucDF]
         paddingListDisp = [dispersionDF]
@@ -415,14 +443,15 @@ if __name__ == "__main__":
     raucForExport.to_html(htmlOutputPath)
     ############
     dfRelativeTo = rawRaucDF
-    # referenceRaucDF = dfRelativeTo
+    referenceRaucDF = dfRelativeTo
+    '''
     referenceRaucDF = (
         dfRelativeTo
             .xs('NA', level='electrode', drop_level=False)
             .xs('NA_NA', level='kinematicCondition', drop_level=False)
             # .median()
-            )
-    qScaler = PowerTransformer()  # method='yeo-johnson'
+            )'''
+    qScaler = PowerTransformer()  # method='yeo-johnson' method='box-cox'
     qScaler.fit(referenceRaucDF)
     scaledRaucDF = pd.DataFrame(
         qScaler.transform(dfRelativeTo),
@@ -447,6 +476,7 @@ if __name__ == "__main__":
     # (rawRaucDF - rawRaucDF.clip(rawRaucDF.quantile(0.99), axis=1)).to_numpy()
     # (rawRaucDF.apply(lambda x: x.clip(upper=x.quantile(0.99))) - ).to_numpy()
     if infIndices.size > 0:
+        print('Dropping {} indices because they are large'.format(infIndices))
         scaledRaucDF.drop(infIndices, inplace=True)
         clippedRaucDF.drop(infIndices, inplace=True)
         clippedScaledRaucDF.drop(infIndices, inplace=True)
@@ -468,7 +498,7 @@ if __name__ == "__main__":
         columns=rawRaucDF.columns)
     scalers = pd.Series({'boxcox': qScaler, 'minmax': mmScaler, 'boxcox_minmax': mmScaler2})
     #
-    #
+    print('saving RAUC to \n{}'.format(resultPath))
     dispersionDF.to_hdf(resultPath, 'dispersion')
     rawRaucDF.to_hdf(resultPath, 'raw')
     scaledRaucDF.to_hdf(resultPath, 'boxcox')

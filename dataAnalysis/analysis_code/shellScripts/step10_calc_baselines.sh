@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s10_calc_baselines_202101_27
+#SBATCH -J s10_calc_baselines_202101_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/covariance/s10_calc_baselines_202101_27.out
-#SBATCH -e ../../batch_logs/covariance/s10_calc_baselines_202101_27.out
+#SBATCH -o ../../batch_logs/covariance/s10_calc_baselines_202101_25.out
+#SBATCH -e ../../batch_logs/covariance/s10_calc_baselines_202101_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -26,9 +26,9 @@
 # Request custom resources
 #SBATCH --array=999
 
-# exps=(201901_27 201902_03 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
+# exps=(201901_27 201902 201902_04 201902_05 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 
-exps=(202101_27)
+exps=(201901_25)
 for A in "${exps[@]}"
 do
   echo "step 10 calc baselines, on $A"

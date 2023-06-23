@@ -247,8 +247,12 @@ if arguments['verbose']:
 
 trialInfo = exportDF.index.to_frame().reset_index(drop=True)
 trialInfo.loc[:, 't'] = np.round(trialInfo['t'], decimals=9)
-trialInfo.loc[:, 'isOutlierTrial'] = trialInfo.set_index(['segment', 't']).index.map(outlierTrialsForReference['rejectBlock'])
-trialInfo.loc[:, 'outlierDeviation'] = trialInfo.set_index(['segment', 't']).index.map(outlierTrialsForReference['deviation'])
+if outlierTrialsForReference is not None:
+    trialInfo.loc[:, 'isOutlierTrial'] = trialInfo.set_index(['segment', 't']).index.map(outlierTrialsForReference['rejectBlock'])
+    trialInfo.loc[:, 'outlierDeviation'] = trialInfo.set_index(['segment', 't']).index.map(outlierTrialsForReference['deviation'])
+else:
+    trialInfo.loc[:, 'isOutlierTrial'] = False
+    trialInfo.loc[:, 'outlierDeviation'] = 0
 exportDF.index = pd.MultiIndex.from_frame(trialInfo)
 ##
 ddfColumns = exportDF.columns.to_frame().reset_index(drop=True)

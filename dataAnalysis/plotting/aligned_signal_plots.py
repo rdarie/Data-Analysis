@@ -785,7 +785,7 @@ def genTraceAnnotator(
                     g.axes[ro, co].text(
                         xpos, ypos,
                         annText, **textOpts)
-                g.axes[ro, co].tracesAnnotated = True
+                # g.axes[ro, co].tracesAnnotated = True
         return
     return traceAnnotator
 
@@ -1540,7 +1540,7 @@ def genAUCShader(
                 yy = thisData.groupby(g._x_var)[g._y_var].apply(estimatorFun)
                 if span is not None:
                     yy = yy.loc[(yy.index >= span[0]) & (yy.index <= span[1])]
-                print('shade auc {} {} {}'.format(ro, co, hu))
+                # print('shade auc {} {} {}'.format(ro, co, hu))
                 g.axes[ro, co].fill_between(yy.index, yy, **thesePatchOpts)
             # g.axes[ro, co].isAUCShaded = True
         return
