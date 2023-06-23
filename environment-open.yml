@@ -3,10 +3,9 @@ channels:
 - conda-forge
 - defaults
 dependencies:
-- python=3.7.6
+- python
 - pip
-- line_profiler=2.1.2
-- brian2
+- line_profiler
 - tzlocal
 - pytables
 - docopt
@@ -38,9 +37,9 @@ dependencies:
 - python-snappy
 - datashader
 - holoviews
-- tensorflow>2=mkl*
 - pynndescent
 - outdated
 - tabulate
 - numdifftools
 - sklearn-pandas
+- ipykernel

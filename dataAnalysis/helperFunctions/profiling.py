@@ -32,7 +32,8 @@ def get_memory_usage():
     return mem
 
 
-def print_memory_usage(prefix='profiling', placeholder=None):
+def print_memory_usage(
+        prefix='profiling', placeholder=None):
     if placeholder is None:
         placeholder = ': using {:.1f} MB'
     mem = get_memory_usage()
@@ -40,13 +41,15 @@ def print_memory_usage(prefix='profiling', placeholder=None):
     return
 
 
-def start_timing(mess='Starting timer...'):
+def start_timing(
+        mess='Starting timer...'):
     global startTime
     startTime = time.perf_counter()
     return
 
 
-def stop_timing(prefix='profiling', placeholder=None):
+def stop_timing(
+        prefix='profiling', placeholder=None):
     if placeholder is None:
         placeholder = ': took {:.1f} sec'
     global startTime
@@ -55,14 +58,16 @@ def stop_timing(prefix='profiling', placeholder=None):
     return
 
 
-def register_module_with_profiler(mod, profile):
+def register_module_with_profiler(
+        mod, profile):
     functionList = [o[1] for o in getmembers(mod) if isfunction(o[1])]
     for thisFun in functionList:
         profile.add_function(thisFun)
     return
 
 
-def register_list_with_profiler(functionList, profile):
+def register_list_with_profiler(
+        functionList, profile):
     for thisFun in functionList:
         if isfunction(thisFun):
             profile.add_function(thisFun)

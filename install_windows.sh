@@ -14,7 +14,7 @@ RepoList=(\
 "umap"
 )
 
-conda env create -f environment-open.yml
+conda env create -f environment-open.yml -v -v
 conda.bat activate nda2
 cd ..
 
