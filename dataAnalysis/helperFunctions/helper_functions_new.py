@@ -1056,14 +1056,13 @@ def fillInOverflow2(
     return data, {'fig': fig, 'ax': ax}
 
 
-def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=10):
-    #
+def confirmTriggersPlot(
+        peakIdx, dataSeries, fs, whichPeak=0, nSec=10):
     indent = peakIdx[whichPeak]
-    #
     dataSlice = slice(
         max(0, int(indent-.25*fs)),
         min(int(indent+nSec*fs), dataSeries.shape[0])) # 5 sec after first peak
-    peakSlice = np.where(np.logical_and(peakIdx > indent - .25*fs, peakIdx < indent + nSec*fs))
+    peakSlice = np.where(np.logical_and(peakIdx > indent - .25 * fs, peakIdx < indent + nSec*fs))
     #
     fig, ax = plt.subplots()
     plt.plot((dataSeries.index[dataSlice] - indent) * fs ** (-1), dataSeries.iloc[dataSlice])

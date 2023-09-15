@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s03_assemble_ma_202101_20
+#SBATCH -J s03_assemble_ma_202101_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/covariance/s03_assemble_ma_202101_20.out
-#SBATCH -e ../../batch_logs/covariance/s03_assemble_ma_202101_20.out
+#SBATCH -o ../../batch_logs/covariance/s03_assemble_ma_202101_25.out
+#SBATCH -e ../../batch_logs/covariance/s03_assemble_ma_202101_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -30,7 +30,7 @@
 # exps=(201901_27 201902_03)
 # # 202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 
-exps=(202101_20)
+exps=(202101_25)
 for A in "${exps[@]}"
 do
   echo "step 3 assemble dataframes, on $A"

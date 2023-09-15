@@ -13,11 +13,11 @@
 #SBATCH --hint=memory_bound
 
 # Specify a job name:
-#SBATCH -J s01_analyze_align_all_201901_25
+#SBATCH -J s01_analyze_align_all_202101_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/s01_analyze_align_all_201901_25-%a.out
-#SBATCH -e ../../batch_logs/s01_analyze_align_all_201901_25-%a.out
+#SBATCH -o ../../batch_logs/s01_analyze_align_all_202101_25-%a.out
+#SBATCH -e ../../batch_logs/s01_analyze_align_all_202101_25-%a.out
 
 # Request custom resources
 #SBATCH --array=1-5
@@ -44,7 +44,7 @@ BLOCKPREFIX="--sourceFilePrefix=utah"
 # exps=(201901_25 201901_26 201901_27)
 # exps=(202101_20 202101_21 202101_22 202101_25 202101_27 202101_28 202102_02)
 # exps=(201902 201902_04 201902_05)
-exps=(201901_25)
+exps=(202101_25)
 for A in "${exps[@]}"
 do
   echo "step 01, on $A"

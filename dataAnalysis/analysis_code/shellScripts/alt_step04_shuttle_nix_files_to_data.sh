@@ -84,7 +84,7 @@ KEYPROMPT=""
 #  # exps=(exp202101201100 exp202101211100 exp202101221100)
 #  # exps=(exp202101251100 exp202101271100 exp202101281100 exp202102021100)
 
-exps=(exp202101201100)
+exps=(exp202102021100)
 for EXP in "${exps[@]}"
 do
   echo "step 15 cleanup, on $EXP"
